@@ -71,6 +71,21 @@ simplicio doctor --repo .
 simplicio --help
 ```
 
+## Subscription
+
+Installing is free. Deterministic commands (`map`, `validate`, `gate`, `edit`,
+`deliver`, `checkpoint`) work without a subscription.
+
+AI features (`chat`, coding loop `run`, `vision`) require an active monthly
+subscription:
+
+1. Subscribe: https://buy.stripe.com/eVqaEWcMgcqM1dW7zfa7C00
+2. You receive a signed license token after payment.
+3. Activate it: `simplicio license activate <token>`
+4. Check status: `simplicio license status`
+
+The token is verified offline (Ed25519). No telemetry, no phone-home.
+
 ## System requirements
 
 | Requirement | Minimum | Recommended |
