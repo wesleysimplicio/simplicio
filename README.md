@@ -1,8 +1,11 @@
-# simplicio
+# Simplicio
 
-A terminal-based AI coding agent.
+A terminal-based AI coding agent and runtime.
 
-Single binary, zero runtime deps. Just download and run.
+Simplicio is the execution backbone for AI-assisted software development. It
+provides deterministic editing, memory recall, quality gates, and multi-agent
+orchestration — so LLMs can focus on reasoning while Simplicio handles
+execution.
 
 ## Install
 
@@ -12,100 +15,53 @@ Single binary, zero runtime deps. Just download and run.
 curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.sh | sh
 ```
 
-### Windows (PowerShell)
+### Windows
 
 ```powershell
 powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.ps1 | iex"
 ```
 
-### npm / pnpm / bun (cross-platform)
+## What It Does
 
-```bash
-npm install -g simplicio
-pnpm add -g simplicio
-bun add -g simplicio
+| Capability | Command | Tokens |
+|-----------|---------|--------|
+| **Repo map** — compressed view for LLMs | `simplicio map --repo .` | Saves ~70% |
+| **Memory recall** — don't re-derive known facts | `simplicio memory "query"` | Saves ~80% |
+| **Mechanical edit** — deterministic file changes | `simplicio edit '{...}'` | Zero output tokens |
+| **Coding loop** — iterate until tests pass | `simplicio coding-loop "task"` | Auto-repair |
+| **Delivery gates** — quality check before shipping | `simplicio deliver certify` | Deterministic |
+| **Multi-agent** — 600+ concurrent async agents | `simplicio run "task" --agents N` | Local-first |
+
+## Architecture
+
+```
+LLM (Claude/Codex/Gemini)          Simplicio Runtime (Rust)
+  |                                   |
+  | 1. Orient                         | simplicio map
+  | 2. Recall                         | simplicio memory
+  | 3. Decide                         |
+  | 4. Edit  ───────────────────────> | simplicio edit (0 tokens)
+  | 5. Verify <─────────────────────  | simplicio deliver certify
+  | 6. Iterate                        | simplicio coding-loop
 ```
 
-### PyPI (Python)
+The LLM reasons. Simplicio executes deterministically.
 
-```bash
-pip install simplicio
-```
+## Key Features
 
-The binary is downloaded on first run and cached in `~/.cache/simplicio/bin/`.
+- **Local-first inference** — built-in llama.cpp, escalates to remote only when needed
+- **Graduated agent ladder** — 64 → 100 → 200 → 600 local agents before paid remote
+- **Shannon novelty gate** — filters redundant agent outputs (zero LLM tokens on dedup)
+- **Sharded inference pool** — per-worker channels, zero lock contention
+- **Sealed receipts** — sha256 per evidence artifact, tamper-evident chain
+- **5 delivery gates** — acceptance, validation, run-verify, regression, self-review
+- **Action gate** — risk classification + hardline blocklist for chat-initiated mutations
 
-### Homebrew (macOS / Linux)
+## Documentation
 
-```bash
-brew install wesleysimplicio/tap/simplicio
-```
+- [Installation Guide](https://github.com/wesleysimplicio/simplicio-runtime/blob/main/docs/INSTALL.md)
+- [Operational Manual](https://github.com/wesleysimplicio/simplicio-runtime/blob/main/docs/SIMPLICIO_OPERATIONAL_MANUAL.md)
 
-### Arch Linux (AUR)
+## Version
 
-```bash
-paru -S simplicio-bin
-yay -S simplicio-bin
-```
-
-### Manual (any platform)
-
-```bash
-curl -sSfL https://github.com/wesleysimplicio/simplicio/releases/latest/download/simplicio-v0.7.0-macos-aarch64.tar.gz \
-  | tar xz -C /tmp
-sudo mv /tmp/simplicio /usr/local/bin/
-```
-
-## Quick start
-
-```bash
-# Start a conversation
-simplicio chat "hello" --repo .
-
-# Interactive REPL
-simplicio chat --repl --repo .
-
-# Check your setup
-simplicio doctor --repo .
-
-# List all commands
-simplicio --help
-```
-
-## Public Beta — free until 2026-06-30
-
-**Everything is unlocked for free during the public beta** — chat, coding loop,
-vision, local LLM, all of it. No sign-up, no license key. After 2026-06-30 the
-subscription gate re-engages automatically.
-
-## Subscription (after the beta)
-
-Installing is free. Deterministic commands (`map`, `validate`, `gate`, `edit`,
-`deliver`, `checkpoint`) work without a subscription.
-
-AI features (`chat`, coding loop `run`, `vision`) require an active monthly
-subscription:
-
-1. Subscribe: https://buy.stripe.com/eVqaEWcMgcqM1dW7zfa7C00
-2. You receive a signed license token after payment.
-3. Activate it: `simplicio license activate <token>`
-4. Check status: `simplicio license status`
-
-The token is verified offline (Ed25519). No telemetry, no phone-home.
-
-## System requirements
-
-| Requirement | Minimum | Recommended |
-|---|---|---|
-| RAM | 8 GB | 16 GB+ |
-| Storage | 5 MB | 1.5 GB (with local LLM) |
-| OS | macOS 13+, Linux, Windows 10+ | macOS ARM64 |
-| Terminal | any modern terminal | WezTerm / Alacritty / Ghostty |
-
-## What's included
-
-- **Chat REPL** — conversational AI assistant
-- **Agent mode** — multi-turn task execution
-- **App runner** — launch bundled apps (exo AI Cluster, MoneyPrinter, etc.)
-- **Gateways** — Telegram, Discord, Slack, WhatsApp bridges
-- **ACP adapter** — Agent Client Protocol server
-- **CLI commands** — doctor, config, model, skill, map, and more
+Current: **v0.9.2** — 2467 tests, 159k lines of Rust, 65+ modules.
