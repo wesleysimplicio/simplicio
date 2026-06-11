@@ -17,8 +17,8 @@
     {
       "target": "windows-x86_64",
       "artifact": "simplicio-windows-x86_64.exe",
-      "sha256": "56ce5eb9ed6a5692079e1ab986753b4a55f8f053727ed9b00e5411470a65165c",
-      "signature": "ed25519:4kFt4mxKlNRJmPwRqhexV14KJUV6U9g4II5ZabCOncHBNtxb3GdccabktYCn0HhFm4rxGR0HaRgViRQ0B4SBDw==",
+      "sha256": "b74366965501080c3918fdc25bbd7e4f8a43f8ba162113a3a83e9a1b2035e688",
+      "signature": "ed25519:y0vyB+RE264M03tL/BDnLLVVb4ezoVKPpyekZVaRBslU993nBL+RO+cMIUrX14QFC6IOfkhbTAwHB2WeBdVrCQ==",
       "signature_algorithm": "ed25519"
     },
     {
