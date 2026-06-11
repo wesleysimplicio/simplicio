@@ -1,0 +1,52 @@
+name: publish-release
+# Publishes the committed binaries + signed update manifest as a GitHub
+# Release so `simplicio update` (which downloads from
+# github.com/<repo>/releases/latest/download/...) works for beta testers.
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - simplicio.exe
+      - simplicio
+      - simplicio-update-manifest.json
+      - .github/workflows/release.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read version from manifest
+        id: ver
+        run: echo "version=$(jq -r .version simplicio-update-manifest.json)" >> "$GITHUB_OUTPUT"
+      - name: Stage release assets
+        run: |
+          mkdir -p dist
+          cp simplicio.exe dist/simplicio-windows-x86_64.exe
+          cp simplicio dist/simplicio-macos-arm64
+          cp simplicio-update-manifest.json dist/
+          cp SHA256SUMS dist/ || true
+      - name: Create or update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: "v${{ steps.ver.outputs.version }} — Public Beta (free until 2026-09-30)"
+          body: |
+            Free public beta. All features unlocked until 2026-09-30; the
+            subscription gate re-engages automatically afterwards.
+
+            Windows: `irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.ps1 | iex`
+            macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.sh | sh`
+
+            Signed update manifest included (`simplicio update check`).
+          prerelease: true
+          make_latest: "true"
+          files: |
+            dist/simplicio-windows-x86_64.exe
+            dist/simplicio-macos-arm64
+            dist/simplicio-update-manifest.json
+            dist/SHA256SUMS

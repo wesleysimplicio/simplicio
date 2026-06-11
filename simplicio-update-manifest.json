@@ -1,0 +1,32 @@
+{
+  "schema": "simplicio.update-manifest/v1",
+  "version": "0.8.0",
+  "channel": "stable",
+  "security": {
+    "checksum_algorithm": "SHA256",
+    "signature_algorithm": "ed25519",
+    "signature_required": true,
+    "refuse_unsigned": true
+  },
+  "entitlement": {
+    "current_phase": "public_beta",
+    "beta_until": "2026-09-30",
+    "updates_allowed": true
+  },
+  "artifacts": [
+    {
+      "target": "windows-x86_64",
+      "artifact": "simplicio-windows-x86_64.exe",
+      "sha256": "56ce5eb9ed6a5692079e1ab986753b4a55f8f053727ed9b00e5411470a65165c",
+      "signature": "ed25519:4kFt4mxKlNRJmPwRqhexV14KJUV6U9g4II5ZabCOncHBNtxb3GdccabktYCn0HhFm4rxGR0HaRgViRQ0B4SBDw==",
+      "signature_algorithm": "ed25519"
+    },
+    {
+      "target": "macos-arm64",
+      "artifact": "simplicio-macos-arm64",
+      "sha256": "73aa48d31c4ddca9d6ca49f55be00c943a95cce3816ff7c0df4a066c51dd8b6f",
+      "signature": "ed25519:Fx20cmJTOWGD/ycU+9B9Oby+8ZtCAsWgt69GHWbhi4TxFf10TUIk6HCbaOu+ZfKo+71vyogunICt4nbm8clxBg==",
+      "signature_algorithm": "ed25519"
+    }
+  ]
+}

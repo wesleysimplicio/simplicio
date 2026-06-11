@@ -71,7 +71,13 @@ simplicio doctor --repo .
 simplicio --help
 ```
 
-## Subscription
+## Public Beta — free until 2026-09-30
+
+**Everything is unlocked for free during the public beta** — chat, coding loop,
+vision, local LLM, all of it. No sign-up, no license key. After 2026-09-30 the
+subscription gate re-engages automatically.
+
+## Subscription (after the beta)
 
 Installing is free. Deterministic commands (`map`, `validate`, `gate`, `edit`,
 `deliver`, `checkpoint`) work without a subscription.
