@@ -160,6 +160,55 @@ if [ -z "${SIMPLICIO_SKIP_SELF_CHECK:-}" ]; then
   fi
 fi
 
+# ─── Claude Code statusline badge ────────────────────────────────────────────
+# Shows a green [SIMPLICIO] badge in Claude Code when the repo is simplicio-enabled.
+if command -v python3 >/dev/null 2>&1; then
+  CLAUDE_DIR="$HOME/.claude"
+  mkdir -p "$CLAUDE_DIR/hooks"
+  cat > "$CLAUDE_DIR/hooks/simplicio-statusline.sh" <<'SLEOF'
+#!/bin/bash
+# Simplicio statusline — prints a green [SIMPLICIO] badge when the current
+# repo is simplicio-enabled (.simplicio/ dir or .simplicio.toml present).
+# If the user already had a statusLine command before install, it was saved
+# at ~/.claude/hooks/.simplicio-statusline-prev and is chained first.
+
+INPUT=$(cat)
+CWD=$(printf '%s' "$INPUT" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("workspace",{}).get("current_dir") or d.get("cwd") or "")' 2>/dev/null)
+
+OUT=""
+PREV="$HOME/.claude/hooks/.simplicio-statusline-prev"
+if [ -s "$PREV" ]; then
+  OUT=$(printf '%s' "$INPUT" | sh -c "$(cat "$PREV")" 2>/dev/null) || OUT=""
+fi
+
+if [ -n "$CWD" ] && { [ -d "$CWD/.simplicio" ] || [ -f "$CWD/.simplicio.toml" ]; }; then
+  [ -n "$OUT" ] && OUT="$OUT "
+  OUT="$OUT$(printf '\033[38;5;42m[SIMPLICIO]\033[0m')"
+fi
+
+printf '%s' "$OUT"
+SLEOF
+  chmod +x "$CLAUDE_DIR/hooks/simplicio-statusline.sh"
+  python3 - "$CLAUDE_DIR/settings.json" <<'PY' 2>/dev/null || true
+import json, os, sys
+p = sys.argv[1]
+try:
+    d = json.load(open(p)) if os.path.exists(p) else {}
+except Exception:
+    d = {}
+sl_cmd = "bash ~/.claude/hooks/simplicio-statusline.sh"
+sl = d.get("statusLine") or {}
+prev = sl.get("command", "")
+if "simplicio-statusline" not in prev:
+    if prev:
+        open(os.path.expanduser("~/.claude/hooks/.simplicio-statusline-prev"), "w").write(prev)
+    d["statusLine"] = {"type": "command", "command": sl_cmd}
+os.makedirs(os.path.dirname(p), exist_ok=True)
+json.dump(d, open(p, "w"), indent=2)
+PY
+  ok "Claude Code statusline badge installed ([SIMPLICIO])"
+fi
+
 # ─── PATH hint ───────────────────────────────────────────────────────────────
 case ":$PATH:" in
   *:"$INSTALL_DIR":*)
