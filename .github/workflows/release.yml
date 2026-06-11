@@ -34,9 +34,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.ver.outputs.version }}
-          name: "v${{ steps.ver.outputs.version }} — Public Beta (free until 2026-09-30)"
+          name: "v${{ steps.ver.outputs.version }} — Public Beta (free until 2026-06-30)"
           body: |
-            Free public beta. All features unlocked until 2026-09-30; the
+            Free public beta. All features unlocked until 2026-06-30; the
             subscription gate re-engages automatically afterwards.
 
             Windows: `irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.ps1 | iex`

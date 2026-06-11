@@ -71,10 +71,10 @@ simplicio doctor --repo .
 simplicio --help
 ```
 
-## Public Beta — free until 2026-09-30
+## Public Beta — free until 2026-06-30
 
 **Everything is unlocked for free during the public beta** — chat, coding loop,
-vision, local LLM, all of it. No sign-up, no license key. After 2026-09-30 the
+vision, local LLM, all of it. No sign-up, no license key. After 2026-06-30 the
 subscription gate re-engages automatically.
 
 ## Subscription (after the beta)
