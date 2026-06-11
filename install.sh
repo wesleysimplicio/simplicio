@@ -209,6 +209,17 @@ PY
   ok "Claude Code statusline badge installed ([SIMPLICIO])"
 fi
 
+# ─── Editor badge (VS Code, Cursor, Windsurf, Antigravity) ───────────────────
+VSIX="$HOME/.simplicio/simplicio-badge.vsix"
+mkdir -p "$HOME/.simplicio"
+if curl -fsSL "https://simpleti.com.br/simplicio/dist/simplicio-badge.vsix" -o "$VSIX" 2>/dev/null; then
+  for ed in code cursor windsurf antigravity codium; do
+    if command -v "$ed" >/dev/null 2>&1; then
+      "$ed" --install-extension "$VSIX" >/dev/null 2>&1 && ok "[SIMPLICIO] badge installed in $ed" || true
+    fi
+  done
+fi
+
 # ─── PATH hint ───────────────────────────────────────────────────────────────
 case ":$PATH:" in
   *:"$INSTALL_DIR":*)
