@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Simplicio Runtime flow</title>
+  <desc id="desc">Install once, connect assistants and work sources, run local agents, validate, collect evidence, hand off work, and update safely from releases.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#07131d"/>
+      <stop offset="100%" stop-color="#091018"/>
+    </linearGradient>
+    <linearGradient id="core" x1="0" x2="1">
+      <stop offset="0%" stop-color="#35d0c8"/>
+      <stop offset="100%" stop-color="#8ee65d"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#35d0c8"/>
+    </marker>
+    <style>
+      .bg{fill:url(#bg)}
+      .card{fill:#0d2230;stroke:#2b6f8c;stroke-width:1.5;rx:18}
+      .core{fill:#102833;stroke:url(#core);stroke-width:3;rx:24}
+      .line{stroke:#35d0c8;stroke-width:3;fill:none;marker-end:url(#arrow)}
+      .title{fill:#fff;font-family:sans-serif;font-size:34px;font-weight:700}
+      .head{fill:#fff;font-family:sans-serif;font-size:20px;font-weight:700}
+      .body{fill:#b9ccd4;font-family:sans-serif;font-size:15px;font-weight:400}
+      .muted{fill:#9ab1ba;font-family:sans-serif;font-size:13px;font-weight:400}
+      .pill{fill:#102833;stroke:#8ee65d;stroke-width:1.5;rx:12}
+    </style>
+  </defs>
+  <rect class="bg" width="1280" height="720"/>
+  <text x="52" y="64" class="title">Simplicio Runtime Flow</text>
+  <text x="52" y="96" class="body">Local, native, fast, resource-aware execution for programming tasks.</text>
+
+  <rect x="52" y="140" width="212" height="118" class="card"/>
+  <text x="76" y="178" class="head">1. Install Once</text>
+  <text x="76" y="210" class="body">PATH, MCP, HTTP</text>
+  <text x="76" y="236" class="body">stdio, optional daemon</text>
+
+  <rect x="52" y="306" width="212" height="154" class="card"/>
+  <text x="76" y="344" class="head">2. Work Sources</text>
+  <text x="76" y="378" class="body">GitHub, Jira</text>
+  <text x="76" y="406" class="body">Azure DevOps</text>
+  <text x="76" y="434" class="body">sprints, CLI text</text>
+
+  <rect x="330" y="140" width="236" height="118" class="card"/>
+  <text x="358" y="178" class="head">3. Map + Detect</text>
+  <text x="358" y="210" class="body">repo, stack, endpoints</text>
+  <text x="358" y="236" class="body">screens, skills, tools</text>
+
+  <rect x="330" y="306" width="236" height="154" class="core"/>
+  <text x="373" y="352" class="title" style="font-size:28px">Decision</text>
+  <text x="373" y="386" class="body">cheapest safe path</text>
+  <text x="373" y="414" class="body">local-first execution</text>
+  <text x="373" y="442" class="body">remote only if needed</text>
+
+  <rect x="638" y="100" width="228" height="100" class="card"/>
+  <text x="664" y="138" class="head">4. Agents</text>
+  <text x="664" y="170" class="body">spawn, reuse, kill</text>
+
+  <rect x="638" y="230" width="228" height="100" class="card"/>
+  <text x="664" y="268" class="head">5. Local LLM</text>
+  <text x="664" y="300" class="body">classify, summarize, edit</text>
+
+  <rect x="638" y="360" width="228" height="100" class="card"/>
+  <text x="664" y="398" class="head">6. Validate</text>
+  <text x="664" y="430" class="body">tests, lint, Playwright</text>
+
+  <rect x="638" y="490" width="228" height="100" class="card"/>
+  <text x="664" y="528" class="head">7. Evidence</text>
+  <text x="664" y="560" class="body">logs, traces, reports</text>
+
+  <rect x="938" y="180" width="236" height="118" class="card"/>
+  <text x="966" y="218" class="head">8. Handoff</text>
+  <text x="966" y="250" class="body">commit, push, PR</text>
+  <text x="966" y="276" class="body">shareable proof</text>
+
+  <rect x="938" y="364" width="236" height="118" class="card"/>
+  <text x="966" y="402" class="head">9. Safe Update</text>
+  <text x="966" y="434" class="body">detect Git releases</text>
+  <text x="966" y="460" class="body">verify, apply, rollback</text>
+
+  <path d="M264 199 H330" class="line"/>
+  <path d="M158 258 V306" class="line"/>
+  <path d="M264 383 H330" class="line"/>
+  <path d="M448 258 V306" class="line"/>
+  <path d="M566 383 C610 383 600 150 638 150" class="line"/>
+  <path d="M566 383 C610 383 600 280 638 280" class="line"/>
+  <path d="M566 383 H638" class="line"/>
+  <path d="M566 383 C610 383 600 540 638 540" class="line"/>
+  <path d="M866 540 C910 540 900 239 938 239" class="line"/>
+  <path d="M866 540 C910 540 900 423 938 423" class="line"/>
+
+  <rect x="52" y="610" width="1122" height="62" class="pill"/>
+  <text x="78" y="648" class="head">Adaptive capacity governor:</text>
+  <text x="350" y="648" class="body">runs as many agents/subagents as the machine can safely handle, then throttles before the computer feels slow.</text>
+</svg>
