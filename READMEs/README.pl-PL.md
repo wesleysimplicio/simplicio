@@ -1,7 +1,7 @@
-# 🔥 Simplicio — The AI Agent That SAVES UP TO 96% OF YOUR TOKENS
+# 🔥 Simplicio — Agent AI, KTÓRY OSZCZĘDZA DO 96% TWOICH TOKENÓW
 
 <p align="center">
-  <img src="assets/simplicio-hero.png" alt="Simplicio — AI coding agent" width="920" />
+  <img src="assets/simplicio-hero.png" alt="Simplicio — agent AI do kodowania" width="920" />
 </p>
 
 <p align="center">
@@ -12,14 +12,14 @@
 </p>
 
 <p align="center">
-  <a href="#-installation">Install</a> ·
-  <a href="#-what-it-does">Features</a> ·
-  <a href="#-token-savings">96% Savings</a> ·
-  <a href="https://simpleti.com.br/simplicio/#start">Website</a>
+  <a href="#instalacja">Instalacja</a> ·
+  <a href="#co-robi">Co robi</a> ·
+  <a href="#oszczędność-tokenów--96-to-rzeczywistość">Oszczędność tokenów — 96% to rzeczywistość</a> ·
+  <a href="https://simpleti.com.br/simplicio/#start">Strona WWW</a>
 </p>
 
 <p align="center">
-  <strong>🌍 Languages:</strong><br>
+  <strong>🌍 Języki:</strong><br>
   <a href="README.md">🇬🇧 English</a> |
   <a href="READMEs/README.pt-BR.md">🇧🇷 Português</a> |
   <a href="READMEs/README.es-ES.md">🇪🇸 Español</a> |
@@ -41,26 +41,26 @@
 
 ## ⚡ TL;DR
 
-**Simplicio** is a terminal AI coding agent — a single binary that replaces your
-entire AI-assisted development workflow: chat, code generation, repository
-context, planning, local multi-agent orchestration (64 → 600 agents), and
-evidence-backed PR delivery.
+**Simplicio** to terminalowy agent AI do kodowania — pojedynczy plik binarny, który zastępuje
+cały twój workflow wspomagany AI: czat, generowanie kodu, kontekst repozytorium,
+planowanie, lokalną orkiestrację wieloagentową (64 → 600 agentów) i
+dostarczanie PR z potwierdzeniem dowodów.
 
-**Runs on your machine. Your code never leaves your control. Remote models are
-optional, not required.**
+**Działa na twojej maszynie. Twój kod nigdy nie opuszcza twojej kontroli. Modele zdalne są
+opcjonalne, nie wymagane.**
 
-> **🔥 Save up to 96% of tokens vs traditional agents — more than Caveman (65%) or RTK (80%).**
-> Every interaction shows exactly how many tokens you saved. Single Rust binary, zero deps.
+> **🔥 Oszczędź do 96% tokenów w porównaniu z tradycyjnymi agentami — więcej niż Caveman (65%) czy RTK (80%).**
+> Każda interakcja pokazuje dokładnie, ile tokenów zaoszczędziłeś. Pojedynczy plik binarny w Ruście, zero zależności.
 
-## 🚀 Installation
+## 🚀 Instalacja
 
-### npm / npx (any OS)
+### npm / npx (dowolny system)
 
 ```bash
 npx simplicio install
 ```
 
-### pip / PyPI (any OS)
+### pip / PyPI (dowolny system)
 
 ```bash
 pip install simplicio-installer
@@ -91,41 +91,41 @@ curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/inst
 powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.ps1 | iex"
 ```
 
-Done. One command. No package manager, no model configuration.
+Gotowe. Jedno polecenie. Żaden menedżer pakietów, żadna konfiguracja modelu.
 
 ---
 
-## 💰 Token Savings — 96% is Real
+## 💰 Oszczędność tokenów — 96% to rzeczywistość
 
-**Without Simplicio:** every AI session rediscovers your repo, loads too much
-context, repeats prompts, burns paid tokens.
+**Bez Simplicio:** każda sesja AI odkrywa twoje repozytorium na nowo, ładuje zbyt dużo
+kontekstu, powtarza prompty, spala płatne tokeny.
 
-**With Simplicio:**
+**Z Simplicio:**
 
-| Optimization | Savings |
+| Optymalizacja | Oszczędność |
 |---|---|
-| 🗺️ **Repo Map** — compressed context instead of reading raw files | ~70% |
-| 🧠 **Memory Recall** — known facts are not re-derived | ~80% |
-| ✏️ **Deterministic Editing** — changes without spending LLM tokens | 100% (output) |
-| 🏠 **Local LLM** — classification, summarization, low-risk edits | ~90% |
-| 📡 **Remote LLM** — only for planning and complex decisions | ~85% |
-| 🔀 **Local Fan-out** — 64→600 agents before scaling to cloud | ~95% |
-| **💎 Combined: up to 96% total savings** | **~96%** |
+| 🗺️ **Mapa repozytorium** — skompresowany kontekst zamiast czytania surowych plików | ~70% |
+| 🧠 **Pamięć** — znane fakty nie są wyciągane na nowo | ~80% |
+| ✏️ **Deterministyczna edycja** — zmiany bez wydawania tokenów LLM | 100% (output) |
+| 🏠 **Lokalny LLM** — klasyfikacja, podsumowywanie, mało ryzykowne edycje | ~90% |
+| 📡 **Zdalny LLM** — tylko do planowania i złożonych decyzji | ~85% |
+| 🔀 **Lokalne rozgałęzianie** — 64→600 agentów przed skalowaniem do chmury | ~95% |
+| **💎 Łącznie: do 96% całkowitych oszczędności** | **~96%** |
 
-**Every Simplicio response shows real savings:** `Simplicio: ~X tokens spent · saved ~Y (Z%)`
+**Każda odpowiedź Simplicio pokazuje rzeczywiste oszczędności:** `Simplicio: ~X tokenów wydanych · zaoszczędzono ~Y (Z%)`
 
 ---
 
-## 🎯 What It Does
+## 🎯 Co robi
 
-| Command | Description | Tokens |
+| Polecenie | Opis | Tokeny |
 |---|---|---|
-| `simplicio map --repo .` | Maps the repository for LLMs | ~70% savings |
-| `simplicio memory "query"` | Neural recall (FTS + vectors) | ~80% savings |
-| `simplicio edit '{...}'` | Deterministic file editing | **Zero tokens** |
-| `simplicio coding-loop "task"` | Iterates until tests pass | Auto-repair |
-| `simplicio deliver certify` | 5 quality gates before shipping | Deterministic |
-| `simplicio run "task" --agents N` | Multi-agent orchestration | Local-first |
+| `simplicio map --repo .` | Mapuje repozytorium dla LLM-ów | ~70% oszczędności |
+| `simplicio memory "query"` | Neuronowe przywoływanie (FTS + wektory) | ~80% oszczędności |
+| `simplicio edit '{...}'` | Deterministyczna edycja plików | **Zero tokenów** |
+| `simplicio coding-loop "task"` | Iteruje, aż testy przejdą | Auto-naprawa |
+| `simplicio deliver certify` | 5 bram jakości przed wydaniem | Deterministyczne |
+| `simplicio run "task" --agents N` | Orkiestracja wieloagentowa | Lokalnie najpierw |
 
 ---
 
@@ -133,27 +133,27 @@ context, repeats prompts, burns paid tokens.
 
 | | 🪨 Caveman | 🔧 RTK | 🔥 **Simplicio** |
 |---|---|---|---|
-| **Approach** | Output style compression | Shell command proxy | **Full agent runtime** |
-| **Max savings** | ~65% output tokens | ~80% on shell commands | **Up to 96% total** |
-| **Input compression** | ❌ | ✅ (filtered) | ✅ **Repo map + neural memory** |
-| **Output compression** | ✅ (caveman-speak) | ❌ | ✅ **Zero-token deterministic edits** |
-| **Local LLM** | ❌ | ❌ | ✅ **Built-in llama.cpp** |
-| **Multi-agent** | ❌ | ❌ | ✅ **64 → 600 local agents** |
-| **Memory across sessions** | ❌ | ❌ | ✅ **FTS + vector recall** |
-| **Evidence chain** | ❌ | ❌ | ✅ **sha256 sealed receipts** |
-| **Language** | JS/Python (skill) | Rust (binary) | **Rust (single binary)** |
-| **License** | MIT | Apache 2.0 | Proprietary |
-| **Stars** | 72.5k | 62.2k | ⭐ **You're early** |
+| **Podejście** | Kompresja stylu wypowiedzi | Proxy poleceń powłoki | **Pełne środowisko uruchomieniowe agenta** |
+| **Maks. oszczędność** | ~65% tokenów wyjściowych | ~80% na poleceniach powłoki | **Do 96% łącznie** |
+| **Kompresja wejścia** | ❌ | ✅ (filtrowane) | ✅ **Mapa repozytorium + pamięć neuronowa** |
+| **Kompresja wyjścia** | ✅ (język jaskiniowca) | ❌ | ✅ **Deterministyczne edycje za zero tokenów** |
+| **Lokalny LLM** | ❌ | ❌ | ✅ **Wbudowany llama.cpp** |
+| **Multi-agent** | ❌ | ❌ | ✅ **64 → 600 lokalnych agentów** |
+| **Pamięć między sesjami** | ❌ | ❌ | ✅ **FTS + przywoływanie wektorowe** |
+| **Łańcuch dowodów** | ❌ | ❌ | ✅ **Pieczęcie sha256** |
+| **Język** | JS/Python (skill) | Rust (binarny) | **Rust (pojedynczy plik binarny)** |
+| **Licencja** | MIT | Apache 2.0 | Proprietary |
+| **Gwiazdki** | 72,5k | 62,2k | ⭐ **Jesteś wcześnie** |
 
-**Bottom line:** Caveman makes the AI *talk* less. RTK makes commands *output* less.
-Simplicio makes the AI *think* less — by remembering, mapping, editing deterministically,
-and running locally before ever touching a paid LLM.
+**Podsumowanie:** Caveman sprawia, że AI *mówi* mniej. RTK sprawia, że polecenia *wyświetlają* mniej.
+Simplicio sprawia, że AI *myśli* mniej — przez zapamiętywanie, mapowanie, deterministyczne edycje
+i działanie lokalnie, zanim kiedykolwiek dotknie płatnego LLM-a.
 
-| **Simplicio saves 96% where Caveman saves 65% and RTK saves 80%.** |
+| **Simplicio oszczędza 96%, podczas gdy Caveman oszczędza 65%, a RTK 80%.** |
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Architektura
 
 ```
 LLM (Claude/Codex/Gemini)          Simplicio Runtime (Rust)
@@ -166,34 +166,34 @@ LLM (Claude/Codex/Gemini)          Simplicio Runtime (Rust)
   | 6. Iterate                        | simplicio coding-loop
 ```
 
-**The LLM reasons. Simplicio executes deterministically.**
+**LLM rozumuje. Simplicio wykonuje deterministycznie.**
 
 ---
 
-## ✨ Features
+## ✨ Funkcje
 
-- 🏠 **Local-first** — built-in llama.cpp, scales to remote only when needed
-- 🪜 **Tiered agents** — 64 → 100 → 200 → 600 local agents before paid cloud
-- 🔇 **Shannon novelty gate** — filters redundant outputs (zero tokens on dedup)
-- 🔒 **Sealed receipts** — sha256 per artifact, tamper-proof evidence chain
-- 🛡️ **5 delivery gates** — acceptance, validation, run-verify, regression, self-review
-- ⚡ **Action gate** — risk classification + blocklist for chat-initiated mutations
+- 🏠 **Lokalnie najpierw** — wbudowany llama.cpp, skaluje do zdalnych tylko gdy potrzebne
+- 🪜 **Warstwowi agenci** — 64 → 100 → 200 → 600 lokalnych agentów przed płatną chmurą
+- 🔇 **Bramka nowości Shannona** — filtruje zbędne wyjścia (zero tokenów na deduplikacji)
+- 🔒 **Zapieczętowane paragony** — sha256 na artefakt, odporny na manipulacje łańcuch dowodów
+- 🛡️ **5 bram dostarczania** — akceptacja, walidacja, uruchom-weryfikuj, regresja, samoocena
+- ⚡ **Bramka akcji** — klasyfikacja ryzyka + lista blokowana dla mutacji inicjowanych z czatu
 - 🔌 **MCP/ACP** — Model Context Protocol + Agent Client Protocol
-- 🌐 **Gateways** — Telegram, Discord, Slack, WhatsApp
-- 🧩 **Skill system** — loads and chains reusable capabilities
-- 💾 **Memory DB** — persistent FTS + vector recall across sessions
-- 🔀 **LLM router** — no LLM → local LLM → remote LLM automatically
-- 🖥️ **Cross-platform** — macOS, Linux, Windows, single binary
+- 🌐 **Bramy** — Telegram, Discord, Slack, WhatsApp
+- 🧩 **System umiejętności** — ładuje i łańcuchuje wielokrotnego użytku możliwości
+- 💾 **Baza pamięci** — trwałe FTS + przywoływanie wektorowe między sesjami
+- 🔀 **Router LLM** — brak LLM → lokalny LLM → zdalny LLM automatycznie
+- 🖥️ **Wieloplatformowość** — macOS, Linux, Windows, pojedynczy plik binarny
 
 ---
 
-## 🎁 Free Public Beta
+## 🎁 Darmowa Beta Publiczna
 
-**Deterministic commands are FREE forever:**
+**Deterministyczne polecenia są DARMOWE na zawsze:**
 `map`, `validate`, `edit`, `deliver`, `checkpoint`
 
-**AI features are free during the public beta with no end date.**
-Billing will be defined in future updates.
+**Funkcje AI są darmowe podczas publicznej bety bez daty zakończenia.**
+Rozliczenia zostaną zdefiniowane w przyszłych aktualizacjach.
 
 ```bash
 simplicio license status
@@ -201,32 +201,32 @@ simplicio license status
 
 ---
 
-## 📋 Requirements
+## 📋 Wymagania
 
-| Requirement | Minimum | Recommended |
+| Wymaganie | Minimalne | Zalecane |
 |---|---|---|
 | RAM | 8 GB | 16 GB+ |
-| Storage | 5 MB | 1.5 GB (with local LLM) |
-| OS | macOS 13+, Linux, Windows 10+ | macOS ARM64 |
-| Terminal | any modern terminal | WezTerm / Alacritty / Ghostty |
+| Miejsce na dysku | 5 MB | 1,5 GB (z lokalnym LLM) |
+| System | macOS 13+, Linux, Windows 10+ | macOS ARM64 |
+| Terminal | dowolny nowoczesny terminal | WezTerm / Alacritty / Ghostty |
 
 ---
 
-## 🌐 Ecosystem
+## 🌐 Ekosystem
 
-- [Website](https://simpleti.com.br/simplicio/#start) — full docs, benchmarks, install
-- [Discord](https://discord.gg/wM6tr7xVb) — community and support
-
----
-
-## 📄 License
-
-Proprietary. Binary free to download and use. AI features free during the
-public beta. See [LICENSE](LICENSE).
+- [Strona WWW](https://simpleti.com.br/simplicio/#start) — pełna dokumentacja, benchmarki, instalacja
+- [Discord](https://discord.gg/wM6tr7xVb) — społeczność i wsparcie
 
 ---
 
-## ⭐ Star History
+## 📄 Licencja
+
+Proprietary. Plik binarny darmowy do pobrania i użytku. Funkcje AI darmowe podczas
+publicznej bety. Zobacz [LICENSE](LICENSE).
+
+---
+
+## ⭐ Historia gwiazdek
 
 <a href="https://star-history.com/#wesleysimplicio/simplicio&Date">
   <img src="https://api.star-history.com/svg?repos=wesleysimplicio/simplicio&type=Date" alt="Star History Chart" width="100%" />
@@ -234,13 +234,13 @@ public beta. See [LICENSE](LICENSE).
 
 ---
 
-## 💬 Community
+## 💬 Społeczność
 
-- [Discord](https://discord.gg/wM6tr7xVb) — chat, support, early access
-- [GitHub Issues](https://github.com/wesleysimplicio/simplicio/issues) — bugs and feature requests
+- [Discord](https://discord.gg/wM6tr7xVb) — czat, wsparcie, wczesny dostęp
+- [GitHub Issues](https://github.com/wesleysimplicio/simplicio/issues) — błędy i prośby o funkcje
 
 ---
 
 <p align="center">
-  <strong>🔥 Simplicio — Your code, your machine, 96% cheaper. 🔥</strong>
+  <strong>🔥 Simplicio — Twój kod, twoja maszyna, 96% taniej. 🔥</strong>
 </p>

@@ -1,25 +1,25 @@
-# 🔥 Simplicio — The AI Agent That SAVES UP TO 96% OF YOUR TOKENS
+# 🔥 سيمپليسيو — العميل الذكي الذي يُوَفّرُ لَكَ حَتّى 96% مِنَ التوكينز
 
 <p align="center">
-  <img src="assets/simplicio-hero.png" alt="Simplicio — AI coding agent" width="920" />
+  <img src="assets/simplicio-hero.png" alt="سيمپليسيو — عميل برمجة ذكي" width="920" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/wesleysimplicio/simplicio/releases/latest"><img src="https://img.shields.io/github/v/release/wesleysimplicio/simplicio?color=blue&label=latest" alt="Latest Release"></a>
-  <a href="https://github.com/wesleysimplicio/simplicio/stargazers"><img src="https://img.shields.io/github/stars/wesleysimplicio/simplicio?style=social" alt="Stars"></a>
-  <a href="https://github.com/wesleysimplicio/simplicio/releases"><img src="https://img.shields.io/github/downloads/wesleysimplicio/simplicio/total?color=green" alt="Downloads"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="License"></a>
+  <a href="https://github.com/wesleysimplicio/simplicio/releases/latest"><img src="https://img.shields.io/github/v/release/wesleysimplicio/simplicio?color=blue&label=latest" alt="أحدث إصدار"></a>
+  <a href="https://github.com/wesleysimplicio/simplicio/stargazers"><img src="https://img.shields.io/github/stars/wesleysimplicio/simplicio?style=social" alt="النجوم"></a>
+  <a href="https://github.com/wesleysimplicio/simplicio/releases"><img src="https://img.shields.io/github/downloads/wesleysimplicio/simplicio/total?color=green" alt="التنزيلات"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="الرخصة"></a>
 </p>
 
 <p align="center">
-  <a href="#-installation">Install</a> ·
-  <a href="#-what-it-does">Features</a> ·
-  <a href="#-token-savings">96% Savings</a> ·
-  <a href="https://simpleti.com.br/simplicio/#start">Website</a>
+  <a href="#التثبيت">التثبيت</a> ·
+  <a href="#ما-يفعله">ما يفعله</a> ·
+  <a href="#توفير-التوكينز--96-حقيقية">توفير التوكينز — 96% حقيقية</a> ·
+  <a href="https://simpleti.com.br/simplicio/#start">الموقع الإلكتروني</a>
 </p>
 
 <p align="center">
-  <strong>🌍 Languages:</strong><br>
+  <strong>🌍 اللغات:</strong><br>
   <a href="README.md">🇬🇧 English</a> |
   <a href="READMEs/README.pt-BR.md">🇧🇷 Português</a> |
   <a href="READMEs/README.es-ES.md">🇪🇸 Español</a> |
@@ -39,28 +39,28 @@
 
 ---
 
-## ⚡ TL;DR
+## ⚡ خلاصة سريعة
 
-**Simplicio** is a terminal AI coding agent — a single binary that replaces your
-entire AI-assisted development workflow: chat, code generation, repository
-context, planning, local multi-agent orchestration (64 → 600 agents), and
-evidence-backed PR delivery.
+**سيمپليسيو** هو عميل برمجة ذكي يعمل في الطرفية — ملف ثنائي واحد يستبدل
+سير عملك التطويري المدعوم بالذكاء الاصطناعي بالكامل: الدردشة، توليد الأكواد،
+سياق المستودع، التخطيط، التنسيق المحلي متعدد العملاء (64 ← 600 عميل)،
+وتسليم طلبات السحب المدعومة بالأدلة.
 
-**Runs on your machine. Your code never leaves your control. Remote models are
-optional, not required.**
+**يعمل على جهازك. كودك لا يغادر سيطرتك أبدًا. النماذج البعيدة
+اختيارية، وليست إلزامية.**
 
-> **🔥 Save up to 96% of tokens vs traditional agents — more than Caveman (65%) or RTK (80%).**
-> Every interaction shows exactly how many tokens you saved. Single Rust binary, zero deps.
+> **🔥 وفر حتى 96% من التوكينز مقارنة بالعملاء التقليديين — أكثر من Caveman (65%) أو RTK (80%).**
+> كل تفاعل يُظهر بالضبط كم توكينًا وفّرته. ملف Rust ثنائي واحد، بدون تبعيات.
 
-## 🚀 Installation
+## 🚀 التثبيت
 
-### npm / npx (any OS)
+### npm / npx (أي نظام تشغيل)
 
 ```bash
 npx simplicio install
 ```
 
-### pip / PyPI (any OS)
+### pip / PyPI (أي نظام تشغيل)
 
 ```bash
 pip install simplicio-installer
@@ -91,109 +91,109 @@ curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/inst
 powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.ps1 | iex"
 ```
 
-Done. One command. No package manager, no model configuration.
+تم. أمر واحد. لا حاجة لمدير حزم أو تهيئة نموذج.
 
 ---
 
-## 💰 Token Savings — 96% is Real
+## 💰 توفير التوكينز — 96% حقيقية
 
-**Without Simplicio:** every AI session rediscovers your repo, loads too much
-context, repeats prompts, burns paid tokens.
+**بدون سيمپليسيو:** كل جلسة ذكاء اصطناعي تكتشف مستودعك من جديد، تحمّل سياقًا
+كثيرًا جدًا، تكرر الاستفسارات، تحرق توكينز مدفوعة.
 
-**With Simplicio:**
+**مع سيمپليسيو:**
 
-| Optimization | Savings |
+| التحسين | التوفير |
 |---|---|
-| 🗺️ **Repo Map** — compressed context instead of reading raw files | ~70% |
-| 🧠 **Memory Recall** — known facts are not re-derived | ~80% |
-| ✏️ **Deterministic Editing** — changes without spending LLM tokens | 100% (output) |
-| 🏠 **Local LLM** — classification, summarization, low-risk edits | ~90% |
-| 📡 **Remote LLM** — only for planning and complex decisions | ~85% |
-| 🔀 **Local Fan-out** — 64→600 agents before scaling to cloud | ~95% |
-| **💎 Combined: up to 96% total savings** | **~96%** |
+| 🗺️ **خريطة المستودع** — سياق مضغوط بدل قراءة الملفات الخام | ~70% |
+| 🧠 **استرجاع الذاكرة** — الحقائق المعروفة لا يُعاد اشتقاقها | ~80% |
+| ✏️ **التحرير الحتمي** — تغييرات بدون إنفاق توكينز LLM | 100% (الإخراج) |
+| 🏠 **LLM محلي** — التصنيف، التلخيص، التعديلات منخفضة المخاطر | ~90% |
+| 📡 **LLM بعيد** — فقط للتخطيط والقرارات المعقدة | ~85% |
+| 🔀 **التوزيع المحلي** — 64←600 عميل قبل التوسع للسحابة | ~95% |
+| **💎 مجتمعة: حتى 96% توفير إجمالي** | **~96%** |
 
-**Every Simplicio response shows real savings:** `Simplicio: ~X tokens spent · saved ~Y (Z%)`
+**كل استجابة من سيمپليسيو تُظهر التوفير الفعلي:** `Simplicio: ~X توكينًا مُنفَق · تم توفير ~Y (Z%)`
 
 ---
 
-## 🎯 What It Does
+## 🎯 ما يفعله
 
-| Command | Description | Tokens |
+| الأمر | الوصف | التوكينز |
 |---|---|---|
-| `simplicio map --repo .` | Maps the repository for LLMs | ~70% savings |
-| `simplicio memory "query"` | Neural recall (FTS + vectors) | ~80% savings |
-| `simplicio edit '{...}'` | Deterministic file editing | **Zero tokens** |
-| `simplicio coding-loop "task"` | Iterates until tests pass | Auto-repair |
-| `simplicio deliver certify` | 5 quality gates before shipping | Deterministic |
-| `simplicio run "task" --agents N` | Multi-agent orchestration | Local-first |
+| `simplicio map --repo .` | يرسم خريطة المستودع لـ LLMs | توفير ~70% |
+| `simplicio memory "استعلام"` | استرجاع عصبي (FTS + متجهات) | توفير ~80% |
+| `simplicio edit '{...}'` | تحرير حتمي للملفات | **صفر توكينز** |
+| `simplicio coding-loop "مهمة"` | يكرر حتى تنجح الاختبارات | إصلاح تلقائي |
+| `simplicio deliver certify` | 5 بوابات جودة قبل الشحن | حتمي |
+| `simplicio run "مهمة" --agents N` | تنسيق متعدد العملاء | محلي أولاً |
 
 ---
 
-## 🆚 Simplicio vs Caveman vs RTK
+## 🆚 سيمپليسيو مقابل Caveman مقابل RTK
 
-| | 🪨 Caveman | 🔧 RTK | 🔥 **Simplicio** |
+| | 🪨 Caveman | 🔧 RTK | 🔥 **سيمپليسيو** |
 |---|---|---|---|
-| **Approach** | Output style compression | Shell command proxy | **Full agent runtime** |
-| **Max savings** | ~65% output tokens | ~80% on shell commands | **Up to 96% total** |
-| **Input compression** | ❌ | ✅ (filtered) | ✅ **Repo map + neural memory** |
-| **Output compression** | ✅ (caveman-speak) | ❌ | ✅ **Zero-token deterministic edits** |
-| **Local LLM** | ❌ | ❌ | ✅ **Built-in llama.cpp** |
-| **Multi-agent** | ❌ | ❌ | ✅ **64 → 600 local agents** |
-| **Memory across sessions** | ❌ | ❌ | ✅ **FTS + vector recall** |
-| **Evidence chain** | ❌ | ❌ | ✅ **sha256 sealed receipts** |
-| **Language** | JS/Python (skill) | Rust (binary) | **Rust (single binary)** |
-| **License** | MIT | Apache 2.0 | Proprietary |
-| **Stars** | 72.5k | 62.2k | ⭐ **You're early** |
+| **النهج** | ضغط أسلوب الإخراج | وكيل أوامر الصدفة | **بيئة تشغيل عميل كاملة** |
+| **أقصى توفير** | ~65% توكينز الإخراج | ~80% على أوامر الصدفة | **حتى 96% إجمالي** |
+| **ضغط الإدخال** | ❌ | ✅ (مصفّى) | ✅ **خريطة مستودع + ذاكرة عصبية** |
+| **ضغط الإخراج** | ✅ (لغة الكهف) | ❌ | ✅ **تحريرات حتمية بصفر توكينز** |
+| **LLM محلي** | ❌ | ❌ | ✅ **llama.cpp مدمج** |
+| **متعدد العملاء** | ❌ | ❌ | ✅ **64 ← 600 عميل محلي** |
+| **ذاكرة عبر الجلسات** | ❌ | ❌ | ✅ **FTS + استرجاع متجهي** |
+| **سلسلة الأدلة** | ❌ | ❌ | ✅ **إيصالات مختومة بـ sha256** |
+| **اللغة** | JS/Python (مهارة) | Rust (ثنائي) | **Rust (ملف ثنائي واحد)** |
+| **الرخصة** | MIT | Apache 2.0 | مملوكة |
+| **النجوم** | 72.5k | 62.2k | ⭐ **أنت من الأوائل** |
 
-**Bottom line:** Caveman makes the AI *talk* less. RTK makes commands *output* less.
-Simplicio makes the AI *think* less — by remembering, mapping, editing deterministically,
-and running locally before ever touching a paid LLM.
+**الخلاصة:** Caveman يجعل الذكاء الاصطناعي *يتحدث* أقل. RTK يجعل الأوامر *تُخرج* أقل.
+سيمپليسيو يجعل الذكاء الاصطناعي *يفكر* أقل — من خلال التذكر، ورسم الخرائط، والتحرير الحتمي،
+والتشغيل المحلي قبل أن يلمس أي LLM مدفوع.
 
-| **Simplicio saves 96% where Caveman saves 65% and RTK saves 80%.** |
+| **سيمپليسيو يوفّر 96% بينما Caveman يوفّر 65% و RTK يوفّر 80%.** |
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ المعمارية
 
 ```
 LLM (Claude/Codex/Gemini)          Simplicio Runtime (Rust)
   |                                   |
-  | 1. Orient                         | simplicio map
-  | 2. Recall                         | simplicio memory
-  | 3. Decide                         |
-  | 4. Edit  ───────────────────────> | simplicio edit (0 tokens)
-  | 5. Verify <─────────────────────  | simplicio deliver certify
-  | 6. Iterate                        | simplicio coding-loop
+  | 1. توجّه                          | simplicio map
+  | 2. استرجع                         | simplicio memory
+  | 3. قرّر                           |
+  | 4. حرّر  ───────────────────────> | simplicio edit (0 tokens)
+  | 5. تحقق <──────────────────────  | simplicio deliver certify
+  | 6. كرّر                           | simplicio coding-loop
 ```
 
-**The LLM reasons. Simplicio executes deterministically.**
+**الـ LLM يفكر. سيمپليسيو ينفّذ بشكل حتمي.**
 
 ---
 
-## ✨ Features
+## ✨ الميزات
 
-- 🏠 **Local-first** — built-in llama.cpp, scales to remote only when needed
-- 🪜 **Tiered agents** — 64 → 100 → 200 → 600 local agents before paid cloud
-- 🔇 **Shannon novelty gate** — filters redundant outputs (zero tokens on dedup)
-- 🔒 **Sealed receipts** — sha256 per artifact, tamper-proof evidence chain
-- 🛡️ **5 delivery gates** — acceptance, validation, run-verify, regression, self-review
-- ⚡ **Action gate** — risk classification + blocklist for chat-initiated mutations
-- 🔌 **MCP/ACP** — Model Context Protocol + Agent Client Protocol
-- 🌐 **Gateways** — Telegram, Discord, Slack, WhatsApp
-- 🧩 **Skill system** — loads and chains reusable capabilities
-- 💾 **Memory DB** — persistent FTS + vector recall across sessions
-- 🔀 **LLM router** — no LLM → local LLM → remote LLM automatically
-- 🖥️ **Cross-platform** — macOS, Linux, Windows, single binary
+- 🏠 **محلي أولاً** — llama.cpp مدمج، يتوسع إلى البعيد فقط عند الحاجة
+- 🪜 **عملاء متدرجون** — 64 ← 100 ← 200 ← 600 عميل محلي قبل السحابة المدفوعة
+- 🔇 **بوابة شانون للجدة** — يصفّي المخرجات المتكررة (صفر توكينز عند إزالة التكرار)
+- 🔒 **إيصالات مختومة** — sha256 لكل قطعة أثرية، سلسلة أدلة مضادة للتلاعب
+- 🛡️ **5 بوابات تسليم** — القبول، التحقق، تشغيل-تحقق، الانحدار، المراجعة الذاتية
+- ⚡ **بوابة الإجراءات** — تصنيف المخاطر + قائمة الحظر للطفرات المنطلقة من الدردشة
+- 🔌 **MCP/ACP** — بروتوكول سياق النموذج + بروتوكول عميل الوكيل
+- 🌐 **بوابات** — Telegram، Discord، Slack، WhatsApp
+- 🧩 **نظام المهارات** — يحمّل ويسلسل القدرات القابلة لإعادة الاستخدام
+- 💾 **قاعدة بيانات الذاكرة** — FTS دائم + استرجاع متجهي عبر الجلسات
+- 🔀 **موجه LLM** — لا LLM ← LLM محلي ← LLM بعيد تلقائيًا
+- 🖥️ **متعدد المنصات** — macOS، Linux، Windows، ملف ثنائي واحد
 
 ---
 
-## 🎁 Free Public Beta
+## 🎁 النسخة التجريبية العامة المجانية
 
-**Deterministic commands are FREE forever:**
+**الأوامر الحتمية مجانية إلى الأبد:**
 `map`, `validate`, `edit`, `deliver`, `checkpoint`
 
-**AI features are free during the public beta with no end date.**
-Billing will be defined in future updates.
+**ميزات الذكاء الاصطناعي مجانية خلال النسخة التجريبية العامة بدون تاريخ انتهاء.**
+سيتم تحديد الفوترة في التحديثات المستقبلية.
 
 ```bash
 simplicio license status
@@ -201,46 +201,46 @@ simplicio license status
 
 ---
 
-## 📋 Requirements
+## 📋 المتطلبات
 
-| Requirement | Minimum | Recommended |
+| المتطلب | الأدنى | الموصى به |
 |---|---|---|
-| RAM | 8 GB | 16 GB+ |
-| Storage | 5 MB | 1.5 GB (with local LLM) |
-| OS | macOS 13+, Linux, Windows 10+ | macOS ARM64 |
-| Terminal | any modern terminal | WezTerm / Alacritty / Ghostty |
+| RAM | 8 جيجابايت | 16 جيجابايت+ |
+| التخزين | 5 ميجابايت | 1.5 جيجابايت (مع LLM محلي) |
+| نظام التشغيل | macOS 13+، Linux، Windows 10+ | macOS ARM64 |
+| الطرفية | أي طرفية حديثة | WezTerm / Alacritty / Ghostty |
 
 ---
 
-## 🌐 Ecosystem
+## 🌐 النظام البيئي
 
-- [Website](https://simpleti.com.br/simplicio/#start) — full docs, benchmarks, install
-- [Discord](https://discord.gg/wM6tr7xVb) — community and support
-
----
-
-## 📄 License
-
-Proprietary. Binary free to download and use. AI features free during the
-public beta. See [LICENSE](LICENSE).
+- [الموقع الإلكتروني](https://simpleti.com.br/simplicio/#start) — الوثائق الكاملة، المقاييس، التثبيت
+- [Discord](https://discord.gg/wM6tr7xVb) — المجتمع والدعم
 
 ---
 
-## ⭐ Star History
+## 📄 الرخصة
+
+مملوكة. الملف الثنائي مجاني للتنزيل والاستخدام. ميزات الذكاء الاصطناعي مجانية خلال
+النسخة التجريبية العامة. انظر [LICENSE](LICENSE).
+
+---
+
+## ⭐ تاريخ النجوم
 
 <a href="https://star-history.com/#wesleysimplicio/simplicio&Date">
-  <img src="https://api.star-history.com/svg?repos=wesleysimplicio/simplicio&type=Date" alt="Star History Chart" width="100%" />
+  <img src="https://api.star-history.com/svg?repos=wesleysimplicio/simplicio&type=Date" alt="مخطط تاريخ النجوم" width="100%" />
 </a>
 
 ---
 
-## 💬 Community
+## 💬 المجتمع
 
-- [Discord](https://discord.gg/wM6tr7xVb) — chat, support, early access
-- [GitHub Issues](https://github.com/wesleysimplicio/simplicio/issues) — bugs and feature requests
+- [Discord](https://discord.gg/wM6tr7xVb) — دردشة، دعم، وصول مبكر
+- [GitHub Issues](https://github.com/wesleysimplicio/simplicio/issues) — الأخطاء وطلبات الميزات
 
 ---
 
 <p align="center">
-  <strong>🔥 Simplicio — Your code, your machine, 96% cheaper. 🔥</strong>
+  <strong>🔥 سيمپليسيو — كودك، جهازك، أرخص بنسبة 96% 🔥</strong>
 </p>

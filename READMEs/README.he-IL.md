@@ -1,25 +1,25 @@
-# 🔥 Simplicio — The AI Agent That SAVES UP TO 96% OF YOUR TOKENS
+# 🔥 Simplicio — סוכן הבינה המלאכותית שחוסך עד 96% מהטוקנים שלך
 
 <p align="center">
-  <img src="assets/simplicio-hero.png" alt="Simplicio — AI coding agent" width="920" />
+  <img src="assets/simplicio-hero.png" alt="Simplicio — סוכן קידוד בינה מלאכותית" width="920" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/wesleysimplicio/simplicio/releases/latest"><img src="https://img.shields.io/github/v/release/wesleysimplicio/simplicio?color=blue&label=latest" alt="Latest Release"></a>
-  <a href="https://github.com/wesleysimplicio/simplicio/stargazers"><img src="https://img.shields.io/github/stars/wesleysimplicio/simplicio?style=social" alt="Stars"></a>
-  <a href="https://github.com/wesleysimplicio/simplicio/releases"><img src="https://img.shields.io/github/downloads/wesleysimplicio/simplicio/total?color=green" alt="Downloads"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="License"></a>
+  <a href="https://github.com/wesleysimplicio/simplicio/releases/latest"><img src="https://img.shields.io/github/v/release/wesleysimplicio/simplicio?color=blue&label=latest" alt="גרסה אחרונה"></a>
+  <a href="https://github.com/wesleysimplicio/simplicio/stargazers"><img src="https://img.shields.io/github/stars/wesleysimplicio/simplicio?style=social" alt="כוכבים"></a>
+  <a href="https://github.com/wesleysimplicio/simplicio/releases"><img src="https://img.shields.io/github/downloads/wesleysimplicio/simplicio/total?color=green" alt="הורדות"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="רישיון"></a>
 </p>
 
 <p align="center">
-  <a href="#-installation">Install</a> ·
-  <a href="#-what-it-does">Features</a> ·
-  <a href="#-token-savings">96% Savings</a> ·
-  <a href="https://simpleti.com.br/simplicio/#start">Website</a>
+  <a href="#התקנה">התקנה</a> ·
+  <a href="#מה-זה-עושה">מה זה עושה</a> ·
+  <a href="#חיסכון-בטוקנים--96-הוא-אמיתי">חיסכון בטוקנים — 96% הוא אמיתי</a> ·
+  <a href="https://simpleti.com.br/simplicio/#start">אתר אינטרנט</a>
 </p>
 
 <p align="center">
-  <strong>🌍 Languages:</strong><br>
+  <strong>🌍 שפות:</strong><br>
   <a href="README.md">🇬🇧 English</a> |
   <a href="READMEs/README.pt-BR.md">🇧🇷 Português</a> |
   <a href="READMEs/README.es-ES.md">🇪🇸 Español</a> |
@@ -39,28 +39,28 @@
 
 ---
 
-## ⚡ TL;DR
+## ⚡ תקציר
 
-**Simplicio** is a terminal AI coding agent — a single binary that replaces your
-entire AI-assisted development workflow: chat, code generation, repository
-context, planning, local multi-agent orchestration (64 → 600 agents), and
-evidence-backed PR delivery.
+**Simplicio** הוא סוכן קידוד בינה מלאכותית מבוסס טרמינל — בינארי יחיד שמחליף את
+כל זרימת העבודה שלך בסיוע בינה מלאכותית: צ'אט, יצירת קוד, הקשר
+מאגר, תכנון, תיאום רב-סוכנים מקומי (64 → 600 סוכנים), ומשלוח PR
+מגובה בראיות.
 
-**Runs on your machine. Your code never leaves your control. Remote models are
-optional, not required.**
+**רץ על המחשב שלך. הקוד שלך לעולם לא עוזב את השליטה שלך. מודלים מרוחקים הם
+אופציונליים, לא חובה.**
 
-> **🔥 Save up to 96% of tokens vs traditional agents — more than Caveman (65%) or RTK (80%).**
-> Every interaction shows exactly how many tokens you saved. Single Rust binary, zero deps.
+> **🔥 חסוך עד 96% מהטוקנים לעומת סוכנים מסורתיים — יותר מ-Caveman (65%) או RTK (80%).**
+> כל אינטראקציה מראה בדיוק כמה טוקנים חסכת. בינארי יחיד ב-Rust, אפס תלויות.
 
-## 🚀 Installation
+## 🚀 התקנה
 
-### npm / npx (any OS)
+### npm / npx (כל מערכת הפעלה)
 
 ```bash
 npx simplicio install
 ```
 
-### pip / PyPI (any OS)
+### pip / PyPI (כל מערכת הפעלה)
 
 ```bash
 pip install simplicio-installer
@@ -91,109 +91,109 @@ curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/inst
 powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.ps1 | iex"
 ```
 
-Done. One command. No package manager, no model configuration.
+בוצע. פקודה אחת. ללא מנהל חבילות, ללא הגדרת מודל.
 
 ---
 
-## 💰 Token Savings — 96% is Real
+## 💰 חיסכון בטוקנים — 96% הוא אמיתי
 
-**Without Simplicio:** every AI session rediscovers your repo, loads too much
-context, repeats prompts, burns paid tokens.
+**ללא Simplicio:** כל הפעלת AI מגלה מחדש את המאגר שלך, טוענת יותר מדי
+הקשר, חוזרת על הנחיות, שורפת טוקנים בתשלום.
 
-**With Simplicio:**
+**עם Simplicio:**
 
-| Optimization | Savings |
+| אופטימיזציה | חיסכון |
 |---|---|
-| 🗺️ **Repo Map** — compressed context instead of reading raw files | ~70% |
-| 🧠 **Memory Recall** — known facts are not re-derived | ~80% |
-| ✏️ **Deterministic Editing** — changes without spending LLM tokens | 100% (output) |
-| 🏠 **Local LLM** — classification, summarization, low-risk edits | ~90% |
-| 📡 **Remote LLM** — only for planning and complex decisions | ~85% |
-| 🔀 **Local Fan-out** — 64→600 agents before scaling to cloud | ~95% |
-| **💎 Combined: up to 96% total savings** | **~96%** |
+| 🗺️ **מפת מאגר** — הקשר דחוס במקום קריאת קבצים גולמיים | ~70% |
+| 🧠 **זיכרון** — עובדות ידועות לא נגזרות מחדש | ~80% |
+| ✏️ **עריכה דטרמיניסטית** — שינויים מבלי לבזבז טוקני LLM | 100% (פלט) |
+| 🏠 **LLM מקומי** — סיווג, תמצות, עריכות בסיכון נמוך | ~90% |
+| 📡 **LLM מרוחק** — רק לתכנון והחלטות מורכבות | ~85% |
+| 🔀 **פריסה מקומית** — 64→600 סוכנים לפני קנה מידה לענן | ~95% |
+| **💎 שילוב: עד 96% חיסכון כולל** | **~96%** |
 
-**Every Simplicio response shows real savings:** `Simplicio: ~X tokens spent · saved ~Y (Z%)`
+**כל תגובת Simplicio מציגה חיסכון אמיתי:** `Simplicio: ~X טוקנים נצרכו · נחסכו ~Y (Z%)`
 
 ---
 
-## 🎯 What It Does
+## 🎯 מה זה עושה
 
-| Command | Description | Tokens |
+| פקודה | תיאור | טוקנים |
 |---|---|---|
-| `simplicio map --repo .` | Maps the repository for LLMs | ~70% savings |
-| `simplicio memory "query"` | Neural recall (FTS + vectors) | ~80% savings |
-| `simplicio edit '{...}'` | Deterministic file editing | **Zero tokens** |
-| `simplicio coding-loop "task"` | Iterates until tests pass | Auto-repair |
-| `simplicio deliver certify` | 5 quality gates before shipping | Deterministic |
-| `simplicio run "task" --agents N` | Multi-agent orchestration | Local-first |
+| `simplicio map --repo .` | ממפה את המאגר עבור LLMs | ~70% חיסכון |
+| `simplicio memory "שאילתה"` | שליפה עצבית (FTS + וקטורים) | ~80% חיסכון |
+| `simplicio edit '{...}'` | עריכת קבצים דטרמיניסטית | **אפס טוקנים** |
+| `simplicio coding-loop "משימה"` | מתמשכת עד שהבדיקות עוברות | תיקון אוטומטי |
+| `simplicio deliver certify` | 5 שערי איכות לפני משלוח | דטרמיניסטי |
+| `simplicio run "משימה" --agents N` | תיאום רב-סוכנים | מקומי תחילה |
 
 ---
 
-## 🆚 Simplicio vs Caveman vs RTK
+## 🆚 Simplicio לעומת Caveman לעומת RTK
 
 | | 🪨 Caveman | 🔧 RTK | 🔥 **Simplicio** |
 |---|---|---|---|
-| **Approach** | Output style compression | Shell command proxy | **Full agent runtime** |
-| **Max savings** | ~65% output tokens | ~80% on shell commands | **Up to 96% total** |
-| **Input compression** | ❌ | ✅ (filtered) | ✅ **Repo map + neural memory** |
-| **Output compression** | ✅ (caveman-speak) | ❌ | ✅ **Zero-token deterministic edits** |
-| **Local LLM** | ❌ | ❌ | ✅ **Built-in llama.cpp** |
-| **Multi-agent** | ❌ | ❌ | ✅ **64 → 600 local agents** |
-| **Memory across sessions** | ❌ | ❌ | ✅ **FTS + vector recall** |
-| **Evidence chain** | ❌ | ❌ | ✅ **sha256 sealed receipts** |
-| **Language** | JS/Python (skill) | Rust (binary) | **Rust (single binary)** |
-| **License** | MIT | Apache 2.0 | Proprietary |
-| **Stars** | 72.5k | 62.2k | ⭐ **You're early** |
+| **גישה** | דחיסת סגנון פלט | מתווך פקודות Shell | **סביבת הרצה מלאה של סוכן** |
+| **חיסכון מקסימלי** | ~65% טוקני פלט | ~80% בפקודות Shell | **עד 96% סה"כ** |
+| **דחיסת קלט** | ❌ | ✅ (מסונן) | ✅ **מפת מאגר + זיכרון עצבי** |
+| **דחיסת פלט** | ✅ (שפת-קייבמן) | ❌ | ✅ **עריכות דטרמיניסטיות באפס טוקנים** |
+| **LLM מקומי** | ❌ | ❌ | ✅ **llama.cpp מובנה** |
+| **רב-סוכנים** | ❌ | ❌ | ✅ **64 → 600 סוכנים מקומיים** |
+| **זיכרון בין הפעלות** | ❌ | ❌ | ✅ **FTS + שליפה וקטורית** |
+| **שרשרת ראיות** | ❌ | ❌ | ✅ **קבלות חתומות ב-sha256** |
+| **שפה** | JS/Python (מיומנות) | Rust (בינארי) | **Rust (בינארי יחיד)** |
+| **רישיון** | MIT | Apache 2.0 | קנייני |
+| **כוכבים** | 72.5k | 62.2k | ⭐ **אתה מוקדם** |
 
-**Bottom line:** Caveman makes the AI *talk* less. RTK makes commands *output* less.
-Simplicio makes the AI *think* less — by remembering, mapping, editing deterministically,
-and running locally before ever touching a paid LLM.
+**השורה התחתונה:** Caveman גורם ל-AI *לדבר* פחות. RTK גורם לפקודות *להפיק* פחות.
+Simplicio גורם ל-AI *לחשוב* פחות — על ידי זכירה, מיפוי, עריכה דטרמיניסטית,
+ורצה מקומית לפני כל נגיעה ב-LLM בתשלום.
 
-| **Simplicio saves 96% where Caveman saves 65% and RTK saves 80%.** |
+| **Simplicio חוסך 96% בעוד Caveman חוסך 65% ו-RTK חוסך 80%.** |
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ ארכיטקטורה
 
 ```
 LLM (Claude/Codex/Gemini)          Simplicio Runtime (Rust)
   |                                   |
-  | 1. Orient                         | simplicio map
-  | 2. Recall                         | simplicio memory
-  | 3. Decide                         |
-  | 4. Edit  ───────────────────────> | simplicio edit (0 tokens)
-  | 5. Verify <─────────────────────  | simplicio deliver certify
-  | 6. Iterate                        | simplicio coding-loop
+  | 1. התמצאות                        | simplicio map
+  | 2. שליפה                          | simplicio memory
+  | 3. החלטה                          |
+  | 4. עריכה  ───────────────────────> | simplicio edit (0 טוקנים)
+  | 5. אימות <─────────────────────  | simplicio deliver certify
+  | 6. חזרה                           | simplicio coding-loop
 ```
 
-**The LLM reasons. Simplicio executes deterministically.**
+**ה-LLM חושב. Simplicio מבצע דטרמיניסטית.**
 
 ---
 
-## ✨ Features
+## ✨ תכונות
 
-- 🏠 **Local-first** — built-in llama.cpp, scales to remote only when needed
-- 🪜 **Tiered agents** — 64 → 100 → 200 → 600 local agents before paid cloud
-- 🔇 **Shannon novelty gate** — filters redundant outputs (zero tokens on dedup)
-- 🔒 **Sealed receipts** — sha256 per artifact, tamper-proof evidence chain
-- 🛡️ **5 delivery gates** — acceptance, validation, run-verify, regression, self-review
-- ⚡ **Action gate** — risk classification + blocklist for chat-initiated mutations
-- 🔌 **MCP/ACP** — Model Context Protocol + Agent Client Protocol
-- 🌐 **Gateways** — Telegram, Discord, Slack, WhatsApp
-- 🧩 **Skill system** — loads and chains reusable capabilities
-- 💾 **Memory DB** — persistent FTS + vector recall across sessions
-- 🔀 **LLM router** — no LLM → local LLM → remote LLM automatically
-- 🖥️ **Cross-platform** — macOS, Linux, Windows, single binary
+- 🏠 **מקומי תחילה** — llama.cpp מובנה, עובר למרוחק רק בעת הצורך
+- 🪜 **סוכנים מדורגים** — 64 → 100 → 200 → 600 סוכנים מקומיים לפני ענן בתשלום
+- 🔇 **שער חידוש שאנון** — מסנן פלטים כפולים (אפס טוקנים על כפילויות)
+- 🔒 **קבלות חתומות** — sha256 לכל נספח, שרשרת ראיות חסינת חבלה
+- 🛡️ **5 שערי משלוח** — קבלה, אימות, הרצה-אימות, רגרסיה, סקירה עצמית
+- ⚡ **שער פעולה** — סיווג סיכונים + רשימה חסומה למוטציות ביוזמת צ'אט
+- 🔌 **MCP/ACP** — פרוטוקול הקשר מודל + פרוטוקול לקוח סוכן
+- 🌐 **שערים** — Telegram, Discord, Slack, WhatsApp
+- 🧩 **מערכת מיומנויות** — טוען ומשרשר יכולות לשימוש חוזר
+- 💾 **מסד זיכרון** — FTS מתמשך + שליפה וקטורית בין הפעלות
+- 🔀 **נתב LLM** — ללא LLM → LLM מקומי → LLM מרוחק באופן אוטומטי
+- 🖥️ **חוצה-פלטפורמות** — macOS, Linux, Windows, בינארי יחיד
 
 ---
 
-## 🎁 Free Public Beta
+## 🎁 גרסת בטא ציבורית חינם
 
-**Deterministic commands are FREE forever:**
+**פקודות דטרמיניסטיות הן בחינם לנצח:**
 `map`, `validate`, `edit`, `deliver`, `checkpoint`
 
-**AI features are free during the public beta with no end date.**
-Billing will be defined in future updates.
+**תכונות AI הן בחינם במהלך הבטא הציבורית ללא תאריך סיום.**
+חיוב יוגדר בעדכונים עתידיים.
 
 ```bash
 simplicio license status
@@ -201,46 +201,46 @@ simplicio license status
 
 ---
 
-## 📋 Requirements
+## 📋 דרישות
 
-| Requirement | Minimum | Recommended |
+| דרישה | מינימום | מומלץ |
 |---|---|---|
 | RAM | 8 GB | 16 GB+ |
-| Storage | 5 MB | 1.5 GB (with local LLM) |
-| OS | macOS 13+, Linux, Windows 10+ | macOS ARM64 |
-| Terminal | any modern terminal | WezTerm / Alacritty / Ghostty |
+| אחסון | 5 MB | 1.5 GB (עם LLM מקומי) |
+| מערכת הפעלה | macOS 13+, Linux, Windows 10+ | macOS ARM64 |
+| טרמינל | כל טרמינל מודרני | WezTerm / Alacritty / Ghostty |
 
 ---
 
-## 🌐 Ecosystem
+## 🌐 אקוסיסטם
 
-- [Website](https://simpleti.com.br/simplicio/#start) — full docs, benchmarks, install
-- [Discord](https://discord.gg/wM6tr7xVb) — community and support
-
----
-
-## 📄 License
-
-Proprietary. Binary free to download and use. AI features free during the
-public beta. See [LICENSE](LICENSE).
+- [אתר אינטרנט](https://simpleti.com.br/simplicio/#start) — תיעוד מלא, מדדים, התקנה
+- [Discord](https://discord.gg/wM6tr7xVb) — קהילה ותמיכה
 
 ---
 
-## ⭐ Star History
+## 📄 רישיון
+
+קנייני. הבינארי חופשי להורדה ולשימוש. תכונות AI בחינם במהלך
+הבטא הציבורית. ראה [LICENSE](LICENSE).
+
+---
+
+## ⭐ היסטוריית כוכבים
 
 <a href="https://star-history.com/#wesleysimplicio/simplicio&Date">
-  <img src="https://api.star-history.com/svg?repos=wesleysimplicio/simplicio&type=Date" alt="Star History Chart" width="100%" />
+  <img src="https://api.star-history.com/svg?repos=wesleysimplicio/simplicio&type=Date" alt="תרשים היסטוריית כוכבים" width="100%" />
 </a>
 
 ---
 
-## 💬 Community
+## 💬 קהילה
 
-- [Discord](https://discord.gg/wM6tr7xVb) — chat, support, early access
-- [GitHub Issues](https://github.com/wesleysimplicio/simplicio/issues) — bugs and feature requests
+- [Discord](https://discord.gg/wM6tr7xVb) — צ'אט, תמיכה, גישה מוקדמת
+- [GitHub Issues](https://github.com/wesleysimplicio/simplicio/issues) — באגים ובקשות תכונות
 
 ---
 
 <p align="center">
-  <strong>🔥 Simplicio — Your code, your machine, 96% cheaper. 🔥</strong>
+  <strong>🔥 Simplicio — הקוד שלך, המחשב שלך, 96% זול יותר. 🔥</strong>
 </p>
