@@ -43,6 +43,6 @@ Chat REPL, modo agente autónomo, mapeo de repositorio, LLM local (llama.cpp), e
 
 ## Beta público
 
-**Todo desbloqueado gratis hasta el 30/06/2026.** Después de la beta, las funciones de IA requieren suscripción. Los comandos determinísticos (map, validate, edit, deliver, checkpoint) son gratuitos para siempre.
+**Todo desbloqueado gratis durante la beta pública sin fecha de término.** La facturación se definirá en futuras actualizaciones. Los comandos determinísticos (map, validate, edit, deliver, checkpoint) son gratuitos para siempre. Los comandos determinísticos (map, validate, edit, deliver, checkpoint) son gratuitos para siempre.
 
 Más: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/)

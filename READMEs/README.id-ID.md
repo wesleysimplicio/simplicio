@@ -43,6 +43,6 @@ Chat REPL, mode agen otonom, pemetaan repositori, LLM lokal (llama.cpp), eksekus
 
 ## Beta publik
 
-**Semua terbuka gratis hingga 30 Juni 2026.** Setelah beta, fitur AI memerlukan langganan. Perintah deterministik (map, validate, edit, deliver, checkpoint) tetap gratis selamanya.
+**Semua tidak terkunci secara gratis selama beta publik tanpa tanggal berakhir.** Penagihan akan ditentukan dalam pembaruan mendatang. Perintah deterministik (map, validate, edit, deliver, checkpoint) gratis selamanya.** Setelah beta, fitur AI memerlukan langganan. Perintah deterministik (map, validate, edit, deliver, checkpoint) tetap gratis selamanya.
 
 Lainnya: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/)

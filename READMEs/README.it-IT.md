@@ -43,6 +43,6 @@ Chat REPL, modalità agente autonomo, mappatura repository, LLM locale (llama.cp
 
 ## Beta pubblica
 
-**Tutto sbloccato gratuitamente fino al 30/06/2026.** Dopo la beta, le funzionalità AI richiedono un abbonamento. I comandi deterministici (map, validate, edit, deliver, checkpoint) rimangono gratuiti per sempre.
+**Tutto sbloccato gratuitamente durante la beta pubblica senza data di termine.** La fatturazione sarà definita nei prossimi aggiornamenti. I comandi deterministici (map, validate, edit, deliver, checkpoint) rimangono gratuiti per sempre. I comandi deterministici (map, validate, edit, deliver, checkpoint) rimangono gratuiti per sempre.
 
 Altro: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/)

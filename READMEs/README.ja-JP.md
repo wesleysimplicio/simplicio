@@ -43,6 +43,6 @@ Chat REPL、自律エージェントモード、リポジトリマッピング�
 
 ## パブリックベータ
 
-**2026年6月30日まですべて無料で利用可能。** ベータ終了後、AI機能はサブスクリプションが必要です。決定論的コマンド（map、validate、edit、deliver、checkpoint）は永久に無料です。
+**無期限のパブリックベータ期間中はすべて無料で利用できます。** 請求は将来のアップデートで定義されます。決定論的コマンド（map、validate、edit、deliver、checkpoint）は永久に無料です。
 
 詳細: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/)

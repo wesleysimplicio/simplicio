@@ -43,6 +43,6 @@ Chat REPL、自主代理模式、仓库映射、本地 LLM (llama.cpp)、50–60
 
 ## 公开测试版
 
-**2026年6月30日前所有功能免费使用。** 测试结束后，AI 功能需要订阅。确定性命令（map、validate、edit、deliver、checkpoint）永久免费。
+**公开测试期间无结束日期，所有功能免费。** 计费将在未来更新中定义。确定性命令（map、validate、edit、deliver、checkpoint）永久免费。
 
 更多信息: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/)

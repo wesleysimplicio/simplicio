@@ -43,6 +43,6 @@ Chat REPL, mod ejen autonomi, pemetaan repositori, LLM tempatan (llama.cpp), pel
 
 ## Beta awam
 
-**Semua dibuka kunci secara percuma sehingga 30 Jun 2026.** Selepas beta, ciri AI memerlukan langganan. Perintah deterministik (map, validate, edit, deliver, checkpoint) kekal percuma selamanya.
+**Semua dibuka secara percuma semasa beta awam tanpa tarikh tamat.** Pengebilan akan ditentukan dalam kemas kini akan datang. Perintah deterministik (map, validate, edit, deliver, checkpoint) kekal percuma selama-lamanya.** Selepas beta, ciri AI memerlukan langganan. Perintah deterministik (map, validate, edit, deliver, checkpoint) kekal percuma selamanya.
 
 Lagi: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/)
