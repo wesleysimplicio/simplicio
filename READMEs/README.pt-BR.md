@@ -49,8 +49,8 @@ contexto do repositório, planejamento, orquestração multi-agente local
 **Roda na sua máquina. Seu código nunca sai do seu controle. Modelos remotos
 são opcionais, não obrigatórios.**
 
-> **🔥 NOVO: Economizamos até 96% dos tokens comparado a agentes tradicionais.**
-> Cada interação mostra exatamente quantos tokens você economizou.
+> **🔥 Economize até 96% de tokens vs agentes tradicionais — mais que Caveman (65%) ou RTK (80%).**
+> Cada interação mostra exatamente quantos tokens você economizou. Binário único em Rust, zero deps.
 
 ---
 
@@ -103,6 +103,30 @@ demais, repete prompts, torra tokens pagos.
 | `simplicio coding-loop "task"` | Itera até testes passarem | Auto-repair |
 | `simplicio deliver certify` | 5 gates de qualidade antes de shipping | Determinístico |
 | `simplicio run "task" --agents N` | Orquestração multi-agente | Local-first |
+
+---
+
+## 🆚 Simplicio vs Caveman vs RTK
+
+| | 🪨 Caveman | 🔧 RTK | 🔥 **Simplicio** |
+|---|---|---|---|
+| **Abordagem** | Compressão de estilo | Proxy de comandos shell | **Runtime de agente completo** |
+| **Economia máx.** | ~65% output tokens | ~80% em comandos shell | **Até 96% total** |
+| **Compressão de input** | ❌ | ✅ (filtrado) | ✅ **Repo map + memória neural** |
+| **Compressão de output** | ✅ (fala de caverna) | ❌ | ✅ **Edição determinística zero-token** |
+| **LLM Local** | ❌ | ❌ | ✅ **llama.cpp integrado** |
+| **Multi-agente** | ❌ | ❌ | ✅ **64 → 600 agentes locais** |
+| **Memória entre sessões** | ❌ | ❌ | ✅ **FTS + vector recall** |
+| **Cadeia de evidências** | ❌ | ❌ | ✅ **recibos sha256 selados** |
+| **Linguagem** | JS/Python (skill) | Rust (binário) | **Rust (binário único)** |
+| **Licença** | MIT | Apache 2.0 | Proprietária |
+| **Stars** | 72.5k | 62.2k | ⭐ **Você chegou cedo** |
+
+**Resumo:** Caveman faz a IA *falar* menos. RTK faz comandos *gerarem* menos output.
+Simplicio faz a IA *pensar* menos — lembrando, mapeando, editando deterministicamente
+e rodando local antes de tocar em qualquer LLM pago.
+
+| **Simplicio economiza 96% onde Caveman economiza 65% e RTK economiza 80%.** |
 
 ---
 

@@ -49,10 +49,8 @@ evidence-backed PR delivery.
 **Runs on your machine. Your code never leaves your control. Remote models are
 optional, not required.**
 
-> **🔥 NEW: Save up to 96% of tokens compared to traditional agents.**
-> Every interaction shows exactly how many tokens you saved.
-
----
+> **🔥 Save up to 96% of tokens vs traditional agents — more than Caveman (65%) or RTK (80%).**
+> Every interaction shows exactly how many tokens you saved. Single Rust binary, zero deps.
 
 ## 🚀 Installation
 
@@ -103,6 +101,30 @@ context, repeats prompts, burns paid tokens.
 | `simplicio coding-loop "task"` | Iterates until tests pass | Auto-repair |
 | `simplicio deliver certify` | 5 quality gates before shipping | Deterministic |
 | `simplicio run "task" --agents N` | Multi-agent orchestration | Local-first |
+
+---
+
+## 🆚 Simplicio vs Caveman vs RTK
+
+| | 🪨 Caveman | 🔧 RTK | 🔥 **Simplicio** |
+|---|---|---|---|
+| **Approach** | Output style compression | Shell command proxy | **Full agent runtime** |
+| **Max savings** | ~65% output tokens | ~80% on shell commands | **Up to 96% total** |
+| **Input compression** | ❌ | ✅ (filtered) | ✅ **Repo map + neural memory** |
+| **Output compression** | ✅ (caveman-speak) | ❌ | ✅ **Zero-token deterministic edits** |
+| **Local LLM** | ❌ | ❌ | ✅ **Built-in llama.cpp** |
+| **Multi-agent** | ❌ | ❌ | ✅ **64 → 600 local agents** |
+| **Memory across sessions** | ❌ | ❌ | ✅ **FTS + vector recall** |
+| **Evidence chain** | ❌ | ❌ | ✅ **sha256 sealed receipts** |
+| **Language** | JS/Python (skill) | Rust (binary) | **Rust (single binary)** |
+| **License** | MIT | Apache 2.0 | Proprietary |
+| **Stars** | 72.5k | 62.2k | ⭐ **You're early** |
+
+**Bottom line:** Caveman makes the AI *talk* less. RTK makes commands *output* less.
+Simplicio makes the AI *think* less — by remembering, mapping, editing deterministically,
+and running locally before ever touching a paid LLM.
+
+| **Simplicio saves 96% where Caveman saves 65% and RTK saves 80%.** |
 
 ---
 
