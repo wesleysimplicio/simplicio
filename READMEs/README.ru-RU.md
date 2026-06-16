@@ -73,6 +73,12 @@ simplicio install
 brew install simplicio
 ```
 
+### Bun
+
+```bash
+bunx simplicio install
+```
+
 ### macOS / Linux
 
 ```bash
