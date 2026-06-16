@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "simplicio-installer"
+version = "1.0.0"
+description = "Simplicio — AI coding agent that saves up to 96% on tokens"
+readme = "README.md"
+requires-python = ">=3.7"
+license = {text = "Proprietary"}
+keywords = ["ai", "coding-agent", "cli", "token-savings"]
+
+[project.urls]
+Homepage = "https://simpleti.com.br/simplicio/#start"
+Source = "https://github.com/wesleysimplicio/simplicio"
+
+[project.scripts]
+simplicio = "simplicio:main"

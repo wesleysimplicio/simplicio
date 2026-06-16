@@ -60,6 +60,13 @@ optional, not required.**
 npx simplicio install
 ```
 
+### pip / PyPI (any OS)
+
+```bash
+pip install simplicio-installer
+simplicio install
+```
+
 ### macOS / Linux
 
 ```bash
