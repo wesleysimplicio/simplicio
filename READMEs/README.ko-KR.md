@@ -45,4 +45,4 @@ Chat REPL, 자율 에이전트 모드, 리포지토리 맵핑, 로컬 LLM (llama
 
 **종료일이 정해지지 않은 공개 베타 기간 동안 모든 기능이 무료로 제공됩니다.** 과금은 향후 업데이트에서 정의됩니다. 결정적 명령어(map, validate, edit, deliver, checkpoint)는 영구적으로 무료입니다.** 베타 종료 후 AI 기능은 구독이 필요합니다. 결정론적 명령어(map, validate, edit, deliver, checkpoint)는 영구적으로 무료입니다.
 
-더보기: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/)
+더보기: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/#start)

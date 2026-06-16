@@ -45,4 +45,4 @@ Chat REPL, mod ejen autonomi, pemetaan repositori, LLM tempatan (llama.cpp), pel
 
 **Semua dibuka secara percuma semasa beta awam tanpa tarikh tamat.** Pengebilan akan ditentukan dalam kemas kini akan datang. Perintah deterministik (map, validate, edit, deliver, checkpoint) kekal percuma selama-lamanya.** Selepas beta, ciri AI memerlukan langganan. Perintah deterministik (map, validate, edit, deliver, checkpoint) kekal percuma selamanya.
 
-Lagi: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/)
+Lagi: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/#start)

@@ -45,4 +45,4 @@ Chat REPL, mode agent autonome, cartographie de dépôt, LLM local (llama.cpp), 
 
 **Tout est débloqué gratuitement pendant la bêta publique sans date de fin.** La facturation sera définie dans les prochaines mises à jour. Les commandes déterministes (map, validate, edit, deliver, checkpoint) restent gratuites pour toujours. Les commandes déterministes (map, validate, edit, deliver, checkpoint) restent gratuites pour toujours.
 
-Plus: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/)
+Plus: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/#start)

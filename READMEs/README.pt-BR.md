@@ -15,7 +15,7 @@
   <a href="#-instalação">Instalação</a> ·
   <a href="#-o-que-faz">Features</a> ·
   <a href="#-token-savings">96% Economia</a> ·
-  <a href="https://simpleti.com.br/simplicio/">Website</a>
+  <a href="https://simpleti.com.br/simplicio/#start">Website</a>
 </p>
 
 <p align="center">
@@ -191,7 +191,7 @@ simplicio license status
 
 ## 🌐 Ecossistema
 
-- [Website](https://simpleti.com.br/simplicio/) — docs completas, benchmarks, instalação
+- [Website](https://simpleti.com.br/simplicio/#start) — docs completas, benchmarks, instalação
 - [Discord](https://discord.gg/simplicio) — comunidade e suporte
 
 ---

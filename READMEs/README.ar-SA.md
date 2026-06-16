@@ -45,4 +45,4 @@ Chat REPL، وضع الوكيل المستقل، رسم خريطة المستو�
 
 **كل شيء مجاني خلال النسخة التجريبية العامة بدون تاريخ انتهاء.** سيتم تحديد الفوترة في التحديثات المستقبلية. الأوامر الحتمية (map، validate، edit، deliver، checkpoint) مجانية للأبد.** بعد النسخة التجريبية، تتطلب ميزات AI اشتراكًا. الأوامر الحتمية (map, validate, edit, deliver, checkpoint) تبقى مجانية إلى الأبد.
 
-المزيد: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/)
+المزيد: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/#start)

@@ -45,4 +45,4 @@ Chat REPL, מצב סוכן אוטונומי, מיפוי מאגר, LLM מקומי
 
 **הכל פתוח בחינם במהלך הבטא הציבורית ללא תאריך סיום.** החיוב יוגדר בעדכונים עתידיים. פקודות דטרמיניסטיות (map, validate, edit, deliver, checkpoint) נשארות בחינם לתמיד.** לאחר גרסת הבטא, תכונות AI דורשות מנוי. הפקודות הדטרמיניסטיות (map, validate, edit, deliver, checkpoint) נשארות בחינם לנצח.
 
-עוד: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/)
+עוד: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/#start)

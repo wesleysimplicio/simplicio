@@ -2,4 +2,4 @@
 
 **Один бинарник. Без настройки. Ваш ИИ-агент для программирования в терминале.**Всё разблокировано бесплатно во время публичной беты без даты окончания.** Оплата будет определена в будущих обновлениях. Детерминированные команды (map, validate, edit, deliver, checkpoint) бесплатны навсегда.** После беты функции ИИ требуют подписки. Детерминированные команды (map, validate, edit, deliver, checkpoint) остаются бесплатными навсегда.
 
-Подробнее: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/)
+Подробнее: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/#start)

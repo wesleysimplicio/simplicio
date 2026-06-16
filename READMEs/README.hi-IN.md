@@ -45,4 +45,4 @@ Chat REPL, स्वायत्त एजेंट मोड, रिपॉज�
 
 **बिना किसी समाप्ति तिथि के सार्वजनिक बीटा के दौरान सब कुछ मुफ़्त है।** बिलिंग भविष्य के अपडेट में परिभाषित की जाएगी। नियतात्मक कमांड (map, validate, edit, deliver, checkpoint) हमेशा के लिए मुफ़्त हैं।
 
-और अधिक: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/)
+और अधिक: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/#start)

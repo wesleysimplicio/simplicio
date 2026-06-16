@@ -45,4 +45,4 @@ Chat REPL, tryb autonomicznego agenta, mapowanie repozytorium, lokalny LLM (llam
 
 **Wszystko odblokowane za darmo podczas publicznej bety bez daty zakończenia.** Płatności zostaną określone w przyszłych aktualizacjach. Polecenia deterministyczne (map, validate, edit, deliver, checkpoint) są darmowe na zawsze.** Po zakończeniu bety funkcje AI wymagają subskrypcji. Polecenia deterministyczne (map, validate, edit, deliver, checkpoint) pozostają darmowe na zawsze.
 
-Więcej: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/)
+Więcej: [simpleti.com.br/simplicio/](https://simpleti.com.br/simplicio/#start)
