@@ -228,7 +228,7 @@ public beta. See [LICENSE](LICENSE).
 
 ## ⭐ Star History
 
-<iframe style="width:100%;height:auto;min-width:600px;min-height:400px;" src="https://www.star-history.com/?type=date&repos=wesleysimplicio%2Fsimplicio" frameBorder="0"></iframe>
+[![Star History Chart](https://api.star-history.com/chart?repos=wesleysimplicio/simplicio&type=date&legend=top-left)](https://www.star-history.com/?type=date&repos=wesleysimplicio%2Fsimplicio)
 
 ---
 
