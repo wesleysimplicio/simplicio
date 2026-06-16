@@ -190,7 +190,7 @@ simplicio license status
 ## 🌐 Ecosystem
 
 - [Website](https://simpleti.com.br/simplicio/) — full docs, benchmarks, install
-- [Discord](https://discord.gg/simplicio) — community and support
+- [Discord](https://discord.gg/wM6tr7xVb) — community and support
 
 ---
 
@@ -198,6 +198,21 @@ simplicio license status
 
 Proprietary. Binary free to download and use. AI features free during the
 public beta. See [LICENSE](LICENSE).
+
+---
+
+## ⭐ Star History
+
+<a href="https://star-history.com/#wesleysimplicio/simplicio&Date">
+  <img src="https://api.star-history.com/svg?repos=wesleysimplicio/simplicio&type=Date" alt="Star History Chart" width="100%" />
+</a>
+
+---
+
+## 💬 Community
+
+- [Discord](https://discord.gg/wM6tr7xVb) — chat, support, early access
+- [GitHub Issues](https://github.com/wesleysimplicio/simplicio/issues) — bugs and feature requests
 
 ---
 
