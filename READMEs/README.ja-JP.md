@@ -1,25 +1,25 @@
-# 🔥 Simplicio — The AI Agent That SAVES UP TO 96% OF YOUR TOKENS
+# 🔥 Simplicio — トークンを最大96%削減するAIエージェント
 
 <p align="center">
-  <img src="assets/simplicio-hero.png" alt="Simplicio — AI coding agent" width="920" />
+  <img src="assets/simplicio-hero.png" alt="Simplicio — AIコーディングエージェント" width="920" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/wesleysimplicio/simplicio/releases/latest"><img src="https://img.shields.io/github/v/release/wesleysimplicio/simplicio?color=blue&label=latest" alt="Latest Release"></a>
-  <a href="https://github.com/wesleysimplicio/simplicio/stargazers"><img src="https://img.shields.io/github/stars/wesleysimplicio/simplicio?style=social" alt="Stars"></a>
-  <a href="https://github.com/wesleysimplicio/simplicio/releases"><img src="https://img.shields.io/github/downloads/wesleysimplicio/simplicio/total?color=green" alt="Downloads"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="License"></a>
+  <a href="https://github.com/wesleysimplicio/simplicio/releases/latest"><img src="https://img.shields.io/github/v/release/wesleysimplicio/simplicio?color=blue&label=latest" alt="最新リリース"></a>
+  <a href="https://github.com/wesleysimplicio/simplicio/stargazers"><img src="https://img.shields.io/github/stars/wesleysimplicio/simplicio?style=social" alt="スター"></a>
+  <a href="https://github.com/wesleysimplicio/simplicio/releases"><img src="https://img.shields.io/github/downloads/wesleysimplicio/simplicio/total?color=green" alt="ダウンロード数"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="ライセンス"></a>
 </p>
 
 <p align="center">
-  <a href="#-installation">Install</a> ·
-  <a href="#-what-it-does">Features</a> ·
-  <a href="#-token-savings">96% Savings</a> ·
-  <a href="https://simpleti.com.br/simplicio/#start">Website</a>
+  <a href="#インストール">インストール</a> ·
+  <a href="#機能一覧">機能一覧</a> ·
+  <a href="#トークン削減効果--96は現実です">トークン削減効果——96%は現実です</a> ·
+  <a href="https://simpleti.com.br/simplicio/#start">ウェブサイト</a>
 </p>
 
 <p align="center">
-  <strong>🌍 Languages:</strong><br>
+  <strong>🌍 言語:</strong><br>
   <a href="README.md">🇬🇧 English</a> |
   <a href="READMEs/README.pt-BR.md">🇧🇷 Português</a> |
   <a href="READMEs/README.es-ES.md">🇪🇸 Español</a> |
@@ -39,35 +39,31 @@
 
 ---
 
-## ⚡ TL;DR
+## ⚡ TL;DR（概要）
 
-**Simplicio** is a terminal AI coding agent — a single binary that replaces your
-entire AI-assisted development workflow: chat, code generation, repository
-context, planning, local multi-agent orchestration (64 → 600 agents), and
-evidence-backed PR delivery.
+**Simplicio** はターミナル上で動作するAIコーディングエージェントです——たった1つのバイナリで、チャット、コード生成、リポジトリコンテキスト、計画立案、ローカルでのマルチエージェントオーケストレーション（64 → 600エージェント）、エビデンス付きPR納品まで、AI支援開発ワークフロー全体を置き換えます。
 
-**Runs on your machine. Your code never leaves your control. Remote models are
-optional, not required.**
+**あなたのマシン上で動作します。コードがあなたの管理下から離れることはありません。リモートモデルはオプションであり、必須ではありません。**
 
-> **🔥 Save up to 96% of tokens vs traditional agents — more than Caveman (65%) or RTK (80%).**
-> Every interaction shows exactly how many tokens you saved. Single Rust binary, zero deps.
+> **🔥 従来のエージェントと比較して最大96%のトークンを削減——Caveman（65%）やRTK（80%）を上回ります。**
+> すべての操作で、削減したトークン数が正確に表示されます。単一のRustバイナリ、依存関係ゼロ。
 
-## 🚀 Installation
+## 🚀 インストール
 
-### npm / npx (any OS)
+### npm / npx（全OS対応）
 
 ```bash
 npx simplicio install
 ```
 
-### pip / PyPI (any OS)
+### pip / PyPI（全OS対応）
 
 ```bash
 pip install simplicio-installer
 simplicio install
 ```
 
-### Homebrew (macOS)
+### Homebrew（macOS）
 
 ```bash
 brew install simplicio
@@ -91,41 +87,40 @@ curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/inst
 powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.ps1 | iex"
 ```
 
-Done. One command. No package manager, no model configuration.
+完了。たった1つのコマンドです。パッケージマネージャーもモデル設定も不要です。
 
 ---
 
-## 💰 Token Savings — 96% is Real
+## 💰 トークン削減効果——96%は現実です
 
-**Without Simplicio:** every AI session rediscovers your repo, loads too much
-context, repeats prompts, burns paid tokens.
+**Simplicioなしの場合:** AIセッションのたびにリポジトリを再検出し、過剰なコンテキストを読み込み、プロンプトを繰り返し、有料トークンを消費します。
 
-**With Simplicio:**
+**Simplicioありの場合:**
 
-| Optimization | Savings |
+| 最適化 | 削減率 |
 |---|---|
-| 🗺️ **Repo Map** — compressed context instead of reading raw files | ~70% |
-| 🧠 **Memory Recall** — known facts are not re-derived | ~80% |
-| ✏️ **Deterministic Editing** — changes without spending LLM tokens | 100% (output) |
-| 🏠 **Local LLM** — classification, summarization, low-risk edits | ~90% |
-| 📡 **Remote LLM** — only for planning and complex decisions | ~85% |
-| 🔀 **Local Fan-out** — 64→600 agents before scaling to cloud | ~95% |
-| **💎 Combined: up to 96% total savings** | **~96%** |
+| 🗺️ **リポマップ** — 生ファイルを読む代わりに圧縮コンテキスト | ~70% |
+| 🧠 **メモリーリコール** — 既知の事実を再導出しない | ~80% |
+| ✏️ **決定論的編集** — LLMトークンを消費せずに変更 | 100%（出力） |
+| 🏠 **ローカルLLM** — 分類、要約、低リスク編集 | ~90% |
+| 📡 **リモートLLM** — 計画と複雑な判断のみに使用 | ~85% |
+| 🔀 **ローカルファンアウト** — クラウド拡張前に64→600エージェント | ~95% |
+| **💎 組み合わせ効果: 最大96%の総削減** | **~96%** |
 
-**Every Simplicio response shows real savings:** `Simplicio: ~X tokens spent · saved ~Y (Z%)`
+**Simplicioのすべての応答に実際の削減効果が表示されます:** `Simplicio: ~X トークン消費 · ~Y 削減 (Z%)`
 
 ---
 
-## 🎯 What It Does
+## 🎯 機能一覧
 
-| Command | Description | Tokens |
+| コマンド | 説明 | トークン |
 |---|---|---|
-| `simplicio map --repo .` | Maps the repository for LLMs | ~70% savings |
-| `simplicio memory "query"` | Neural recall (FTS + vectors) | ~80% savings |
-| `simplicio edit '{...}'` | Deterministic file editing | **Zero tokens** |
-| `simplicio coding-loop "task"` | Iterates until tests pass | Auto-repair |
-| `simplicio deliver certify` | 5 quality gates before shipping | Deterministic |
-| `simplicio run "task" --agents N` | Multi-agent orchestration | Local-first |
+| `simplicio map --repo .` | LLM向けにリポジトリをマッピング | ~70%削減 |
+| `simplicio memory "query"` | ニューラルリコール（FTS + ベクトル） | ~80%削減 |
+| `simplicio edit '{...}'` | 決定論的ファイル編集 | **ゼロトークン** |
+| `simplicio coding-loop "task"` | テストが通るまで反復 | 自動修復 |
+| `simplicio deliver certify` | 出荷前に5つの品質ゲートを通過 | 決定論的 |
+| `simplicio run "task" --agents N` | マルチエージェントオーケストレーション | ローカル優先 |
 
 ---
 
@@ -133,67 +128,66 @@ context, repeats prompts, burns paid tokens.
 
 | | 🪨 Caveman | 🔧 RTK | 🔥 **Simplicio** |
 |---|---|---|---|
-| **Approach** | Output style compression | Shell command proxy | **Full agent runtime** |
-| **Max savings** | ~65% output tokens | ~80% on shell commands | **Up to 96% total** |
-| **Input compression** | ❌ | ✅ (filtered) | ✅ **Repo map + neural memory** |
-| **Output compression** | ✅ (caveman-speak) | ❌ | ✅ **Zero-token deterministic edits** |
-| **Local LLM** | ❌ | ❌ | ✅ **Built-in llama.cpp** |
-| **Multi-agent** | ❌ | ❌ | ✅ **64 → 600 local agents** |
-| **Memory across sessions** | ❌ | ❌ | ✅ **FTS + vector recall** |
-| **Evidence chain** | ❌ | ❌ | ✅ **sha256 sealed receipts** |
-| **Language** | JS/Python (skill) | Rust (binary) | **Rust (single binary)** |
-| **License** | MIT | Apache 2.0 | Proprietary |
-| **Stars** | 72.5k | 62.2k | ⭐ **You're early** |
+| **アプローチ** | 出力スタイルの圧縮 | シェルコマンドプロキシ | **完全なエージェントランタイム** |
+| **最大削減率** | ~65% 出力トークン | ~80% シェルコマンド | **最大96% 総合** |
+| **入力圧縮** | ❌ | ✅（フィルタリング） | ✅ **リポマップ + ニューラルメモリー** |
+| **出力圧縮** | ✅（原始的な話し方） | ❌ | ✅ **ゼロトークン決定論的編集** |
+| **ローカルLLM** | ❌ | ❌ | ✅ **内蔵 llama.cpp** |
+| **マルチエージェント** | ❌ | ❌ | ✅ **64 → 600 ローカルエージェント** |
+| **セッション間メモリー** | ❌ | ❌ | ✅ **FTS + ベクトルリコール** |
+| **エビデンスチェーン** | ❌ | ❌ | ✅ **sha256封印済みレシート** |
+| **言語** | JS/Python（スキル） | Rust（バイナリ） | **Rust（単一バイナリ）** |
+| **ライセンス** | MIT | Apache 2.0 | Proprietary |
+| **スター数** | 72.5k | 62.2k | ⭐ **あなたが初期ユーザーです** |
 
-**Bottom line:** Caveman makes the AI *talk* less. RTK makes commands *output* less.
-Simplicio makes the AI *think* less — by remembering, mapping, editing deterministically,
-and running locally before ever touching a paid LLM.
+**結論:** CavemanはAIの*発言*を減らします。RTKはコマンドの*出力*を減らします。
+SimplicioはAIの*思考*を減らします——記憶、マッピング、決定論的編集、そして有料LLMに触れる前にローカルで実行することによって。
 
-| **Simplicio saves 96% where Caveman saves 65% and RTK saves 80%.** |
+| **Simplicioは96%削減します。Cavemanは65%、RTKは80%です。** |
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ アーキテクチャ
 
 ```
 LLM (Claude/Codex/Gemini)          Simplicio Runtime (Rust)
   |                                   |
-  | 1. Orient                         | simplicio map
-  | 2. Recall                         | simplicio memory
-  | 3. Decide                         |
-  | 4. Edit  ───────────────────────> | simplicio edit (0 tokens)
-  | 5. Verify <─────────────────────  | simplicio deliver certify
-  | 6. Iterate                        | simplicio coding-loop
+  | 1. Orient（方向付け）              | simplicio map
+  | 2. Recall（想起）                  | simplicio memory
+  | 3. Decide（判断）                  |
+  | 4. Edit（編集） ────────────────> | simplicio edit (0 tokens)
+  | 5. Verify（検証）<──────────────  | simplicio deliver certify
+  | 6. Iterate（反復）                 | simplicio coding-loop
 ```
 
-**The LLM reasons. Simplicio executes deterministically.**
+**LLMが推論します。Simplicioが決定論的に実行します。**
 
 ---
 
-## ✨ Features
+## ✨ 特徴
 
-- 🏠 **Local-first** — built-in llama.cpp, scales to remote only when needed
-- 🪜 **Tiered agents** — 64 → 100 → 200 → 600 local agents before paid cloud
-- 🔇 **Shannon novelty gate** — filters redundant outputs (zero tokens on dedup)
-- 🔒 **Sealed receipts** — sha256 per artifact, tamper-proof evidence chain
-- 🛡️ **5 delivery gates** — acceptance, validation, run-verify, regression, self-review
-- ⚡ **Action gate** — risk classification + blocklist for chat-initiated mutations
+- 🏠 **ローカル優先** — 内蔵llama.cpp、必要なときだけリモートに拡張
+- 🪜 **階層型エージェント** — 有料クラウドの前に64 → 100 → 200 → 600のローカルエージェント
+- 🔇 **シャノン新規性ゲート** — 冗長な出力をフィルタリング（重複排除でゼロトークン）
+- 🔒 **封印レシート** — アーティファクトごとにsha256、改ざん防止のエビデンスチェーン
+- 🛡️ **5つの納品ゲート** — 受入、検証、実行確認、回帰テスト、自己レビュー
+- ⚡ **アクションゲート** — チャット発信の変更に対するリスク分類 + ブロックリスト
 - 🔌 **MCP/ACP** — Model Context Protocol + Agent Client Protocol
-- 🌐 **Gateways** — Telegram, Discord, Slack, WhatsApp
-- 🧩 **Skill system** — loads and chains reusable capabilities
-- 💾 **Memory DB** — persistent FTS + vector recall across sessions
-- 🔀 **LLM router** — no LLM → local LLM → remote LLM automatically
-- 🖥️ **Cross-platform** — macOS, Linux, Windows, single binary
+- 🌐 **ゲートウェイ** — Telegram、Discord、Slack、WhatsApp
+- 🧩 **スキルシステム** — 再利用可能な機能を読み込んで連鎖実行
+- 💾 **メモリDB** — セッション間で永続的なFTS + ベクトルリコール
+- 🔀 **LLMルーター** — LLMなし → ローカルLLM → リモートLLM を自動切替
+- 🖥️ **クロスプラットフォーム** — macOS、Linux、Windows、単一バイナリ
 
 ---
 
-## 🎁 Free Public Beta
+## 🎁 無料パブリックベータ
 
-**Deterministic commands are FREE forever:**
-`map`, `validate`, `edit`, `deliver`, `checkpoint`
+**決定論的コマンドは永久無料です:**
+`map`、`validate`、`edit`、`deliver`、`checkpoint`
 
-**AI features are free during the public beta with no end date.**
-Billing will be defined in future updates.
+**AI機能は期間無制限でパブリックベータ期間中無料です。**
+課金は将来のアップデートで定義されます。
 
 ```bash
 simplicio license status
@@ -201,46 +195,45 @@ simplicio license status
 
 ---
 
-## 📋 Requirements
+## 📋 必要環境
 
-| Requirement | Minimum | Recommended |
+| 要件 | 最小 | 推奨 |
 |---|---|---|
-| RAM | 8 GB | 16 GB+ |
-| Storage | 5 MB | 1.5 GB (with local LLM) |
-| OS | macOS 13+, Linux, Windows 10+ | macOS ARM64 |
-| Terminal | any modern terminal | WezTerm / Alacritty / Ghostty |
+| RAM | 8 GB | 16 GB以上 |
+| ストレージ | 5 MB | 1.5 GB（ローカルLLM使用時） |
+| OS | macOS 13+、Linux、Windows 10+ | macOS ARM64 |
+| ターミナル | 任意のモダンなターミナル | WezTerm / Alacritty / Ghostty |
 
 ---
 
-## 🌐 Ecosystem
+## 🌐 エコシステム
 
-- [Website](https://simpleti.com.br/simplicio/#start) — full docs, benchmarks, install
-- [Discord](https://discord.gg/wM6tr7xVb) — community and support
-
----
-
-## 📄 License
-
-Proprietary. Binary free to download and use. AI features free during the
-public beta. See [LICENSE](LICENSE).
+- [ウェブサイト](https://simpleti.com.br/simplicio/#start) — 完全なドキュメント、ベンチマーク、インストール
+- [Discord](https://discord.gg/wM6tr7xVb) — コミュニティとサポート
 
 ---
 
-## ⭐ Star History
+## 📄 ライセンス
+
+Proprietary（プロプライエタリ）。バイナリは無料でダウンロードして使用できます。AI機能はパブリックベータ期間中無料です。詳しくは [LICENSE](LICENSE) をご覧ください。
+
+---
+
+## ⭐ スター履歴
 
 <a href="https://star-history.com/#wesleysimplicio/simplicio&Date">
-  <img src="https://api.star-history.com/svg?repos=wesleysimplicio/simplicio&type=Date" alt="Star History Chart" width="100%" />
+  <img src="https://api.star-history.com/svg?repos=wesleysimplicio/simplicio&type=Date" alt="スター履歴チャート" width="100%" />
 </a>
 
 ---
 
-## 💬 Community
+## 💬 コミュニティ
 
-- [Discord](https://discord.gg/wM6tr7xVb) — chat, support, early access
-- [GitHub Issues](https://github.com/wesleysimplicio/simplicio/issues) — bugs and feature requests
+- [Discord](https://discord.gg/wM6tr7xVb) — チャット、サポート、早期アクセス
+- [GitHub Issues](https://github.com/wesleysimplicio/simplicio/issues) — バグ報告と機能リクエスト
 
 ---
 
 <p align="center">
-  <strong>🔥 Simplicio — Your code, your machine, 96% cheaper. 🔥</strong>
+  <strong>🔥 Simplicio — あなたのコード、あなたのマシン、96%のコスト削減。 🔥</strong>
 </p>

@@ -1,25 +1,25 @@
-# 🔥 Simplicio — The AI Agent That SAVES UP TO 96% OF YOUR TOKENS
+# 🔥 Simplicio — 最多可节省高达 96% 的 Token 的 AI 智能体
 
 <p align="center">
-  <img src="assets/simplicio-hero.png" alt="Simplicio — AI coding agent" width="920" />
+  <img src="assets/simplicio-hero.png" alt="Simplicio — AI 编程助手" width="920" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/wesleysimplicio/simplicio/releases/latest"><img src="https://img.shields.io/github/v/release/wesleysimplicio/simplicio?color=blue&label=latest" alt="Latest Release"></a>
-  <a href="https://github.com/wesleysimplicio/simplicio/stargazers"><img src="https://img.shields.io/github/stars/wesleysimplicio/simplicio?style=social" alt="Stars"></a>
-  <a href="https://github.com/wesleysimplicio/simplicio/releases"><img src="https://img.shields.io/github/downloads/wesleysimplicio/simplicio/total?color=green" alt="Downloads"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="License"></a>
+  <a href="https://github.com/wesleysimplicio/simplicio/releases/latest"><img src="https://img.shields.io/github/v/release/wesleysimplicio/simplicio?color=blue&label=latest" alt="最新版本"></a>
+  <a href="https://github.com/wesleysimplicio/simplicio/stargazers"><img src="https://img.shields.io/github/stars/wesleysimplicio/simplicio?style=social" alt="星标"></a>
+  <a href="https://github.com/wesleysimplicio/simplicio/releases"><img src="https://img.shields.io/github/downloads/wesleysimplicio/simplicio/total?color=green" alt="下载量"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="许可证"></a>
 </p>
 
 <p align="center">
-  <a href="#-installation">Install</a> ·
-  <a href="#-what-it-does">Features</a> ·
-  <a href="#-token-savings">96% Savings</a> ·
-  <a href="https://simpleti.com.br/simplicio/#start">Website</a>
+  <a href="#-安装">安装</a> ·
+  <a href="#-功能简介">功能</a> ·
+  <a href="#-token-节省">96% 节省</a> ·
+  <a href="https://simpleti.com.br/simplicio/#start">官网</a>
 </p>
 
 <p align="center">
-  <strong>🌍 Languages:</strong><br>
+  <strong>🌍 语言：</strong><br>
   <a href="README.md">🇬🇧 English</a> |
   <a href="READMEs/README.pt-BR.md">🇧🇷 Português</a> |
   <a href="READMEs/README.es-ES.md">🇪🇸 Español</a> |
@@ -39,35 +39,35 @@
 
 ---
 
-## ⚡ TL;DR
+## ⚡ 快速概览
 
-**Simplicio** is a terminal AI coding agent — a single binary that replaces your
-entire AI-assisted development workflow: chat, code generation, repository
-context, planning, local multi-agent orchestration (64 → 600 agents), and
-evidence-backed PR delivery.
+**Simplicio** 是一款终端 AI 编程代理——一个单一二进制文件即可替代你的
+整个 AI 辅助开发工作流：聊天、代码生成、仓库上下文、
+规划、本地多智能体编排（64 → 600 个代理）以及
+基于证据的 PR 交付。
 
-**Runs on your machine. Your code never leaves your control. Remote models are
-optional, not required.**
+**运行在你的机器上。你的代码始终在你的掌控之中。远程模型是
+可选项，而非必需项。**
 
-> **🔥 Save up to 96% of tokens vs traditional agents — more than Caveman (65%) or RTK (80%).**
-> Every interaction shows exactly how many tokens you saved. Single Rust binary, zero deps.
+> **🔥 相比传统代理，最多可节省 96% 的 Token——超过 Caveman (65%) 或 RTK (80%)。**
+> 每次交互都会精确显示你节省了多少 Token。单一 Rust 二进制文件，零依赖。
 
-## 🚀 Installation
+## 🚀 安装
 
-### npm / npx (any OS)
+### npm / npx（支持所有操作系统）
 
 ```bash
 npx simplicio install
 ```
 
-### pip / PyPI (any OS)
+### pip / PyPI（支持所有操作系统）
 
 ```bash
 pip install simplicio-installer
 simplicio install
 ```
 
-### Homebrew (macOS)
+### Homebrew（macOS）
 
 ```bash
 brew install simplicio
@@ -91,41 +91,41 @@ curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/inst
 powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.ps1 | iex"
 ```
 
-Done. One command. No package manager, no model configuration.
+完成。一条命令。无需包管理器，无需模型配置。
 
 ---
 
-## 💰 Token Savings — 96% is Real
+## 💰 Token 节省——96% 是真实可得的
 
-**Without Simplicio:** every AI session rediscovers your repo, loads too much
-context, repeats prompts, burns paid tokens.
+**没有 Simplicio：** 每次 AI 会话都重新探索你的仓库，加载过多
+上下文，重复提示，消耗付费 Token。
 
-**With Simplicio:**
+**有了 Simplicio：**
 
-| Optimization | Savings |
+| 优化项 | 节省比例 |
 |---|---|
-| 🗺️ **Repo Map** — compressed context instead of reading raw files | ~70% |
-| 🧠 **Memory Recall** — known facts are not re-derived | ~80% |
-| ✏️ **Deterministic Editing** — changes without spending LLM tokens | 100% (output) |
-| 🏠 **Local LLM** — classification, summarization, low-risk edits | ~90% |
-| 📡 **Remote LLM** — only for planning and complex decisions | ~85% |
-| 🔀 **Local Fan-out** — 64→600 agents before scaling to cloud | ~95% |
-| **💎 Combined: up to 96% total savings** | **~96%** |
+| 🗺️ **仓库地图** — 压缩上下文，而非读取原始文件 | ~70% |
+| 🧠 **记忆召回** — 已知事实无需重新推导 | ~80% |
+| ✏️ **确定性编辑** — 无需消耗 LLM Token 即可完成更改 | 100%（输出端） |
+| 🏠 **本地 LLM** — 分类、摘要、低风险编辑 | ~90% |
+| 📡 **远程 LLM** — 仅用于规划和复杂决策 | ~85% |
+| 🔀 **本地扇出** — 64→600 个代理，无需扩展至云端 | ~95% |
+| **💎 综合：最高可节省 96%** | **~96%** |
 
-**Every Simplicio response shows real savings:** `Simplicio: ~X tokens spent · saved ~Y (Z%)`
+**每次 Simplicio 响应都会显示真实节省：** `Simplicio: ~X 个 Token 已使用 · 节省 ~Y (Z%)`
 
 ---
 
-## 🎯 What It Does
+## 🎯 功能简介
 
-| Command | Description | Tokens |
+| 命令 | 描述 | Token |
 |---|---|---|
-| `simplicio map --repo .` | Maps the repository for LLMs | ~70% savings |
-| `simplicio memory "query"` | Neural recall (FTS + vectors) | ~80% savings |
-| `simplicio edit '{...}'` | Deterministic file editing | **Zero tokens** |
-| `simplicio coding-loop "task"` | Iterates until tests pass | Auto-repair |
-| `simplicio deliver certify` | 5 quality gates before shipping | Deterministic |
-| `simplicio run "task" --agents N` | Multi-agent orchestration | Local-first |
+| `simplicio map --repo .` | 为 LLM 映射仓库结构 | ~70% 节省 |
+| `simplicio memory "query"` | 神经记忆召回（全文搜索 + 向量） | ~80% 节省 |
+| `simplicio edit '{...}'` | 确定性文件编辑 | **零 Token** |
+| `simplicio coding-loop "task"` | 迭代直到测试通过 | 自动修复 |
+| `simplicio deliver certify` | 交付前通过 5 道质量关卡 | 确定性 |
+| `simplicio run "task" --agents N` | 多智能体编排 | 本地优先 |
 
 ---
 
@@ -133,67 +133,67 @@ context, repeats prompts, burns paid tokens.
 
 | | 🪨 Caveman | 🔧 RTK | 🔥 **Simplicio** |
 |---|---|---|---|
-| **Approach** | Output style compression | Shell command proxy | **Full agent runtime** |
-| **Max savings** | ~65% output tokens | ~80% on shell commands | **Up to 96% total** |
-| **Input compression** | ❌ | ✅ (filtered) | ✅ **Repo map + neural memory** |
-| **Output compression** | ✅ (caveman-speak) | ❌ | ✅ **Zero-token deterministic edits** |
-| **Local LLM** | ❌ | ❌ | ✅ **Built-in llama.cpp** |
-| **Multi-agent** | ❌ | ❌ | ✅ **64 → 600 local agents** |
-| **Memory across sessions** | ❌ | ❌ | ✅ **FTS + vector recall** |
-| **Evidence chain** | ❌ | ❌ | ✅ **sha256 sealed receipts** |
-| **Language** | JS/Python (skill) | Rust (binary) | **Rust (single binary)** |
-| **License** | MIT | Apache 2.0 | Proprietary |
-| **Stars** | 72.5k | 62.2k | ⭐ **You're early** |
+| **方法** | 输出风格压缩 | Shell 命令代理 | **完整智能体运行时** |
+| **最大节省** | ~65% 输出 Token | ~80% 在 shell 命令上 | **最高 96% 总计** |
+| **输入压缩** | ❌ | ✅（过滤） | ✅ **仓库地图 + 神经记忆** |
+| **输出压缩** | ✅（原始人语） | ❌ | ✅ **零 Token 确定性编辑** |
+| **本地 LLM** | ❌ | ❌ | ✅ **内置 llama.cpp** |
+| **多智能体** | ❌ | ❌ | ✅ **64 → 600 个本地代理** |
+| **跨会话记忆** | ❌ | ❌ | ✅ **全文搜索 + 向量召回** |
+| **证据链** | ❌ | ❌ | ✅ **sha256 密封收据** |
+| **语言** | JS/Python（技能） | Rust（二进制） | **Rust（单一二进制）** |
+| **许可证** | MIT | Apache 2.0 | 专有许可 |
+| **星标** | 72.5k | 62.2k | ⭐ **你来得真早** |
 
-**Bottom line:** Caveman makes the AI *talk* less. RTK makes commands *output* less.
-Simplicio makes the AI *think* less — by remembering, mapping, editing deterministically,
-and running locally before ever touching a paid LLM.
+**底线：** Caveman 让 AI *少说*。RTK 让命令 *少输出*。
+Simplicio 让 AI *少想*——通过记忆、映射、确定性编辑，
+以及在触及付费 LLM 之前在本地运行。
 
-| **Simplicio saves 96% where Caveman saves 65% and RTK saves 80%.** |
+| **Simplicio 节省 96%，而 Caveman 节省 65%，RTK 节省 80%。** |
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ 架构
 
 ```
-LLM (Claude/Codex/Gemini)          Simplicio Runtime (Rust)
+LLM (Claude/Codex/Gemini)          Simplicio 运行时 (Rust)
   |                                   |
-  | 1. Orient                         | simplicio map
-  | 2. Recall                         | simplicio memory
-  | 3. Decide                         |
-  | 4. Edit  ───────────────────────> | simplicio edit (0 tokens)
-  | 5. Verify <─────────────────────  | simplicio deliver certify
-  | 6. Iterate                        | simplicio coding-loop
+  | 1. 定位                           | simplicio map
+  | 2. 回忆                           | simplicio memory
+  | 3. 决策                           |
+  | 4. 编辑  ───────────────────────> | simplicio edit (0 Token)
+  | 5. 验证 <─────────────────────  | simplicio deliver certify
+  | 6. 迭代                           | simplicio coding-loop
 ```
 
-**The LLM reasons. Simplicio executes deterministically.**
+**LLM 负责推理。Simplicio 负责确定性执行。**
 
 ---
 
-## ✨ Features
+## ✨ 特性
 
-- 🏠 **Local-first** — built-in llama.cpp, scales to remote only when needed
-- 🪜 **Tiered agents** — 64 → 100 → 200 → 600 local agents before paid cloud
-- 🔇 **Shannon novelty gate** — filters redundant outputs (zero tokens on dedup)
-- 🔒 **Sealed receipts** — sha256 per artifact, tamper-proof evidence chain
-- 🛡️ **5 delivery gates** — acceptance, validation, run-verify, regression, self-review
-- ⚡ **Action gate** — risk classification + blocklist for chat-initiated mutations
-- 🔌 **MCP/ACP** — Model Context Protocol + Agent Client Protocol
-- 🌐 **Gateways** — Telegram, Discord, Slack, WhatsApp
-- 🧩 **Skill system** — loads and chains reusable capabilities
-- 💾 **Memory DB** — persistent FTS + vector recall across sessions
-- 🔀 **LLM router** — no LLM → local LLM → remote LLM automatically
-- 🖥️ **Cross-platform** — macOS, Linux, Windows, single binary
+- 🏠 **本地优先** — 内置 llama.cpp，仅在需要时扩展至远程
+- 🪜 **分层代理** — 64 → 100 → 200 → 600 个本地代理，之后才使用付费云端
+- 🔇 **Shannon 新颖性门控** — 过滤冗余输出（去重零 Token）
+- 🔒 **密封收据** — 每个工件 sha256，防篡改证据链
+- 🛡️ **5 道交付关卡** — 验收、验证、运行验证、回归、自审
+- ⚡ **操作门控** — 针对聊天发起的变更的风险分类 + 黑名单
+- 🔌 **MCP/ACP** — 模型上下文协议 + 智能体客户端协议
+- 🌐 **网关** — Telegram、Discord、Slack、WhatsApp
+- 🧩 **技能系统** — 加载并链式组合可复用的能力
+- 💾 **记忆数据库** — 跨会话持久化的全文搜索 + 向量召回
+- 🔀 **LLM 路由器** — 无 LLM → 本地 LLM → 远程 LLM 自动切换
+- 🖥️ **跨平台** — macOS、Linux、Windows，单一二进制文件
 
 ---
 
-## 🎁 Free Public Beta
+## 🎁 免费公测
 
-**Deterministic commands are FREE forever:**
-`map`, `validate`, `edit`, `deliver`, `checkpoint`
+**确定性命令永久免费：**
+`map`、`validate`、`edit`、`deliver`、`checkpoint`
 
-**AI features are free during the public beta with no end date.**
-Billing will be defined in future updates.
+**AI 功能在公测期间免费，无截止日期。**
+计费方案将在未来更新中确定。
 
 ```bash
 simplicio license status
@@ -201,46 +201,46 @@ simplicio license status
 
 ---
 
-## 📋 Requirements
+## 📋 系统要求
 
-| Requirement | Minimum | Recommended |
+| 要求 | 最低配置 | 推荐配置 |
 |---|---|---|
-| RAM | 8 GB | 16 GB+ |
-| Storage | 5 MB | 1.5 GB (with local LLM) |
-| OS | macOS 13+, Linux, Windows 10+ | macOS ARM64 |
-| Terminal | any modern terminal | WezTerm / Alacritty / Ghostty |
+| 内存 | 8 GB | 16 GB+ |
+| 存储 | 5 MB | 1.5 GB（含本地 LLM） |
+| 操作系统 | macOS 13+、Linux、Windows 10+ | macOS ARM64 |
+| 终端 | 任意现代终端 | WezTerm / Alacritty / Ghostty |
 
 ---
 
-## 🌐 Ecosystem
+## 🌐 生态系统
 
-- [Website](https://simpleti.com.br/simplicio/#start) — full docs, benchmarks, install
-- [Discord](https://discord.gg/wM6tr7xVb) — community and support
-
----
-
-## 📄 License
-
-Proprietary. Binary free to download and use. AI features free during the
-public beta. See [LICENSE](LICENSE).
+- [官网](https://simpleti.com.br/simplicio/#start) — 完整文档、基准测试、安装指南
+- [Discord](https://discord.gg/wM6tr7xVb) — 社区与支持
 
 ---
 
-## ⭐ Star History
+## 📄 许可证
+
+专有许可。二进制文件可免费下载和使用。AI 功能在公开
+公测期间免费。详见 [LICENSE](LICENSE)。
+
+---
+
+## ⭐ 星标历史
 
 <a href="https://star-history.com/#wesleysimplicio/simplicio&Date">
-  <img src="https://api.star-history.com/svg?repos=wesleysimplicio/simplicio&type=Date" alt="Star History Chart" width="100%" />
+  <img src="https://api.star-history.com/svg?repos=wesleysimplicio/simplicio&type=Date" alt="星标历史图表" width="100%" />
 </a>
 
 ---
 
-## 💬 Community
+## 💬 社区
 
-- [Discord](https://discord.gg/wM6tr7xVb) — chat, support, early access
-- [GitHub Issues](https://github.com/wesleysimplicio/simplicio/issues) — bugs and feature requests
+- [Discord](https://discord.gg/wM6tr7xVb) — 聊天、支持、抢先体验
+- [GitHub Issues](https://github.com/wesleysimplicio/simplicio/issues) — 报告问题和功能请求
 
 ---
 
 <p align="center">
-  <strong>🔥 Simplicio — Your code, your machine, 96% cheaper. 🔥</strong>
+  <strong>🔥 Simplicio — 你的代码，你的机器，便宜 96%。 🔥</strong>
 </p>

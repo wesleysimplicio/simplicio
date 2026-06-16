@@ -1,25 +1,25 @@
-# 🔥 Simplicio — The AI Agent That SAVES UP TO 96% OF YOUR TOKENS
+# 🔥 Simplicio — Ejen AI Yang MENJIMATKAN SEHINGGA 96% TOKEN ANDA
 
 <p align="center">
-  <img src="assets/simplicio-hero.png" alt="Simplicio — AI coding agent" width="920" />
+  <img src="assets/simplicio-hero.png" alt="Simplicio — ejen pengekodan AI" width="920" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/wesleysimplicio/simplicio/releases/latest"><img src="https://img.shields.io/github/v/release/wesleysimplicio/simplicio?color=blue&label=latest" alt="Latest Release"></a>
-  <a href="https://github.com/wesleysimplicio/simplicio/stargazers"><img src="https://img.shields.io/github/stars/wesleysimplicio/simplicio?style=social" alt="Stars"></a>
-  <a href="https://github.com/wesleysimplicio/simplicio/releases"><img src="https://img.shields.io/github/downloads/wesleysimplicio/simplicio/total?color=green" alt="Downloads"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="License"></a>
+  <a href="https://github.com/wesleysimplicio/simplicio/releases/latest"><img src="https://img.shields.io/github/v/release/wesleysimplicio/simplicio?color=blue&label=terkini" alt="Keluaran Terkini"></a>
+  <a href="https://github.com/wesleysimplicio/simplicio/stargazers"><img src="https://img.shields.io/github/stars/wesleysimplicio/simplicio?style=social" alt="Bintang"></a>
+  <a href="https://github.com/wesleysimplicio/simplicio/releases"><img src="https://img.shields.io/github/downloads/wesleysimplicio/simplicio/total?color=green" alt="Muat Turun"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/licensi-Proprietary-red" alt="Lesen"></a>
 </p>
 
 <p align="center">
-  <a href="#-installation">Install</a> ·
-  <a href="#-what-it-does">Features</a> ·
-  <a href="#-token-savings">96% Savings</a> ·
-  <a href="https://simpleti.com.br/simplicio/#start">Website</a>
+  <a href="#-pemasangan">Pasang</a> ·
+  <a href="#-apa-yang-ia-lakukan">Ciri</a> ·
+  <a href="#-penjimatan-token">Penjimatan 96%</a> ·
+  <a href="https://simpleti.com.br/simplicio/#start">Laman Web</a>
 </p>
 
 <p align="center">
-  <strong>🌍 Languages:</strong><br>
+  <strong>🌍 Bahasa:</strong><br>
   <a href="README.md">🇬🇧 English</a> |
   <a href="READMEs/README.pt-BR.md">🇧🇷 Português</a> |
   <a href="READMEs/README.es-ES.md">🇪🇸 Español</a> |
@@ -39,28 +39,28 @@
 
 ---
 
-## ⚡ TL;DR
+## ⚡ RL;DR
 
-**Simplicio** is a terminal AI coding agent — a single binary that replaces your
-entire AI-assisted development workflow: chat, code generation, repository
-context, planning, local multi-agent orchestration (64 → 600 agents), and
-evidence-backed PR delivery.
+**Simplicio** ialah ejen pengekodan AI terminal — satu binari yang menggantikan
+keseluruhan aliran kerja pembangunan berbantu AI anda: sembang, penjanaan kod,
+konteks repositori, perancangan, orkestrasi multi-ejen tempatan (64 → 600 ejen),
+dan penghantaran PR berasaskan bukti.
 
-**Runs on your machine. Your code never leaves your control. Remote models are
-optional, not required.**
+**Berjalan di mesin anda. Kod anda tidak pernah meninggalkan kawalan anda. Model
+jarak jauh adalah pilihan, bukan keperluan.**
 
-> **🔥 Save up to 96% of tokens vs traditional agents — more than Caveman (65%) or RTK (80%).**
-> Every interaction shows exactly how many tokens you saved. Single Rust binary, zero deps.
+> **🔥 Jimat sehingga 96% token berbanding ejen tradisional — lebih daripada Caveman (65%) atau RTK (80%).**
+> Setiap interaksi menunjukkan dengan tepat berapa banyak token yang anda jimatkan. Binari Rust tunggal, sifar kebergantungan.
 
-## 🚀 Installation
+## 🚀 Pemasangan
 
-### npm / npx (any OS)
+### npm / npx (sebarang OS)
 
 ```bash
 npx simplicio install
 ```
 
-### pip / PyPI (any OS)
+### pip / PyPI (sebarang OS)
 
 ```bash
 pip install simplicio-installer
@@ -91,41 +91,41 @@ curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/inst
 powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.ps1 | iex"
 ```
 
-Done. One command. No package manager, no model configuration.
+Selesai. Satu arahan. Tiada pengurus pakej, tiada konfigurasi model.
 
 ---
 
-## 💰 Token Savings — 96% is Real
+## 💰 Penjimatan Token — 96% Adalah Nyata
 
-**Without Simplicio:** every AI session rediscovers your repo, loads too much
-context, repeats prompts, burns paid tokens.
+**Tanpa Simplicio:** setiap sesi AI menemui semula repositori anda, memuatkan terlalu
+banyak konteks, mengulang gesaan, membakar token berbayar.
 
-**With Simplicio:**
+**Dengan Simplicio:**
 
-| Optimization | Savings |
+| Pengoptimuman | Penjimatan |
 |---|---|
-| 🗺️ **Repo Map** — compressed context instead of reading raw files | ~70% |
-| 🧠 **Memory Recall** — known facts are not re-derived | ~80% |
-| ✏️ **Deterministic Editing** — changes without spending LLM tokens | 100% (output) |
-| 🏠 **Local LLM** — classification, summarization, low-risk edits | ~90% |
-| 📡 **Remote LLM** — only for planning and complex decisions | ~85% |
-| 🔀 **Local Fan-out** — 64→600 agents before scaling to cloud | ~95% |
-| **💎 Combined: up to 96% total savings** | **~96%** |
+| 🗺️ **Peta Repo** — konteks dimampatkan dan bukannya membaca fail mentah | ~70% |
+| 🧠 **Ingatan Semula** — fakta diketahui tidak diterbitkan semula | ~80% |
+| ✏️ **Suntingan Deterministik** — perubahan tanpa menggunakan token LLM | 100% (output) |
+| 🏠 **LLM Tempatan** — pengelasan, rumusan, suntingan berisiko rendah | ~90% |
+| 📡 **LLM Jarak Jauh** — hanya untuk perancangan dan keputusan kompleks | ~85% |
+| 🔀 **Fan-out Tempatan** — 64→600 ejen sebelum penskalaan ke awan | ~95% |
+| **💎 Gabungan: sehingga 96% jumlah penjimatan** | **~96%** |
 
-**Every Simplicio response shows real savings:** `Simplicio: ~X tokens spent · saved ~Y (Z%)`
+**Setiap respons Simplicio menunjukkan penjimatan sebenar:** `Simplicio: ~X token digunakan · jimat ~Y (Z%)`
 
 ---
 
-## 🎯 What It Does
+## 🎯 Apa Yang Ia Lakukan
 
-| Command | Description | Tokens |
+| Perintah | Penerangan | Token |
 |---|---|---|
-| `simplicio map --repo .` | Maps the repository for LLMs | ~70% savings |
-| `simplicio memory "query"` | Neural recall (FTS + vectors) | ~80% savings |
-| `simplicio edit '{...}'` | Deterministic file editing | **Zero tokens** |
-| `simplicio coding-loop "task"` | Iterates until tests pass | Auto-repair |
-| `simplicio deliver certify` | 5 quality gates before shipping | Deterministic |
-| `simplicio run "task" --agents N` | Multi-agent orchestration | Local-first |
+| `simplicio map --repo .` | Memetakan repositori untuk LLM | ~70% penjimatan |
+| `simplicio memory "query"` | Ingatan semula neural (FTS + vektor) | ~80% penjimatan |
+| `simplicio edit '{...}'` | Suntingan fail deterministik | **Sifar token** |
+| `simplicio coding-loop "tugas"` | Berulang sehingga ujian lulus | Auto-pembaikan |
+| `simplicio deliver certify` | 5 pintu kualiti sebelum penghantaran | Deterministik |
+| `simplicio run "tugas" --agents N` | Orkestrasi multi-ejen | Tempatan-dahulu |
 
 ---
 
@@ -133,27 +133,27 @@ context, repeats prompts, burns paid tokens.
 
 | | 🪨 Caveman | 🔧 RTK | 🔥 **Simplicio** |
 |---|---|---|---|
-| **Approach** | Output style compression | Shell command proxy | **Full agent runtime** |
-| **Max savings** | ~65% output tokens | ~80% on shell commands | **Up to 96% total** |
-| **Input compression** | ❌ | ✅ (filtered) | ✅ **Repo map + neural memory** |
-| **Output compression** | ✅ (caveman-speak) | ❌ | ✅ **Zero-token deterministic edits** |
-| **Local LLM** | ❌ | ❌ | ✅ **Built-in llama.cpp** |
-| **Multi-agent** | ❌ | ❌ | ✅ **64 → 600 local agents** |
-| **Memory across sessions** | ❌ | ❌ | ✅ **FTS + vector recall** |
-| **Evidence chain** | ❌ | ❌ | ✅ **sha256 sealed receipts** |
-| **Language** | JS/Python (skill) | Rust (binary) | **Rust (single binary)** |
-| **License** | MIT | Apache 2.0 | Proprietary |
-| **Stars** | 72.5k | 62.2k | ⭐ **You're early** |
+| **Pendekatan** | Mampatan gaya output | Proksi arahan shell | **Runtime ejen penuh** |
+| **Penjimatan maks** | ~65% token output | ~80% pada arahan shell | **Sehingga 96% jumlah** |
+| **Mampatan input** | ❌ | ✅ (ditapis) | ✅ **Peta repo + ingatan neural** |
+| **Mampatan output** | ✅ (caveman-speak) | ❌ | ✅ **Suntingan deterministik sifar token** |
+| **LLM Tempatan** | ❌ | ❌ | ✅ **llama.cpp terbina dalam** |
+| **Multi-ejen** | ❌ | ❌ | ✅ **64 → 600 ejen tempatan** |
+| **Ingatan merentas sesi** | ❌ | ❌ | ✅ **FTS + ingatan vektor** |
+| **Rantaian bukti** | ❌ | ❌ | ✅ **Resit bermeterai sha256** |
+| **Bahasa** | JS/Python (kemahiran) | Rust (binari) | **Rust (binari tunggal)** |
+| **Lesen** | MIT | Apache 2.0 | Proprietari |
+| **Bintang** | 72.5k | 62.2k | ⭐ **Anda awal** |
 
-**Bottom line:** Caveman makes the AI *talk* less. RTK makes commands *output* less.
-Simplicio makes the AI *think* less — by remembering, mapping, editing deterministically,
-and running locally before ever touching a paid LLM.
+**Kesimpulan:** Caveman membuat AI *bercakap* kurang. RTK membuat arahan *output* kurang.
+Simplicio membuat AI *berfikir* kurang — dengan mengingat, memetakan, menyunting secara
+deterministik, dan berjalan secara tempatan sebelum menyentuh LLM berbayar.
 
-| **Simplicio saves 96% where Caveman saves 65% and RTK saves 80%.** |
+| **Simplicio menjimatkan 96% di mana Caveman menjimatkan 65% dan RTK menjimatkan 80%.** |
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Seni Bina
 
 ```
 LLM (Claude/Codex/Gemini)          Simplicio Runtime (Rust)
@@ -166,34 +166,34 @@ LLM (Claude/Codex/Gemini)          Simplicio Runtime (Rust)
   | 6. Iterate                        | simplicio coding-loop
 ```
 
-**The LLM reasons. Simplicio executes deterministically.**
+**LLM menaakul. Simplicio melaksana secara deterministik.**
 
 ---
 
-## ✨ Features
+## ✨ Ciri
 
-- 🏠 **Local-first** — built-in llama.cpp, scales to remote only when needed
-- 🪜 **Tiered agents** — 64 → 100 → 200 → 600 local agents before paid cloud
-- 🔇 **Shannon novelty gate** — filters redundant outputs (zero tokens on dedup)
-- 🔒 **Sealed receipts** — sha256 per artifact, tamper-proof evidence chain
-- 🛡️ **5 delivery gates** — acceptance, validation, run-verify, regression, self-review
-- ⚡ **Action gate** — risk classification + blocklist for chat-initiated mutations
-- 🔌 **MCP/ACP** — Model Context Protocol + Agent Client Protocol
-- 🌐 **Gateways** — Telegram, Discord, Slack, WhatsApp
-- 🧩 **Skill system** — loads and chains reusable capabilities
-- 💾 **Memory DB** — persistent FTS + vector recall across sessions
-- 🔀 **LLM router** — no LLM → local LLM → remote LLM automatically
-- 🖥️ **Cross-platform** — macOS, Linux, Windows, single binary
+- 🏠 **Tempatan-dahulu** — llama.cpp terbina dalam, skala ke jarak jauh hanya apabila perlu
+- 🪜 **Ejen bertingkat** — 64 → 100 → 200 → 600 ejen tempatan sebelum awan berbayar
+- 🔇 **Gerbang kebaharuan Shannon** — menapis output berlebihan (sifar token pada dedup)
+- 🔒 **Resit bermeterai** — sha256 setiap artifak, rantaian bukti kalis gangguan
+- 🛡️ **5 pintu penghantaran** — penerimaan, pengesahan, laksana-verify, regresi, semakan sendiri
+- ⚡ **Gerbang tindakan** — pengelasan risiko + senarai blok untuk mutasi cetusan sembang
+- 🔌 **MCP/ACP** — Protokol Konteks Model + Protokol Klien Ejen
+- 🌐 **Gerbang** — Telegram, Discord, Slack, WhatsApp
+- 🧩 **Sistem kemahiran** — memuat dan merantai kebolehan boleh guna semula
+- 💾 **Pangkalan data ingatan** — FTS berterusan + ingatan vektor merentas sesi
+- 🔀 **Penghala LLM** — tiada LLM → LLM tempatan → LLM jarak jauh secara automatik
+- 🖥️ **Merentas platform** — macOS, Linux, Windows, binari tunggal
 
 ---
 
-## 🎁 Free Public Beta
+## 🎁 Beta Awam Percuma
 
-**Deterministic commands are FREE forever:**
+**Perintah deterministik adalah PERCUMA selama-lamanya:**
 `map`, `validate`, `edit`, `deliver`, `checkpoint`
 
-**AI features are free during the public beta with no end date.**
-Billing will be defined in future updates.
+**Ciri AI adalah percuma semasa beta awam tanpa tarikh tamat.**
+Pengecasan akan ditentukan dalam kemas kini akan datang.
 
 ```bash
 simplicio license status
@@ -201,46 +201,46 @@ simplicio license status
 
 ---
 
-## 📋 Requirements
+## 📋 Keperluan
 
-| Requirement | Minimum | Recommended |
+| Keperluan | Minimum | Disarankan |
 |---|---|---|
 | RAM | 8 GB | 16 GB+ |
-| Storage | 5 MB | 1.5 GB (with local LLM) |
+| Storan | 5 MB | 1.5 GB (dengan LLM tempatan) |
 | OS | macOS 13+, Linux, Windows 10+ | macOS ARM64 |
-| Terminal | any modern terminal | WezTerm / Alacritty / Ghostty |
+| Terminal | mana-mana terminal moden | WezTerm / Alacritty / Ghostty |
 
 ---
 
-## 🌐 Ecosystem
+## 🌐 Ekosistem
 
-- [Website](https://simpleti.com.br/simplicio/#start) — full docs, benchmarks, install
-- [Discord](https://discord.gg/wM6tr7xVb) — community and support
-
----
-
-## 📄 License
-
-Proprietary. Binary free to download and use. AI features free during the
-public beta. See [LICENSE](LICENSE).
+- [Laman Web](https://simpleti.com.br/simplicio/#start) — dokumen penuh, penanda aras, pemasangan
+- [Discord](https://discord.gg/wM6tr7xVb) — komuniti dan sokongan
 
 ---
 
-## ⭐ Star History
+## 📄 Lesen
+
+Proprietari. Binari percuma untuk dimuat turun dan digunakan. Ciri AI percuma
+semasa beta awam. Lihat [LICENSE](LICENSE).
+
+---
+
+## ⭐ Sejarah Bintang
 
 <a href="https://star-history.com/#wesleysimplicio/simplicio&Date">
-  <img src="https://api.star-history.com/svg?repos=wesleysimplicio/simplicio&type=Date" alt="Star History Chart" width="100%" />
+  <img src="https://api.star-history.com/svg?repos=wesleysimplicio/simplicio&type=Date" alt="Carta Sejarah Bintang" width="100%" />
 </a>
 
 ---
 
-## 💬 Community
+## 💬 Komuniti
 
-- [Discord](https://discord.gg/wM6tr7xVb) — chat, support, early access
-- [GitHub Issues](https://github.com/wesleysimplicio/simplicio/issues) — bugs and feature requests
+- [Discord](https://discord.gg/wM6tr7xVb) — sembang, sokongan, akses awal
+- [Isu GitHub](https://github.com/wesleysimplicio/simplicio/issues) — pepijat dan permintaan ciri
 
 ---
 
 <p align="center">
-  <strong>🔥 Simplicio — Your code, your machine, 96% cheaper. 🔥</strong>
+  <strong>🔥 Simplicio — Kod anda, mesin anda, 96% lebih murah. 🔥</strong>
 </p>
