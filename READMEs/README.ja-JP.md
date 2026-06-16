@@ -54,6 +54,12 @@ optional, not required.**
 
 ## 🚀 Installation
 
+### npm / npx (any OS)
+
+```bash
+npx simplicio install
+```
+
 ### macOS / Linux
 
 ```bash
