@@ -67,6 +67,12 @@ pip install simplicio-installer
 simplicio install
 ```
 
+### Homebrew (macOS)
+
+```bash
+brew install simplicio
+```
+
 ### macOS / Linux
 
 ```bash
