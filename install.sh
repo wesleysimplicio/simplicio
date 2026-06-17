@@ -41,9 +41,11 @@ err()   { printf "${RED}  ✗${NC} %s\n" "$*"; exit 1; }
 OS="$(uname -s)"
 ARCH="$(uname -m)"
 
+# Asset OS/arch must match the published release names:
+#   simplicio-linux-x64 · simplicio-darwin-arm64 · simplicio-windows-x64
 case "$OS" in
   Darwin)
-    OS_TARGET="macos"
+    OS_TARGET="darwin"
     ;;
   Linux)
     OS_TARGET="linux"
@@ -59,14 +61,14 @@ esac
 
 case "$ARCH" in
   x86_64|amd64)
-    ARCH_TARGET="x86_64"
+    ARCH_TARGET="x64"
     ;;
   aarch64|arm64)
-    ARCH_TARGET="aarch64"
+    ARCH_TARGET="arm64"
     ;;
   *)
-    warn "untested architecture: $ARCH (assuming x86_64)"
-    ARCH_TARGET="x86_64"
+    warn "untested architecture: $ARCH (assuming x64)"
+    ARCH_TARGET="x64"
     ;;
 esac
 
@@ -106,40 +108,28 @@ if [ -z "$VERSION" ]; then
 fi
 
 # ─── Download binary ─────────────────────────────────────────────────────────
-DOWNLOAD_URL="$GITHUB/releases/download/$VERSION/simplicio-$VERSION-$OS_TARGET-$ARCH_TARGET.tar.gz"
-FALLBACK_URL="$GITHUB/releases/download/$VERSION/simplicio-$OS_TARGET-$ARCH_TARGET.tar.gz"
-BINARY_URL="$RAW/$BIN_NAME"
+# Release assets are raw binaries named simplicio-<os>-<arch> (no tarball).
+ASSET="simplicio-$OS_TARGET-$ARCH_TARGET"
+TAGGED_URL="$GITHUB/releases/download/$VERSION/$ASSET"
+LATEST_URL="$GITHUB/releases/latest/download/$ASSET"
 
-info "downloading simplicio..."
+info "downloading $ASSET..."
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-# Try release tarball first, fall back to raw binary
-if curl -sSfL "$DOWNLOAD_URL" -o "$TMP_DIR/release.tar.gz" 2>/dev/null; then
-  info "extracting release tarball..."
-  tar xzf "$TMP_DIR/release.tar.gz" -C "$TMP_DIR"
-  # Find the binary inside the extracted dir
-  BINARY_SRC=$(find "$TMP_DIR" -name "$BIN_NAME" -type f | head -1)
-  if [ -z "$BINARY_SRC" ]; then
-    err "binary not found in release tarball"
+# Try the pinned tag first, then the 'latest' redirect (covers VERSION=latest /
+# API hiccups). Both are raw binaries from the PUBLIC simplicio repo.
+BINARY_SRC=""
+for _u in "$TAGGED_URL" "$LATEST_URL"; do
+  if curl -sSfL --max-time 60 "$_u" -o "$TMP_DIR/$BIN_NAME" 2>/dev/null && [ -s "$TMP_DIR/$BIN_NAME" ]; then
+    BINARY_SRC="$TMP_DIR/$BIN_NAME"
+    break
   fi
-elif curl -sSfL "$FALLBACK_URL" -o "$TMP_DIR/release.tar.gz" 2>/dev/null; then
-  info "extracting release tarball (fallback url)..."
-  tar xzf "$TMP_DIR/release.tar.gz" -C "$TMP_DIR"
-  BINARY_SRC=$(find "$TMP_DIR" -name "$BIN_NAME" -type f | head -1)
-  if [ -z "$BINARY_SRC" ]; then
-    err "binary not found in release tarball"
-  fi
-else
-  # Raw binary fallback
-  info "downloading raw binary..."
-  curl -sSfL "$BINARY_URL" -o "$TMP_DIR/$BIN_NAME"
-  BINARY_SRC="$TMP_DIR/$BIN_NAME"
-fi
+done
 
-if [ ! -f "$BINARY_SRC" ]; then
-  err "download failed (no binary found)"
+if [ -z "$BINARY_SRC" ] || [ ! -s "$BINARY_SRC" ]; then
+  err "download failed for $ASSET — try: npm install -g @wesleysimplicio/simplicio"
 fi
 
 chmod +x "$BINARY_SRC"
