@@ -63,7 +63,7 @@ foreach ($u in $urls) {
   } catch { Write-Host "  ⚠ failed: $($_.Exception.Message)" }
 }
 if (-not $dlOk) {
-  Write-Error "Download failed for $Asset. Try: npm install -g @wesleysimplicio/simplicio"
+  Write-Error "Download failed for $Asset. Get it at https://github.com/wesleysimplicio/simplicio/releases/latest"
   exit 1
 }
 Write-Host "  ✓ installed: $DestPath"
