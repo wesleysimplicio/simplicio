@@ -1,6 +1,6 @@
 {
   "schema": "simplicio.update-manifest/v1",
-  "version": "0.8.0",
+  "version": "1.0.2",
   "channel": "stable",
   "security": {
     "checksum_algorithm": "SHA256",
@@ -24,7 +24,7 @@
     {
       "target": "macos-arm64",
       "artifact": "simplicio-macos-arm64",
-      "sha256": "dc45def336dd882961ea72155e8523099cd741e882631a79454ec159bb64299c",
+      "sha256": "a525ae7dec531dd849563451aae96915b93ff17efb1ed4289169461d7f6522ad",
       "signature": "ed25519:YPXU7ouNPTKfXzNoIiP8NiSl4LV2SvGSukIssQo2eOKd2RI9CQ2z4ocqd9rw3DcXaPuPySS/A6/I3qzYY1IIAA==",
       "signature_algorithm": "ed25519"
     }
