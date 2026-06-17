@@ -17,8 +17,8 @@ $ErrorActionPreference = "Stop"
 $Repo = "wesleysimplicio/simplicio"
 $BinName = "simplicio.exe"
 
-# Detect architecture
-$Arch = if ([Environment]::Is64BitOperatingSystem) { "x86_64" } else { "x86" }
+# Detect architecture. Published Windows asset is simplicio-windows-x64.
+$Arch = "x64"
 
 Write-Host "==> simplicio installer for Windows ($Arch)"
 
@@ -46,44 +46,27 @@ if (-not $Version) {
   }
 }
 
-# Download
-$Tarball = "simplicio-$Version-windows-$Arch.tar.gz"
-$DownloadUrl = "https://github.com/$Repo/releases/download/$Version/$Tarball"
-$TempDir = [System.IO.Path]::GetTempPath()
-$TarballPath = Join-Path $TempDir $Tarball
-
-Write-Host "==> downloading $DownloadUrl"
-try {
-  Invoke-WebRequest -Uri $DownloadUrl -OutFile $TarballPath -ErrorAction Stop
-} catch {
-  # Fallback: try alternate URL without version in filename
-  $FallbackUrl = "https://github.com/$Repo/releases/download/$Version/simplicio-windows-$Arch.tar.gz"
-  Write-Host "  ⚠ trying fallback: $FallbackUrl"
-  Invoke-WebRequest -Uri $FallbackUrl -OutFile $TarballPath -ErrorAction Stop
+# Download. Release assets are raw binaries named simplicio-windows-x64
+# (no tarball). Try the pinned tag then the 'latest' redirect.
+$Asset = "simplicio-windows-$Arch"
+$DestPath = Join-Path $InstallDir $BinName
+$urls = @(
+  "https://github.com/$Repo/releases/download/$Version/$Asset",
+  "https://github.com/$Repo/releases/latest/download/$Asset"
+)
+$dlOk = $false
+foreach ($u in $urls) {
+  Write-Host "==> downloading $u"
+  try {
+    Invoke-WebRequest -Uri $u -OutFile $DestPath -UseBasicParsing -ErrorAction Stop
+    if ((Test-Path $DestPath) -and ((Get-Item $DestPath).Length -gt 0)) { $dlOk = $true; break }
+  } catch { Write-Host "  ⚠ failed: $($_.Exception.Message)" }
 }
-
-# Extract
-Write-Host "==> extracting..."
-$ExtractDir = Join-Path $TempDir "simplicio-install"
-if (Test-Path $ExtractDir) { Remove-Item -Recurse -Force $ExtractDir }
-New-Item -ItemType Directory -Force -Path $ExtractDir | Out-Null
-tar -xzf $TarballPath -C $ExtractDir
-
-# Find binary
-$BinarySrc = Get-ChildItem -Path $ExtractDir -Recurse -Filter $BinName | Select-Object -First 1
-if (-not $BinarySrc) {
-  Write-Error "Binary not found in downloaded archive"
+if (-not $dlOk) {
+  Write-Error "Download failed for $Asset. Try: npm install -g @wesleysimplicio/simplicio"
   exit 1
 }
-
-# Install
-$DestPath = Join-Path $InstallDir $BinName
-Copy-Item -Path $BinarySrc.FullName -Destination $DestPath -Force
 Write-Host "  ✓ installed: $DestPath"
-
-# Cleanup
-Remove-Item -Recurse -Force $ExtractDir
-Remove-Item -Force $TarballPath
 
 # Verify
 try {
