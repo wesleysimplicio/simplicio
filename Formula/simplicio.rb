@@ -4,21 +4,21 @@
 class Simplicio < Formula
   desc "AI coding agent that saves up to 96% on tokens"
   homepage "https://simpleti.com.br/simplicio/#start"
-  version "1.0.0"
+  version "1.0.2"
   license "Proprietary"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/wesleysimplicio/simplicio/releases/download/v/simplicio-macos-arm64"
-      sha256 "dc45def336dd882961ea72155e8523099cd741e882631a79454ec159bb64299c"
+      url "https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/simplicio"
+      sha256 "a525ae7dec531dd849563451aae96915b93ff17efb1ed4289169461d7f6522ad"
     else
-      url "https://github.com/wesleysimplicio/simplicio/releases/download/v/simplicio-macos-arm64"
-      sha256 "dc45def336dd882961ea72155e8523099cd741e882631a79454ec159bb64299c"
+      url "https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/simplicio"
+      sha256 "a525ae7dec531dd849563451aae96915b93ff17efb1ed4289169461d7f6522ad"
     end
   end
 
   def install
-    bin.install "simplicio-macos-arm64" => "simplicio"
+    bin.install "simplicio" => "simplicio"
   end
 
   test do
