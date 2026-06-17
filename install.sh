@@ -129,7 +129,7 @@ for _u in "$TAGGED_URL" "$LATEST_URL"; do
 done
 
 if [ -z "$BINARY_SRC" ] || [ ! -s "$BINARY_SRC" ]; then
-  err "download failed for $ASSET — try: npm install -g @wesleysimplicio/simplicio"
+  err "download failed for $ASSET — get it at https://github.com/wesleysimplicio/simplicio/releases/latest"
 fi
 
 chmod +x "$BINARY_SRC"
