@@ -22,7 +22,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Read version from manifest
         id: ver
-        run: echo "version=$(jq -r .version simplicio-update-manifest.json)" >> "$GITHUB_OUTPUT"
+        shell: pwsh
+        run: echo "version=$((Get-Content simplicio-update-manifest.json | ConvertFrom-Json).version)" >> $env:GITHUB_OUTPUT
       - name: Stage release assets
         run: |
           mkdir -p dist
