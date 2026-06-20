@@ -4,16 +4,16 @@
 class Simplicio < Formula
   desc "AI coding agent that saves up to 96% on tokens"
   homepage "https://simpleti.com.br/simplicio/#start"
-  version "1.0.4"
+  version "1.2.0"
   license "Proprietary"
 
   on_macos do
     if Hardware::CPU.arm?
       url "https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/simplicio"
-      sha256 "36dd2cbb21ecd7ac2bdd944dd0f90b051b8db6d6d6b4eb736a2906f533f74b55"
+      sha256 "d6d6eee7b086c6f25e13a313444d4d0533aeb45c01a8c9f2dce1f119e29e43c0"
     else
       url "https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/simplicio"
-      sha256 "36dd2cbb21ecd7ac2bdd944dd0f90b051b8db6d6d6b4eb736a2906f533f74b55"
+      sha256 "d6d6eee7b086c6f25e13a313444d4d0533aeb45c01a8c9f2dce1f119e29e43c0"
     end
   end
 

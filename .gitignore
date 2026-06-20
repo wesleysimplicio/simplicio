@@ -1,2 +1,3 @@
 .npmrc
 *.egg-info/
+dist/
