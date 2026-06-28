@@ -11,57 +11,45 @@ import subprocess
 import sys
 import os
 import platform
-import urllib.request
-import json
-import tarfile
-import io
 import shutil
 
-INSTALL_DIR = os.path.expanduser("~/.simplicio/bin")
+# Canonical install location (matches install.sh / install.ps1).
+INSTALL_DIR = os.path.expanduser("~/.local/bin")
 BINARY_NAME = "simplicio" + (".exe" if platform.system() == "Windows" else "")
 BINARY_PATH = os.path.join(INSTALL_DIR, BINARY_NAME)
 
+def _resolve_binary():
+    """Find the installed real binary: canonical dir first, then PATH."""
+    if os.path.exists(BINARY_PATH):
+        return BINARY_PATH
+    found = shutil.which("simplicio")
+    # Avoid recursing into this very wrapper if it shadows the real binary.
+    if found and os.path.realpath(found) != os.path.realpath(sys.argv[0]):
+        return found
+    return None
+
 def do_install() -> None:
-    """Download and install the Simplicio binary."""
-    print("⚡ Installing Simplicio...")
-    os.makedirs(INSTALL_DIR, exist_ok=True)
-    
-    # Detect arch
-    arch_map = {"x86_64": "x86_64", "aarch64": "arm64", "arm64": "arm64"}
-    machine = platform.machine().lower()
-    arch = arch_map.get(machine, machine)
-    
-    sys_map = {"Darwin": "apple-darwin", "Linux": "unknown-linux-gnu"}
-    os_name = sys_map.get(platform.system(), platform.system().lower())
-    
-    url = f"https://github.com/wesleysimplicio/simplicio/releases/latest/download/simplicio-{arch}-{os_name}.tar.gz"
-    
-    print(f"  Downloading {url}...")
-    try:
-        resp = urllib.request.urlopen(url)
-        data = resp.read()
-    except Exception as e:
-        print(f"  Download failed: {e}")
-        print("  Falling back to install.sh...")
+    """Install the real Simplicio binary via the canonical platform installer.
+
+    Single source of truth: the shell/powershell installers handle release
+    asset-name resolution, PATH, and the centralized ~/.local/bin location.
+    """
+    print("Installing Simplicio...")
+    system = platform.system()
+    if system in ("Darwin", "Linux"):
         subprocess.run(
             "curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.sh | sh",
-            shell=True, check=True
+            shell=True, check=True,
         )
-        return
-    
-    # Extract binary
-    with tarfile.open(fileobj=io.BytesIO(data)) as tar:
-        for member in tar.getmembers():
-            if member.name.endswith("/simplicio") or member.name == "simplicio":
-                tar.extract(member, INSTALL_DIR)
-                extracted = os.path.join(INSTALL_DIR, member.name)
-                if extracted != BINARY_PATH:
-                    shutil.move(extracted, BINARY_PATH)
-                break
-    
-    os.chmod(BINARY_PATH, 0o755)
-    print(f"✅ Installed at {BINARY_PATH}")
-    print("   Run 'simplicio --help' to get started.")
+    elif system == "Windows":
+        subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.ps1 | iex"],
+            check=True,
+        )
+    else:
+        print(f"Unsupported platform: {system}")
+        sys.exit(1)
 
 def main():
     args = sys.argv[1:]
@@ -70,10 +58,11 @@ def main():
         do_install()
         return
     
-    # If binary exists, delegate
-    if os.path.exists(BINARY_PATH):
+    # If the real binary is installed, delegate to it.
+    binary = _resolve_binary()
+    if binary:
         try:
-            subprocess.run([BINARY_PATH] + args, check=True)
+            subprocess.run([binary] + args, check=True)
         except subprocess.CalledProcessError as e:
             sys.exit(e.returncode)
     else:

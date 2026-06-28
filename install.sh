@@ -109,27 +109,34 @@ fi
 
 # ─── Download binary ─────────────────────────────────────────────────────────
 # Release assets are raw binaries named simplicio-<os>-<arch> (no tarball).
-ASSET="simplicio-$OS_TARGET-$ARCH_TARGET"
-TAGGED_URL="$GITHUB/releases/download/$VERSION/$ASSET"
-LATEST_URL="$GITHUB/releases/latest/download/$ASSET"
+# The publish step has shipped Apple Silicon under both `darwin-arm64` and
+# `macos-arm64`; try every known spelling so install survives asset-name drift.
+ASSET_CANDIDATES="simplicio-$OS_TARGET-$ARCH_TARGET"
+if [ "$OS_TARGET" = "darwin" ]; then
+  ASSET_CANDIDATES="$ASSET_CANDIDATES simplicio-macos-$ARCH_TARGET"
+fi
 
-info "downloading $ASSET..."
+info "downloading simplicio ($OS_TARGET/$ARCH_TARGET)..."
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-# Try the pinned tag first, then the 'latest' redirect (covers VERSION=latest /
-# API hiccups). Both are raw binaries from the PUBLIC simplicio repo.
+# For each candidate name, try the pinned tag first, then the 'latest' redirect
+# (covers VERSION=latest / API hiccups). All are raw binaries from the PUBLIC repo.
 BINARY_SRC=""
-for _u in "$TAGGED_URL" "$LATEST_URL"; do
-  if curl -sSfL --max-time 60 "$_u" -o "$TMP_DIR/$BIN_NAME" 2>/dev/null && [ -s "$TMP_DIR/$BIN_NAME" ]; then
-    BINARY_SRC="$TMP_DIR/$BIN_NAME"
-    break
-  fi
+ASSET=""
+for _asset in $ASSET_CANDIDATES; do
+  for _u in "$GITHUB/releases/download/$VERSION/$_asset" "$GITHUB/releases/latest/download/$_asset"; do
+    if curl -sSfL --max-time 60 "$_u" -o "$TMP_DIR/$BIN_NAME" 2>/dev/null && [ -s "$TMP_DIR/$BIN_NAME" ]; then
+      BINARY_SRC="$TMP_DIR/$BIN_NAME"
+      ASSET="$_asset"
+      break 2
+    fi
+  done
 done
 
 if [ -z "$BINARY_SRC" ] || [ ! -s "$BINARY_SRC" ]; then
-  err "download failed for $ASSET — get it at https://github.com/wesleysimplicio/simplicio/releases/latest"
+  err "download failed ($ASSET_CANDIDATES) — get it at https://github.com/wesleysimplicio/simplicio/releases/latest"
 fi
 
 chmod +x "$BINARY_SRC"
