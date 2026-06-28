@@ -1,6 +1,6 @@
 {
   "schema": "simplicio.update-manifest/v1",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "channel": "stable",
   "security": {
     "checksum_algorithm": "SHA256",
@@ -17,14 +17,14 @@
     {
       "target": "windows-x86_64",
       "artifact": "simplicio-windows-x86_64.exe",
-      "sha256": "2e93ace3b4fe563c52ef862ec856e76fbd812e902ad58709ccc265c863f07de1",
+      "sha256": "9a953ff564fe16a4fdd378f76dd7594648a059fd688e0b65318adb4486056429",
       "signature": "",
       "signature_algorithm": "ed25519"
     },
     {
       "target": "macos-arm64",
       "artifact": "simplicio-macos-arm64",
-      "sha256": "001de758f948ffae618647af5b066f8be7d79a9a4daff45547f43d4e7bbc4f1a",
+      "sha256": "5378eded12ceb58eb1b8205247a3a9c7e939a71ef08bf4bed26ba1a51bb8bc55",
       "signature": "",
       "signature_algorithm": "ed25519"
     }
