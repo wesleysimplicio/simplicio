@@ -8,7 +8,7 @@ This is the **public distribution repo** for [Simplicio](https://github.com/wesl
 
 **Not the source code.** The Rust runtime source lives in the private [`simplicio-runtime`](https://github.com/wesleysimplicio/simplicio-runtime) repo.
 
-## Current Version: v1.3.6
+## Current Version: v1.4.0
 
 - **Release:** v1.2.0 — Universal Adapter + 58 tests + Hermes parity
 - **Default branch:** `master`
