@@ -54,12 +54,6 @@ optional, not required.**
 
 ## 🚀 Installation
 
-### npm / npx (any OS)
-
-```bash
-npx simplicio install
-```
-
 ### pip / PyPI (any OS)
 
 ```bash
@@ -71,12 +65,6 @@ simplicio install
 
 ```bash
 brew install simplicio
-```
-
-### Bun
-
-```bash
-bunx simplicio install
 ```
 
 ### macOS / Linux
