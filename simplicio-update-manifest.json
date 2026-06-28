@@ -17,14 +17,14 @@
     {
       "target": "windows-x86_64",
       "artifact": "simplicio-windows-x86_64.exe",
-      "sha256": "6420460126882a9f31ccb8f73b4d8b0e42a990f6b45ace27dbc7b99b59497198",
+      "sha256": "21a40c2b7a7587aa88970d7eee9c8918fb185f502cabedff275da9b6981ea261",
       "signature": "",
       "signature_algorithm": "ed25519"
     },
     {
       "target": "macos-arm64",
       "artifact": "simplicio-macos-arm64",
-      "sha256": "3700f492a0bb881ca57f2e732586bc3b261d49bd7b89122659805ff5d3cd4f64",
+      "sha256": "c267faf826878bf958cc7b0c3489a4e957aa364a385031a9666f92cacbb20f91",
       "signature": "",
       "signature_algorithm": "ed25519"
     }
