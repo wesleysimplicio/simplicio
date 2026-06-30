@@ -1,19 +1,16 @@
 {
-  "name": "simplicio",
+  "name": "simplicio-installer",
   "version": "1.0.2",
-  "description": "Simplicio — up to 96% token savings on any LLM. One-command install.",
+  "description": "Simplicio installer wrapper for npm.",
   "bin": {
-    "simplicio": "./install.js"
+    "simplicio-installer": "./install.js"
   },
   "files": [
     "install.js"
   ],
-  "scripts": {
-    "postinstall": "node install.js"
-  },
   "keywords": [
     "simplicio",
-    "token-savings",
+    "installer",
     "cli",
     "llm",
     "ai"
@@ -23,7 +20,5 @@
     "type": "git",
     "url": "git+https://github.com/wesleysimplicio/simplicio.git"
   },
-  "publishConfig": {
-    "access": "public"
-  }
+  "homepage": "https://simpleti.com.br/simplicio/#start"
 }
