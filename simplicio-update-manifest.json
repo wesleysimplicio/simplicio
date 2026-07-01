@@ -1,6 +1,6 @@
 {
   "schema": "simplicio.update-manifest/v1",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "channel": "stable",
   "security": {
     "checksum_algorithm": "SHA256",
