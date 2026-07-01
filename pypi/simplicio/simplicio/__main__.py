@@ -38,13 +38,13 @@ def do_install() -> None:
     system = platform.system()
     if system in ("Darwin", "Linux"):
         subprocess.run(
-            "curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.sh | sh",
+            "curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh",
             shell=True, check=True,
         )
     elif system == "Windows":
         subprocess.run(
             ["powershell", "-NoProfile", "-Command",
-             "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.ps1 | iex"],
+             "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex"],
             check=True,
         )
     else:

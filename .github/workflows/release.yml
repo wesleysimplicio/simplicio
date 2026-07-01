@@ -44,8 +44,8 @@ jobs:
             Free public beta. All features unlocked until 2026-06-30; the
             subscription gate re-engages automatically afterwards.
 
-            Windows: `irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.ps1 | iex`
-            macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.sh | sh`
+            Windows: `irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex`
+            macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh`
 
             Signed update manifest included (`simplicio update check`).
           prerelease: false

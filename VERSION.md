@@ -71,5 +71,6 @@ This is the **public distribution repo** for [Simplicio](https://github.com/wesl
 
 1. `git checkout master && git pull`
 2. Edit files
-3. `git add -A && git commit -m "type(scope): description"`
-4. `git push origin master`
+3. `python3 scripts/verify_distribution_consistency.py`
+4. `git add -A && git commit -m "type(scope): description"`
+5. `git push origin master`
