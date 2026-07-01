@@ -2,7 +2,7 @@
 # install.sh — Install the simplicio binary
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
 #
 # The script:
 #   1. Detects OS and architecture
@@ -20,7 +20,7 @@ set -eu
 # ─── Config ──────────────────────────────────────────────────────────────────
 REPO="wesleysimplicio/simplicio"
 GITHUB="https://github.com/$REPO"
-RAW="https://raw.githubusercontent.com/$REPO/main"
+RAW="https://raw.githubusercontent.com/$REPO/master"
 
 BIN_NAME="simplicio"
 
