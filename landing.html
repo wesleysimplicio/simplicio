@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Simplicio Agent</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased;background:#fff}
+nav{position:fixed;top:0;width:100%;height:48px;background:rgba(0,0,0,0.8);backdrop-filter:blur(20px);z-index:100;display:flex;align-items:center;justify-content:center}
+nav .inner{max-width:980px;width:100%;display:flex;align-items:center;justify-content:space-between;padding:0 22px}
+nav .logo{background:linear-gradient(135deg,#22d3ee,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:600}
+nav a{color:rgba(255,255,255,0.8);font-size:12px;text-decoration:none;padding:0 16px}
+.hero{background:#000;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:120px 20px 60px;text-align:center}
+.hero h1{font-size:56px;font-weight:600;line-height:1.07;color:#fff;margin-bottom:8px;letter-spacing:-0.28px}
+.hero .sub{font-size:24px;color:rgba(255,255,255,0.6);margin-bottom:24px}
+.hero p{font-size:17px;line-height:1.47;color:rgba(255,255,255,0.8);max-width:500px;margin-bottom:32px}
+.btn-pill{display:inline-block;padding:10px 20px;border-radius:980px;font-size:17px;text-decoration:none;margin:4px}
+.btn-pill.blue{background:#0071e3;color:#fff}
+.btn-pill.outline{background:transparent;color:#2997ff;border:1px solid #2997ff}
+.light{background:#f5f5f7;padding:80px 20px;text-align:center}
+.light h2{font-size:40px;font-weight:600;color:#1d1d1f;margin-bottom:12px}
+.light p{font-size:17px;line-height:1.47;color:rgba(0,0,0,0.8);max-width:500px;margin:0 auto 24px}
+.dark{background:#000;padding:80px 20px;text-align:center}
+.dark h2{font-size:40px;font-weight:600;color:#fff;margin-bottom:12px}
+.dark p{font-size:17px;line-height:1.47;color:rgba(255,255,255,0.8);max-width:500px;margin:0 auto 24px}
+.row{display:flex;gap:12px;max-width:800px;margin:24px auto;flex-wrap:wrap;justify-content:center}
+.card{background:#fff;border-radius:12px;padding:24px;flex:1;min-width:240px;max-width:380px;box-shadow:rgba(0,0,0,0.22) 3px 5px 30px}
+.card .icon{font-size:28px;margin-bottom:8px}
+.card h3{font-size:18px;font-weight:700;margin-bottom:4px}
+.card p{font-size:13px;line-height:1.5;color:rgba(0,0,0,0.6)}
+.steps{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:20px 0}
+.step{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:16px;text-align:center;min-width:120px;flex:1;max-width:180px}
+.step .num{font-size:24px;font-weight:700;color:#22d3ee}
+.step .desc{font-size:12px;color:rgba(255,255,255,0.6)}
+.badge{display:inline-block;background:rgba(52,211,153,.15);color:#34d399;font-size:12px;padding:2px 10px;border-radius:20px;margin-bottom:12px}
+footer{background:#f5f5f7;padding:24px 20px;text-align:center;font-size:12px;color:rgba(0,0,0,0.48)}
+footer a{color:#0066cc;text-decoration:none}
+@media(max-width:734px){.hero h1{font-size:32px}.hero .sub{font-size:18px}.light h2,.dark h2{font-size:28px}}
+</style>
+</head>
+<body>
+<nav><div class="inner">
+<span class="logo">Simplicio</span>
+<div><a href="#como">Funciona</a><a href="#mcp">MCP</a><a href="#download">Download</a></div>
+</div></nav>
+
+<section class="hero">
+<h1>Simplicio Agent</h1>
+<div class="sub">Enquanto você vive, ele trabalha.</div>
+<p>Tami, Isa, Helo e Levi. Fale "Simplicio". Ele faz o resto.</p>
+<div style="margin-bottom:16px">
+<a href="#download" class="btn-pill blue">⬇ Download · 7 dias grátis</a>
+<a href="#como" class="btn-pill outline">Como funciona</a>
+</div>
+<div style="font-size:13px;color:rgba(255,255,255,0.3)">💚 Tami · 🧠 Isa · ⚡ Helo · 🔍 Levi · 🎤 Wake word · 🔌 MCP</div>
+</section>
+
+<section id="como" class="light">
+<h2>Fale "Simplicio". Ele faz.</h2>
+<p>Você pede. Ele executa. Você descansa. Ele trabalha.</p>
+<div class="row">
+<div class="card"><div class="icon">💚</div><h3>Tami cuida</h3><p>Guardiã emocional. Aparece, pergunta como você está, sugere melhorias. O coração do sistema.</p></div>
+<div class="card"><div class="icon">🧠</div><h3>Isa lembra</h3><p>Memória neural. Cada conversa, cada decisão, cada preferência. Você nunca repete nada.</p></div>
+<div class="card"><div class="icon">⚡</div><h3>Helo executa</h3><p>66 comandos em Rust. Pipeline assíncrono, 600 agents. Rápido, preciso, zero desperdício.</p></div>
+<div class="card"><div class="icon">🔍</div><h3>Levi descobre</h3><p>Vasculha o mundo. Código, docs, fóruns. Se existe, ele encontra e entrega.</p></div>
+</div>
+</section>
+
+<section id="mcp" class="dark">
+<div class="badge">🔌 MCP Server</div>
+<h2>Conecte seu LLM favorito.</h2>
+<p>10 ferramentas que qualquer LLM usa pra economizar 80% dos tokens.</p>
+<div class="steps">
+<div class="step"><div class="num">1</div><div class="desc">LLM chama tool</div></div>
+<div class="step"><div class="num">→</div><div class="desc">Runtime Rust executa</div></div>
+<div class="step"><div class="num">2</div><div class="desc">Resultado comprimido</div></div>
+<div class="step"><div class="num">→</div><div class="desc">80% menos tokens</div></div>
+</div>
+<p style="font-size:12px;color:rgba(255,255,255,0.3);margin-top:8px">map · memory · edit · gate · validate · run · symbol · search · read · exec</p>
+</section>
+
+<section class="light">
+<h2>Tranquilo, ele resolve.</h2>
+<p>Você esquece. Ele lembra. Você pede. Ele faz. Simples assim.</p>
+<div class="row">
+<div class="card"><div style="font-size:28px;margin-bottom:8px">😰</div><h3>Antes</h3><p>Você abria terminal, procurava arquivos, decorava comandos, repetia tarefas. Horas perdidas.</p></div>
+<div class="card"><div style="font-size:28px;margin-bottom:8px">😊</div><h3>Depois</h3><p>"Simplicio, organiza isso." Pronto. Ele lembra, executa, busca, entrega. Você só aproveita.</p></div>
+</div>
+</section>
+
+<section id="download" class="dark">
+<h2>Baixe e experimente.</h2>
+<p>7 dias grátis · R$ 99/mês · Cancele quando quiser</p>
+<div style="margin:20px 0">
+<a href="download/Simplicio-Agent-1.8.0-arm64.dmg" class="btn-pill blue">⬇ Apple Silicon</a>
+<a href="download/Simplicio-Agent-1.8.0-x64.dmg" class="btn-pill outline">⬇ Intel</a>
+</div>
+<div style="font-size:12px;color:rgba(255,255,255,0.3)">v3.0.0 · macOS 13+ · DeepSeek incluso</div>
+</section>
+
+<footer>
+<a href="#">Privacidade</a> · <a href="#">Termos</a> · <a href="https://github.com/wesleysimplicio/simplicio-runtime">GitHub</a><br>
+© 2026 Simplicio
+</footer>
+</body></html>
