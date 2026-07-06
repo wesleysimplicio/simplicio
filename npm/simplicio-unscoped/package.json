@@ -1,7 +1,7 @@
 {
   "name": "simplicio",
-  "version": "1.0.2",
-  "description": "Simplicio — up to 96% token savings on any LLM. One-command install.",
+  "version": "3.0.2",
+  "description": "Simplicio \u2014 up to 96% token savings on any LLM. One-command install.",
   "bin": {
     "simplicio": "./install.js"
   },

@@ -1,16 +1,25 @@
 {
   "name": "@wesleysimplicio/simplicio",
-  "version": "1.2.0",
-  "description": "Simplicio CLI — up to 96% token savings on any LLM. One command install.",
+  "version": "3.0.2",
+  "description": "Simplicio CLI \u2014 up to 96% token savings on any LLM. One command install.",
   "bin": {
     "simplicio": "./install.js"
   },
-  "files": ["install.js"],
+  "files": [
+    "install.js"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/wesleysimplicio/simplicio.git"
   },
   "homepage": "https://simpleti.com.br/simplicio/#start",
   "license": "MIT",
-  "keywords": ["simplicio", "claude", "llm", "tokens", "ai", "cli"]
+  "keywords": [
+    "simplicio",
+    "claude",
+    "llm",
+    "tokens",
+    "ai",
+    "cli"
+  ]
 }

@@ -1,6 +1,6 @@
 {
   "schema": "simplicio.update-manifest/v1",
-  "version": "1.6.4",
+  "version": "3.0.2",
   "channel": "stable",
   "security": {
     "checksum_algorithm": "SHA256",
@@ -19,14 +19,16 @@
       "artifact": "simplicio-windows-x86_64.exe",
       "sha256": "ff1a1b6e30f809cf3afc28554ba385f51d1574a41438fcbbdc786267a8ba480c",
       "signature": "",
-      "signature_algorithm": "ed25519"
+      "signature_algorithm": "ed25519",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.0.2/simplicio-windows-x64.exe"
     },
     {
       "target": "macos-arm64",
       "artifact": "simplicio-macos-arm64",
-      "sha256": "dcf699e4bd2ae1edbc75c64a247e8e31f32086635d5dd1626cf29077e7f52f51",
+      "sha256": "1911069c423544985d4dbef204fc57617e1ed34f7ef48999a2e7d705877a6765",
       "signature": "",
-      "signature_algorithm": "ed25519"
+      "signature_algorithm": "ed25519",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.0.2/simplicio-macos-arm64"
     }
   ]
 }
