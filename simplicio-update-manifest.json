@@ -15,14 +15,6 @@
   },
   "artifacts": [
     {
-      "target": "windows-x86_64",
-      "artifact": "simplicio-windows-x86_64.exe",
-      "sha256": "ff1a1b6e30f809cf3afc28554ba385f51d1574a41438fcbbdc786267a8ba480c",
-      "signature": "",
-      "signature_algorithm": "ed25519",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.0.2/simplicio-windows-x64.exe"
-    },
-    {
       "target": "macos-arm64",
       "artifact": "simplicio-macos-arm64",
       "sha256": "1911069c423544985d4dbef204fc57617e1ed34f7ef48999a2e7d705877a6765",
