@@ -8,9 +8,9 @@ This is the **public distribution repo** for [Simplicio](https://github.com/wesl
 
 **Not the source code.** The Rust runtime source lives in the private [`simplicio-runtime`](https://github.com/wesleysimplicio/simplicio-runtime) repo.
 
-## Current Version: v1.6.4
+## Current Version: v1.6.6
 
-- **Release:** v1.6.1 — fix public install links to point at `master`
+- **Release:** v1.6.6 — Omnicoder HBP fabric, Guardians CLI, Parakeet STT, provider cleanup
 - **Previous release:** v1.2.0 — Universal Adapter + 58 tests + Hermes parity
 - **Default branch:** `master`
 - **Last release asset:** macOS (ARM/x86_64), Linux (x86_64), Windows (x86_64)
