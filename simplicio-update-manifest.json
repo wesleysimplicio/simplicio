@@ -1,6 +1,6 @@
 {
   "schema": "simplicio.update-manifest/v1",
-  "version": "3.5.1",
+  "version": "3.5.2",
   "channel": "stable",
   "security": {
     "checksum_algorithm": "SHA256",
@@ -17,10 +17,10 @@
     {
       "target": "macos-arm64",
       "artifact": "simplicio-macos-arm64",
-      "sha256": "53f62026df78942ca9acba7fd87498fbd6f007e54bd9e479b44407fe97b97dc9",
-      "signature": "ed25519:6pttb85XjfCU2sB/tM8ZQbEk28iyEKkRm6JOhbPKcAVIDTBWm22ctrXQUoNrbf/AjM1o5knu1Ljym+rcExbpCA==",
+      "sha256": "931bc6d8f45c1b1e586070f8f5ac4a762861bc9157c70f75aaa4ebfad8ff27bb",
+      "signature": "ed25519:2omwTRLIpznbAjJJfCLKopWRjQWQPegU1bQKFGKQztgcg/ux3YGQWIBw9oOMzzMvd6E4kVe8vWvhU6+hDhfKAg==",
       "signature_algorithm": "ed25519",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.5.1/simplicio-macos-arm64"
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.5.2/simplicio-macos-arm64"
     }
   ]
 }
