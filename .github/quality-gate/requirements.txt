@@ -1,0 +1,8 @@
+# Tooling pinned by major/minor version for the CI quality gate
+# (.github/workflows/quality-gate.yml). Bump deliberately, not implicitly.
+pytest~=9.1
+pytest-cov~=7.1
+pytest-rerunfailures~=15.0
+ruff~=0.9
+bandit~=1.8
+pip-audit~=2.7

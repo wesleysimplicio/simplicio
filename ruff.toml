@@ -1,0 +1,9 @@
+# Ruff config for the CI quality gate. Scoped to the only Python that
+# actually ships from this repo's own tooling — not the vendored pypi/npm
+# package trees, which have their own release lifecycles.
+include = ["scripts/*.py", "tests/*.py"]
+target-version = "py311"
+line-length = 130
+
+[lint]
+select = ["E", "F", "W", "I"]
