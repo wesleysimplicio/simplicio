@@ -1,0 +1,17 @@
+[run]
+branch = True
+source = scripts
+omit =
+    scripts/run_python_tests.py
+
+[report]
+show_missing = True
+skip_covered = False
+exclude_also =
+    if __name__ == .__main__.:
+
+[xml]
+output = artifacts/unit/python-coverage.xml
+
+[json]
+output = artifacts/unit/python-coverage.json

@@ -27,22 +27,24 @@ jobs:
         shell: pwsh
         run: echo "version=$((Get-Content simplicio-update-manifest.json | ConvertFrom-Json).version)" >> $env:GITHUB_OUTPUT
       - name: Stage release assets
+        shell: pwsh
         run: |
-          mkdir -p dist
-          cp simplicio.exe dist/simplicio-windows-x86_64.exe
-          cp simplicio dist/simplicio-macos-arm64
-          if (Test-Path simplicio-darwin-x64) { cp simplicio-darwin-x64 dist/simplicio-darwin-x64 }
-          if (Test-Path simplicio-linux-x64) { cp simplicio-linux-x64 dist/simplicio-linux-x64 }
-          cp simplicio-update-manifest.json dist/
-          cp SHA256SUMS dist/ || true
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item simplicio.exe dist/simplicio-windows-x86_64.exe
+          Copy-Item simplicio dist/simplicio-macos-arm64
+          if (Test-Path simplicio-darwin-x64) { Copy-Item simplicio-darwin-x64 dist/simplicio-darwin-x64 }
+          if (Test-Path simplicio-linux-x64) { Copy-Item simplicio-linux-x64 dist/simplicio-linux-x64 }
+          Copy-Item simplicio-update-manifest.json dist/
+          Get-ChildItem dist -File | Sort-Object Name | ForEach-Object {
+            "$(($_ | Get-FileHash -Algorithm SHA256).Hash.ToLower()) *$($_.Name)"
+          } | Set-Content -Encoding ascii dist/SHA256SUMS
       - name: Create or update release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.ver.outputs.version }}
-          name: "v${{ steps.ver.outputs.version }} — Public Beta (free until 2026-06-30)"
+          name: "v${{ steps.ver.outputs.version }} — Public Beta"
           body: |
-            Free public beta. All features unlocked until 2026-06-30; the
-            subscription gate re-engages automatically afterwards.
+            Free public beta. All features remain unlocked during the public-beta phase.
 
             Windows: `irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex`
             macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh`

@@ -4,7 +4,7 @@
 class Simplicio < Formula
   desc "AI coding agent that saves up to 96% on tokens"
   homepage "https://simpleti.com.br/simplicio/#start"
-  version "1.2.0"
+  version "3.5.2"
   license "Proprietary"
 
   on_macos do
