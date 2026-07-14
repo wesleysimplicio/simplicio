@@ -26,6 +26,23 @@ FORMULA_SHA256_RE = re.compile(r'^\s*sha256\s+"([0-9a-fA-F]{64})"', re.MULTILINE
 BETA_NO_END_RE = re.compile(r"public beta with no end date", re.IGNORECASE)
 ECOSYSTEM_VERSION_RE = re.compile(r"## Versão atual\s+([^\n]+)", re.MULTILINE)
 CURRENT_VERSION_RE = re.compile(r"## Current Version:\s*v([^\s]+)")
+PUBLISH_BODY = (
+    "Free public beta. All features remain unlocked during the public-beta phase.\n\n"
+    "Windows: `irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex`\n"
+    "macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh`\n\n"
+    "Signed update manifest included (`simplicio update check`).\n"
+)
+CANONICAL_PUBLISH_WITH = {
+    "tag_name": "v${{ steps.state.outputs.version }}",
+    "target_commitish": "${{ github.sha }}",
+    "name": "v${{ steps.state.outputs.version }} — Public Beta",
+    "body": PUBLISH_BODY,
+    "prerelease": False,
+    "make_latest": "true",
+    "fail_on_unmatched_files": True,
+    "overwrite_files": False,
+    "files": "dist/*",
+}
 
 
 class UniqueKeyLoader(yaml.SafeLoader):
@@ -208,30 +225,8 @@ def release_workflow_errors(workflow: str) -> list[str]:
     publish_with = publish.get("with")
     if not isinstance(publish_with, dict):
         errors.append("publish step must define structured with inputs")
-    else:
-        expected_publish_keys = {
-            "tag_name",
-            "target_commitish",
-            "name",
-            "body",
-            "prerelease",
-            "make_latest",
-            "fail_on_unmatched_files",
-            "overwrite_files",
-            "files",
-        }
-        if set(publish_with) != expected_publish_keys:
-            errors.append("publish inputs must match the exact closed-world allowlist")
-        if publish_with.get("tag_name") != "v${{ steps.state.outputs.version }}":
-            errors.append("publish tag_name must come from verified state")
-        if publish_with.get("target_commitish") != "${{ github.sha }}":
-            errors.append("publish target_commitish must be the dispatched commit")
-        if publish_with.get("overwrite_files") is not False:
-            errors.append("publish step must set overwrite_files: false")
-        if publish_with.get("fail_on_unmatched_files") is not True:
-            errors.append("publish step must set fail_on_unmatched_files: true")
-        if publish_with.get("files") != "dist/*":
-            errors.append("publish step must upload only dist/*")
+    elif publish_with != CANONICAL_PUBLISH_WITH:
+        errors.append("publish with mapping must equal the complete canonical mapping")
     return errors
 
 

@@ -57,7 +57,10 @@ reusable Python planner chooses exactly one mode:
   every remote artifact has the declared SHA256 digest. Download, metadata, and publish steps are skipped.
 - `publish`: neither tag nor release exists and the staging URL is safe. Artifacts are downloaded from
   staging, never from the not-yet-existing target release, and their bytes plus signature metadata are
-  verified before release creation with `overwrite_files: false`.
+  verified before release creation with `overwrite_files: false`. The destination must start empty;
+  before metadata its entries must equal the manifest artifact names exactly, and after metadata the
+  only additions allowed are `simplicio-update-manifest.json` and `SHA256SUMS`. Directories, symlinks,
+  stale files, and unmanifested files fail closed. Checksums iterate that allowlist rather than a glob.
 
 The existing `v3.5.2` tag contains a `3.5.1` manifest, so the manual workflow is intentionally blocked
 for that tag and must not move it or replace its assets. Preparing a fresh version, immutable tag, and
@@ -69,7 +72,8 @@ environment variables cannot satisfy executable-step requirements. The topology 
 release job, nine unique ordered step IDs, three approved actions, exact environment maps, and six
 canonical single-command script invocations. Any extra job/step/key/action/command or appended shell
 separator fails the audit. Workflow permissions default to `contents: read`; only that exact release job
-elevates to `contents: write`.
+elevates to `contents: write`. The publish action's complete `with` mapping is canonical; changing its
+tag/name/body/prerelease/latest/overwrite/file inputs or adding another input fails the audit.
 
 ## Local parity
 

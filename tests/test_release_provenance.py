@@ -7,6 +7,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 from urllib.error import HTTPError
 
 from scripts import verify_release_provenance as provenance
@@ -213,7 +214,7 @@ class ReleaseProvenanceTests(unittest.TestCase):
         working = manifest(payload=payload)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            self.assertEqual(provenance.verify_staged_files(working, root), ["staged artifact is missing: simplicio-macos-arm64"])
+            self.assertEqual(provenance.verify_staged_files(working, root), ["staging set is missing: simplicio-macos-arm64"])
             artifact = root / "simplicio-macos-arm64"
             artifact.write_bytes(b"wrong")
             self.assertEqual(provenance.verify_staged_files(working, root), ["staged artifact digest mismatch for simplicio-macos-arm64"])
@@ -238,9 +239,70 @@ class ReleaseProvenanceTests(unittest.TestCase):
             self.assertEqual((dist / "simplicio-macos-arm64").read_bytes(), payload)
             provenance.generate_release_metadata(working, dist)
             self.assertTrue((dist / "simplicio-update-manifest.json").is_file())
+            self.assertEqual(
+                {path.name for path in dist.iterdir()},
+                {"simplicio-macos-arm64", "simplicio-update-manifest.json", "SHA256SUMS"},
+            )
+            self.assertEqual(provenance.verify_publish_files(working_value, dist), [])
             sums = (dist / "SHA256SUMS").read_text(encoding="ascii")
             self.assertIn("simplicio-macos-arm64", sums)
             self.assertIn("simplicio-update-manifest.json", sums)
+
+    def test_unmanifested_stale_directory_and_symlink_entries_are_rejected(self):
+        payload = b"release"
+        working = manifest(payload=payload)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            dist = root / "dist"
+            dist.mkdir()
+            (dist / "simplicio-macos-arm64").write_bytes(payload)
+            (dist / "unmanifested.exe").write_bytes(b"attack")
+            self.assertTrue(any("unmanifested.exe" in error for error in provenance.verify_staged_files(working, dist)))
+            with self.assertRaisesRegex(ValueError, "not empty"):
+                provenance.download_staged_files(
+                    working,
+                    STAGING,
+                    REPOSITORY,
+                    dist,
+                    opener=lambda _request: FakeResponse(payload),
+                )
+
+            (dist / "unmanifested.exe").unlink()
+            artifact = dist / "simplicio-macos-arm64"
+            original_is_symlink = Path.is_symlink
+
+            def simulated_symlink(path):
+                return path == artifact or original_is_symlink(path)
+
+            with mock.patch.object(Path, "is_symlink", simulated_symlink):
+                self.assertEqual(
+                    provenance.verify_staged_files(working, dist),
+                    ["staging entry is not a regular file: simplicio-macos-arm64"],
+                )
+
+            artifact.unlink()
+            artifact.mkdir()
+            self.assertEqual(
+                provenance.verify_staged_files(working, dist),
+                ["staging entry is not a regular file: simplicio-macos-arm64"],
+            )
+
+    def test_final_publish_set_rejects_any_extra_file(self):
+        payload = b"release"
+        working_value = manifest(payload=payload)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(working_value), encoding="utf-8")
+            dist = root / "dist"
+            dist.mkdir()
+            (dist / "simplicio-macos-arm64").write_bytes(payload)
+            provenance.generate_release_metadata(manifest_path, dist)
+            (dist / "stale.bin").write_bytes(b"stale")
+            self.assertEqual(
+                provenance.verify_publish_files(working_value, dist),
+                ["publish set has unmanifested entries: stale.bin"],
+            )
 
     def test_invalid_manifest_shapes_and_signature_are_rejected(self):
         for broken, message in (
@@ -319,11 +381,13 @@ class ReleaseProvenanceTests(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(provenance.main(args), 0)
             self.assertEqual(output.read_text(encoding="utf-8"), "mode=idempotent\n")
-            artifact = root / "simplicio-macos-arm64"
+            dist = root / "dist"
+            dist.mkdir()
+            artifact = dist / "simplicio-macos-arm64"
             artifact.write_bytes(payload)
             with contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(
-                    provenance.main(["verify-staged", "--working-manifest", str(working), "--staging-dir", str(root)]),
+                    provenance.main(["verify-staged", "--working-manifest", str(working), "--staging-dir", str(dist)]),
                     0,
                 )
 

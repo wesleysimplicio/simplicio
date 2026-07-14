@@ -218,18 +218,45 @@ def plan_release(
     return ReleasePlan("blocked" if errors else "publish", tuple(errors))
 
 
+def exact_directory_errors(directory: Path, expected_names: set[str], label: str) -> list[str]:
+    errors: list[str] = []
+    if directory.is_symlink() or not directory.is_dir():
+        return [f"{label} directory is missing or not a real directory"]
+    entries = list(directory.iterdir())
+    actual_names = {entry.name for entry in entries}
+    missing = sorted(expected_names - actual_names)
+    extra = sorted(actual_names - expected_names)
+    if missing:
+        errors.append(f"{label} set is missing: {', '.join(missing)}")
+    if extra:
+        errors.append(f"{label} set has unmanifested entries: {', '.join(extra)}")
+    for entry in entries:
+        if entry.name in expected_names and (entry.is_symlink() or not entry.is_file()):
+            errors.append(f"{label} entry is not a regular file: {entry.name}")
+    return errors
+
+
 def verify_staged_files(working: dict, staging_dir: Path) -> list[str]:
     _, artifacts = provenance_snapshot(working)
-    errors: list[str] = []
+    expected_names = {record[0] for record in artifacts}
+    errors = exact_directory_errors(staging_dir, expected_names, "staging")
+    if errors:
+        return errors
     for name, _, expected_sha256, _ in artifacts:
         path = staging_dir / name
-        if not path.is_file():
-            errors.append(f"staged artifact is missing: {name}")
-            continue
         actual = hashlib.sha256(path.read_bytes()).hexdigest()
         if actual != expected_sha256:
             errors.append(f"staged artifact digest mismatch for {name}")
     return errors
+
+
+def verify_publish_files(working: dict, staging_dir: Path) -> list[str]:
+    _, artifacts = provenance_snapshot(working)
+    expected_names = {record[0] for record in artifacts} | {
+        "simplicio-update-manifest.json",
+        "SHA256SUMS",
+    }
+    return exact_directory_errors(staging_dir, expected_names, "publish")
 
 
 def download_staged_files(
@@ -245,7 +272,14 @@ def download_staged_files(
     errors.extend(target_url_errors(working, repository))
     if errors:
         raise ValueError("; ".join(errors))
-    staging_dir.mkdir(parents=True, exist_ok=True)
+    if staging_dir.exists():
+        if staging_dir.is_symlink() or not staging_dir.is_dir():
+            raise ValueError("staging destination must be a real directory")
+        stale = sorted(entry.name for entry in staging_dir.iterdir())
+        if stale:
+            raise ValueError("staging destination is not empty: " + ", ".join(stale))
+    else:
+        staging_dir.mkdir(parents=True)
     base = artifact_base_url.rstrip("/")
     for name, _, _, _ in artifacts:
         with opener(Request(f"{base}/{name}")) as response:
@@ -254,15 +288,21 @@ def download_staged_files(
 
 def generate_release_metadata(working_manifest: Path, staging_dir: Path) -> None:
     working = load_json(working_manifest)
+    _, artifacts = provenance_snapshot(working)
     errors = verify_staged_files(working, staging_dir)
     if errors:
         raise ValueError("; ".join(errors))
+    lines = [
+        f"{hashlib.sha256((staging_dir / name).read_bytes()).hexdigest()} *{name}"
+        for name, _, _, _ in artifacts
+    ]
     shutil.copy2(working_manifest, staging_dir / "simplicio-update-manifest.json")
-    lines = []
-    for path in sorted(staging_dir.iterdir(), key=lambda item: item.name):
-        if path.is_file() and path.name != "SHA256SUMS":
-            lines.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()} *{path.name}")
+    manifest_path = staging_dir / "simplicio-update-manifest.json"
+    lines.append(f"{hashlib.sha256(manifest_path.read_bytes()).hexdigest()} *{manifest_path.name}")
     (staging_dir / "SHA256SUMS").write_text("\n".join(lines) + "\n", encoding="ascii")
+    final_errors = verify_publish_files(working, staging_dir)
+    if final_errors:
+        raise ValueError("; ".join(final_errors))
 
 
 def write_output(path: Path | None, mode: str) -> None:

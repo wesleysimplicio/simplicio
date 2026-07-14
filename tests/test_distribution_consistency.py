@@ -88,8 +88,14 @@ jobs:
         with:
           tag_name: v${{ steps.state.outputs.version }}
           target_commitish: ${{ github.sha }}
-          name: fixture
-          body: fixture
+          name: "v${{ steps.state.outputs.version }} — Public Beta"
+          body: |
+            Free public beta. All features remain unlocked during the public-beta phase.
+
+            Windows: `irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex`
+            macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh`
+
+            Signed update manifest included (`simplicio update check`).
           prerelease: false
           make_latest: "true"
           fail_on_unmatched_files: true
@@ -250,7 +256,26 @@ class DistributionConsistencyTests(unittest.TestCase):
                 publish["with"]["overwrite_files"] = value
             with self.subTest(value=value):
                 errors = audit.release_workflow_errors(yaml.safe_dump(document, sort_keys=False))
-                self.assertTrue(any("overwrite_files" in error for error in errors))
+                self.assertTrue(any("complete canonical mapping" in error for error in errors))
+
+    def test_publish_mapping_rejects_prerelease_name_body_and_latest_mutations(self):
+        workflow = self.root / ".github/workflows/release.yml"
+        clean = yaml.safe_load(workflow.read_text(encoding="utf-8"))
+        for key, value in (
+            ("prerelease", True),
+            ("name", "attacker-controlled release"),
+            ("body", "mutated body"),
+            ("make_latest", "false"),
+        ):
+            document = json.loads(json.dumps(clean))
+            publish = next(step for step in document["jobs"]["release"]["steps"] if step.get("id") == "publish")
+            publish["with"][key] = value
+            with self.subTest(key=key):
+                errors = audit.release_workflow_errors(yaml.safe_dump(document, sort_keys=False))
+                self.assertEqual(
+                    [error for error in errors if "publish with mapping" in error],
+                    ["publish with mapping must equal the complete canonical mapping"],
+                )
 
     def test_adversarial_comments_and_env_cannot_spoof_executable_workflow(self):
         for workflow in (
