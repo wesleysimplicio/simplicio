@@ -72,7 +72,7 @@ jobs:
         run: |
           coverage run --rcfile=.coveragerc scripts/run_python_tests.py --junit artifacts/unit/python-junit.xml
           coverage report --fail-under=85
-          coverage report --include=scripts/verify_distribution_consistency.py --fail-under=90
+          coverage report --include=scripts/verify_distribution_consistency.py,scripts/verify_release_provenance.py --fail-under=90
           coverage xml
           coverage json
       - name: Node installer coverage

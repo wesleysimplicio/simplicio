@@ -22,6 +22,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   staging set.
 - Expanded ignored-test enforcement to Python `skipTest`/`SkipTest` and Node
   skip options, with issue, owner, and 30-day removal metadata required.
+- Made publication manual-only and immutable: tag-bound manifest provenance must
+  match exactly, existing release assets cannot be replaced, and the known stale
+  `v3.5.2` tag now fails closed pending separate fresh-release preparation.
 
 ## [1.6.1] - 2026-07-01
 

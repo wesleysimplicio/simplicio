@@ -35,13 +35,22 @@ class DistributionFixture:
             self.put(relative, "https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh\n")
         self.put(
             ".github/workflows/release.yml",
+            "on:\n"
+            "  workflow_dispatch: {}\n"
             "git show-ref --verify --quiet refs/tags/v3.5.2\n"
+            'git show "${tag}:simplicio-update-manifest.json"\n'
+            "python scripts/verify_release_provenance.py \n"
+            "  --working-manifest simplicio-update-manifest.json \n"
+            "  --tag-manifest .release/tag-manifest.json \n"
+            "  --remote-release .release/remote-release.json\n"
             "foreach ($artifact in $manifest.artifacts) {\n"
             "  Invoke-WebRequest -Uri $artifact.url -OutFile $destination\n"
             "  $actualHash = (Get-FileHash $destination -Algorithm SHA256).Hash.ToLower()\n"
             "  if ($actualHash -ne $artifact.sha256.ToLower()) { throw 'mismatch' }\n"
             "}\n"
             "fail_on_unmatched_files: true\n"
+            "overwrite_files: false\n"
+            "uses: softprops/action-gh-release@v2\n"
             "files: dist/*\n",
         )
         self.put("version.txt", self.version + "\n")
@@ -166,6 +175,26 @@ class DistributionConsistencyTests(unittest.TestCase):
         workflow.write_text(workflow.read_text(encoding="utf-8") + "Copy-Item simplicio dist/simplicio-macos-arm64\n", encoding="utf-8")
         errors = [item.message for item in audit.run_audit(self.root) if item.level == "ERROR"]
         self.assertTrue(any("release workflow provenance" in message and "unsafe" in message for message in errors))
+
+    def test_regression_release_must_be_manual_only(self):
+        workflow = self.root / ".github/workflows/release.yml"
+        workflow.write_text(workflow.read_text(encoding="utf-8").replace("  workflow_dispatch: {}", "  push:\n  workflow_dispatch: {}"), encoding="utf-8")
+        errors = audit.release_workflow_errors(workflow.read_text(encoding="utf-8"))
+        self.assertTrue(any("automatic trigger: push" in error for error in errors))
+
+    def test_regression_release_requires_tag_bound_verifier(self):
+        workflow = self.root / ".github/workflows/release.yml"
+        workflow.write_text(workflow.read_text(encoding="utf-8").replace("python scripts/verify_release_provenance.py", "python scripts/untrusted.py"), encoding="utf-8")
+        errors = audit.release_workflow_errors(workflow.read_text(encoding="utf-8"))
+        self.assertTrue(any("missing python scripts/verify_release_provenance.py" in error for error in errors))
+
+    def test_regression_release_requires_explicit_no_overwrite(self):
+        workflow = self.root / ".github/workflows/release.yml"
+        clean = workflow.read_text(encoding="utf-8")
+        for unsafe in (clean.replace("overwrite_files: false\n", ""), clean.replace("overwrite_files: false", "overwrite_files: true")):
+            with self.subTest(unsafe="absent" if "overwrite_files:" not in unsafe else "true"):
+                errors = audit.release_workflow_errors(unsafe)
+                self.assertTrue(any("overwrite_files" in error for error in errors))
 
     def test_regression_manifest_url_must_be_version_bound(self):
         manifest_path = self.root / "simplicio-update-manifest.json"

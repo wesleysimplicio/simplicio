@@ -48,11 +48,16 @@ updated baseline; the environment override is not configured on protected branch
 
 ## Release provenance
 
-`publish-release` never renames a checked-in wrapper binary into a platform artifact. It requires
-the version tag to exist, downloads every artifact from the exact version-bound URL declared in
-`simplicio-update-manifest.json`, verifies its SHA256 and required signature metadata, then uploads
-only that verified staging directory. A missing tag, drifting URL, missing signature, or hash
-mismatch stops before the release action; the workflow never creates or moves a tag.
+`publish-release` is manual-only; merging a CI or manifest change cannot trigger publication. Before
+any download or release mutation, it reads `simplicio-update-manifest.json` from the immutable version
+tag and requires exact version plus artifact name/URL/SHA256/signature equality with the working tree.
+It also reads the remote release and refuses any declared or generated asset name that already exists;
+the release action has `overwrite_files: false` as a second fail-closed guard.
+
+The existing `v3.5.2` tag contains a `3.5.1` manifest, so the manual workflow is intentionally blocked
+for that tag and must not move it or replace its assets. Preparing a fresh version, immutable tag, and
+signed artifact set is separate release work. Once those inputs agree, the workflow downloads each
+version-bound artifact, verifies SHA256, and uploads only new assets from the verified staging directory.
 
 ## Local parity
 

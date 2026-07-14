@@ -80,6 +80,51 @@ def iter_install_reference_files(root: Path) -> Iterable[Path]:
     yield from sorted((root / "READMEs").glob("README*.md"))
 
 
+def release_workflow_errors(workflow: str) -> list[str]:
+    lower = workflow.lower()
+    errors: list[str] = []
+    if not re.search(r"(?m)^on:\s*\n\s{2}workflow_dispatch:\s*(?:\{\})?\s*$", workflow):
+        errors.append("release workflow is not manual-only")
+    automatic_triggers = re.findall(r"(?m)^\s{2}(push|pull_request|schedule):", workflow)
+    if automatic_triggers:
+        errors.append("release workflow has automatic trigger: " + ", ".join(sorted(set(automatic_triggers))))
+    required_tokens = (
+        "git show-ref --verify --quiet",
+        'git show "${tag}:simplicio-update-manifest.json"',
+        "python scripts/verify_release_provenance.py",
+        "--working-manifest simplicio-update-manifest.json",
+        "--tag-manifest .release/tag-manifest.json",
+        "--remote-release .release/remote-release.json",
+        "foreach ($artifact in $manifest.artifacts)",
+        "invoke-webrequest -uri $artifact.url",
+        "get-filehash $destination -algorithm sha256",
+        "if ($actualhash -ne $artifact.sha256.tolower())",
+        "fail_on_unmatched_files: true",
+        "overwrite_files: false",
+        "files: dist/*",
+        "uses: softprops/action-gh-release@v2",
+    )
+    errors.extend(f"missing {token}" for token in required_tokens if token not in lower)
+    if "overwrite_files: true" in lower:
+        errors.append("overwrite_files must never be true")
+    unsafe_lines = (
+        "\n      - simplicio\n",
+        "\n      - simplicio.exe\n",
+        "copy-item simplicio ",
+        "copy-item simplicio.exe ",
+        "cp simplicio ",
+    )
+    errors.extend(f"unsafe {token.strip()}" for token in unsafe_lines if token in lower)
+    verifier_index = lower.find("python scripts/verify_release_provenance.py")
+    download_index = lower.find("invoke-webrequest -uri $artifact.url")
+    mutation_index = lower.find("uses: softprops/action-gh-release@v2")
+    if min(verifier_index, download_index, mutation_index) >= 0 and not (
+        verifier_index < download_index < mutation_index
+    ):
+        errors.append("tag provenance verification must run before download and release mutation")
+    return errors
+
+
 def run_audit(root: Path = ROOT, *, today: date | None = None) -> list[Finding]:
     today = today or date.today()
     findings: list[Finding] = []
@@ -176,31 +221,11 @@ def run_audit(root: Path = ROOT, *, today: date | None = None) -> list[Finding]:
         else:
             findings.append(Finding("OK", "Formula URL/SHA256/install matches the signed macos-arm64 manifest artifact."))
 
-    release_workflow = read_text(root / ".github/workflows/release.yml")
-    release_lower = release_workflow.lower()
-    required_release_tokens = (
-        "git show-ref --verify --quiet",
-        "foreach ($artifact in $manifest.artifacts)",
-        "invoke-webrequest -uri $artifact.url",
-        "get-filehash $destination -algorithm sha256",
-        "if ($actualhash -ne $artifact.sha256.tolower())",
-        "fail_on_unmatched_files: true",
-        "files: dist/*",
-    )
-    unsafe_release_lines = (
-        "\n      - simplicio\n",
-        "\n      - simplicio.exe\n",
-        "copy-item simplicio ",
-        "copy-item simplicio.exe ",
-        "cp simplicio ",
-    )
-    missing_tokens = [token for token in required_release_tokens if token not in release_lower]
-    unsafe_tokens = [token.strip() for token in unsafe_release_lines if token in release_lower]
-    if missing_tokens or unsafe_tokens:
-        details = ", ".join([*(f"missing {token}" for token in missing_tokens), *(f"unsafe {token}" for token in unsafe_tokens)])
-        findings.append(Finding("ERROR", f"release workflow provenance is not fail-closed: {details}"))
+    release_errors = release_workflow_errors(read_text(root / ".github/workflows/release.yml"))
+    if release_errors:
+        findings.append(Finding("ERROR", "release workflow provenance is not fail-closed: " + ", ".join(release_errors)))
     else:
-        findings.append(Finding("OK", "release workflow downloads only manifest artifacts and verifies SHA256 before upload."))
+        findings.append(Finding("OK", "manual release verifies tag provenance and immutable assets before upload."))
 
     ecosystem = read_text(root / "SIMPLICIO_ECOSYSTEM.md")
     ecosystem_match = ECOSYSTEM_VERSION_RE.search(ecosystem)
