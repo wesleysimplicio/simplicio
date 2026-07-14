@@ -7,11 +7,26 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from urllib.error import HTTPError
 
 from scripts import verify_release_provenance as provenance
 
 REPOSITORY = "wesleysimplicio/simplicio"
 STAGING = "https://artifacts.example/simplicio/v3.5.2"
+
+
+class FakeResponse:
+    def __init__(self, value: bytes):
+        self.value = value
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+    def read(self) -> bytes:
+        return self.value
 
 
 def manifest(version: str = "3.5.2", *, payload: bytes | None = None) -> dict:
@@ -45,6 +60,58 @@ def remote_release(value: dict, *, digest: str | None = None) -> dict:
 
 
 class ReleaseProvenanceTests(unittest.TestCase):
+    def test_state_collection_writes_existing_and_absent_tag_receipts(self):
+        working_value = manifest()
+        remote_value = remote_release(working_value)
+
+        class Result:
+            def __init__(self, stdout: str):
+                self.stdout = stdout
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            working = root / "working.json"
+            working.write_text(json.dumps(working_value), encoding="utf-8")
+            output = root / "output.txt"
+
+            def existing_runner(command, **_kwargs):
+                return Result("v3.5.2\n" if command[1] == "tag" else json.dumps(working_value))
+
+            exists = provenance.collect_release_state(
+                working,
+                REPOSITORY,
+                "token",
+                root / "existing",
+                output,
+                runner=existing_runner,
+                opener=lambda _request: FakeResponse(json.dumps(remote_value).encode()),
+            )
+            self.assertTrue(exists)
+            self.assertEqual(json.loads((root / "existing/tag-manifest.json").read_text()), working_value)
+            self.assertIn("tag_exists=true", output.read_text(encoding="utf-8"))
+
+            def absent_runner(_command, **_kwargs):
+                return Result("")
+
+            def missing_release(request):
+                raise HTTPError(request.full_url, 404, "missing", {}, None)
+
+            exists = provenance.collect_release_state(
+                working,
+                REPOSITORY,
+                "token",
+                root / "absent",
+                None,
+                runner=absent_runner,
+                opener=missing_release,
+            )
+            self.assertFalse(exists)
+            self.assertEqual(json.loads((root / "absent/remote-release.json").read_text()), {"exists": False, "assets": []})
+
+    def test_state_collection_requires_repository_and_token(self):
+        with self.assertRaisesRegex(ValueError, "required"):
+            provenance.collect_release_state(Path("missing"), "", "", Path("state"), None)
+
     def test_existing_coherent_tag_is_idempotent_no_publish(self):
         working = manifest()
         plan = provenance.plan_release(
@@ -152,6 +219,28 @@ class ReleaseProvenanceTests(unittest.TestCase):
             self.assertEqual(provenance.verify_staged_files(working, root), ["staged artifact digest mismatch for simplicio-macos-arm64"])
             artifact.write_bytes(payload)
             self.assertEqual(provenance.verify_staged_files(working, root), [])
+
+    def test_download_and_metadata_use_verified_staging(self):
+        payload = b"immutable staged bytes"
+        working_value = manifest(payload=payload)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            working = root / "manifest.json"
+            working.write_text(json.dumps(working_value), encoding="utf-8")
+            dist = root / "dist"
+            provenance.download_staged_files(
+                working_value,
+                STAGING,
+                REPOSITORY,
+                dist,
+                opener=lambda _request: FakeResponse(payload),
+            )
+            self.assertEqual((dist / "simplicio-macos-arm64").read_bytes(), payload)
+            provenance.generate_release_metadata(working, dist)
+            self.assertTrue((dist / "simplicio-update-manifest.json").is_file())
+            sums = (dist / "SHA256SUMS").read_text(encoding="ascii")
+            self.assertIn("simplicio-macos-arm64", sums)
+            self.assertIn("simplicio-update-manifest.json", sums)
 
     def test_invalid_manifest_shapes_and_signature_are_rejected(self):
         for broken, message in (

@@ -28,6 +28,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Restored a safe new-release path through distinct versioned HTTPS staging, with
   idempotent no-op success for coherent existing releases and structured PyYAML
   validation of real workflow steps, conditions, ordering, and action inputs.
+- Closed the release topology to an exact job/step/action/command/environment
+  allowlist, moving state, download, and metadata logic into fixed verifier
+  subcommands so extra write steps and appended force/clobber commands fail.
 
 ## [1.6.1] - 2026-07-01
 

@@ -6,11 +6,16 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import shutil
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
+from urllib.error import HTTPError
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 PROVENANCE_FIELDS = ("artifact", "url", "sha256", "signature")
 
@@ -26,6 +31,63 @@ def load_json(path: Path) -> dict:
     if not isinstance(value, dict):
         raise ValueError(f"expected a JSON object in {path}")
     return value
+
+
+def append_outputs(path: Path | None, values: dict[str, str]) -> None:
+    if path:
+        with path.open("a", encoding="utf-8") as stream:
+            for key, value in values.items():
+                stream.write(f"{key}={value}\n")
+
+
+def collect_release_state(
+    working_manifest: Path,
+    repository: str,
+    token: str,
+    state_dir: Path,
+    github_output: Path | None,
+    *,
+    runner=subprocess.run,
+    opener=urlopen,
+) -> bool:
+    if not repository or not token:
+        raise ValueError("GITHUB_REPOSITORY and GITHUB_TOKEN are required")
+    working = load_json(working_manifest)
+    version, _ = provenance_snapshot(working)
+    tag = f"v{version}"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    tag_result = runner(["git", "tag", "--list", tag], check=True, capture_output=True, text=True)
+    tag_exists = tag_result.stdout.strip() == tag
+    tag_manifest_path = state_dir / "tag-manifest.json"
+    if tag_exists:
+        tagged = runner(
+            ["git", "show", f"{tag}:simplicio-update-manifest.json"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        tag_manifest_path.write_text(tagged, encoding="utf-8")
+    else:
+        tag_manifest_path.write_text("{}\n", encoding="utf-8")
+    request = Request(
+        f"https://api.github.com/repos/{repository}/releases/tags/{tag}",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+    )
+    try:
+        with opener(request) as response:
+            remote = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        if exc.code != 404:
+            raise
+        exc.close()
+        remote = {"exists": False, "assets": []}
+    (state_dir / "remote-release.json").write_text(json.dumps(remote, indent=2) + "\n", encoding="utf-8")
+    append_outputs(github_output, {"version": version, "tag_exists": str(tag_exists).lower()})
+    return tag_exists
 
 
 def provenance_snapshot(manifest: dict) -> tuple[str, tuple[tuple[str, str, str, str], ...]]:
@@ -170,10 +232,57 @@ def verify_staged_files(working: dict, staging_dir: Path) -> list[str]:
     return errors
 
 
+def download_staged_files(
+    working: dict,
+    artifact_base_url: str,
+    repository: str,
+    staging_dir: Path,
+    *,
+    opener=urlopen,
+) -> None:
+    version, artifacts = provenance_snapshot(working)
+    errors = validate_staging_base_url(artifact_base_url, version, repository)
+    errors.extend(target_url_errors(working, repository))
+    if errors:
+        raise ValueError("; ".join(errors))
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    base = artifact_base_url.rstrip("/")
+    for name, _, _, _ in artifacts:
+        with opener(Request(f"{base}/{name}")) as response:
+            (staging_dir / name).write_bytes(response.read())
+
+
+def generate_release_metadata(working_manifest: Path, staging_dir: Path) -> None:
+    working = load_json(working_manifest)
+    errors = verify_staged_files(working, staging_dir)
+    if errors:
+        raise ValueError("; ".join(errors))
+    shutil.copy2(working_manifest, staging_dir / "simplicio-update-manifest.json")
+    lines = []
+    for path in sorted(staging_dir.iterdir(), key=lambda item: item.name):
+        if path.is_file() and path.name != "SHA256SUMS":
+            lines.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()} *{path.name}")
+    (staging_dir / "SHA256SUMS").write_text("\n".join(lines) + "\n", encoding="ascii")
+
+
 def write_output(path: Path | None, mode: str) -> None:
-    if path:
-        with path.open("a", encoding="utf-8") as stream:
-            stream.write(f"mode={mode}\n")
+    append_outputs(path, {"mode": mode})
+
+
+def state_command(args: argparse.Namespace) -> int:
+    try:
+        tag_exists = collect_release_state(
+            args.working_manifest,
+            args.repository,
+            args.github_token,
+            args.state_dir,
+            args.github_output,
+        )
+    except (OSError, ValueError, json.JSONDecodeError, subprocess.CalledProcessError, HTTPError) as exc:
+        print(f"[ERROR] release state collection failed: {exc}")
+        return 1
+    print(f"release-provenance: state PASS tag_exists={str(tag_exists).lower()}")
+    return 0
 
 
 def plan_command(args: argparse.Namespace) -> int:
@@ -213,22 +322,69 @@ def staged_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def download_command(args: argparse.Namespace) -> int:
+    try:
+        download_staged_files(
+            load_json(args.working_manifest),
+            args.artifact_base_url,
+            args.repository,
+            args.staging_dir,
+        )
+    except (OSError, ValueError, json.JSONDecodeError, HTTPError) as exc:
+        print(f"[ERROR] staged artifact download failed: {exc}")
+        return 1
+    print("release-provenance: staging download PASS")
+    return 0
+
+
+def metadata_command(args: argparse.Namespace) -> int:
+    try:
+        generate_release_metadata(args.working_manifest, args.staging_dir)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"[ERROR] release metadata generation failed: {exc}")
+        return 1
+    print("release-provenance: metadata PASS")
+    return 0
+
+
+def environment_path(name: str) -> Path | None:
+    value = os.environ.get(name)
+    return Path(value) if value else None
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
+    state = subparsers.add_parser("state")
+    state.add_argument("--working-manifest", type=Path, default=Path("simplicio-update-manifest.json"))
+    state.add_argument("--repository", default=os.environ.get("GITHUB_REPOSITORY", ""))
+    state.add_argument("--github-token", default=os.environ.get("GITHUB_TOKEN", ""))
+    state.add_argument("--state-dir", type=Path, default=Path(".release"))
+    state.add_argument("--github-output", type=Path, default=environment_path("GITHUB_OUTPUT"))
+    state.set_defaults(handler=state_command)
     plan = subparsers.add_parser("plan")
-    plan.add_argument("--working-manifest", type=Path, required=True)
-    plan.add_argument("--tag-exists", action="store_true")
-    plan.add_argument("--tag-manifest", type=Path, required=True)
-    plan.add_argument("--remote-release", type=Path, required=True)
-    plan.add_argument("--artifact-base-url", required=True)
-    plan.add_argument("--repository", required=True)
-    plan.add_argument("--github-output", type=Path)
+    plan.add_argument("--working-manifest", type=Path, default=Path("simplicio-update-manifest.json"))
+    plan.add_argument("--tag-exists", action="store_true", default=os.environ.get("TAG_EXISTS", "").lower() == "true")
+    plan.add_argument("--tag-manifest", type=Path, default=Path(".release/tag-manifest.json"))
+    plan.add_argument("--remote-release", type=Path, default=Path(".release/remote-release.json"))
+    plan.add_argument("--artifact-base-url", default=os.environ.get("ARTIFACT_BASE_URL", ""))
+    plan.add_argument("--repository", default=os.environ.get("GITHUB_REPOSITORY", ""))
+    plan.add_argument("--github-output", type=Path, default=environment_path("GITHUB_OUTPUT"))
     plan.set_defaults(handler=plan_command)
+    download = subparsers.add_parser("download")
+    download.add_argument("--working-manifest", type=Path, default=Path("simplicio-update-manifest.json"))
+    download.add_argument("--artifact-base-url", default=os.environ.get("ARTIFACT_BASE_URL", ""))
+    download.add_argument("--repository", default=os.environ.get("GITHUB_REPOSITORY", ""))
+    download.add_argument("--staging-dir", type=Path, default=Path("dist"))
+    download.set_defaults(handler=download_command)
     staged = subparsers.add_parser("verify-staged")
-    staged.add_argument("--working-manifest", type=Path, required=True)
-    staged.add_argument("--staging-dir", type=Path, required=True)
+    staged.add_argument("--working-manifest", type=Path, default=Path("simplicio-update-manifest.json"))
+    staged.add_argument("--staging-dir", type=Path, default=Path("dist"))
     staged.set_defaults(handler=staged_command)
+    metadata = subparsers.add_parser("metadata")
+    metadata.add_argument("--working-manifest", type=Path, default=Path("simplicio-update-manifest.json"))
+    metadata.add_argument("--staging-dir", type=Path, default=Path("dist"))
+    metadata.set_defaults(handler=metadata_command)
     args = parser.parse_args(argv)
     return args.handler(args)
 

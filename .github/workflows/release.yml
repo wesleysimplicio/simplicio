@@ -1,6 +1,6 @@
 name: publish-release
-# Manual-only immutable publisher. New artifacts come from a distinct,
-# version-bound staging origin; coherent existing releases are no-op success.
+# Closed-world manual publisher. Every executable step is a canonical repository
+# command; existing coherent releases are no-op success.
 "on":
   workflow_dispatch:
     inputs:
@@ -10,109 +10,51 @@ name: publish-release
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   release:
+    permissions:
+      contents: write
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - id: checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - id: setup_python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - name: Install pinned release verifier dependencies
+      - id: install
         run: python -m pip install -r requirements-quality.txt
-      - name: Read version from manifest
-        id: version
-        shell: pwsh
-        run: echo "version=$((Get-Content simplicio-update-manifest.json | ConvertFrom-Json).version)" >> $env:GITHUB_OUTPUT
-      - name: Read target tag and release state without mutation
-        id: state
-        shell: pwsh
+      - id: state
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          $tag = "v${{ steps.version.outputs.version }}"
-          New-Item -ItemType Directory -Force -Path .release | Out-Null
-          $matchingTag = git tag --list $tag
-          if ($matchingTag -eq $tag) {
-            "tag_exists=true" >> $env:GITHUB_OUTPUT
-            git show "${tag}:simplicio-update-manifest.json" | Set-Content -Encoding utf8 .release/tag-manifest.json
-            if ($LASTEXITCODE -ne 0) { throw "Tag $tag has no update manifest." }
-          } else {
-            "tag_exists=false" >> $env:GITHUB_OUTPUT
-            '{}' | Set-Content -Encoding utf8 .release/tag-manifest.json
-          }
-          $headers = @{
-            Authorization = "Bearer $env:GITHUB_TOKEN"
-            Accept = "application/vnd.github+json"
-            "X-GitHub-Api-Version" = "2022-11-28"
-          }
-          $uri = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/$tag"
-          $response = Invoke-WebRequest -Uri $uri -Headers $headers -SkipHttpErrorCheck
-          if ($response.StatusCode -eq 200) {
-            $response.Content | Set-Content -Encoding utf8 .release/remote-release.json
-          } elseif ($response.StatusCode -eq 404) {
-            '{"exists":false,"assets":[]}' | Set-Content -Encoding utf8 .release/remote-release.json
-          } else {
-            throw "Could not verify remote release state: HTTP $($response.StatusCode)."
-          }
-      - name: Plan immutable release
-        id: provenance
-        shell: pwsh
+        run: python scripts/verify_release_provenance.py state
+      - id: provenance
         env:
           ARTIFACT_BASE_URL: ${{ inputs.artifact_base_url }}
-        run: |
-          $tagArgument = @()
-          if ("${{ steps.state.outputs.tag_exists }}" -eq "true") { $tagArgument = @("--tag-exists") }
-          python scripts/verify_release_provenance.py plan `
-            --working-manifest simplicio-update-manifest.json `
-            --tag-manifest .release/tag-manifest.json `
-            --remote-release .release/remote-release.json `
-            --artifact-base-url "$env:ARTIFACT_BASE_URL" `
-            --repository "$env:GITHUB_REPOSITORY" `
-            --github-output "$env:GITHUB_OUTPUT" @tagArgument
-      - name: Download new artifacts from immutable staging
-        id: download
+          TAG_EXISTS: ${{ steps.state.outputs.tag_exists }}
+        run: python scripts/verify_release_provenance.py plan
+      - id: download
         if: steps.provenance.outputs.mode == 'publish'
-        shell: pwsh
         env:
           ARTIFACT_BASE_URL: ${{ inputs.artifact_base_url }}
-        run: |
-          $manifest = Get-Content simplicio-update-manifest.json -Raw | ConvertFrom-Json
-          $base = $env:ARTIFACT_BASE_URL.TrimEnd('/')
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
-          foreach ($artifact in $manifest.artifacts) {
-            $source = "$base/$($artifact.artifact)"
-            $destination = Join-Path dist $artifact.artifact
-            Invoke-WebRequest -Uri $source -OutFile $destination -UseBasicParsing
-          }
-      - name: Verify staged bytes and signature metadata
-        id: verify_staged
+        run: python scripts/verify_release_provenance.py download
+      - id: verify_staged
         if: steps.provenance.outputs.mode == 'publish'
-        run: >-
-          python scripts/verify_release_provenance.py verify-staged
-          --working-manifest simplicio-update-manifest.json
-          --staging-dir dist
-      - name: Generate verified release metadata
-        id: metadata
+        run: python scripts/verify_release_provenance.py verify-staged
+      - id: metadata
         if: steps.provenance.outputs.mode == 'publish'
-        shell: pwsh
-        run: |
-          Copy-Item simplicio-update-manifest.json dist/
-          Get-ChildItem dist -File | Sort-Object Name | ForEach-Object {
-            "$(($_ | Get-FileHash -Algorithm SHA256).Hash.ToLower()) *$($_.Name)"
-          } | Set-Content -Encoding ascii dist/SHA256SUMS
-      - name: Create release from verified new-tag staging
-        id: publish
+        run: python scripts/verify_release_provenance.py metadata
+      - id: publish
         if: steps.provenance.outputs.mode == 'publish'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version }}
+          tag_name: v${{ steps.state.outputs.version }}
           target_commitish: ${{ github.sha }}
-          name: "v${{ steps.version.outputs.version }} — Public Beta"
+          name: "v${{ steps.state.outputs.version }} — Public Beta"
           body: |
             Free public beta. All features remain unlocked during the public-beta phase.
 

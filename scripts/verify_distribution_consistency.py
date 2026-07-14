@@ -28,6 +28,23 @@ ECOSYSTEM_VERSION_RE = re.compile(r"## Versão atual\s+([^\n]+)", re.MULTILINE)
 CURRENT_VERSION_RE = re.compile(r"## Current Version:\s*v([^\s]+)")
 
 
+class UniqueKeyLoader(yaml.SafeLoader):
+    """Safe YAML loader that rejects ambiguous duplicate mapping keys."""
+
+
+def construct_unique_mapping(loader: UniqueKeyLoader, node: yaml.MappingNode, deep: bool = False) -> dict:
+    mapping = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        if key in mapping:
+            raise yaml.constructor.ConstructorError(None, None, f"duplicate YAML key: {key}", key_node.start_mark)
+        mapping[key] = loader.construct_object(value_node, deep=deep)
+    return mapping
+
+
+UniqueKeyLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, construct_unique_mapping)
+
+
 @dataclass(frozen=True)
 class Finding:
     level: str
@@ -82,25 +99,16 @@ def iter_install_reference_files(root: Path) -> Iterable[Path]:
     yield from sorted((root / "READMEs").glob("README*.md"))
 
 
-def executable_run(step: dict) -> str:
-    run = step.get("run")
-    if not isinstance(run, str):
-        return ""
-    return "\n".join(
-        line.strip().lower()
-        for line in run.splitlines()
-        if line.strip() and not line.lstrip().startswith("#")
-    )
-
-
 def release_workflow_errors(workflow: str) -> list[str]:
     try:
-        document = yaml.safe_load(workflow)
+        document = yaml.load(workflow, Loader=UniqueKeyLoader)
     except yaml.YAMLError as exc:
         return [f"release workflow YAML is invalid: {exc}"]
     if not isinstance(document, dict):
         return ["release workflow must be a YAML mapping"]
     errors: list[str] = []
+    if set(document) != {"name", "on", "permissions", "jobs"}:
+        errors.append("release workflow has unexpected or missing top-level keys")
     triggers = document.get("on")
     if not isinstance(triggers, dict) or set(triggers) != {"workflow_dispatch"}:
         errors.append("release workflow must have only workflow_dispatch trigger")
@@ -111,82 +119,119 @@ def release_workflow_errors(workflow: str) -> list[str]:
     base_input = inputs.get("artifact_base_url") if isinstance(inputs, dict) else None
     if not isinstance(base_input, dict) or base_input.get("required") is not True or base_input.get("type") != "string":
         errors.append("workflow_dispatch must require string input artifact_base_url")
-
+    if document.get("permissions") != {"contents": "read"}:
+        errors.append("workflow permissions must default to contents: read")
     jobs = document.get("jobs")
-    release = jobs.get("release") if isinstance(jobs, dict) else None
+    if not isinstance(jobs, dict) or set(jobs) != {"release"}:
+        errors.append("release workflow must contain exactly one release job")
+        return errors
+    release = jobs.get("release")
+    if not isinstance(release, dict) or set(release) != {"permissions", "runs-on", "steps"}:
+        errors.append("release job has unexpected or missing keys")
+        return errors
+    if release.get("permissions") != {"contents": "write"}:
+        errors.append("only the release job may elevate contents: write")
+    if release.get("runs-on") != "windows-latest":
+        errors.append("release job must run on windows-latest")
     steps = release.get("steps") if isinstance(release, dict) else None
-    if not isinstance(steps, list) or not steps or not all(isinstance(step, dict) for step in steps):
-        errors.append("jobs.release.steps must be a non-empty list of mappings")
+    expected_ids = (
+        "checkout",
+        "setup_python",
+        "install",
+        "state",
+        "provenance",
+        "download",
+        "verify_staged",
+        "metadata",
+        "publish",
+    )
+    if not isinstance(steps, list) or not all(isinstance(step, dict) for step in steps):
+        errors.append("jobs.release.steps must be a list of mappings")
         return errors
-    indexed: dict[str, tuple[int, dict]] = {}
-    for index, step in enumerate(steps):
-        step_id = step.get("id")
-        if isinstance(step_id, str):
-            if step_id in indexed:
-                errors.append(f"duplicate release step id: {step_id}")
-            indexed[step_id] = (index, step)
-    required_ids = ("state", "provenance", "download", "verify_staged", "metadata", "publish")
-    missing_ids = [step_id for step_id in required_ids if step_id not in indexed]
-    if missing_ids:
-        errors.append("missing release step ids: " + ", ".join(missing_ids))
+    actual_ids = tuple(step.get("id") for step in steps)
+    if actual_ids != expected_ids or len(set(actual_ids)) != len(actual_ids):
+        errors.append("release step IDs must match the exact ordered closed-world allowlist")
         return errors
-    positions = [indexed[step_id][0] for step_id in required_ids]
-    if positions != sorted(positions) or len(set(positions)) != len(positions):
-        errors.append("release steps must order state, provenance, download, verify_staged, metadata, publish")
-
-    install_runs = [executable_run(step) for step in steps]
-    if not any("pip install -r requirements-quality.txt" in run for run in install_runs):
-        errors.append("release job must install pinned requirements-quality.txt")
-
-    state_run = executable_run(indexed["state"][1])
-    for command in ("git tag --list", "git show \"${tag}:simplicio-update-manifest.json\"", "remote-release.json"):
-        if command not in state_run:
-            errors.append(f"state step lacks executable command: {command}")
-    provenance_run = executable_run(indexed["provenance"][1])
-    for argument in (
-        "scripts/verify_release_provenance.py plan",
-        "--working-manifest",
-        "--tag-manifest",
-        "--remote-release",
-        "--artifact-base-url",
-        "--github-output",
-        "--tag-exists",
-    ):
-        if argument not in provenance_run:
-            errors.append(f"provenance step lacks executable argument: {argument}")
-
+    indexed = {step["id"]: step for step in steps}
+    expected_keys = {
+        "checkout": {"id", "uses", "with"},
+        "setup_python": {"id", "uses", "with"},
+        "install": {"id", "run"},
+        "state": {"id", "env", "run"},
+        "provenance": {"id", "env", "run"},
+        "download": {"id", "if", "env", "run"},
+        "verify_staged": {"id", "if", "run"},
+        "metadata": {"id", "if", "run"},
+        "publish": {"id", "if", "uses", "with"},
+    }
+    expected_uses = {
+        "checkout": "actions/checkout@v4",
+        "setup_python": "actions/setup-python@v5",
+        "publish": "softprops/action-gh-release@v2",
+    }
+    expected_runs = {
+        "install": "python -m pip install -r requirements-quality.txt",
+        "state": "python scripts/verify_release_provenance.py state",
+        "provenance": "python scripts/verify_release_provenance.py plan",
+        "download": "python scripts/verify_release_provenance.py download",
+        "verify_staged": "python scripts/verify_release_provenance.py verify-staged",
+        "metadata": "python scripts/verify_release_provenance.py metadata",
+    }
+    expected_env = {
+        "state": {"GITHUB_TOKEN": "${{ github.token }}"},
+        "provenance": {
+            "ARTIFACT_BASE_URL": "${{ inputs.artifact_base_url }}",
+            "TAG_EXISTS": "${{ steps.state.outputs.tag_exists }}",
+        },
+        "download": {"ARTIFACT_BASE_URL": "${{ inputs.artifact_base_url }}"},
+    }
+    for step_id in expected_ids:
+        step = indexed[step_id]
+        if set(step) != expected_keys[step_id]:
+            errors.append(f"{step_id} step has unexpected or missing keys")
+        if step_id in expected_uses and step.get("uses") != expected_uses[step_id]:
+            errors.append(f"{step_id} step uses an unapproved action")
+        if step_id in expected_runs and step.get("run") != expected_runs[step_id]:
+            errors.append(f"{step_id} step must equal its canonical single command")
+        if step_id in expected_env and step.get("env") != expected_env[step_id]:
+            errors.append(f"{step_id} step env must match the exact allowlist")
     publish_condition = "steps.provenance.outputs.mode == 'publish'"
     guarded_ids = ("download", "verify_staged", "metadata", "publish")
     for step_id in guarded_ids:
-        if indexed[step_id][1].get("if") != publish_condition:
+        if indexed[step_id].get("if") != publish_condition:
             errors.append(f"{step_id} step must be guarded by publish mode")
-    download_run = executable_run(indexed["download"][1])
-    if "$env:artifact_base_url" not in download_run or "invoke-webrequest -uri $source" not in download_run:
-        errors.append("download step must source artifacts from artifact_base_url")
-    if "$artifact.url" in download_run or "releases/download" in download_run:
-        errors.append("download step must not source a new binary from its target release URL")
-    if "copy-item simplicio " in download_run or "copy-item simplicio.exe " in download_run:
-        errors.append("download step must not stage checked-in wrappers")
-
-    staged_run = executable_run(indexed["verify_staged"][1])
-    if "scripts/verify_release_provenance.py verify-staged" not in staged_run or "--staging-dir" not in staged_run:
-        errors.append("verify_staged step must execute the reusable digest verifier")
-    publish = indexed["publish"][1]
-    if publish.get("uses") != "softprops/action-gh-release@v2":
-        errors.append("publish step must use softprops/action-gh-release@v2")
+    if indexed["checkout"].get("with") != {"fetch-depth": 0}:
+        errors.append("checkout step inputs must match the exact allowlist")
+    if indexed["setup_python"].get("with") != {"python-version": "3.13"}:
+        errors.append("setup_python step inputs must match the exact allowlist")
+    publish = indexed["publish"]
     publish_with = publish.get("with")
     if not isinstance(publish_with, dict):
         errors.append("publish step must define structured with inputs")
     else:
+        expected_publish_keys = {
+            "tag_name",
+            "target_commitish",
+            "name",
+            "body",
+            "prerelease",
+            "make_latest",
+            "fail_on_unmatched_files",
+            "overwrite_files",
+            "files",
+        }
+        if set(publish_with) != expected_publish_keys:
+            errors.append("publish inputs must match the exact closed-world allowlist")
+        if publish_with.get("tag_name") != "v${{ steps.state.outputs.version }}":
+            errors.append("publish tag_name must come from verified state")
+        if publish_with.get("target_commitish") != "${{ github.sha }}":
+            errors.append("publish target_commitish must be the dispatched commit")
         if publish_with.get("overwrite_files") is not False:
             errors.append("publish step must set overwrite_files: false")
         if publish_with.get("fail_on_unmatched_files") is not True:
             errors.append("publish step must set fail_on_unmatched_files: true")
         if publish_with.get("files") != "dist/*":
             errors.append("publish step must upload only dist/*")
-    release_actions = [step for step in steps if step.get("uses") == "softprops/action-gh-release@v2"]
-    if len(release_actions) != 1:
-        errors.append("release job must contain exactly one publish action")
     return errors
 
 

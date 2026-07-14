@@ -65,7 +65,11 @@ signed staging set is separate release work.
 
 The strict distribution audit parses workflow YAML using pinned PyYAML and validates the actual trigger,
 input, `jobs.release.steps`, executable commands, action inputs, conditions, and ordering. Comments and
-environment variables cannot satisfy executable-step requirements.
+environment variables cannot satisfy executable-step requirements. The topology is closed-world: one
+release job, nine unique ordered step IDs, three approved actions, exact environment maps, and six
+canonical single-command script invocations. Any extra job/step/key/action/command or appended shell
+separator fails the audit. Workflow permissions default to `contents: read`; only that exact release job
+elevates to `contents: write`.
 
 ## Local parity
 
