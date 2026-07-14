@@ -20,7 +20,38 @@
       "sha256": "931bc6d8f45c1b1e586070f8f5ac4a762861bc9157c70f75aaa4ebfad8ff27bb",
       "signature": "ed25519:2omwTRLIpznbAjJJfCLKopWRjQWQPegU1bQKFGKQztgcg/ux3YGQWIBw9oOMzzMvd6E4kVe8vWvhU6+hDhfKAg==",
       "signature_algorithm": "ed25519",
+      "signed": true,
       "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.5.2/simplicio-macos-arm64"
+    },
+    {
+      "target": "windows-x64",
+      "artifact": "simplicio-windows-x64.exe",
+      "sha256": "ff1a1b6e30f809cf3afc28554ba385f51d1574a41438fcbbdc786267a8ba480c",
+      "signature": null,
+      "signature_algorithm": null,
+      "signed": false,
+      "signing_note": "checksum verified from committed SHA256SUMS; ed25519 signing infra not yet wired for this target — see issue #5.",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.5.2/simplicio-windows-x64.exe"
+    },
+    {
+      "target": "macos-x64",
+      "artifact": "simplicio-macos-x64",
+      "sha256": "7f1035be4cc2cf6a5053d894159622b233ca0fad00a5215f9ece3772fe462c42",
+      "signature": null,
+      "signature_algorithm": null,
+      "signed": false,
+      "signing_note": "checksum verified from committed SHA256SUMS (legacy asset simplicio-darwin-x64); ed25519 signing infra not yet wired for this target — see issue #5.",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.5.2/simplicio-macos-x64"
+    },
+    {
+      "target": "linux-x64",
+      "artifact": "simplicio-linux-x64",
+      "sha256": "84d86fb1760c11e1e123c013174a712faff62468639f68a0173d53b6cbe99f29",
+      "signature": null,
+      "signature_algorithm": null,
+      "signed": false,
+      "signing_note": "checksum verified from committed SHA256SUMS; ed25519 signing infra not yet wired for this target — see issue #5.",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.5.2/simplicio-linux-x64"
     }
   ]
 }

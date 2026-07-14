@@ -123,6 +123,7 @@ jobs:
                             "url": artifact_url,
                             "sha256": artifact_sha,
                             "signature": "ed25519:fixture",
+                            "signed": True,
                         }
                     ],
                 }
@@ -141,6 +142,23 @@ jobs:
         )
         self.put("pypi/simplicio/pyproject.toml", f'version = "{self.version}"\n')
         self.put("SIMPLICIO_ECOSYSTEM.md", f"## Versão atual\n{self.version} (manifest)\n")
+        self.put(
+            "distribution/targets.json",
+            json.dumps(
+                {
+                    "targets": [
+                        {
+                            "id": "macos-arm64",
+                            "os": "macos",
+                            "arch": "arm64",
+                            "asset": "simplicio-macos-arm64",
+                            "installer": None,
+                            "manifest_target": "macos-arm64",
+                        }
+                    ]
+                }
+            ),
+        )
 
 
 class DistributionConsistencyTests(unittest.TestCase):
@@ -156,7 +174,7 @@ class DistributionConsistencyTests(unittest.TestCase):
         return [item.level for item in audit.run_audit(self.root, today=date(2026, 7, 14))]
 
     def test_clean_distribution_has_no_blocking_findings(self):
-        self.assertEqual(self.levels(), ["OK"] * 8)
+        self.assertEqual(self.levels(), ["OK"] * 9)
 
     def test_regression_wrong_branch_and_version_fail(self):
         self.fixture.put("README.md", "https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.sh\n")
@@ -398,7 +416,7 @@ env:
             result = audit.main(["--root", str(self.root), "--strict", "--junit", str(junit), "--json"])
         self.assertEqual(result, 0)
         self.assertTrue(junit.exists())
-        self.assertEqual(len(json.loads(output.getvalue())), 8)
+        self.assertEqual(len(json.loads(output.getvalue())), 9)
 
     def test_strict_mode_fails_warning_while_default_does_not(self):
         self.fixture.put("npm/simplicio/package.json", json.dumps({"version": "3.0.2"}))

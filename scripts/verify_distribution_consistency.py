@@ -1,5 +1,19 @@
 #!/usr/bin/env python3
-"""Fail-closed integrity audit for the public Simplicio distribution."""
+"""Fail-closed integrity audit for the public Simplicio distribution.
+
+Covers verifiable packaging/distribution drift:
+- canonical branch install URLs (`master` in this repo)
+- release/version source-of-truth mismatches
+- stale or contradictory public-beta claims
+- the release workflow's closed-world, provenance-driven publish contract
+- target-triplet naming drift between distribution/targets.json (the
+  canonical table), the release workflow, the update manifest and the
+  installers (issue #5)
+
+Exit code:
+- 0: no hard failures (warnings may still be printed, unless --strict)
+- 1: at least one hard failure
+"""
 
 from __future__ import annotations
 
@@ -230,9 +244,93 @@ def release_workflow_errors(workflow: str) -> list[str]:
     return errors
 
 
+def check_target_triplet_consistency(root: Path, findings: list[Finding]) -> None:
+    """Enforce that distribution/targets.json is the single source of truth
+    for asset naming across release.yml, the update manifest and both
+    installers. This is the concrete regression guard for issue #5's
+    "tabela canonica de target triplets" acceptance criterion.
+    """
+    targets_path = root / "distribution/targets.json"
+    if not targets_path.exists():
+        findings.append(Finding("ERROR", "distribution/targets.json (canonical target-triplet table) is missing."))
+        return
+
+    table = load_json(targets_path)
+    targets = table.get("targets", [])
+    if not targets:
+        findings.append(Finding("ERROR", "distribution/targets.json has no targets defined."))
+        return
+
+    release_yml = read_text(root / ".github/workflows/release.yml")
+    install_ps1 = read_text(root / "install.ps1")
+    install_sh = read_text(root / "install.sh")
+    manifest = load_json(root / "simplicio-update-manifest.json")
+    manifest_by_target = {a.get("target"): a for a in manifest.get("artifacts", [])}
+
+    offenders: list[str] = []
+
+    # Under the closed-world provenance release model, release.yml stages
+    # whatever verify_release_provenance.py verifies-and-downloads by
+    # publishing the whole dist/ directory (a generic glob), rather than
+    # hard-coding a `cp asset dist/asset` line per target triplet. So the
+    # per-asset name that matters lives in simplicio-update-manifest.json
+    # (checked per-target below), not in release.yml's text; here we only
+    # assert release.yml still publishes generically instead of silently
+    # reintroducing a target-specific allowlist that could drift from this
+    # table.
+    if "dist/*" not in release_yml:
+        offenders.append("release.yml no longer publishes the generic dist/* glob (asset naming may have drifted from distribution/targets.json)")
+
+    for t in targets:
+        target_id = t["id"]
+        asset = t["asset"]
+        installer = t.get("installer")
+        manifest_target = t.get("manifest_target", target_id)
+
+        # The installer responsible for this target must use the canonical asset name.
+        if installer == "install.ps1" and asset not in install_ps1:
+            offenders.append(f"install.ps1 does not reference canonical asset {asset} (target {target_id})")
+        if installer == "install.sh":
+            if t["os"] not in install_sh or t["arch"] not in install_sh:
+                offenders.append(
+                    f"install.sh does not map os={t['os']!r}/arch={t['arch']!r} to canonical asset {asset} (target {target_id})"
+                )
+
+        # If the manifest already publishes this target, its artifact name must match.
+        artifact = manifest_by_target.get(manifest_target)
+        if artifact and artifact.get("artifact") != asset:
+            offenders.append(
+                f"manifest artifact for target {manifest_target!r} is {artifact.get('artifact')!r}, expected canonical {asset!r}"
+            )
+
+    if offenders:
+        findings.append(Finding("ERROR", "target-triplet drift detected: " + "; ".join(offenders)))
+    else:
+        findings.append(
+            Finding("OK", f"release.yml, installers and manifest all agree with distribution/targets.json ({len(targets)} targets).")
+        )
+
+    # Unsigned-but-checksummed artifacts are allowed as an interim step, but
+    # must say so explicitly rather than silently claiming full verification.
+    unsigned = [
+        a["target"]
+        for a in manifest.get("artifacts", [])
+        if a.get("sha256") and not a.get("signed", False)
+    ]
+    if unsigned:
+        findings.append(
+            Finding(
+                "WARN",
+                "artifacts published with checksum but no signature yet (interim, see issue #5): " + ", ".join(unsigned),
+            )
+        )
+
+
 def run_audit(root: Path = ROOT, *, today: date | None = None) -> list[Finding]:
     today = today or date.today()
     findings: list[Finding] = []
+
+    check_target_triplet_consistency(root, findings)
 
     version_document = read_text(root / "VERSION.md")
     if "Use `master` branch only" not in version_document:

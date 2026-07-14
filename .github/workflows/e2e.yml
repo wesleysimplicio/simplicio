@@ -1,0 +1,63 @@
+name: e2e-ecosystem
+
+# Real integration/E2E checks against the already-compiled `simplicio`
+# binary committed in this repo (see docs/e2e-integration.md). Deliberately
+# does NOT invoke cargo build/test/check — this repo only distributes the
+# runtime, it doesn't build it.
+on:
+  pull_request:
+    paths:
+      - simplicio.exe
+      - simplicio
+      - simplicio-windows-x64.exe
+      - simplicio-darwin-x64
+      - simplicio-linux-x64
+      - simplicio-macos-arm64
+      - simplicio-update-manifest.json
+      - version.txt
+      - "npm/**"
+      - "pypi/**"
+      - "Formula/**"
+      - "scripts/e2e_ecosystem.py"
+      - "scripts/verify_distribution_consistency.py"
+      - ".github/workflows/e2e.yml"
+  push:
+    branches: [master, main]
+    paths:
+      - simplicio.exe
+      - simplicio-windows-x64.exe
+      - simplicio-update-manifest.json
+      - version.txt
+      - "npm/**"
+      - "pypi/**"
+      - "Formula/**"
+      - "scripts/e2e_ecosystem.py"
+      - "scripts/verify_distribution_consistency.py"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run ecosystem E2E integration tests
+        id: e2e
+        shell: bash
+        run: |
+          python scripts/e2e_ecosystem.py --json | tee e2e-output.txt
+        continue-on-error: true
+
+      - name: Upload E2E evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-ecosystem-evidence
+          path: e2e-output.txt
+
+      - name: Fail the job if any scenario failed
+        if: steps.e2e.outcome == 'failure'
+        run: exit 1
