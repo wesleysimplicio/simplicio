@@ -1,0 +1,11 @@
+[tool.pytest.ini_options]
+testpaths = ["tests/unit"]
+addopts = "-ra"
+
+[tool.coverage.run]
+source = ["scripts"]
+omit = ["scripts/__pycache__/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true

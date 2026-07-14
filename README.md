@@ -200,6 +200,23 @@ simplicio license status
 
 ---
 
+## 🧪 Testing this repo's tooling
+
+This repo ships committed release binaries plus the packaging/tooling around
+them (npm/pypi/Homebrew wrappers, install scripts, a distribution-consistency
+checker). The official command to run that tooling's unit test suite:
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest tests/unit -v --cov=scripts --cov-report=term-missing --cov-fail-under=85
+```
+
+See [docs/testing-strategy.md](docs/testing-strategy.md) for what's covered,
+what's intentionally out of scope, and the plan for the rest of the testing
+epic. See also [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
 ## 🌐 Ecosystem
 
 - [Website](https://simpleti.com.br/simplicio/#start) — full docs, benchmarks, install
