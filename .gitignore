@@ -1,3 +1,6 @@
 .npmrc
 *.egg-info/
 dist/
+.pytest_cache/
+.coverage
+__pycache__/
