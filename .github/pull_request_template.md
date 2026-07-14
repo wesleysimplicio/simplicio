@@ -13,7 +13,8 @@
 - [ ] Coverage remains >=85% globally and >=90% for critical release-integrity code.
 - [ ] Installer/package behavior was exercised in dry-run mode on the supported matrix.
 - [ ] No test is skipped. If an external dependency requires a skip, the adjacent
-      `JUSTIFICATION:` comment links a time-boxed repository issue.
+      exception includes `JUSTIFICATION:`, repository issue URL, `OWNER:`, and a `REMOVE-BY:` date
+      no more than 30 days away.
 - [ ] Benchmark changes are within `benchmarks/baseline.json`, or this PR updates the baseline with
       measured rationale.
 

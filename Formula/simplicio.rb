@@ -6,19 +6,13 @@ class Simplicio < Formula
   homepage "https://simpleti.com.br/simplicio/#start"
   version "3.5.2"
   license "Proprietary"
-
-  on_macos do
-    if Hardware::CPU.arm?
-      url "https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/simplicio"
-      sha256 "d6d6eee7b086c6f25e13a313444d4d0533aeb45c01a8c9f2dce1f119e29e43c0"
-    else
-      url "https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/simplicio"
-      sha256 "d6d6eee7b086c6f25e13a313444d4d0533aeb45c01a8c9f2dce1f119e29e43c0"
-    end
-  end
+  url "https://github.com/wesleysimplicio/simplicio/releases/download/v3.5.2/simplicio-macos-arm64"
+  sha256 "931bc6d8f45c1b1e586070f8f5ac4a762861bc9157c70f75aaa4ebfad8ff27bb"
+  depends_on :macos
+  depends_on arch: :arm64
 
   def install
-    bin.install "simplicio" => "simplicio"
+    bin.install "simplicio-macos-arm64" => "simplicio"
   end
 
   test do

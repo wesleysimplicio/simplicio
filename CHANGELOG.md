@@ -17,7 +17,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 
 - Aligned public wrapper metadata with the canonical `3.5.2` update manifest
-  and made release checksums derive from the staged artifacts.
+  and made release publication download only version-bound manifest artifacts,
+  verify their signed SHA256 provenance, and derive checksums from that verified
+  staging set.
+- Expanded ignored-test enforcement to Python `skipTest`/`SkipTest` and Node
+  skip options, with issue, owner, and 30-day removal metadata required.
 
 ## [1.6.1] - 2026-07-01
 

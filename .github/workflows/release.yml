@@ -1,15 +1,10 @@
 name: publish-release
-# Publishes the committed binaries + signed update manifest as a GitHub
-# Release so `simplicio update` (which downloads from
-# github.com/<repo>/releases/latest/download/...) works for beta testers.
+# Republishes only manifest-declared, checksum-verified artifacts. Checked-in
+# wrapper binaries are never renamed or treated as release provenance.
 on:
   push:
-    branches: [master, main]
+    branches: [master]
     paths:
-      - simplicio.exe
-      - simplicio
-      - simplicio-darwin-x64
-      - simplicio-linux-x64
       - simplicio-update-manifest.json
       - .github/workflows/release.yml
   workflow_dispatch: {}
@@ -22,18 +17,47 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Read version from manifest
         id: ver
         shell: pwsh
         run: echo "version=$((Get-Content simplicio-update-manifest.json | ConvertFrom-Json).version)" >> $env:GITHUB_OUTPUT
-      - name: Stage release assets
+      - name: Require an existing immutable release tag
         shell: pwsh
         run: |
+          $tag = "v${{ steps.ver.outputs.version }}"
+          git show-ref --verify --quiet "refs/tags/$tag"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Refusing to create or move missing tag $tag; publish the signed provenance first."
+          }
+      - name: Download and verify manifest artifacts
+        shell: pwsh
+        run: |
+          $manifest = Get-Content simplicio-update-manifest.json -Raw | ConvertFrom-Json
+          if (-not $manifest.artifacts -or $manifest.artifacts.Count -eq 0) {
+            throw "Manifest contains no release artifacts."
+          }
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          Copy-Item simplicio.exe dist/simplicio-windows-x86_64.exe
-          Copy-Item simplicio dist/simplicio-macos-arm64
-          if (Test-Path simplicio-darwin-x64) { Copy-Item simplicio-darwin-x64 dist/simplicio-darwin-x64 }
-          if (Test-Path simplicio-linux-x64) { Copy-Item simplicio-linux-x64 dist/simplicio-linux-x64 }
+          $releasePrefix = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/v$($manifest.version)/"
+          foreach ($artifact in $manifest.artifacts) {
+            if (-not $artifact.artifact -or -not $artifact.url -or -not $artifact.sha256) {
+              throw "Manifest artifact is missing artifact/url/sha256 provenance."
+            }
+            $expectedUrl = "$releasePrefix$($artifact.artifact)"
+            if ($artifact.url -ne $expectedUrl) {
+              throw "Artifact URL must be version-bound: expected $expectedUrl, got $($artifact.url)."
+            }
+            if ($manifest.security.signature_required -and -not $artifact.signature) {
+              throw "Artifact $($artifact.artifact) is missing its required signature."
+            }
+            $destination = Join-Path dist $artifact.artifact
+            Invoke-WebRequest -Uri $artifact.url -OutFile $destination -UseBasicParsing
+            $actualHash = (Get-FileHash $destination -Algorithm SHA256).Hash.ToLower()
+            if ($actualHash -ne $artifact.sha256.ToLower()) {
+              throw "SHA256 mismatch for $($artifact.artifact): expected $($artifact.sha256), got $actualHash."
+            }
+          }
           Copy-Item simplicio-update-manifest.json dist/
           Get-ChildItem dist -File | Sort-Object Name | ForEach-Object {
             "$(($_ | Get-FileHash -Algorithm SHA256).Hash.ToLower()) *$($_.Name)"
@@ -52,10 +76,5 @@ jobs:
             Signed update manifest included (`simplicio update check`).
           prerelease: false
           make_latest: "true"
-          files: |
-            dist/simplicio-windows-x86_64.exe
-            dist/simplicio-macos-arm64
-            dist/simplicio-darwin-x64
-            dist/simplicio-linux-x64
-            dist/simplicio-update-manifest.json
-            dist/SHA256SUMS
+          fail_on_unmatched_files: true
+          files: dist/*

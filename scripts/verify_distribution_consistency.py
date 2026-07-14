@@ -19,6 +19,8 @@ MAIN_INSTALL_RE = re.compile(
     r"https://raw\.githubusercontent\.com/wesleysimplicio/simplicio/main/install\.(?:sh|ps1)"
 )
 FORMULA_VERSION_RE = re.compile(r'version\s+"([^"]+)"')
+FORMULA_URL_RE = re.compile(r'^\s*url\s+"([^"]+)"', re.MULTILINE)
+FORMULA_SHA256_RE = re.compile(r'^\s*sha256\s+"([0-9a-fA-F]{64})"', re.MULTILINE)
 BETA_NO_END_RE = re.compile(r"public beta with no end date", re.IGNORECASE)
 ECOSYSTEM_VERSION_RE = re.compile(r"## Versão atual\s+([^\n]+)", re.MULTILINE)
 CURRENT_VERSION_RE = re.compile(r"## Current Version:\s*v([^\s]+)")
@@ -47,6 +49,15 @@ def version_from_formula(path: Path) -> str:
     if not match:
         raise ValueError(f"could not parse formula version from {path}")
     return match.group(1)
+
+
+def formula_provenance(path: Path) -> tuple[str, str]:
+    text = read_text(path)
+    url = FORMULA_URL_RE.search(text)
+    sha256 = FORMULA_SHA256_RE.search(text)
+    if not url or not sha256:
+        raise ValueError(f"could not parse formula URL/SHA256 from {path}")
+    return url.group(1), sha256.group(1).lower()
 
 
 def version_from_pyproject(path: Path) -> str:
@@ -109,6 +120,28 @@ def run_audit(root: Path = ROOT, *, today: date | None = None) -> list[Finding]:
     else:
         findings.append(Finding("OK", "VERSION.md matches the release manifest."))
 
+    artifacts = manifest.get("artifacts") or []
+    signature_required = bool(manifest.get("security", {}).get("signature_required"))
+    manifest_errors: list[str] = []
+    for artifact in artifacts:
+        name = str(artifact.get("artifact") or "")
+        expected_url = (
+            f"https://github.com/wesleysimplicio/simplicio/releases/download/"
+            f"v{manifest_version}/{name}"
+        )
+        if not name or artifact.get("url") != expected_url:
+            manifest_errors.append(f"manifest artifact URL is not version-bound: {name or 'missing-name'}")
+        if not re.fullmatch(r"[0-9a-fA-F]{64}", str(artifact.get("sha256") or "")):
+            manifest_errors.append(f"manifest artifact has invalid SHA256: {name or 'missing-name'}")
+        if signature_required and not str(artifact.get("signature") or "").startswith("ed25519:"):
+            manifest_errors.append(f"manifest artifact lacks required Ed25519 signature: {name or 'missing-name'}")
+    if not artifacts:
+        manifest_errors.append("manifest contains no release artifacts")
+    if manifest_errors:
+        findings.extend(Finding("ERROR", message) for message in manifest_errors)
+    else:
+        findings.append(Finding("OK", "manifest artifact URLs, hashes, and signatures are version-bound."))
+
     wrappers = {
         "Formula/simplicio.rb": version_from_formula(root / "Formula/simplicio.rb"),
         "npm/simplicio/package.json": version_from_package_json(root / "npm/simplicio/package.json"),
@@ -126,6 +159,48 @@ def run_audit(root: Path = ROOT, *, today: date | None = None) -> list[Finding]:
         findings.append(Finding("WARN", f"wrapper versions lag manifest {manifest_version}: {details}"))
     else:
         findings.append(Finding("OK", "wrapper/package versions match the release manifest."))
+
+    macos_artifact = next((item for item in artifacts if item.get("target") == "macos-arm64"), None)
+    if not macos_artifact:
+        findings.append(Finding("ERROR", "manifest lacks the macos-arm64 artifact required by Formula/simplicio.rb."))
+    else:
+        formula_url, formula_sha256 = formula_provenance(root / "Formula/simplicio.rb")
+        formula_text = read_text(root / "Formula/simplicio.rb")
+        formula_install = f'bin.install "{macos_artifact.get("artifact")}" => "simplicio"'
+        if (
+            formula_url != macos_artifact.get("url")
+            or formula_sha256 != str(macos_artifact.get("sha256", "")).lower()
+            or formula_install not in formula_text
+        ):
+            findings.append(Finding("ERROR", "Formula URL/SHA256/install does not match the signed macos-arm64 manifest artifact."))
+        else:
+            findings.append(Finding("OK", "Formula URL/SHA256/install matches the signed macos-arm64 manifest artifact."))
+
+    release_workflow = read_text(root / ".github/workflows/release.yml")
+    release_lower = release_workflow.lower()
+    required_release_tokens = (
+        "git show-ref --verify --quiet",
+        "foreach ($artifact in $manifest.artifacts)",
+        "invoke-webrequest -uri $artifact.url",
+        "get-filehash $destination -algorithm sha256",
+        "if ($actualhash -ne $artifact.sha256.tolower())",
+        "fail_on_unmatched_files: true",
+        "files: dist/*",
+    )
+    unsafe_release_lines = (
+        "\n      - simplicio\n",
+        "\n      - simplicio.exe\n",
+        "copy-item simplicio ",
+        "copy-item simplicio.exe ",
+        "cp simplicio ",
+    )
+    missing_tokens = [token for token in required_release_tokens if token not in release_lower]
+    unsafe_tokens = [token.strip() for token in unsafe_release_lines if token in release_lower]
+    if missing_tokens or unsafe_tokens:
+        details = ", ".join([*(f"missing {token}" for token in missing_tokens), *(f"unsafe {token}" for token in unsafe_tokens)])
+        findings.append(Finding("ERROR", f"release workflow provenance is not fail-closed: {details}"))
+    else:
+        findings.append(Finding("OK", "release workflow downloads only manifest artifacts and verifies SHA256 before upload."))
 
     ecosystem = read_text(root / "SIMPLICIO_ECOSYSTEM.md")
     ecosystem_match = ECOSYSTEM_VERSION_RE.search(ecosystem)

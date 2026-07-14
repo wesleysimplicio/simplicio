@@ -31,10 +31,11 @@ JUnit, coverage, benchmark, security, package-build, and flaky-attempt reports a
 - Node installer lines must stay at or above 85% and functions at or above 90%.
 - Every bug fix must add a test that fails before the fix. The version-source and expired-beta
   regressions that triggered issue #10 are frozen in `tests/test_distribution_consistency.py`.
-- A test may be skipped only with an adjacent `JUSTIFICATION:` comment and a full
-  `https://github.com/wesleysimplicio/simplicio/issues/<number>` URL. The linked issue must name an
-  owner, external dependency, and removal date no later than 30 days. `quality_policy.py` blocks
-  unregistered skips.
+- A test may be skipped only with an adjacent four-line exception block containing
+  `JUSTIFICATION:`, a full `https://github.com/wesleysimplicio/simplicio/issues/<number>` URL,
+  `OWNER:`, and `REMOVE-BY: YYYY-MM-DD`. Removal must be between today and 30 days from today.
+  Decorators, `self.skipTest`, raised `SkipTest`, pytest skips, Node `.skip`, and `{skip: true}` are
+  all enforced by `quality_policy.py`.
 - Retries never hide failure: `flaky_check.py` records every attempt, labels mixed outcomes FLAKY,
   and returns non-zero if any attempt fails.
 
@@ -44,6 +45,14 @@ JUnit, coverage, benchmark, security, package-build, and flaky-attempt reports a
 the baseline in the same PR with measurements and rationale. Emergency diagnosis may set
 `SIMPLICIO_BENCHMARK_TOLERANCE_PERCENT`, but merges still require a linked exception issue and an
 updated baseline; the environment override is not configured on protected branches.
+
+## Release provenance
+
+`publish-release` never renames a checked-in wrapper binary into a platform artifact. It requires
+the version tag to exist, downloads every artifact from the exact version-bound URL declared in
+`simplicio-update-manifest.json`, verifies its SHA256 and required signature metadata, then uploads
+only that verified staging directory. A missing tag, drifting URL, missing signature, or hash
+mismatch stops before the release action; the workflow never creates or moves a tag.
 
 ## Local parity
 

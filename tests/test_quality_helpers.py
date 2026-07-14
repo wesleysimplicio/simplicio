@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 
 from scripts import benchmark_distribution as benchmark
@@ -26,7 +27,7 @@ class QualityPolicyTests(unittest.TestCase):
             path = root / "tests/example.test.cjs"
             path.parent.mkdir(parents=True)
             path.write_text("test" + ".skip('later', () => {});\n", encoding="utf-8")
-            violations = quality_policy.find_violations(root)
+            violations = quality_policy.find_violations(root, today=date(2026, 7, 14))
             self.assertEqual([(item.path, item.line) for item in violations], [("tests/example.test.cjs", 1)])
 
     def test_skip_with_adjacent_issue_justification_is_allowed(self):
@@ -37,16 +38,44 @@ class QualityPolicyTests(unittest.TestCase):
             marker = "@unittest." + "skip('external')"
             path.write_text(
                 "# JUSTIFICATION: tracked at https://github.com/wesleysimplicio/simplicio/issues/10\n"
+                "# OWNER: @release-maintainer\n"
+                "# REMOVE-BY: 2026-07-30\n"
                 + marker
                 + "\n",
                 encoding="utf-8",
             )
-            self.assertEqual(quality_policy.find_violations(root), [])
+            self.assertEqual(quality_policy.find_violations(root, today=date(2026, 7, 14)), [])
+
+    def test_all_supported_skip_forms_are_detected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "tests/skip_forms.py"
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                "self." + "skipTest('later')\n"
+                "raise unittest." + "SkipTest('later')\n"
+                "raise " + "SkipTest('later')\n"
+                "options = { " + "sk" + "ip: true }\n",
+                encoding="utf-8",
+            )
+            violations = quality_policy.find_violations(root, today=date(2026, 7, 14))
+            self.assertEqual(len(violations), 4)
+            self.assertTrue(all(item.reason == "missing JUSTIFICATION" for item in violations))
+
+    def test_exception_requires_owner_and_near_term_removal(self):
+        base = (
+            "# JUSTIFICATION: external service\n"
+            "# https://github.com/wesleysimplicio/simplicio/issues/10\n"
+        )
+        self.assertEqual(quality_policy.justification_error(base + "# REMOVE-BY: 2026-07-20", date(2026, 7, 14)), "missing OWNER")
+        complete = base + "# OWNER: @maintainer\n"
+        self.assertEqual(quality_policy.justification_error(complete + "# REMOVE-BY: 2026-07-01", date(2026, 7, 14)), "REMOVE-BY is expired")
+        self.assertEqual(quality_policy.justification_error(complete + "# REMOVE-BY: 2026-09-01", date(2026, 7, 14)), "REMOVE-BY exceeds 30 days")
 
     def test_policy_junit_records_violation(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "policy.xml"
-            violation = quality_policy.Violation("tests/a.py", 3, "skip")
+            violation = quality_policy.Violation("tests/a.py", 3, "skip", "missing OWNER")
             quality_policy.write_junit(target, [violation])
             self.assertIn("unjustified ignored tests", target.read_text(encoding="utf-8"))
 
