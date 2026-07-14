@@ -7,11 +7,11 @@ Consumidores finais via `npx @wesleysimplicio/simplicio`.
 - [simplicio-runtime](https://github.com/wesleysimplicio/simplicio-runtime) — binário compilado incluído no release
 
 ## Versão atual
-1.2.0 (package.json)
+3.5.2 (simplicio-update-manifest.json)
 
 ## Versão mínima esperada pelos dependentes
 Nenhuma — repo é ponto de entrada para usuários finais.
 
 ---
 
-_Last updated: 2026-06-30_
+_Last updated: 2026-07-14_

@@ -1,0 +1,266 @@
+name: quality-gate
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install pinned quality dependencies
+        run: python -m pip install -r requirements-quality.txt
+      - name: Python syntax
+        run: python -m compileall -q scripts pypi/simplicio/simplicio tests
+      - name: Node syntax
+        run: |
+          node --check npm/simplicio/install.js
+          node --check npm/simplicio-installer/install.js
+          node --check npm/simplicio-unscoped/install.js
+      - name: Shell syntax
+        run: shellcheck install.sh scripts/tami-loop.sh
+      - name: Homebrew formula syntax
+        run: ruby -c Formula/simplicio.rb
+      - name: PowerShell syntax
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path install.ps1), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1 }
+      - name: Ignored-test policy
+        run: python scripts/quality_policy.py --junit artifacts/lint/skip-policy.xml
+      - name: Upload lint evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-reports
+          path: artifacts/lint
+          retention-days: 14
+
+  unit:
+    name: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install pinned quality dependencies
+        run: python -m pip install -r requirements-quality.txt
+      - name: Python tests with JUnit and coverage
+        run: |
+          coverage run --rcfile=.coveragerc scripts/run_python_tests.py --junit artifacts/unit/python-junit.xml
+          coverage report --fail-under=85
+          coverage report --include=scripts/verify_distribution_consistency.py,scripts/verify_release_provenance.py --fail-under=90
+          coverage xml
+          coverage json
+      - name: Node installer coverage
+        run: >-
+          node --test --experimental-test-coverage
+          --test-coverage-include='npm/*/install.js'
+          --test-coverage-lines=85 --test-coverage-functions=90
+          tests/node/installer-unit.test.cjs
+      - name: Node JUnit
+        if: always()
+        run: >-
+          node --test --test-reporter=junit
+          --test-reporter-destination=artifacts/unit/node-junit.xml
+          tests/node/installer-unit.test.cjs
+      - name: Upload unit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-reports
+          path: artifacts/unit
+          retention-days: 14
+
+  integration:
+    name: integration (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install pinned quality dependencies
+        run: python -m pip install -r requirements-quality.txt
+      - name: Strict distribution regression audit
+        run: >-
+          python scripts/verify_distribution_consistency.py --strict
+          --junit artifacts/integration/distribution-junit.xml
+      - name: Build Python distribution
+        run: |
+          python -m pip install build==1.2.2.post1
+          python -m build --sdist --wheel --outdir artifacts/integration/dist pypi/simplicio
+      - name: Validate npm package manifests
+        run: |
+          npm pack --dry-run ./npm/simplicio
+          npm pack --dry-run ./npm/simplicio-installer
+          npm pack --dry-run ./npm/simplicio-unscoped
+      - name: Upload integration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-${{ matrix.os }}-py${{ matrix.python }}
+          path: artifacts/integration
+          retention-days: 14
+
+  e2e:
+    name: e2e (${{ matrix.os }}, node${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Prepare report directory
+        run: >-
+          node -e "require('fs').mkdirSync('artifacts/e2e', { recursive: true })"
+      - name: Exercise real npm entrypoints without network
+        run: >-
+          node --test --test-reporter=junit
+          --test-reporter-destination=artifacts/e2e/junit.xml
+          tests/node/installer-e2e.test.cjs
+      - name: Upload E2E evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-${{ matrix.os }}-node${{ matrix.node }}
+          path: artifacts/e2e
+          retention-days: 14
+
+  security:
+    name: security
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install pinned quality dependencies
+        run: python -m pip install -r requirements-quality.txt
+      - name: Deterministic secret and dangerous-code scan
+        run: python scripts/security_scan.py --junit artifacts/security/secret-scan-junit.xml
+      - name: Upload security evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: artifacts/security
+          retention-days: 14
+
+  benchmark:
+    name: benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install pinned quality dependencies
+        run: python -m pip install -r requirements-quality.txt
+      - name: Enforce versioned regression budget
+        run: >-
+          python scripts/benchmark_distribution.py
+          --junit artifacts/benchmark/junit.xml
+          --json artifacts/benchmark/results.json
+      - name: Upload benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-reports
+          path: artifacts/benchmark
+          retention-days: 14
+
+  flaky:
+    name: flaky
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install pinned quality dependencies
+        run: python -m pip install -r requirements-quality.txt
+      - name: Repeat Python unit suite
+        run: >-
+          python scripts/flaky_check.py --attempts 3
+          --junit artifacts/flaky/python-junit.xml --
+          python -m unittest discover -s tests -p test_*.py
+      - name: Repeat Node unit suite
+        run: >-
+          python scripts/flaky_check.py --attempts 3
+          --junit artifacts/flaky/node-junit.xml --
+          node --test tests/node/installer-unit.test.cjs
+      - name: Upload flaky evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flaky-reports
+          path: artifacts/flaky
+          retention-days: 14
+
+  quality-gate:
+    name: quality-gate
+    if: always()
+    runs-on: ubuntu-latest
+    needs: [lint, unit, integration, e2e, security, benchmark, flaky]
+    steps:
+      - name: Reject any missing or failed mandatory gate
+        if: >-
+          needs.lint.result != 'success' ||
+          needs.unit.result != 'success' ||
+          needs.integration.result != 'success' ||
+          needs.e2e.result != 'success' ||
+          needs.security.result != 'success' ||
+          needs.benchmark.result != 'success' ||
+          needs.flaky.result != 'success'
+        run: exit 1
+      - name: Confirm merge evidence
+        run: echo "All mandatory quality gates passed."

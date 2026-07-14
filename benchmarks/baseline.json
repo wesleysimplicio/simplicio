@@ -1,0 +1,13 @@
+{
+  "schema": "simplicio.distribution-benchmark/v1",
+  "metrics": {
+    "installer_payload_bytes": {
+      "baseline": 16522,
+      "max_regression_percent": 10
+    },
+    "audit_median_ms": {
+      "baseline": 25,
+      "max_regression_percent": 400
+    }
+  }
+}

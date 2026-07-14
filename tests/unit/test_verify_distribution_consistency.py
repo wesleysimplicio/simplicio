@@ -21,8 +21,7 @@ import pytest
 
 
 def run_main(module, repo, capsys):
-    module.ROOT = repo.root
-    exit_code = module.main()
+    exit_code = module.main(["--root", str(repo.root)])
     captured = capsys.readouterr().out
     return exit_code, captured
 
@@ -80,7 +79,7 @@ def test_main_branch_reference_is_error(verify_module, repo, monkeypatch, capsys
     exit_code, out = run_main(verify_module, repo, capsys)
 
     assert exit_code == 1
-    assert "install references still point at `/main/`" in out
+    assert "install references point at `/main/`" in out
     assert filename in out
 
 
@@ -91,7 +90,7 @@ def test_version_txt_manifest_mismatch_is_error(verify_module, repo, monkeypatch
     exit_code, out = run_main(verify_module, repo, capsys)
 
     assert exit_code == 1
-    assert "version mismatch: version.txt=9.9.9 but simplicio-update-manifest.json=3.5.2" in out
+    assert "version mismatch: version.txt=9.9.9 but manifest=3.5.2" in out
 
 
 # ---------------------------------------------------------------------------
@@ -106,7 +105,7 @@ def test_wrapper_version_drift_is_warning_not_error(verify_module, repo, monkeyp
     exit_code, out = run_main(verify_module, repo, capsys)
 
     assert exit_code == 0  # warnings alone must not fail the build
-    assert "wrapper/package versions lag manifest 3.5.2" in out
+    assert "wrapper versions lag manifest 3.5.2" in out
     assert "Formula/simplicio.rb=1.0.0" in out
 
 
@@ -127,7 +126,7 @@ def test_stale_beta_until_is_warning(verify_module, repo, monkeypatch, capsys):
     exit_code, out = run_main(verify_module, repo, capsys)
 
     assert exit_code == 0
-    assert "public-beta date is stale" in out
+    assert "public-beta date 2020-06-30 is before" in out
 
 
 def test_beta_until_not_yet_stale_produces_no_warning(verify_module, repo, monkeypatch, capsys):
@@ -137,7 +136,7 @@ def test_beta_until_not_yet_stale_produces_no_warning(verify_module, repo, monke
     exit_code, out = run_main(verify_module, repo, capsys)
 
     assert exit_code == 0
-    assert "public-beta date is stale" not in out
+    assert "is before" not in out
 
 
 def test_unparseable_beta_until_is_warning(verify_module, repo, monkeypatch, capsys):
@@ -158,7 +157,7 @@ def test_readme_beta_no_end_date_contradicts_manifest(verify_module, repo, monke
     exit_code, out = run_main(verify_module, repo, capsys)
 
     assert exit_code == 0
-    assert "public beta with no end date" in out.lower()
+    assert "README has no-end-date claim but manifest carries beta_until=2099-06-30" in out
 
 
 def test_no_beta_no_end_date_warning_when_no_beta_until(verify_module, repo, monkeypatch, capsys):
@@ -170,7 +169,7 @@ def test_no_beta_no_end_date_warning_when_no_beta_until(verify_module, repo, mon
 
     # No beta_until at all means nothing to contradict.
     assert exit_code == 0
-    assert "README says 'public beta with no end date'" not in out
+    assert "README has no-end-date claim" not in out
 
 
 # ---------------------------------------------------------------------------
@@ -215,10 +214,25 @@ def test_version_from_package_json_reads_version_field(verify_module, tmp_path):
     assert verify_module.version_from_package_json(path) == "7.8.9"
 
 
-def test_rel_returns_path_relative_to_root(verify_module, tmp_path):
-    verify_module.ROOT = tmp_path
-    nested = tmp_path / "a" / "b.txt"
-    nested.parent.mkdir(parents=True)
-    nested.write_text("x", encoding="utf-8")
+def test_iter_install_reference_files_yields_root_relative_paths(verify_module, tmp_path):
+    # The kept implementation threads an explicit `root` argument through
+    # (see iter_install_reference_files(root) / run_audit(root)) instead of
+    # a module-level `rel()` helper over a mutated global `ROOT` — that
+    # global-state design was dropped when the two implementations were
+    # merged; this test covers the surviving equivalent behavior instead.
+    (tmp_path / "READMEs").mkdir()
+    fixed_names = {
+        "README.md",
+        "INSTALL.md",
+        "install.sh",
+        "install.ps1",
+        ".github/workflows/release.yml",
+        "pypi/simplicio/simplicio/__main__.py",
+    }
+    for relative in fixed_names:
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("", encoding="utf-8")
 
-    assert verify_module.rel(nested) == str(nested.relative_to(tmp_path))
+    paths = list(verify_module.iter_install_reference_files(tmp_path))
+    assert {str(p.relative_to(tmp_path)).replace("\\", "/") for p in paths} == fixed_names

@@ -1,0 +1,2 @@
+coverage==7.6.12
+PyYAML==6.0.3

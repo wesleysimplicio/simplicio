@@ -10,7 +10,7 @@
   },
   "entitlement": {
     "current_phase": "public_beta",
-    "beta_until": "2026-06-30",
+    "beta_until": null,
     "updates_allowed": true
   },
   "artifacts": [

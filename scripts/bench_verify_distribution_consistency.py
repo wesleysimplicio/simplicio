@@ -61,7 +61,10 @@ def measure(runs: int = RUNS) -> float:
     for _ in range(runs):
         start = time.perf_counter()
         with contextlib.redirect_stdout(io.StringIO()):
-            vdc.main()
+            # Explicit empty argv: vdc.main() takes an optional argv and
+            # falls back to parsing sys.argv (this benchmark script's own
+            # argv, e.g. --update-baseline) when called with none.
+            vdc.main([])
         samples.append((time.perf_counter() - start) * 1000.0)
     return statistics.median(samples)
 

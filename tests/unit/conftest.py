@@ -46,13 +46,30 @@ class RepoBuilder:
         root = self.root
         v = self.version
 
-        _write(root / "VERSION.md", "# Version policy\n\nUse `master` branch only for installs.\n")
+        _write(root / "VERSION.md", f"## Current Version: v{v}\nUse `master` branch only for installs.\n")
         _write(root / "version.txt", v)
+
+        artifact_url = (
+            "https://github.com/wesleysimplicio/simplicio/releases/download/"
+            f"v{v}/simplicio-macos-arm64"
+        )
+        artifact_sha = "9" * 64
         _write_json(
             root / "simplicio-update-manifest.json",
             {
                 "version": v,
+                "security": {"signature_required": True},
                 "entitlement": {"beta_until": "2099-01-01"},
+                "artifacts": [
+                    {
+                        "target": "macos-arm64",
+                        "artifact": "simplicio-macos-arm64",
+                        "url": artifact_url,
+                        "sha256": artifact_sha,
+                        "signature": "ed25519:fixture",
+                        "signed": True,
+                    }
+                ],
             },
         )
 
@@ -64,17 +81,105 @@ class RepoBuilder:
         _write(root / "INSTALL.md", install_body)
         _write(root / "install.sh", install_body)
         _write(root / "install.ps1", install_body.replace("install.sh", "install.ps1"))
-        _write(root / ".github/workflows/release.yml", "name: release\n")
+        _write(
+            root / ".github/workflows/release.yml",
+            '''name: publish-release
+"on":
+  workflow_dispatch:
+    inputs:
+      artifact_base_url:
+        description: Immutable HTTPS staging base containing the versioned artifacts
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  release:
+    permissions:
+      contents: write
+    runs-on: windows-latest
+    steps:
+      - id: checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: setup_python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - id: install
+        run: python -m pip install -r requirements-quality.txt
+      - id: state
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/verify_release_provenance.py state
+      - id: provenance
+        env:
+          ARTIFACT_BASE_URL: ${{ inputs.artifact_base_url }}
+          TAG_EXISTS: ${{ steps.state.outputs.tag_exists }}
+        run: python scripts/verify_release_provenance.py plan
+      - id: download
+        if: steps.provenance.outputs.mode == 'publish'
+        env:
+          ARTIFACT_BASE_URL: ${{ inputs.artifact_base_url }}
+        run: python scripts/verify_release_provenance.py download
+      - id: verify_staged
+        if: steps.provenance.outputs.mode == 'publish'
+        run: python scripts/verify_release_provenance.py verify-staged
+      - id: metadata
+        if: steps.provenance.outputs.mode == 'publish'
+        run: python scripts/verify_release_provenance.py metadata
+      - id: publish
+        if: steps.provenance.outputs.mode == 'publish'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.state.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: "v${{ steps.state.outputs.version }} — Public Beta"
+          body: |
+            Free public beta. All features remain unlocked during the public-beta phase.
+
+            Windows: `irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex`
+            macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh`
+
+            Signed update manifest included (`simplicio update check`).
+          prerelease: false
+          make_latest: "true"
+          fail_on_unmatched_files: true
+          overwrite_files: false
+          files: dist/*
+''',
+        )
         _write(root / "pypi/simplicio/simplicio/__main__.py", "# entrypoint\n")
         (root / "READMEs").mkdir(parents=True, exist_ok=True)
 
-        _write(root / "Formula/simplicio.rb", f'class Simplicio < Formula\n  version "{v}"\nend\n')
+        _write_json(
+            root / "distribution/targets.json",
+            {
+                "targets": [
+                    {
+                        "id": "macos-arm64",
+                        "os": "macos",
+                        "arch": "arm64",
+                        "asset": "simplicio-macos-arm64",
+                        "installer": None,
+                        "manifest_target": "macos-arm64",
+                    }
+                ]
+            },
+        )
+
+        _write(
+            root / "Formula/simplicio.rb",
+            f'class Simplicio < Formula\n  version "{v}"\n  url "{artifact_url}"\n'
+            f'  sha256 "{artifact_sha}"\n  bin.install "simplicio-macos-arm64" => "simplicio"\nend\n',
+        )
         _write_json(root / "npm/simplicio/package.json", {"version": v})
         _write_json(root / "npm/simplicio-installer/package.json", {"version": v})
         _write_json(root / "npm/simplicio-unscoped/package.json", {"version": v})
         _write(root / "pypi/simplicio/pyproject.toml", f'[project]\nname = "simplicio"\nversion = "{v}"\n')
 
-        _write(root / "SIMPLICIO_ECOSYSTEM.md", f"## Versão atual\n{v}\n")
+        _write(root / "SIMPLICIO_ECOSYSTEM.md", f"## Versão atual\n{v} (manifest)\n")
 
         return self
 
@@ -110,7 +215,18 @@ class RepoBuilder:
         return self
 
     def with_formula_version(self, value: str) -> "RepoBuilder":
-        _write(self.root / "Formula/simplicio.rb", f'class Simplicio < Formula\n  version "{value}"\nend\n')
+        # Deliberately keeps the URL/SHA256/install line pointing at the
+        # *current* manifest artifact so this only exercises the wrapper
+        # version-drift WARN path, not the Formula/manifest binding ERROR
+        # path (see with_formula_unparseable / the manifest-binding checks
+        # in run_audit for that).
+        manifest = json.loads((self.root / "simplicio-update-manifest.json").read_text(encoding="utf-8"))
+        artifact = manifest["artifacts"][0]
+        _write(
+            self.root / "Formula/simplicio.rb",
+            f'class Simplicio < Formula\n  version "{value}"\n  url "{artifact["url"]}"\n'
+            f'  sha256 "{artifact["sha256"]}"\n  bin.install "{artifact["artifact"]}" => "simplicio"\nend\n',
+        )
         return self
 
     def with_formula_unparseable(self) -> "RepoBuilder":
