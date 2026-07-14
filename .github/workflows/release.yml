@@ -7,10 +7,12 @@ on:
     branches: [master, main]
     paths:
       - simplicio.exe
+      - simplicio-windows-x64.exe
       - simplicio
       - simplicio-darwin-x64
       - simplicio-linux-x64
       - simplicio-update-manifest.json
+      - distribution/targets.json
       - .github/workflows/release.yml
   workflow_dispatch: {}
 
@@ -27,13 +29,18 @@ jobs:
         shell: pwsh
         run: echo "version=$((Get-Content simplicio-update-manifest.json | ConvertFrom-Json).version)" >> $env:GITHUB_OUTPUT
       - name: Stage release assets
+        # Asset names MUST match distribution/targets.json (the canonical
+        # target-triplet table) so that install.sh, install.ps1 and
+        # simplicio-update-manifest.json all resolve the same URLs.
+        # scripts/verify_distribution_consistency.py enforces this in CI.
         run: |
           mkdir -p dist
-          cp simplicio.exe dist/simplicio-windows-x86_64.exe
+          cp simplicio-windows-x64.exe dist/simplicio-windows-x64.exe
           cp simplicio dist/simplicio-macos-arm64
-          if (Test-Path simplicio-darwin-x64) { cp simplicio-darwin-x64 dist/simplicio-darwin-x64 }
+          if (Test-Path simplicio-darwin-x64) { cp simplicio-darwin-x64 dist/simplicio-macos-x64 }
           if (Test-Path simplicio-linux-x64) { cp simplicio-linux-x64 dist/simplicio-linux-x64 }
           cp simplicio-update-manifest.json dist/
+          cp distribution/targets.json dist/
           cp SHA256SUMS dist/ || true
       - name: Create or update release
         uses: softprops/action-gh-release@v2
@@ -51,9 +58,10 @@ jobs:
           prerelease: false
           make_latest: "true"
           files: |
-            dist/simplicio-windows-x86_64.exe
+            dist/simplicio-windows-x64.exe
             dist/simplicio-macos-arm64
-            dist/simplicio-darwin-x64
+            dist/simplicio-macos-x64
             dist/simplicio-linux-x64
             dist/simplicio-update-manifest.json
+            dist/targets.json
             dist/SHA256SUMS

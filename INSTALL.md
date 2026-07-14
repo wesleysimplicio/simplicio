@@ -20,16 +20,43 @@ powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/m
 ### Manual Download
 
 Download the binary for your platform from the
-[releases](https://github.com/wesleysimplicio/simplicio/releases):
+[releases](https://github.com/wesleysimplicio/simplicio/releases). Asset names
+are canonical — see [`distribution/targets.json`](distribution/targets.json),
+the single source of truth used by the release workflow, both installers and
+`simplicio-update-manifest.json`:
 
-| Platform | File |
-|----------|------|
-| macOS (Apple Silicon) | `simplicio` |
-| macOS (Intel) | `simplicio` |
-| Linux x86_64 | `simplicio` |
-| Windows x86_64 | `simplicio.exe` |
+| Target id      | Platform               | Asset                       |
+|----------------|------------------------|------------------------------|
+| `macos-arm64`  | macOS (Apple Silicon)  | `simplicio-macos-arm64`      |
+| `macos-x64`    | macOS (Intel)          | `simplicio-macos-x64`        |
+| `linux-x64`    | Linux x86_64           | `simplicio-linux-x64`        |
+| `windows-x64`  | Windows x86_64         | `simplicio-windows-x64.exe`  |
 
-Place it somewhere on your `PATH` (e.g. `/usr/local/bin` or `~/.local/bin`).
+Verify the SHA256 checksum against the `sha256` field for your target in
+`simplicio-update-manifest.json` (published alongside each release) before
+running the binary. Then place it somewhere on your `PATH` (e.g.
+`/usr/local/bin` or `~/.local/bin`), naming it `simplicio` (or `simplicio.exe`
+on Windows).
+
+## Doctor / Uninstall
+
+Both installers are idempotent and expose a health check and a clean,
+data-preserving uninstall — safe to re-run at any time:
+
+```bash
+# macOS / Linux
+sh install.sh --doctor
+sh install.sh --uninstall
+```
+
+```powershell
+# Windows
+pwsh install.ps1 -Doctor
+pwsh install.ps1 -Uninstall
+```
+
+Uninstall only removes the installed binary; it never deletes user data or
+config under `~/.simplicio`.
 
 ## Verify Installation
 

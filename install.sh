@@ -1,26 +1,31 @@
 #!/usr/bin/env sh
-# install.sh — Simplicio Agent: instalador completo e unificado
+# install.sh — Simplicio Agent: instalador completo e unificado (macOS/Linux)
 #
 # Um comando. Tudo instalado. Zero configuração.
 #
 #   curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
 #
-# Instala:
-#   1. simplicio binary (Rust runtime)
-#   2. simplicio-agent (Hermes Turbo + Tami)
-#   3. Desktop app (Electron)
-#   4. Wake word "Simplicio" (escuta 24/7)
-#   5. Áudio STT + TTS (fala e ouve)
-#   6. Tami ativa (consciência emocional)
-#   7. Cron: Tami aparece no chat a cada 30min
+# Idempotent subcommands:
+#   sh install.sh --doctor      # health check, safe to re-run
+#   sh install.sh --uninstall   # removes the binary, preserves user data
 #
-# Tudo pronto pra usar. Só falar "Simplicio" e começar.
+# Environment variables:
+#   SIMPLICIO_VERSION           - pin a specific version (default: latest)
+#   SIMPLICIO_BIN_DIR           - custom install directory
+#   SIMPLICIO_ALLOW_UNVERIFIED  - "1" to proceed even if no checksum is
+#                                 published for this target (default: refuse)
+#
+# Asset naming follows distribution/targets.json (the canonical target
+# triplet table for the whole ecosystem): id "macos-arm64" -> asset
+# "simplicio-macos-arm64", id "macos-x64" -> "simplicio-macos-x64", id
+# "linux-x64" -> "simplicio-linux-x64". Drift between this script, the
+# release workflow and simplicio-update-manifest.json is caught by
+# scripts/verify_distribution_consistency.py in CI.
 
 set -eu
 
 REPO="wesleysimplicio/simplicio"
 GITHUB="https://github.com/$REPO"
-RAW="https://raw.githubusercontent.com/$REPO/master"
 BIN_NAME="simplicio"
 AGENT_PKG="simplicio-agent"
 
@@ -28,7 +33,6 @@ GREEN='\033[0;32m'
 CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
-BOLD='\033[1m'
 NC='\033[0m'
 
 info()  { printf "${CYAN}==>${NC} %s\n" "$*"; }
@@ -36,7 +40,89 @@ ok()    { printf "${GREEN}  ✓${NC} %s\n" "$*"; }
 warn()  { printf "${YELLOW}  ⚠${NC} %s\n" "$*"; }
 err()   { printf "${RED}  ✗${NC} %s\n" "$*"; exit 1; }
 
-# ─── Banner ──────────────────────────────────────────────────────────────────
+BIN_DIR="${SIMPLICIO_BIN_DIR:-$HOME/.local/bin}"
+DEST_PATH="$BIN_DIR/$BIN_NAME"
+
+# ─── Detect platform (canonical os/arch naming, matches distribution/targets.json) ──
+detect_platform() {
+  case "$(uname -m)" in
+    x86_64|amd64) ARCH="x64" ;;
+    aarch64|arm64) ARCH="arm64" ;;
+    *) err "Arquitetura não suportada: $(uname -m)" ;;
+  esac
+
+  case "$(uname -s)" in
+    Darwin) OS="macos" ;;
+    Linux)  OS="linux" ;;
+    *) err "Sistema não suportado: $(uname -s)" ;;
+  esac
+}
+
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{print $1}'
+  else
+    err "Precisa de sha256sum ou shasum para verificar a integridade do download"
+  fi
+}
+
+# ─── --doctor: idempotent, read-only health check ──────────────────────────
+run_doctor() {
+  info "simplicio doctor"
+  status=0
+
+  if [ -x "$DEST_PATH" ]; then
+    ok "binário presente: $DEST_PATH"
+  else
+    warn "binário ausente em $DEST_PATH"
+    status=1
+  fi
+
+  case ":$PATH:" in
+    *":$BIN_DIR:"*) ok "$BIN_DIR está no PATH" ;;
+    *) warn "$BIN_DIR não está no PATH (sessão atual)" ;;
+  esac
+
+  if [ -x "$DEST_PATH" ]; then
+    if "$DEST_PATH" version >/dev/null 2>&1; then
+      ok "binário executa corretamente"
+    else
+      warn "binário presente mas falhou ao executar"
+      status=1
+    fi
+  fi
+
+  if [ "$status" -eq 0 ]; then
+    ok "simplicio está saudável"
+  else
+    err "simplicio tem problemas — rode o instalador novamente"
+  fi
+  exit "$status"
+}
+
+# ─── --uninstall: idempotent removal, safe to run repeatedly ──────────────
+run_uninstall() {
+  info "simplicio uninstall"
+  if [ -e "$DEST_PATH" ]; then
+    rm -f "$DEST_PATH"
+    ok "removido $DEST_PATH"
+  else
+    ok "já estava removido (nada em $DEST_PATH)"
+  fi
+  # Dados do usuário são preservados intencionalmente (uninstall idempotente
+  # e não-destrutivo) — ~/.simplicio nunca é tocado aqui.
+  ok "dados do usuário em \$HOME/.simplicio foram preservados"
+  warn "se você adicionou $BIN_DIR ao PATH no seu ~/.zshrc ou ~/.bashrc, remova a linha manualmente"
+  exit 0
+}
+
+case "${1:-}" in
+  --doctor) detect_platform; run_doctor ;;
+  --uninstall) run_uninstall ;;
+esac
+
 printf "${GREEN}"
 cat << "EOF"
   ╔══════════════════════════════════════╗
@@ -48,48 +134,104 @@ printf "${NC}"
 echo ""
 
 # ─── 1. Detect platform ──────────────────────────────────────────────────────
- ARCH=""
- case "$(uname -m)" in
-   x86_64|amd64) ARCH="x86_64" ;;
-   aarch64|arm64) ARCH="arm64" ;;
-   *) err "Arquitetura não suportada: $(uname -m)" ;;
- esac
+detect_platform
+info "Plataforma detectada: $OS-$ARCH"
 
- OS=""
- case "$(uname -s)" in
-   Darwin) OS="darwin" ;;
-   Linux)  OS="linux" ;;
-   *) err "Sistema não suportado: $(uname -s)" ;;
- esac
-
- info "Plataforma detectada: $OS-$ARCH"
-
-# ─── 2. Instalar simplicio binary ────────────────────────────────────────────
+# ─── 2. Instalar simplicio binary (staged download + SHA256 + atomic swap) ──
 info "Instalando Simplicio Runtime..."
-BIN_DIR="${SIMPLICIO_BIN_DIR:-$HOME/.local/bin}"
 mkdir -p "$BIN_DIR"
 
-if command -v "$BIN_DIR/$BIN_NAME" >/dev/null 2>&1; then
-  ok "$BIN_NAME já instalado em $BIN_DIR/$BIN_NAME"
+if [ -x "$DEST_PATH" ]; then
+  ok "$BIN_NAME já instalado em $DEST_PATH"
 else
   VERSION="${SIMPLICIO_VERSION:-latest}"
+  ASSET="simplicio-$OS-$ARCH"
   if [ "$VERSION" = "latest" ]; then
-    DOWNLOAD_URL="$GITHUB/releases/latest/download/simplicio-$OS-$ARCH"
+    RELEASE_BASE="$GITHUB/releases/latest/download"
   else
-    DOWNLOAD_URL="$GITHUB/releases/download/$VERSION/simplicio-$OS-$ARCH"
+    RELEASE_BASE="$GITHUB/releases/download/$VERSION"
+  fi
+  DOWNLOAD_URL="$RELEASE_BASE/$ASSET"
+  MANIFEST_URL="$RELEASE_BASE/simplicio-update-manifest.json"
+
+  fetch() {
+    # fetch <url> <dest-or-'-'>
+    if command -v curl >/dev/null 2>&1; then
+      curl -fsSL "$1" -o "$2"
+    elif command -v wget >/dev/null 2>&1; then
+      wget -q "$1" -O "$2"
+    else
+      err "Precisa de curl ou wget para baixar"
+    fi
+  }
+
+  TARGET_ID="$OS-$ARCH"
+  EXPECTED_SHA256=""
+  SIGNED="false"
+  MANIFEST_TMP="$(mktemp)"
+  trap 'rm -f "$MANIFEST_TMP"' EXIT
+  if fetch "$MANIFEST_URL" "$MANIFEST_TMP" 2>/dev/null; then
+    if command -v python3 >/dev/null 2>&1; then
+      EXPECTED_SHA256="$(python3 -c "
+import json,sys
+try:
+    m = json.load(open('$MANIFEST_TMP'))
+    for a in m.get('artifacts', []):
+        if a.get('target') == '$TARGET_ID':
+            print(a.get('sha256') or '')
+            print('true' if a.get('signed') else 'false')
+            break
+except Exception:
+    pass
+" 2>/dev/null | sed -n '1p')"
+      SIGNED="$(python3 -c "
+import json
+try:
+    m = json.load(open('$MANIFEST_TMP'))
+    for a in m.get('artifacts', []):
+        if a.get('target') == '$TARGET_ID':
+            print('true' if a.get('signed') else 'false')
+            break
+except Exception:
+    pass
+" 2>/dev/null)"
+    fi
+  fi
+
+  if [ -z "$EXPECTED_SHA256" ]; then
+    if [ "${SIMPLICIO_ALLOW_UNVERIFIED:-}" = "1" ]; then
+      warn "sem checksum publicado para o alvo '$TARGET_ID' — prosseguindo SEM VERIFICAÇÃO (SIMPLICIO_ALLOW_UNVERIFIED=1)"
+    else
+      err "recusando instalar: nenhum SHA256 publicado no manifest para o alvo '$TARGET_ID'. Defina SIMPLICIO_ALLOW_UNVERIFIED=1 para prosseguir por sua conta e risco."
+    fi
+  elif [ "$SIGNED" != "true" ]; then
+    warn "checksum será verificado, mas este artefato ainda não é assinado (ed25519 não configurado para $TARGET_ID — ver issue #5)"
   fi
 
   info "Baixando de $DOWNLOAD_URL ..."
-  if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$DOWNLOAD_URL" -o "$BIN_DIR/$BIN_NAME"
-  elif command -v wget >/dev/null 2>&1; then
-    wget -q "$DOWNLOAD_URL" -O "$BIN_DIR/$BIN_NAME"
-  else
-    err "Precisa de curl ou wget para baixar"
+  STAGING_PATH="$DEST_PATH.download-$$.tmp"
+  fetch "$DOWNLOAD_URL" "$STAGING_PATH"
+
+  if [ ! -s "$STAGING_PATH" ]; then
+    rm -f "$STAGING_PATH"
+    err "download falhou ou arquivo vazio: $DOWNLOAD_URL"
   fi
 
-  chmod +x "$BIN_DIR/$BIN_NAME"
-  ok "Simplicio Runtime instalado em $BIN_DIR/$BIN_NAME"
+  if [ -n "$EXPECTED_SHA256" ]; then
+    ACTUAL_SHA256="$(sha256_of "$STAGING_PATH")"
+    if [ "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]; then
+      rm -f "$STAGING_PATH"
+      err "checksum não confere para $ASSET. esperado $EXPECTED_SHA256, obtido $ACTUAL_SHA256. Recusando instalar binário corrompido ou adulterado."
+    fi
+    ok "SHA256 verificado: $ACTUAL_SHA256"
+  fi
+
+  chmod +x "$STAGING_PATH"
+  # Swap atômico: mv no mesmo filesystem nunca deixa $DEST_PATH parcialmente
+  # escrito, e reexecutar este script (update idempotente) não deixa .tmp
+  # órfãos em caso de sucesso.
+  mv -f "$STAGING_PATH" "$DEST_PATH"
+  ok "Simplicio Runtime instalado em $DEST_PATH"
 fi
 
 # Adiciona ao PATH se não estiver
@@ -158,11 +300,11 @@ ok "Tami configurada em $TAMI_CONFIG"
 # ─── 5. Configurar cron da Tami ──────────────────────────────────────────────
 info "Configurando Tami para aparecer no chat a cada 30min..."
 # Verifica se o simplicio tem suporte a cron
-if command -v "$BIN_DIR/$BIN_NAME" >/dev/null 2>&1; then
+if command -v "$DEST_PATH" >/dev/null 2>&1; then
   # Testa se o runtime tem o comando de cron
-  "$BIN_DIR/$BIN_NAME" cron list 2>/dev/null && {
+  "$DEST_PATH" cron list 2>/dev/null && {
     # Tenta registrar via simplicio
-    "$BIN_DIR/$BIN_NAME" cron add --name "Tami" --schedule "every 30m" --deliver "origin" 2>/dev/null || {
+    "$DEST_PATH" cron add --name "Tami" --schedule "every 30m" --deliver "origin" 2>/dev/null || {
       warn "Não foi possível registrar cron automaticamente. Tami será ativada manualmente."
     }
   } || {
@@ -180,6 +322,7 @@ printf "${GREEN}║   💚 Tami está cuidando de você                         
 printf "${GREEN}║   🎤 Diga \"Simplicio\" para começar                      ║${NC}\n"
 printf "${GREEN}║   🖥️  Desktop: simplicio desktop                        ║${NC}\n"
 printf "${GREEN}║   📱 Chat: simplicio agent start                        ║${NC}\n"
+printf "${GREEN}║   🩺 Doctor: sh install.sh --doctor                     ║${NC}\n"
 printf "${GREEN}║                                                          ║${NC}\n"
 printf "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}\n"
 echo ""
