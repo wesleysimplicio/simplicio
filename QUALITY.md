@@ -48,16 +48,24 @@ updated baseline; the environment override is not configured on protected branch
 
 ## Release provenance
 
-`publish-release` is manual-only; merging a CI or manifest change cannot trigger publication. Before
-any download or release mutation, it reads `simplicio-update-manifest.json` from the immutable version
-tag and requires exact version plus artifact name/URL/SHA256/signature equality with the working tree.
-It also reads the remote release and refuses any declared or generated asset name that already exists;
-the release action has `overwrite_files: false` as a second fail-closed guard.
+`publish-release` is manual-only; merging a CI or manifest change cannot trigger publication. Its
+required `artifact_base_url` input must be an HTTPS, version-segmented staging origin distinct from
+the target GitHub release URL. The workflow reads tag and release state before any mutation, then a
+reusable Python planner chooses exactly one mode:
+
+- `idempotent`: an existing tag manifest matches version plus artifact name/URL/SHA256/signature and
+  every remote artifact has the declared SHA256 digest. Download, metadata, and publish steps are skipped.
+- `publish`: neither tag nor release exists and the staging URL is safe. Artifacts are downloaded from
+  staging, never from the not-yet-existing target release, and their bytes plus signature metadata are
+  verified before release creation with `overwrite_files: false`.
 
 The existing `v3.5.2` tag contains a `3.5.1` manifest, so the manual workflow is intentionally blocked
 for that tag and must not move it or replace its assets. Preparing a fresh version, immutable tag, and
-signed artifact set is separate release work. Once those inputs agree, the workflow downloads each
-version-bound artifact, verifies SHA256, and uploads only new assets from the verified staging directory.
+signed staging set is separate release work.
+
+The strict distribution audit parses workflow YAML using pinned PyYAML and validates the actual trigger,
+input, `jobs.release.steps`, executable commands, action inputs, conditions, and ordering. Comments and
+environment variables cannot satisfy executable-step requirements.
 
 ## Local parity
 

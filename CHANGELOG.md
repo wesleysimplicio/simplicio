@@ -25,6 +25,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Made publication manual-only and immutable: tag-bound manifest provenance must
   match exactly, existing release assets cannot be replaced, and the known stale
   `v3.5.2` tag now fails closed pending separate fresh-release preparation.
+- Restored a safe new-release path through distinct versioned HTTPS staging, with
+  idempotent no-op success for coherent existing releases and structured PyYAML
+  validation of real workflow steps, conditions, ordering, and action inputs.
 
 ## [1.6.1] - 2026-07-01
 

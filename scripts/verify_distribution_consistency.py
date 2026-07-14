@@ -13,6 +13,8 @@ from datetime import date
 from pathlib import Path
 from typing import Iterable, Sequence
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[1]
 CANONICAL_BRANCH = "master"
 MAIN_INSTALL_RE = re.compile(
@@ -80,48 +82,111 @@ def iter_install_reference_files(root: Path) -> Iterable[Path]:
     yield from sorted((root / "READMEs").glob("README*.md"))
 
 
+def executable_run(step: dict) -> str:
+    run = step.get("run")
+    if not isinstance(run, str):
+        return ""
+    return "\n".join(
+        line.strip().lower()
+        for line in run.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    )
+
+
 def release_workflow_errors(workflow: str) -> list[str]:
-    lower = workflow.lower()
+    try:
+        document = yaml.safe_load(workflow)
+    except yaml.YAMLError as exc:
+        return [f"release workflow YAML is invalid: {exc}"]
+    if not isinstance(document, dict):
+        return ["release workflow must be a YAML mapping"]
     errors: list[str] = []
-    if not re.search(r"(?m)^on:\s*\n\s{2}workflow_dispatch:\s*(?:\{\})?\s*$", workflow):
-        errors.append("release workflow is not manual-only")
-    automatic_triggers = re.findall(r"(?m)^\s{2}(push|pull_request|schedule):", workflow)
-    if automatic_triggers:
-        errors.append("release workflow has automatic trigger: " + ", ".join(sorted(set(automatic_triggers))))
-    required_tokens = (
-        "git show-ref --verify --quiet",
-        'git show "${tag}:simplicio-update-manifest.json"',
-        "python scripts/verify_release_provenance.py",
-        "--working-manifest simplicio-update-manifest.json",
-        "--tag-manifest .release/tag-manifest.json",
-        "--remote-release .release/remote-release.json",
-        "foreach ($artifact in $manifest.artifacts)",
-        "invoke-webrequest -uri $artifact.url",
-        "get-filehash $destination -algorithm sha256",
-        "if ($actualhash -ne $artifact.sha256.tolower())",
-        "fail_on_unmatched_files: true",
-        "overwrite_files: false",
-        "files: dist/*",
-        "uses: softprops/action-gh-release@v2",
-    )
-    errors.extend(f"missing {token}" for token in required_tokens if token not in lower)
-    if "overwrite_files: true" in lower:
-        errors.append("overwrite_files must never be true")
-    unsafe_lines = (
-        "\n      - simplicio\n",
-        "\n      - simplicio.exe\n",
-        "copy-item simplicio ",
-        "copy-item simplicio.exe ",
-        "cp simplicio ",
-    )
-    errors.extend(f"unsafe {token.strip()}" for token in unsafe_lines if token in lower)
-    verifier_index = lower.find("python scripts/verify_release_provenance.py")
-    download_index = lower.find("invoke-webrequest -uri $artifact.url")
-    mutation_index = lower.find("uses: softprops/action-gh-release@v2")
-    if min(verifier_index, download_index, mutation_index) >= 0 and not (
-        verifier_index < download_index < mutation_index
+    triggers = document.get("on")
+    if not isinstance(triggers, dict) or set(triggers) != {"workflow_dispatch"}:
+        errors.append("release workflow must have only workflow_dispatch trigger")
+        dispatch = {}
+    else:
+        dispatch = triggers.get("workflow_dispatch") or {}
+    inputs = dispatch.get("inputs") if isinstance(dispatch, dict) else None
+    base_input = inputs.get("artifact_base_url") if isinstance(inputs, dict) else None
+    if not isinstance(base_input, dict) or base_input.get("required") is not True or base_input.get("type") != "string":
+        errors.append("workflow_dispatch must require string input artifact_base_url")
+
+    jobs = document.get("jobs")
+    release = jobs.get("release") if isinstance(jobs, dict) else None
+    steps = release.get("steps") if isinstance(release, dict) else None
+    if not isinstance(steps, list) or not steps or not all(isinstance(step, dict) for step in steps):
+        errors.append("jobs.release.steps must be a non-empty list of mappings")
+        return errors
+    indexed: dict[str, tuple[int, dict]] = {}
+    for index, step in enumerate(steps):
+        step_id = step.get("id")
+        if isinstance(step_id, str):
+            if step_id in indexed:
+                errors.append(f"duplicate release step id: {step_id}")
+            indexed[step_id] = (index, step)
+    required_ids = ("state", "provenance", "download", "verify_staged", "metadata", "publish")
+    missing_ids = [step_id for step_id in required_ids if step_id not in indexed]
+    if missing_ids:
+        errors.append("missing release step ids: " + ", ".join(missing_ids))
+        return errors
+    positions = [indexed[step_id][0] for step_id in required_ids]
+    if positions != sorted(positions) or len(set(positions)) != len(positions):
+        errors.append("release steps must order state, provenance, download, verify_staged, metadata, publish")
+
+    install_runs = [executable_run(step) for step in steps]
+    if not any("pip install -r requirements-quality.txt" in run for run in install_runs):
+        errors.append("release job must install pinned requirements-quality.txt")
+
+    state_run = executable_run(indexed["state"][1])
+    for command in ("git tag --list", "git show \"${tag}:simplicio-update-manifest.json\"", "remote-release.json"):
+        if command not in state_run:
+            errors.append(f"state step lacks executable command: {command}")
+    provenance_run = executable_run(indexed["provenance"][1])
+    for argument in (
+        "scripts/verify_release_provenance.py plan",
+        "--working-manifest",
+        "--tag-manifest",
+        "--remote-release",
+        "--artifact-base-url",
+        "--github-output",
+        "--tag-exists",
     ):
-        errors.append("tag provenance verification must run before download and release mutation")
+        if argument not in provenance_run:
+            errors.append(f"provenance step lacks executable argument: {argument}")
+
+    publish_condition = "steps.provenance.outputs.mode == 'publish'"
+    guarded_ids = ("download", "verify_staged", "metadata", "publish")
+    for step_id in guarded_ids:
+        if indexed[step_id][1].get("if") != publish_condition:
+            errors.append(f"{step_id} step must be guarded by publish mode")
+    download_run = executable_run(indexed["download"][1])
+    if "$env:artifact_base_url" not in download_run or "invoke-webrequest -uri $source" not in download_run:
+        errors.append("download step must source artifacts from artifact_base_url")
+    if "$artifact.url" in download_run or "releases/download" in download_run:
+        errors.append("download step must not source a new binary from its target release URL")
+    if "copy-item simplicio " in download_run or "copy-item simplicio.exe " in download_run:
+        errors.append("download step must not stage checked-in wrappers")
+
+    staged_run = executable_run(indexed["verify_staged"][1])
+    if "scripts/verify_release_provenance.py verify-staged" not in staged_run or "--staging-dir" not in staged_run:
+        errors.append("verify_staged step must execute the reusable digest verifier")
+    publish = indexed["publish"][1]
+    if publish.get("uses") != "softprops/action-gh-release@v2":
+        errors.append("publish step must use softprops/action-gh-release@v2")
+    publish_with = publish.get("with")
+    if not isinstance(publish_with, dict):
+        errors.append("publish step must define structured with inputs")
+    else:
+        if publish_with.get("overwrite_files") is not False:
+            errors.append("publish step must set overwrite_files: false")
+        if publish_with.get("fail_on_unmatched_files") is not True:
+            errors.append("publish step must set fail_on_unmatched_files: true")
+        if publish_with.get("files") != "dist/*":
+            errors.append("publish step must upload only dist/*")
+    release_actions = [step for step in steps if step.get("uses") == "softprops/action-gh-release@v2"]
+    if len(release_actions) != 1:
+        errors.append("release job must contain exactly one publish action")
     return errors
 
 
@@ -225,7 +290,7 @@ def run_audit(root: Path = ROOT, *, today: date | None = None) -> list[Finding]:
     if release_errors:
         findings.append(Finding("ERROR", "release workflow provenance is not fail-closed: " + ", ".join(release_errors)))
     else:
-        findings.append(Finding("OK", "manual release verifies tag provenance and immutable assets before upload."))
+        findings.append(Finding("OK", "structured manual release supports idempotent state or verified staging publish."))
 
     ecosystem = read_text(root / "SIMPLICIO_ECOSYSTEM.md")
     ecosystem_match = ECOSYSTEM_VERSION_RE.search(ecosystem)

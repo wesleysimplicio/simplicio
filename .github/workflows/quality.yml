@@ -26,6 +26,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Install pinned quality dependencies
+        run: python -m pip install -r requirements-quality.txt
       - name: Python syntax
         run: python -m compileall -q scripts pypi/simplicio/simplicio tests
       - name: Node syntax
@@ -66,8 +68,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Install coverage tool
-        run: python -m pip install coverage==7.6.12
+      - name: Install pinned quality dependencies
+        run: python -m pip install -r requirements-quality.txt
       - name: Python tests with JUnit and coverage
         run: |
           coverage run --rcfile=.coveragerc scripts/run_python_tests.py --junit artifacts/unit/python-junit.xml
@@ -112,6 +114,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Install pinned quality dependencies
+        run: python -m pip install -r requirements-quality.txt
       - name: Strict distribution regression audit
         run: >-
           python scripts/verify_distribution_consistency.py --strict
@@ -174,6 +178,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      - name: Install pinned quality dependencies
+        run: python -m pip install -r requirements-quality.txt
       - name: Deterministic secret and dangerous-code scan
         run: python scripts/security_scan.py --junit artifacts/security/secret-scan-junit.xml
       - name: Upload security evidence
@@ -193,6 +199,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      - name: Install pinned quality dependencies
+        run: python -m pip install -r requirements-quality.txt
       - name: Enforce versioned regression budget
         run: >-
           python scripts/benchmark_distribution.py
@@ -218,6 +226,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Install pinned quality dependencies
+        run: python -m pip install -r requirements-quality.txt
       - name: Repeat Python unit suite
         run: >-
           python scripts/flaky_check.py --attempts 3
