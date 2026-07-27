@@ -1,6 +1,6 @@
 {
   "schema": "simplicio.update-manifest/v1",
-  "version": "3.5.2",
+  "version": "3.5.5",
   "channel": "stable",
   "security": {
     "checksum_algorithm": "SHA256",
@@ -13,45 +13,37 @@
     "beta_until": null,
     "updates_allowed": true
   },
+  "release_scope": "windows-x64,macos-arm64,linux-x64",
   "artifacts": [
-    {
-      "target": "macos-arm64",
-      "artifact": "simplicio-macos-arm64",
-      "sha256": "931bc6d8f45c1b1e586070f8f5ac4a762861bc9157c70f75aaa4ebfad8ff27bb",
-      "signature": "ed25519:2omwTRLIpznbAjJJfCLKopWRjQWQPegU1bQKFGKQztgcg/ux3YGQWIBw9oOMzzMvd6E4kVe8vWvhU6+hDhfKAg==",
-      "signature_algorithm": "ed25519",
-      "signed": true,
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.5.2/simplicio-macos-arm64"
-    },
     {
       "target": "windows-x64",
       "artifact": "simplicio-windows-x64.exe",
-      "sha256": "ff1a1b6e30f809cf3afc28554ba385f51d1574a41438fcbbdc786267a8ba480c",
+      "sha256": "b72f191080ca0dcad576b2739b055aaff9bfd308e0f8ebd4bb4bd0f1ca8762e4",
       "signature": null,
       "signature_algorithm": null,
       "signed": false,
-      "signing_note": "checksum verified from committed SHA256SUMS; ed25519 signing infra not yet wired for this target — see issue #5.",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.5.2/simplicio-windows-x64.exe"
+      "signing_note": "Checksum verified from the locally built Simplicio Runtime v3.5.5 Windows release; Ed25519 signing remains pending for this target (issue #5).",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.5.5/simplicio-windows-x64.exe"
     },
     {
-      "target": "macos-x64",
-      "artifact": "simplicio-macos-x64",
-      "sha256": "7f1035be4cc2cf6a5053d894159622b233ca0fad00a5215f9ece3772fe462c42",
+      "target": "macos-arm64",
+      "artifact": "simplicio-macos-arm64",
+      "sha256": "6778471462e4143a8c29fac633f822942d15a00a3532c1a195abe7798a750ff1",
       "signature": null,
       "signature_algorithm": null,
       "signed": false,
-      "signing_note": "checksum verified from committed SHA256SUMS (legacy asset simplicio-darwin-x64); ed25519 signing infra not yet wired for this target — see issue #5.",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.5.2/simplicio-macos-x64"
+      "signing_note": "Checksum verified from the locally built Simplicio Runtime v3.5.5 macOS ARM64 release; Ed25519 signing remains pending for this target.",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.5.5/simplicio-macos-arm64"
     },
     {
       "target": "linux-x64",
       "artifact": "simplicio-linux-x64",
-      "sha256": "84d86fb1760c11e1e123c013174a712faff62468639f68a0173d53b6cbe99f29",
+      "sha256": "912576a62afa24acb7d43189d7bc568ed29c6a25ca5bc5de6df3a7b6a724c0db",
       "signature": null,
       "signature_algorithm": null,
       "signed": false,
-      "signing_note": "checksum verified from committed SHA256SUMS; ed25519 signing infra not yet wired for this target — see issue #5.",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.5.2/simplicio-linux-x64"
+      "signing_note": "Checksum verified from the locally built Simplicio Runtime v3.5.5 Linux x86_64 release; Ed25519 signing remains pending for this target.",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.5.5/simplicio-linux-x64"
     }
   ]
 }
