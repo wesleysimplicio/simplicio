@@ -166,20 +166,40 @@ Use `simplicio deliver certify` before declaring done.
 
 Same workflow — Simplicio commands work from any terminal-based AI agent.
 
-## Python Ecosystem (optional)
+## Instalação completa do ecossistema Python
 
-For additional capabilities, install the Python adapters:
+A instalação oficial do Runtime também prepara o control-plane do Agent:
+`simplicio-loop`, `simplicio-mapper` e `simplicio-dev-cli`.
+### PyPI (recomendado)
 
 ```bash
-pip install --upgrade simplicio-cli
+python3 -m pip install --upgrade "simplicio-agent[all,ecosystem]"
+# Runtime compilado + bootstrap de memória/seed:
+curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
+simplicio doctor --json
+simplicio memory status --json
 ```
 
-This provides:
-- `simplicio-dev-cli` — code editing adapter
-- `simplicio-py` — Python-specific features
-- `simplicio-mapper` — repo mapping
-- `simplicio-prompt` — prompt resources
-- `simplicio-sprint` — sprint planning
+### Clone do repositório
+
+```bash
+git clone https://github.com/wesleysimplicio/simplicio-agent.git ~/Projetos/ai/simplicio-agent
+SIMPLICIO_AGENT_SOURCE_ROOT="$HOME/Projetos/ai/simplicio-agent" \
+  sh install.sh
+```
+
+Para usar o kernel compilado do novo `simplicio-fast` local, sem baixar binário:
+
+```bash
+SIMPLICIO_FAST_SOURCE_ROOT="$HOME/Projetos/ai/simplicio-fast" \
+SIMPLICIO_AGENT_SOURCE_ROOT="$HOME/Projetos/ai/simplicio-agent" \
+  sh install.sh
+```
+
+O instalador é idempotente e cria `~/.simplicio_agent/components.json`. O manifesto
+registra os caminhos reais dos adaptadores, o kernel usado, o estado da memória
+SQLite/FTS5 e a origem runtime-owned dos seeds. Falhas ficam explícitas no manifesto;
+não há download de kernel local não verificado.
 
 ## Building from Source
 

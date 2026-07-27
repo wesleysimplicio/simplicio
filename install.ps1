@@ -11,6 +11,9 @@
 #   SIMPLICIO_BIN_DIR           - custom install directory
 #   SIMPLICIO_ALLOW_UNVERIFIED  - "1" to proceed even if no checksum is
 #                                 published for this target (default: refuse)
+#   SIMPLICIO_AGENT_SOURCE_ROOT - explicit local Agent checkout
+#   SIMPLICIO_FAST_SOURCE_ROOT  - optional local simplicio-fast checkout
+#   SIMPLICIO_AGENT_HOME        - state directory (default: ~/.simplicio_agent)
 #
 # Asset naming follows distribution/targets.json (the canonical target
 # triplet table for the whole ecosystem) — target "windows-x64", asset
@@ -21,7 +24,9 @@
 param(
   [string]$Version = "",
   [switch]$Doctor,
-  [switch]$Uninstall
+  [switch]$Uninstall,
+  [string]$AgentSourceRoot = "",
+  [string]$FastSourceRoot = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -200,6 +205,18 @@ try {
 }
 Write-Host "  ✓ installed: $DestPath"
 
+# ─── Preferir kernel local do simplicio-fast quando disponível ────────────────
+if (-not $FastSourceRoot -and $env:SIMPLICIO_FAST_SOURCE_ROOT) { $FastSourceRoot = $env:SIMPLICIO_FAST_SOURCE_ROOT }
+if (-not $FastSourceRoot) { $FastSourceRoot = Join-Path $env:USERPROFILE "Projetos\ai\simplicio-fast" }
+$FastKernelPath = Join-Path $FastSourceRoot "target\release\simplicio.exe"
+if (Test-Path $FastKernelPath) {
+  Copy-Item -Force $FastKernelPath $DestPath
+  Write-Host "  ✓ Simplicio Fast compilado adotado: $FastKernelPath"
+} else {
+  $FastKernelPath = ""
+  Write-Host "  ! kernel local do simplicio-fast não encontrado; mantendo Runtime verificado"
+}
+
 # Verify
 try {
   $output = & $DestPath version 2>&1 | Out-String
@@ -207,6 +224,48 @@ try {
 } catch {
   Write-Host "  ! binary installed but verification failed"
 }
+
+# ─── Bootstrap Agent + first-party adapters + neural memory ──────────────────
+if (-not $AgentSourceRoot -and $env:SIMPLICIO_AGENT_SOURCE_ROOT) { $AgentSourceRoot = $env:SIMPLICIO_AGENT_SOURCE_ROOT }
+$AgentHome = if ($env:SIMPLICIO_AGENT_HOME) { $env:SIMPLICIO_AGENT_HOME } else { Join-Path $env:USERPROFILE ".simplicio_agent" }
+New-Item -ItemType Directory -Force -Path $AgentHome | Out-Null
+$PythonCommand = Get-Command py -ErrorAction SilentlyContinue
+if (-not $PythonCommand) { $PythonCommand = Get-Command python -ErrorAction SilentlyContinue }
+$AdapterPaths = [ordered]@{}
+if ($PythonCommand) {
+  $Python = $PythonCommand.Source
+  try {
+    if ($AgentSourceRoot) { & $Python -m pip install -e "${AgentSourceRoot}[voice,ecosystem]" } else { & $Python -m pip install --upgrade "simplicio-agent[voice,ecosystem]" }
+    if ($LASTEXITCODE -ne 0) { throw "pip install returned $LASTEXITCODE" }
+    Write-Host "  ✓ Simplicio Agent + ecosystem Python installed"
+  } catch { Write-Warning "Agent/adapters install failed: $($_.Exception.Message)" }
+  foreach ($name in @("simplicio-loop", "simplicio-mapper", "simplicio-dev-cli")) {
+    $cmd = Get-Command $name -ErrorAction SilentlyContinue
+    $AdapterPath = $null
+    if ($cmd) { $AdapterPath = $cmd.Source }
+    $AdapterPaths[$name] = $AdapterPath
+
+  }
+} else { Write-Warning "Python/py not found; install Python 3.11+ to bootstrap adapters" }
+$MemoryStatus = "missing"
+try {
+  & $DestPath memory status --json | Set-Content -Encoding UTF8 (Join-Path $AgentHome ".memory-status.json")
+  if ($LASTEXITCODE -eq 0) { $MemoryStatus = "available" }
+} catch {
+  try { & $DestPath memory init --json | Set-Content -Encoding UTF8 (Join-Path $AgentHome ".memory-init.json"); $MemoryStatus = "initialized" } catch { Write-Warning "Neural memory bootstrap failed: $($_.Exception.Message)" }
+}
+$FastManifestPath = $null
+if ($FastKernelPath) { $FastManifestPath = $FastKernelPath }
+$SeedStatus = "unverified"
+if ($MemoryStatus -in @("available", "initialized")) { $SeedStatus = "available" }
+$Manifest = [ordered]@{
+  schema = "simplicio.ecosystem-manifest/v1"
+  runtime = [ordered]@{ path = $DestPath; fast_kernel = $FastManifestPath; memory = $MemoryStatus }
+  adapters = $AdapterPaths
+  seed = [ordered]@{ status = $SeedStatus; source = "simplicio memory init/status" }
+}
+$Manifest | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 (Join-Path $AgentHome "components.json")
+Write-Host "  ✓ ecosystem manifest: $(Join-Path $AgentHome 'components.json')"
 
 # PATH hint
 if (-not (Test-InPath $InstallDir)) {

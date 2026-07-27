@@ -14,6 +14,9 @@
 #   SIMPLICIO_BIN_DIR           - custom install directory
 #   SIMPLICIO_ALLOW_UNVERIFIED  - "1" to proceed even if no checksum is
 #                                 published for this target (default: refuse)
+#   SIMPLICIO_AGENT_SOURCE_ROOT - explicit local simplicio-agent checkout
+#   SIMPLICIO_AGENT_HOME       - state directory (default: ~/.simplicio_agent)
+#   SIMPLICIO_FAST_SOURCE_ROOT - optional local simplicio-fast checkout
 #
 # Asset naming follows distribution/targets.json (the canonical target
 # triplet table for the whole ecosystem): id "macos-arm64" -> asset
@@ -234,6 +237,20 @@ except Exception:
   ok "Simplicio Runtime instalado em $DEST_PATH"
 fi
 
+# ─── 2.1 Preferir kernel local do simplicio-fast quando disponível ───────────
+FAST_SOURCE_ROOT="${SIMPLICIO_FAST_SOURCE_ROOT:-$HOME/Projetos/ai/simplicio-fast}"
+FAST_KERNEL_PATH="${FAST_SOURCE_ROOT}/target/release/simplicio"
+if [ -x "$FAST_KERNEL_PATH" ]; then
+  FAST_STAGING="$DEST_PATH.fast-$$.tmp"
+  cp "$FAST_KERNEL_PATH" "$FAST_STAGING"
+  chmod +x "$FAST_STAGING"
+  mv -f "$FAST_STAGING" "$DEST_PATH"
+  ok "Simplicio Fast compilado adotado: $FAST_KERNEL_PATH"
+else
+  FAST_KERNEL_PATH=""
+  warn "kernel local do simplicio-fast não encontrado; mantendo Runtime distribuído verificado"
+fi
+
 # Adiciona ao PATH se não estiver
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;
@@ -254,14 +271,73 @@ else
   err "Precisa do Python 3 + pip para instalar o agente"
 fi
 
-# Instala o agente com suporte a voz
-info "Instalando dependências de áudio e voz..."
-$PIP install "$AGENT_PKG[voice]" 2>/dev/null || $PIP install "$AGENT_PKG" 2>/dev/null || {
-  warn "Pacote $AGENT_PKG não encontrado no PyPI. Instalando do source..."
-  if [ -d "$HOME/Projetos/ai/simplicio-agent" ]; then
-    cd "$HOME/Projetos/ai/simplicio-agent" && $PIP install -e ".[voice]" 2>/dev/null || $PIP install -e . 2>/dev/null
+# Instala o agente e o control-plane Python completo. O extra ecosystem inclui
+# simplicio-loop, simplicio-mapper e simplicio-dev-cli com versões compatíveis.
+AGENT_SOURCE_ROOT="${SIMPLICIO_AGENT_SOURCE_ROOT:-}"
+AGENT_SPEC="${AGENT_PKG}[voice,ecosystem]"
+if [ -n "$AGENT_SOURCE_ROOT" ] && [ -f "$AGENT_SOURCE_ROOT/pyproject.toml" ]; then
+  info "Instalando Simplicio Agent do checkout explícito: $AGENT_SOURCE_ROOT"
+  $PIP install -e "${AGENT_SOURCE_ROOT}[voice,ecosystem]" 2>/dev/null || $PIP install -e "$AGENT_SOURCE_ROOT" 2>/dev/null || err "falha ao instalar o checkout do Simplicio Agent"
+else
+
+
+  info "Instalando Simplicio Agent + ecossistema Python via PyPI..."
+  $PIP install "$AGENT_SPEC" 2>/dev/null || $PIP install "$AGENT_PKG" 2>/dev/null || {
+    if [ -d "$HOME/Projetos/ai/simplicio-agent" ]; then
+      warn "PyPI indisponível; usando checkout local detectado"
+      $PIP install -e "$HOME/Projetos/ai/simplicio-agent[voice,ecosystem]" 2>/dev/null || $PIP install -e "$HOME/Projetos/ai/simplicio-agent" 2>/dev/null || err "falha ao instalar o Simplicio Agent"
+    else
+      err "Pacote $AGENT_PKG não encontrado no PyPI e nenhum checkout local foi informado"
+    fi
+  }
+fi
+
+# Verifica os três adaptadores sem inventar sucesso: o manifesto final registra
+# exatamente o caminho resolvido ou "missing".
+for component in simplicio-loop simplicio-mapper simplicio-dev-cli; do
+  if command -v "$component" >/dev/null 2>&1; then
+    ok "$component disponível em $(command -v "$component")"
+  else
+    warn "$component ausente; rode pip install $component ou use [ecosystem]"
   fi
+done
+
+# ─── 3.1 Inicializar/verificar memória neural pelo Runtime (sem SQL direto) ───
+AGENT_HOME="${SIMPLICIO_AGENT_HOME:-$HOME/.simplicio_agent}"
+mkdir -p "$AGENT_HOME"
+# Preferir o banco neural persistente do usuário; respeitar override explícito.
+export SIMPLICIO_MEMORY_DB="${SIMPLICIO_MEMORY_DB:-$HOME/.simplicio/memory/simplicio-memory.sqlite}"
+MEMORY_STATUS="missing"
+if "$DEST_PATH" memory status --json >"$AGENT_HOME/.memory-status.json" 2>/dev/null; then
+  MEMORY_STATUS="available"
+elif "$DEST_PATH" memory init --json >"$AGENT_HOME/.memory-init.json" 2>/dev/null && "$DEST_PATH" memory status --json >"$AGENT_HOME/.memory-status.json" 2>/dev/null; then
+  MEMORY_STATUS="initialized"
+else
+  warn "memória neural não pôde ser verificada pelo Runtime; instalação continua, doctor reportará o gap"
+fi
+
+# Manifesto idempotente e legível para doctor/diagnóstico; nenhum segredo é salvo.
+LOOP_PATH="$(command -v simplicio-loop 2>/dev/null || true)"
+MAPPER_PATH="$(command -v simplicio-mapper 2>/dev/null || true)"
+DEVCLI_PATH="$(command -v simplicio-dev-cli 2>/dev/null || command -v simplicio-py 2>/dev/null || true)"
+export AGENT_PKG DEST_PATH MEMORY_STATUS LOOP_PATH MAPPER_PATH DEVCLI_PATH FAST_KERNEL_PATH
+python3 - "$AGENT_HOME/components.json" <<'PY'
+import json, os, pathlib, sys
+out = pathlib.Path(sys.argv[1])
+data = {
+  "schema": "simplicio.ecosystem-manifest/v1",
+  "agent": {"package": os.environ.get("AGENT_PKG", "simplicio-agent")},
+  "runtime": {"path": os.environ.get("DEST_PATH", ""), "fast_kernel": os.environ.get("FAST_KERNEL_PATH") or None, "memory": os.environ.get("MEMORY_STATUS", "missing")},
+  "adapters": {
+    "simplicio-loop": os.environ.get("LOOP_PATH") or None,
+    "simplicio-mapper": os.environ.get("MAPPER_PATH") or None,
+    "simplicio-dev-cli": os.environ.get("DEVCLI_PATH") or None,
+  },
+  "seed": {"status": "available" if os.environ.get("MEMORY_STATUS") in ("available", "initialized") else "unverified", "source": "simplicio memory init/status"},
 }
+out.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
+ok "manifesto do ecossistema: $AGENT_HOME/components.json"
 
 # Instala wake word detector
 info "Instalando wake word 'Simplicio'..."
