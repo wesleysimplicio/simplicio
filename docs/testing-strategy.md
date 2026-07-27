@@ -9,7 +9,7 @@ epic across multiple PRs.
 
 `wesleysimplicio/simplicio` is the **public distribution repo**: committed
 release binaries (`simplicio.exe`, `simplicio-linux-x64`, ...), package-manager
-wrappers (`npm/`, `pypi/`, `Formula/`), install scripts (`install.sh`,
+wrappers (`npm/`, `pypi/`), install scripts (`install.sh`,
 `install.ps1`), and docs/manifests describing a release. There is no Rust
 source (`Cargo.toml`, `*.rs`) checked into this repo — the actual `simplicio`
 agent source lives elsewhere. That means:
@@ -31,7 +31,7 @@ agent source lives elsewhere. That means:
   case (branch policy text missing, `/main/` references, version.txt/manifest
   mismatch), each `WARN` case (wrapper version drift, ecosystem doc drift,
   stale/unparseable beta date, contradictory beta copy), and the parser
-  helpers' error paths (malformed Formula/pyproject version strings).
+  helpers' error paths (malformed pyproject version strings).
 - The suite is deterministic: `date.today()` is frozen via monkeypatch in
   every test that touches the beta-date check, so no test depends on the
   real wall clock. No test touches the network or mutates the real repo —

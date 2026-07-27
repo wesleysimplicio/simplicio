@@ -40,22 +40,6 @@ def test_version_from_package_json(tmp_path):
     assert vdc.version_from_package_json(path) == "9.9.9"
 
 
-def test_version_from_formula(tmp_path):
-    path = tmp_path / "simplicio.rb"
-    path.write_text('class Simplicio < Formula\n  version "9.9.9"\nend\n', encoding="utf-8")
-    assert vdc.version_from_formula(path) == "9.9.9"
-
-
-def test_version_from_formula_missing_raises(tmp_path):
-    path = tmp_path / "simplicio.rb"
-    path.write_text("class Simplicio < Formula\nend\n", encoding="utf-8")
-    try:
-        vdc.version_from_formula(path)
-        assert False, "expected ValueError"
-    except ValueError:
-        pass
-
-
 def test_version_from_pyproject(tmp_path):
     path = tmp_path / "pyproject.toml"
     path.write_text('[project]\nname = "x"\nversion = "9.9.9"\n', encoding="utf-8")

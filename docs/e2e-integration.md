@@ -2,7 +2,7 @@
 
 > Implements the minimum scope of issue #9 for this repo:
 > `wesleysimplicio/simplicio` is the **public distribution repo** (compiled
-> runtime binary + npm/pip/brew wrappers). The runtime source, mapper,
+> runtime binary + npm/PyPI wrappers). The runtime source, mapper,
 > dev-cli, loop and agent components live in sibling repos and are consumed
 > here only as optional PATH adapters (`simplicio version --json` →
 > `components`). This repo does not build the Rust runtime (no
@@ -71,7 +71,7 @@ summary: 9/10 scenarios passed
 **Known finding (not introduced by this change):** scenario 7b currently
 fails for a real reason — `version.txt` (3.0.2) is stale relative to
 `simplicio-update-manifest.json` (3.5.2, published in commit `e24b426`), and
-the npm/PyPI/Homebrew wrapper versions lag both. This is exactly the
+the npm/PyPI wrapper versions lag both. This is exactly the
 contract-incompatibility failure mode issue #9 asks the pipeline to catch
 ("Contratos incompatíveis fazem o pipeline falhar"), so scenario 7b is
 intentionally left failing rather than papered over — see "Next steps"
@@ -88,7 +88,7 @@ attached diagnostics.
 ## Next steps (out of scope for this PR)
 
 - Fix the real version drift found by 7b (`version.txt`, wrapper
-  `package.json`/`pyproject.toml`/`Formula/simplicio.rb`, and
+  `package.json`/`pyproject.toml`, and
   `SIMPLICIO_ECOSYSTEM.md` vs. `simplicio-update-manifest.json`) — separate
   from the testing work in this issue.
 - Add macOS/Linux CI legs once hosted runners for this repo have `git`

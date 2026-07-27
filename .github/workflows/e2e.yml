@@ -17,7 +17,6 @@ on:
       - version.txt
       - "npm/**"
       - "pypi/**"
-      - "Formula/**"
       - "scripts/e2e_ecosystem.py"
       - "scripts/verify_distribution_consistency.py"
       - ".github/workflows/e2e.yml"
@@ -30,7 +29,6 @@ on:
       - version.txt
       - "npm/**"
       - "pypi/**"
-      - "Formula/**"
       - "scripts/e2e_ecosystem.py"
       - "scripts/verify_distribution_consistency.py"
   workflow_dispatch: {}

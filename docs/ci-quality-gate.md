@@ -14,7 +14,7 @@ run the checks" into "the merge is blocked until the checks pass."
 ## What this repo actually is
 
 This repository ships **prebuilt release artifacts** (`simplicio*`
-binaries, npm/pypi/Homebrew wrapper packages, install scripts, docs) — it
+binaries, npm/PyPI wrapper packages, install scripts, docs) — it
 is not the application's source tree. There is no compiled application
 code here to unit-test, benchmark, or run E2E against. The gate is scoped
 to what actually lives in this repo: the Python release-integrity tooling
@@ -141,7 +141,7 @@ dropped:
   `install.ps1` in disposable containers/VMs) are wanted, that's a
   distinct, heavier job worth its own PR.
 - **Wrapper/version auto-fix**: the audit still WARNs (non-blocking) that
-  `Formula/simplicio.rb`, the npm packages, and `pypi/simplicio` lag the
+  the npm packages and `pypi/simplicio` lag the
   manifest version, and that the beta-until date/README copy are stale.
   Those are real product/release decisions (what version to actually
   publish where), not CI-gate plumbing, and are left for a separate PR.

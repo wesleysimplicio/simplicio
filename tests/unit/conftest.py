@@ -169,11 +169,6 @@ jobs:
             },
         )
 
-        _write(
-            root / "Formula/simplicio.rb",
-            f'class Simplicio < Formula\n  version "{v}"\n  url "{artifact_url}"\n'
-            f'  sha256 "{artifact_sha}"\n  bin.install "simplicio-macos-arm64" => "simplicio"\nend\n',
-        )
         _write_json(root / "npm/simplicio/package.json", {"version": v})
         _write_json(root / "npm/simplicio-installer/package.json", {"version": v})
         _write_json(root / "npm/simplicio-unscoped/package.json", {"version": v})
@@ -212,25 +207,6 @@ jobs:
             self.root / filename,
             "Install:\ncurl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.sh | sh\n",
         )
-        return self
-
-    def with_formula_version(self, value: str) -> "RepoBuilder":
-        # Deliberately keeps the URL/SHA256/install line pointing at the
-        # *current* manifest artifact so this only exercises the wrapper
-        # version-drift WARN path, not the Formula/manifest binding ERROR
-        # path (see with_formula_unparseable / the manifest-binding checks
-        # in run_audit for that).
-        manifest = json.loads((self.root / "simplicio-update-manifest.json").read_text(encoding="utf-8"))
-        artifact = manifest["artifacts"][0]
-        _write(
-            self.root / "Formula/simplicio.rb",
-            f'class Simplicio < Formula\n  version "{value}"\n  url "{artifact["url"]}"\n'
-            f'  sha256 "{artifact["sha256"]}"\n  bin.install "{artifact["artifact"]}" => "simplicio"\nend\n',
-        )
-        return self
-
-    def with_formula_unparseable(self) -> "RepoBuilder":
-        _write(self.root / "Formula/simplicio.rb", "class Simplicio < Formula\nend\n")
         return self
 
     def with_npm_version(self, package: str, value: str) -> "RepoBuilder":
