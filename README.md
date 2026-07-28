@@ -61,12 +61,6 @@ pip install simplicio-installer
 simplicio install
 ```
 
-### Homebrew (macOS)
-
-```bash
-brew install simplicio
-```
-
 ### macOS / Linux
 
 ```bash
@@ -203,8 +197,8 @@ simplicio license status
 ## 🧪 Testing this repo's tooling
 
 This repo ships committed release binaries plus the packaging/tooling around
-them (npm/pypi/Homebrew wrappers, install scripts, a distribution-consistency
-checker). The official command to run that tooling's unit test suite:
+them (npm/PyPI wrappers, install scripts, a distribution-consistency checker).
+The official command to run that tooling's unit test suite:
 
 ```bash
 pip install -r requirements-dev.txt

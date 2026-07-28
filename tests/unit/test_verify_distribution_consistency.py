@@ -99,14 +99,14 @@ def test_version_txt_manifest_mismatch_is_error(verify_module, repo, monkeypatch
 
 
 def test_wrapper_version_drift_is_warning_not_error(verify_module, repo, monkeypatch, capsys):
-    repo.with_formula_version("1.0.0")
+    repo.with_npm_version("simplicio", "1.0.0")
     freeze_today(monkeypatch, verify_module, "2020-01-01")
 
     exit_code, out = run_main(verify_module, repo, capsys)
 
     assert exit_code == 0  # warnings alone must not fail the build
     assert "wrapper versions lag manifest 3.5.2" in out
-    assert "Formula/simplicio.rb=1.0.0" in out
+    assert "npm/simplicio/package.json=1.0.0" in out
 
 
 def test_ecosystem_doc_version_drift_is_warning(verify_module, repo, monkeypatch, capsys):
@@ -175,21 +175,6 @@ def test_no_beta_no_end_date_warning_when_no_beta_until(verify_module, repo, mon
 # ---------------------------------------------------------------------------
 # Parser helper edge/error cases
 # ---------------------------------------------------------------------------
-
-
-def test_version_from_formula_parses_double_quoted_version(verify_module, tmp_path):
-    path = tmp_path / "simplicio.rb"
-    path.write_text('class Foo < Formula\n  version "1.2.3"\nend\n', encoding="utf-8")
-
-    assert verify_module.version_from_formula(path) == "1.2.3"
-
-
-def test_version_from_formula_raises_when_unparseable(verify_module, tmp_path):
-    path = tmp_path / "simplicio.rb"
-    path.write_text("class Foo < Formula\nend\n", encoding="utf-8")
-
-    with pytest.raises(ValueError, match="could not parse formula version"):
-        verify_module.version_from_formula(path)
 
 
 def test_version_from_pyproject_parses_version(verify_module, tmp_path):

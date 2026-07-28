@@ -37,8 +37,6 @@ jobs:
           node --check npm/simplicio-unscoped/install.js
       - name: Shell syntax
         run: shellcheck install.sh scripts/tami-loop.sh
-      - name: Homebrew formula syntax
-        run: ruby -c Formula/simplicio.rb
       - name: PowerShell syntax
         shell: pwsh
         run: |

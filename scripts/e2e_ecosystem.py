@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Real end-to-end integration tests for the Simplicio ecosystem (issue #9).
 
-This repo ships the compiled `simplicio` runtime binary plus the npm/pip/brew
+This repo ships the compiled `simplicio` runtime binary plus the npm/PyPI
 wrappers around it. The actual mapper/dev-cli/prompt/sprint/agent components
 live in sibling repos and are consumed here only as optional PATH adapters
 (see `simplicio version --json` -> `components`). This script therefore

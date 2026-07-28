@@ -135,11 +135,6 @@ jobs:
             "npm/simplicio-unscoped/package.json",
         ):
             self.put(relative, json.dumps({"version": self.version}))
-        self.put(
-            "Formula/simplicio.rb",
-            f'version "{self.version}"\nurl "{artifact_url}"\nsha256 "{artifact_sha}"\n'
-            'bin.install "simplicio-macos-arm64" => "simplicio"\n',
-        )
         self.put("pypi/simplicio/pyproject.toml", f'version = "{self.version}"\n')
         self.put("SIMPLICIO_ECOSYSTEM.md", f"## Versão atual\n{self.version} (manifest)\n")
         self.put(
@@ -174,7 +169,7 @@ class DistributionConsistencyTests(unittest.TestCase):
         return [item.level for item in audit.run_audit(self.root, today=date(2026, 7, 14))]
 
     def test_clean_distribution_has_no_blocking_findings(self):
-        self.assertEqual(self.levels(), ["OK"] * 9)
+        self.assertEqual(self.levels(), ["OK"] * 8)
 
     def test_regression_wrong_branch_and_version_fail(self):
         self.fixture.put("README.md", "https://raw.githubusercontent.com/wesleysimplicio/simplicio/main/install.sh\n")
@@ -214,29 +209,7 @@ class DistributionConsistencyTests(unittest.TestCase):
         broken = self.root / "broken.txt"
         broken.write_text("missing", encoding="utf-8")
         with self.assertRaises(ValueError):
-            audit.version_from_formula(broken)
-        with self.assertRaises(ValueError):
             audit.version_from_pyproject(broken)
-        with self.assertRaises(ValueError):
-            audit.formula_provenance(broken)
-
-    def test_regression_formula_must_match_signed_manifest_artifact(self):
-        formula = self.root / "Formula/simplicio.rb"
-        formula.write_text(formula.read_text(encoding="utf-8").replace("9" * 64, "8" * 64), encoding="utf-8")
-        errors = [item.message for item in audit.run_audit(self.root) if item.level == "ERROR"]
-        self.assertIn("Formula URL/SHA256/install does not match the signed macos-arm64 manifest artifact.", errors)
-
-    def test_regression_formula_must_install_versioned_asset(self):
-        formula = self.root / "Formula/simplicio.rb"
-        formula.write_text(
-            formula.read_text(encoding="utf-8").replace(
-                'bin.install "simplicio-macos-arm64" => "simplicio"',
-                'bin.install "simplicio-wrapper" => "simplicio"',
-            ),
-            encoding="utf-8",
-        )
-        errors = [item.message for item in audit.run_audit(self.root) if item.level == "ERROR"]
-        self.assertIn("Formula URL/SHA256/install does not match the signed macos-arm64 manifest artifact.", errors)
 
     def test_regression_release_must_not_stage_repo_wrapper_binary(self):
         workflow = self.root / ".github/workflows/release.yml"
@@ -416,7 +389,7 @@ env:
             result = audit.main(["--root", str(self.root), "--strict", "--junit", str(junit), "--json"])
         self.assertEqual(result, 0)
         self.assertTrue(junit.exists())
-        self.assertEqual(len(json.loads(output.getvalue())), 9)
+        self.assertEqual(len(json.loads(output.getvalue())), 8)
 
     def test_strict_mode_fails_warning_while_default_does_not(self):
         self.fixture.put("npm/simplicio/package.json", json.dumps({"version": "3.0.2"}))

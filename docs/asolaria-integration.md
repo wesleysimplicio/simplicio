@@ -348,7 +348,6 @@ O scoreboard é publicado como `SCOREBOARD.md` na raiz do repositório e inclui:
 | **Update Manifest** | `simplicio-update-manifest.json` | Cross-platform | ✅ stable | 🔄 in-progress | Schema v2 com tuple |
 | **Package (npm)** | `npm/simplicio/package.json` | Cross-platform | ✅ stable | ⬜ n/a | Wrapper npm |
 | **Package (PyPI)** | `pypi/simplicio/pyproject.toml` | Cross-platform | ✅ stable | ⬜ n/a | Wrapper PyPI |
-| **Formula (Homebrew)** | `Formula/simplicio.rb` | macOS | ✅ stable | ⬜ n/a | Homebrew formula |
 | **Installer (sh)** | `install.sh` | macOS/Linux | ✅ stable | 🔄 in-progress | Com suporte Host-8 |
 | **Installer (ps1)** | `install.ps1` | Windows | ✅ stable | 🔄 in-progress | Com suporte Host-8 |
 | **Badge vsix** | `simplicio-badge.vsix` | Cross-platform | ✅ stable | ⬜ n/a | VS Code badge |
