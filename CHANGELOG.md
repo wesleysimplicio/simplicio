@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.6.0] - 2026-08-04
+
+### Added
+- Public Windows x64 binary from **simplicio-runtime v3.6.0**
+- Loop ownership + `simplicio loop decide` / `execution-report` surfaces
+- Install smoke path documented in private `packaging/windows/install.ps1`
+
+### Changed
+- Refreshed `simplicio.exe` / `simplicio-windows-x64.exe` (+ zips, SHA256, update-manifest)
+- VERSION.md current version → v3.6.0
+
 All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
@@ -57,3 +68,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Auto-built release from `simplicio-runtime`, including refreshed binaries
   for macOS, Linux, and Windows and an updated signed update manifest.
+

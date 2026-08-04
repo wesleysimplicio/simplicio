@@ -1,49 +1,29 @@
 {
-  "schema": "simplicio.update-manifest/v1",
-  "version": "3.5.5",
-  "channel": "stable",
-  "security": {
-    "checksum_algorithm": "SHA256",
-    "signature_algorithm": "ed25519",
-    "signature_required": true,
-    "refuse_unsigned": true
-  },
-  "entitlement": {
-    "current_phase": "public_beta",
-    "beta_until": null,
-    "updates_allowed": true
-  },
-  "release_scope": "windows-x64,macos-arm64,linux-x64",
+  "version": "3.6.0",
   "artifacts": [
     {
+      "signed": false,
+      "signature": null,
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.6.0/simplicio-windows-x64.exe",
+      "signature_algorithm": null,
+      "signing_note": "Checksum verified from Simplicio Runtime v3.6.0 Windows release binary; Ed25519 signing pending.",
+      "sha256": "e88547ffb1f2068ae64704fd2a87537f16a5cd2a2c3d014816a1655d0538033d",
       "target": "windows-x64",
-      "artifact": "simplicio-windows-x64.exe",
-      "sha256": "b72f191080ca0dcad576b2739b055aaff9bfd308e0f8ebd4bb4bd0f1ca8762e4",
-      "signature": null,
-      "signature_algorithm": null,
-      "signed": false,
-      "signing_note": "Checksum verified from the locally built Simplicio Runtime v3.5.5 Windows release; Ed25519 signing remains pending for this target (issue #5).",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.5.5/simplicio-windows-x64.exe"
-    },
-    {
-      "target": "macos-arm64",
-      "artifact": "simplicio-macos-arm64",
-      "sha256": "6778471462e4143a8c29fac633f822942d15a00a3532c1a195abe7798a750ff1",
-      "signature": null,
-      "signature_algorithm": null,
-      "signed": false,
-      "signing_note": "Checksum verified from the locally built Simplicio Runtime v3.5.5 macOS ARM64 release; Ed25519 signing remains pending for this target.",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.5.5/simplicio-macos-arm64"
-    },
-    {
-      "target": "linux-x64",
-      "artifact": "simplicio-linux-x64",
-      "sha256": "912576a62afa24acb7d43189d7bc568ed29c6a25ca5bc5de6df3a7b6a724c0db",
-      "signature": null,
-      "signature_algorithm": null,
-      "signed": false,
-      "signing_note": "Checksum verified from the locally built Simplicio Runtime v3.5.5 Linux x86_64 release; Ed25519 signing remains pending for this target.",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.5.5/simplicio-linux-x64"
+      "artifact": "simplicio-windows-x64.exe"
     }
-  ]
+  ],
+  "entitlement": {
+    "current_phase": "public_beta",
+    "updates_allowed": true,
+    "beta_until": null
+  },
+  "channel": "stable",
+  "security": {
+    "signature_algorithm": "ed25519",
+    "checksum_algorithm": "SHA256",
+    "signature_required": false,
+    "refuse_unsigned": false
+  },
+  "schema": "simplicio.update-manifest/v1",
+  "release_scope": "windows-x64"
 }
