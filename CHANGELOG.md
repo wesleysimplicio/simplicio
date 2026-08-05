@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.6.5] - 2026-08-05
+
+### Fixed
+- Published the Simplicio Runtime v3.6.5 Windows x64 binary with the read-only `simplicio_exec doctor` effect-gate adjustment.
+
 ## [3.6.0] - 2026-08-04
 
 ### Added

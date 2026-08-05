@@ -8,10 +8,10 @@ This is the **public distribution repo** for [Simplicio](https://github.com/wesl
 
 **Not the source code.** The Rust runtime source lives in the private [`simplicio-runtime`](https://github.com/wesleysimplicio/simplicio-runtime) repo.
 
-## Current Version: v3.6.0
+## Current Version: v3.6.5
 
-- **Release:** v3.6.0 — Windows x64 Runtime (loop ownership + execution metrics + install smoke)
-- **Previous:** v3.5.8 — Windows x64 official
+- **Release:** v3.6.5 — Windows x64 Runtime (read-only doctor effect gate)
+- **Previous:** v3.6.0 — Windows x64 Runtime (loop ownership + execution metrics + install smoke)
 - **Default branch:** `master`
 - **Assets this release:** Windows x86_64 (refreshed). macOS/Linux binaries remain from prior multi-platform train until next full rebuild.
 
