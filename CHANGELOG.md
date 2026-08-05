@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.6.7] - 2026-08-05
+
+### Changed
+- Published the Runtime v3.6.7 Windows x64 binary from merge SHA 9d31c6de7628e6de8f2c7ba61dc966f6613d3114.
+- Documented the separate Mapper, Fast, and Loop routes; Dev CLI remains nested under Loop and direct edits use simplicio edit.
+
+
 ## [3.6.5] - 2026-08-05
 
 ### Fixed
