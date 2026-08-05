@@ -1,13 +1,13 @@
 {
-  "version": "3.6.5",
+  "version": "3.6.7",
   "artifacts": [
     {
       "signed": false,
       "signature": null,
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.6.5/simplicio-windows-x64.exe",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.6.7/simplicio-windows-x64.exe",
       "signature_algorithm": null,
-      "signing_note": "Checksum verified from Simplicio Runtime v3.6.5 Windows release binary; Ed25519 signing pending.",
-      "sha256": "bab944aea65e39bba3005b88c7c1790c5bf6a54e0fefbecb0308687b45628f80",
+      "signing_note": "Checksum verified from Simplicio Runtime v3.6.7 Windows release binary; Ed25519 signing pending.",
+      "sha256": "ad7edd17349f78225b73f19b4a86654e8dabfaf66ced8730cb806a11fafe6afc",
       "target": "windows-x64",
       "artifact": "simplicio-windows-x64.exe"
     }
