@@ -1,82 +1,121 @@
 # Simplicio Runtime
 
-Simplicio Runtime is distributed as one native `simplicio` binary. It is the
-Simplicio MCP server: install the binary, register it in an MCP-compatible
-client, and let the client start it over stdio.
+Este repositório é a porta de entrada do Simplicio. Clone o repositório e use
+os instaladores versionados aqui para instalar o Runtime e os componentes CLI
+do ecossistema. Não é necessário acessar um site externo.
 
-This repository is intentionally an installation and quick-start guide. It
-does not try to promote every Simplicio component or document every runtime
-capability.
+O Runtime é distribuído como o binário nativo `simplicio` e expõe o Simplicio
+MCP pelo comando `simplicio serve --mcp --stdio`.
 
-## Scope
+## O que é instalado
 
-- **Runtime binary:** `simplicio`
-- **MCP entry point:** `simplicio serve --mcp --stdio`
-- **No local LLM:** the runtime does not include, download, or require local
-  model weights.
-- **Official distribution:** use the release binary or the official installer.
-- **Release page:** [github.com/wesleysimplicio/simplicio/releases](https://github.com/wesleysimplicio/simplicio/releases)
+Os instaladores baixam os assets oficiais das releases no GitHub:
 
-There is no PyPI installation step for the Runtime binary.
+| Componente | Distribuição instalada |
+|---|---|
+| Runtime / MCP | Binário nativo `simplicio` |
+| Mapper | `simplicio-mapper` |
+| Dev CLI | `simplicio-dev-cli` |
+| Fast | `simplicio-fast` |
+| Loop | `simplicio-loop` |
+| Prompt | `simplicio-prompt` |
+| Sprint | `simplicio-sprint` |
 
-## Install the latest release
+Mapper, Dev CLI, Fast, Loop, Prompt e Sprint são publicados como wheels Python
+que fornecem seus executáveis CLI. O instalador usa uma virtualenv própria em
+`~/.simplicio/components-venv` e não instala extras de inferência nem pesos de
+LLM local.
 
-### macOS and Linux
+## Instalação pelo repositório Git
 
-The official installer detects the platform, downloads the latest release,
-verifies the published SHA-256 checksum, and installs `simplicio`:
+### macOS e Linux
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
-```
-
-To install a specific release instead of the latest one:
-
-```sh
-export SIMPLICIO_VERSION=v3.8.11
-curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
-```
-
-The installer normally places the binary in `~/.local/bin`. If the shell
-cannot find `simplicio`, add that directory to `PATH` and open a new terminal.
-
-### Direct binary download
-
-Use the release asset that matches the operating system and CPU architecture.
-For the currently published targets:
+Requer Python 3.11 ou superior, `curl` e `git`:
 
 ```sh
-# Linux x64
-mkdir -p "$HOME/.local/bin"
-curl -fL https://github.com/wesleysimplicio/simplicio/releases/latest/download/simplicio-linux-x64 \
-  -o "$HOME/.local/bin/simplicio"
-chmod +x "$HOME/.local/bin/simplicio"
+git clone https://github.com/wesleysimplicio/simplicio.git
+cd simplicio
+sh install.sh
 ```
 
-For macOS Apple Silicon, use `simplicio-macos-arm64` in the download URL.
-Checksums are published as `SHA256SUMS` and in
-`simplicio-update-manifest.json`.
+O `install.sh`:
 
-If a target is not present in the selected release, do not use an unrelated
-asset; check the [release assets](https://github.com/wesleysimplicio/simplicio/releases/latest).
+1. consulta as releases do Runtime em ordem decrescente;
+2. escolhe o asset mais recente compatível com o sistema e a arquitetura;
+3. recua para releases anteriores até encontrar Windows, macOS ou Linux quando
+   a release mais recente não tiver aquele asset;
+4. instala as wheels mais recentes disponíveis dos seis componentes;
+5. verifica SHA-256 quando o asset publica digest no GitHub.
 
-## Verify the installation
+Para fixar uma release específica do Runtime:
+
+```sh
+SIMPLICIO_VERSION=v3.8.11 sh install.sh
+```
+
+### Windows
+
+Requer Git, PowerShell 5.1+ e Python 3.11 ou superior:
+
+```powershell
+git clone https://github.com/wesleysimplicio/simplicio.git
+Set-Location simplicio
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+O `install.ps1` aplica a mesma seleção por release. Na publicação atual, o
+Runtime encontra macOS/Linux em `v3.8.11` e o executável Windows na release
+anterior compatível. O instalador não assume que todas as plataformas estejam
+na mesma tag.
+
+Para fixar a release do Runtime no Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -Version v3.8.10
+```
+
+## Releases e assets
+
+As releases oficiais e seus assets ficam nos repositórios GitHub:
+
+- [Runtime](https://github.com/wesleysimplicio/simplicio/releases)
+- [Mapper](https://github.com/wesleysimplicio/simplicio-mapper/releases)
+- [Dev CLI](https://github.com/wesleysimplicio/simplicio-dev-cli/releases)
+- [Fast](https://github.com/wesleysimplicio/simplicio-fast/releases)
+- [Loop](https://github.com/wesleysimplicio/simplicio-loop/releases)
+- [Prompt](https://github.com/wesleysimplicio/simplicio-prompt/releases)
+- [Sprint](https://github.com/wesleysimplicio/simplicio-sprint/releases)
+
+O instalador não usa o site de marketing, PyPI como fonte dos componentes ou
+modelos locais. Ele usa o GitHub para localizar as releases e instala as
+wheels oficiais encontradas nelas; as dependências Python normais são
+resolvidas pela virtualenv.
+
+## Verificação
 
 ```sh
 simplicio version
 simplicio doctor
+simplicio-mapper --help
+simplicio-dev-cli --help
+simplicio-fast --help
+simplicio-loop --help
+sendsprint --help
 ```
 
-## Configure the MCP server
+O Prompt fornece, entre outros, os comandos `simplicio-subagents`,
+`simplicio-tui`, `simplicio-acp-adapter`, `simplicio-plugins` e
+`simplicio-skills`.
 
-The product is referred to as **Simplicio MCP**. The current Runtime command
-that exposes it over stdio is:
+## Configurar o Simplicio MCP
+
+O comando do servidor MCP é:
 
 ```sh
 simplicio serve --mcp --stdio
 ```
 
-An MCP client configuration normally looks like this:
+Exemplo de configuração para um cliente MCP:
 
 ```json
 {
@@ -89,25 +128,26 @@ An MCP client configuration normally looks like this:
 }
 ```
 
-If `simplicio` is not on the client's `PATH`, replace `command` with the
-absolute path to the installed binary. The exact configuration file depends
-on the MCP client.
+Se o cliente não encontrar o executável, use o caminho absoluto instalado em
+`~/.local/bin/simplicio` ou em `%USERPROFILE%\.local\bin\simplicio.exe`.
 
-## Update
+## Atualizar ou remover
+
+Execute novamente o instalador para atualizar o Runtime e os componentes. Os
+instaladores são idempotentes e mantêm a virtualenv sob `~/.simplicio`.
 
 ```sh
-simplicio update check
-simplicio update apply
+sh install.sh --doctor
+sh install.sh --uninstall
 ```
 
-## Troubleshooting
+No Windows:
 
-- `command not found`: add `~/.local/bin` to `PATH` and restart the terminal.
-- Checksum failure: download again from the official release page and do not
-  bypass verification casually.
-- Unsupported platform or architecture: confirm that a matching asset exists
-  in the selected release.
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -Doctor
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -Uninstall
+```
 
-## License
+## Licença
 
-Proprietary. See [LICENSE](LICENSE).
+Proprietária. Consulte [LICENSE](LICENSE).
