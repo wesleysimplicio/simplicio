@@ -28,7 +28,7 @@ LLM local.
 
 ## Instalação pelo repositório Git
 
-### macOS e Linux
+### macOS Apple Silicon e Linux
 
 Requer Python 3.11 ou superior, `curl` e `git`:
 
@@ -64,9 +64,9 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
 O `install.ps1` aplica a mesma seleção por release. Na publicação atual, o
-Runtime encontra macOS/Linux em `v3.8.11` e o executável Windows na release
-anterior compatível. O instalador não assume que todas as plataformas estejam
-na mesma tag.
+Runtime encontra os assets publicados para macOS Apple Silicon e Linux em
+`v3.8.11` e o executável Windows na release anterior compatível. O instalador
+não assume que todas as plataformas estejam na mesma tag.
 
 Para fixar a release do Runtime no Windows:
 
