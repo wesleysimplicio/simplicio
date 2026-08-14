@@ -1,0 +1,60 @@
+schema_version: 1
+owner: simplicio-dev-cli
+role: mutation-and-validation
+capabilities:
+  - id: dev-cli.preflight
+    intent: [preflight, plan-check, scope-check]
+    inputs: [snapshot_id, repository, scope, plan]
+    outputs: [pre_effect, lock]
+    effects: lock-only
+    requires: [mapper.snapshot-create]
+    verifies: [repo-key-path, preconditions]
+  - id: dev-cli.edit
+    intent: [edit, implement, refactor, fix]
+    inputs: [lock, plan, selected_context]
+    outputs: [diff, operation_id]
+    effects: source-mutation
+    requires: [dev-cli.preflight]
+    verifies: [diff-recorded]
+  - id: dev-cli.patch
+    intent: [patch, apply-change, mechanical-change]
+    inputs: [lock, patch]
+    outputs: [diff, operation_id]
+    effects: source-mutation
+    requires: [dev-cli.preflight]
+    verifies: [patch-applied]
+  - id: dev-cli.command
+    intent: [command, build, format, lint]
+    inputs: [scope, command_policy]
+    outputs: [stdout, stderr, exit_status]
+    effects: declared-command-effect
+    requires: [dev-cli.preflight]
+    verifies: [exit-status]
+  - id: dev-cli.tests
+    intent: [test, pytest, cargo-test, smoke, e2e]
+    inputs: [scope, test_policy]
+    outputs: [test_results, logs]
+    effects: test-artifacts
+    requires: [dev-cli.preflight]
+    verifies: [test-run-recorded]
+  - id: dev-cli.diagnostics
+    intent: [diagnose, ruff, mypy, clippy, coverage, contracts]
+    inputs: [scope, diagnostic_policy]
+    outputs: [findings, logs]
+    effects: diagnostic-artifacts
+    requires: [dev-cli.preflight]
+    verifies: [findings-scoped]
+  - id: dev-cli.evidence
+    intent: [evidence, receipt-input, report]
+    inputs: [operation_id, outputs, logs]
+    outputs: [evidence_file]
+    effects: durable-evidence
+    requires: [dev-cli.edit]
+    verifies: [durability, schema]
+  - id: dev-cli.reconcile
+    intent: [reconcile, unknown-effect, ambiguous]
+    inputs: [operation_id, evidence_file, lock]
+    outputs: [verdict]
+    effects: lock-preserving
+    requires: [dev-cli.evidence]
+    verifies: [unchanged-before, proven-after]

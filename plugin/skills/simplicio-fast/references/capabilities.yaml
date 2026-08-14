@@ -1,0 +1,53 @@
+schema_version: 1
+owner: simplicio-fast
+role: acceleration
+capabilities:
+  - id: fast.index-open
+    intent: [index, open, load, accelerate]
+    inputs: [snapshot_id, index_schema]
+    outputs: [index_id, freshness]
+    effects: read-only
+    requires: [mapper.snapshot-create]
+    verifies: [schema-match, revision-match]
+  - id: fast.search
+    intent: [search, find, lookup, retrieve]
+    inputs: [index_id, query, scope]
+    outputs: [results, evidence]
+    effects: read-only
+    requires: [fast.index-open]
+    verifies: [result-locations]
+  - id: fast.rank
+    intent: [rank, relevance, similar]
+    inputs: [results, ranking_policy]
+    outputs: [ranked-results, ranking_basis]
+    effects: read-only
+    requires: [fast.search]
+    verifies: [deterministic-order]
+  - id: fast.cache-read
+    intent: [cache, repeated, warm]
+    inputs: [index_id, query_key]
+    outputs: [cached-results, cache_age]
+    effects: read-only
+    requires: [fast.index-open]
+    verifies: [ttl, revision-match]
+  - id: fast.cache-refresh
+    intent: [refresh, invalidate, stale]
+    inputs: [snapshot_id, index_id]
+    outputs: [new_index_id, invalidated_keys]
+    effects: local-index-write
+    requires: [mapper.snapshot-create]
+    verifies: [index-integrity]
+  - id: fast.batch-retrieve
+    intent: [batch, parallel, many-lookups]
+    inputs: [index_id, queries, concurrency_limit]
+    outputs: [per-query-results, omissions]
+    effects: read-only
+    requires: [fast.index-open]
+    verifies: [bounded-concurrency]
+  - id: fast.fallback-survey
+    intent: [fallback, missing-index, degraded]
+    inputs: [repository, revision, query]
+    outputs: [survey-request]
+    effects: none
+    requires: [mapper.project-survey]
+    verifies: [fallback-marked]

@@ -1,0 +1,30 @@
+{
+  "name": "simplicio",
+  "owner": {
+    "name": "Wesley Simplicio",
+    "email": "wesleybob4@gmail.com"
+  },
+  "metadata": {
+    "description": "Public Simplicio marketplace: evidence-gated Loop orchestration, Prompt fan-out, and Sprint delivery skills over the Simplicio Runtime MCP."
+  },
+  "plugins": [
+    {
+      "name": "simplicio-loop",
+      "source": "./plugin",
+      "category": "development",
+      "description": "Universal evidence-gated Loop plugin with the canonical Simplicio Runtime, Mapper, Fast, Dev CLI, Prism, review, compression, and learning skills."
+    },
+    {
+      "name": "simplicio-prompt",
+      "source": "./plugins/simplicio-prompt",
+      "category": "development",
+      "description": "Tuple-Space and Yool safe-speed prompt runtime with fan-out commands and an opt-in UserPromptSubmit adapter."
+    },
+    {
+      "name": "simplicio-sprint",
+      "source": "./plugins/simplicio-sprint",
+      "category": "development",
+      "description": "SendSprint intake and delivery skill for Jira, Azure DevOps, and GitHub sprint-to-draft-PR workflows."
+    }
+  ]
+}

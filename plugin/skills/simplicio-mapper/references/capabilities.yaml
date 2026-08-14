@@ -1,0 +1,60 @@
+schema_version: 1
+owner: simplicio-mapper
+role: survey
+capabilities:
+  - id: mapper.project-survey
+    intent: [survey, map, understand, architecture]
+    inputs: [repository, revision, scope]
+    outputs: [project-map, snapshot_id, evidence]
+    effects: read-only
+    requires: []
+    verifies: [revision-match, scope-recorded]
+  - id: mapper.snapshot-create
+    intent: [snapshot, context-baseline, handoff]
+    inputs: [repository, revision, scope]
+    outputs: [snapshot_id, immutable-artifacts]
+    effects: read-only
+    requires: [mapper.project-survey]
+    verifies: [artifact-integrity]
+  - id: mapper.symbol-lookup
+    intent: [symbol, definition, reference, locate]
+    inputs: [snapshot_id, symbol, language]
+    outputs: [locations, references, uncertainty]
+    effects: read-only
+    requires: [mapper.snapshot-create]
+    verifies: [evidence-location]
+  - id: mapper.dependency-graph
+    intent: [dependency, impact, imports, callers]
+    inputs: [snapshot_id, target]
+    outputs: [graph, affected-nodes]
+    effects: read-only
+    requires: [mapper.snapshot-create]
+    verifies: [graph-source]
+  - id: mapper.call-graph
+    intent: [call-graph, flow, execution-path]
+    inputs: [snapshot_id, symbol]
+    outputs: [call-graph, unresolved-edges]
+    effects: read-only
+    requires: [mapper.symbol-lookup]
+    verifies: [edge-evidence]
+  - id: mapper.precedent-search
+    intent: [precedent, similar, pattern, example]
+    inputs: [snapshot_id, query]
+    outputs: [matches, ranking, omissions]
+    effects: read-only
+    requires: [mapper.snapshot-create]
+    verifies: [match-locations]
+  - id: mapper.context-select
+    intent: [context, minimal-context, prompt-input]
+    inputs: [snapshot_id, task, budget]
+    outputs: [selected-files, excerpts, rationale]
+    effects: read-only
+    requires: [mapper.snapshot-create]
+    verifies: [scope-bounded]
+  - id: mapper.handoff
+    intent: [handoff, dev-cli-input, loop-input]
+    inputs: [snapshot_id, selected_context, task]
+    outputs: [handoff_record]
+    effects: read-only
+    requires: [mapper.context-select]
+    verifies: [snapshot-id-present]
