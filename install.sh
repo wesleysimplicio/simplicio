@@ -1,405 +1,312 @@
 #!/usr/bin/env sh
-# install.sh — Simplicio Agent: instalador completo e unificado (macOS/Linux)
-#
-# Um comando. Tudo instalado. Zero configuração.
-#
-#   curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
-#
-# Idempotent subcommands:
-#   sh install.sh --doctor      # health check, safe to re-run
-#   sh install.sh --uninstall   # removes the binary, preserves user data
-#
-# Environment variables:
-#   SIMPLICIO_VERSION           - pin a specific version (default: latest)
-#   SIMPLICIO_BIN_DIR           - custom install directory
-#   SIMPLICIO_ALLOW_UNVERIFIED  - "1" to proceed even if no checksum is
-#                                 published for this target (default: refuse)
-#   SIMPLICIO_AGENT_SOURCE_ROOT - explicit local simplicio-agent checkout
-#   SIMPLICIO_AGENT_HOME       - state directory (default: ~/.simplicio_agent)
-#   SIMPLICIO_FAST_SOURCE_ROOT - optional local simplicio-fast checkout
-#
-# Asset naming follows distribution/targets.json (the canonical target
-# triplet table for the whole ecosystem): id "macos-arm64" -> asset
-# "simplicio-macos-arm64", id "macos-x64" -> "simplicio-macos-x64", id
-# "linux-x64" -> "simplicio-linux-x64". Drift between this script, the
-# release workflow and simplicio-update-manifest.json is caught by
-# scripts/verify_distribution_consistency.py in CI.
-
 set -eu
 
+# Simplicio ecosystem installer for macOS and Linux.
+# The source of truth is GitHub releases from the component repositories.
+# Runtime assets are selected newest-first per OS/architecture. Component
+# wheels are selected newest-first and fall back to older releases when the
+# newest release has no published wheel.
+
 REPO="wesleysimplicio/simplicio"
-GITHUB="https://github.com/$REPO"
-BIN_NAME="simplicio"
-AGENT_PKG="simplicio-agent"
+API_ROOT="https://api.github.com/repos"
+INSTALL_DIR="${SIMPLICIO_BIN_DIR:-$HOME/.local/bin}"
+STATE_DIR="${SIMPLICIO_STATE_DIR:-$HOME/.simplicio}"
+VENV_DIR="${SIMPLICIO_COMPONENT_VENV:-$STATE_DIR/components-venv}"
+MANIFEST="$STATE_DIR/components.json"
+TMP_DIR="${TMPDIR:-/tmp}/simplicio-install-$$"
 
-GREEN='\033[0;32m'
-CYAN='\033[0;36m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m'
+info() { printf '%s\n' "==> $*"; }
+ok() { printf '%s\n' "  ✓ $*"; }
+warn() { printf '%s\n' "  ! $*" >&2; }
+fail() { printf '%s\n' "  ✗ $*" >&2; exit 1; }
 
-info()  { printf "${CYAN}==>${NC} %s\n" "$*"; }
-ok()    { printf "${GREEN}  ✓${NC} %s\n" "$*"; }
-warn()  { printf "${YELLOW}  ⚠${NC} %s\n" "$*"; }
-err()   { printf "${RED}  ✗${NC} %s\n" "$*"; exit 1; }
+cleanup() { rm -rf "$TMP_DIR"; }
+trap cleanup EXIT INT TERM
 
-BIN_DIR="${SIMPLICIO_BIN_DIR:-$HOME/.local/bin}"
-DEST_PATH="$BIN_DIR/$BIN_NAME"
-
-# ─── Detect platform (canonical os/arch naming, matches distribution/targets.json) ──
-detect_platform() {
-  case "$(uname -m)" in
-    x86_64|amd64) ARCH="x64" ;;
-    aarch64|arm64) ARCH="arm64" ;;
-    *) err "Arquitetura não suportada: $(uname -m)" ;;
-  esac
-
-  case "$(uname -s)" in
-    Darwin) OS="macos" ;;
-    Linux)  OS="linux" ;;
-    *) err "Sistema não suportado: $(uname -s)" ;;
-  esac
-}
-
-sha256_of() {
+sha256_file() {
   if command -v sha256sum >/dev/null 2>&1; then
     sha256sum "$1" | awk '{print $1}'
   elif command -v shasum >/dev/null 2>&1; then
     shasum -a 256 "$1" | awk '{print $1}'
   else
-    err "Precisa de sha256sum ou shasum para verificar a integridade do download"
+    return 1
   fi
 }
 
-# ─── --doctor: idempotent, read-only health check ──────────────────────────
-run_doctor() {
-  info "simplicio doctor"
-  status=0
-
-  if [ -x "$DEST_PATH" ]; then
-    ok "binário presente: $DEST_PATH"
-  else
-    warn "binário ausente em $DEST_PATH"
-    status=1
-  fi
-
-  case ":$PATH:" in
-    *":$BIN_DIR:"*) ok "$BIN_DIR está no PATH" ;;
-    *) warn "$BIN_DIR não está no PATH (sessão atual)" ;;
+verify_digest() {
+  path=$1
+  digest=$2
+  [ -n "$digest" ] || { warn "sem digest SHA-256 publicado para $(basename "$path"); instalação continua"; return 0; }
+  case "$digest" in
+    sha256:*) digest=${digest#sha256:} ;;
   esac
-
-  if [ -x "$DEST_PATH" ]; then
-    if "$DEST_PATH" version >/dev/null 2>&1; then
-      ok "binário executa corretamente"
-    else
-      warn "binário presente mas falhou ao executar"
-      status=1
-    fi
-  fi
-
-  if [ "$status" -eq 0 ]; then
-    ok "simplicio está saudável"
-  else
-    err "simplicio tem problemas — rode o instalador novamente"
-  fi
-  exit "$status"
+  actual=$(sha256_file "$path" 2>/dev/null || true)
+  [ -n "$actual" ] || { warn "não foi possível calcular SHA-256 para $(basename "$path"); instalação continua"; return 0; }
+  [ "$actual" = "$(printf '%s' "$digest" | tr '[:upper:]' '[:lower:]')" ] || fail "SHA-256 inválido para $(basename "$path")";
+  ok "SHA-256 verificado: $(basename "$path")"
 }
 
-# ─── --uninstall: idempotent removal, safe to run repeatedly ──────────────
-run_uninstall() {
-  info "simplicio uninstall"
-  if [ -e "$DEST_PATH" ]; then
-    rm -f "$DEST_PATH"
-    ok "removido $DEST_PATH"
-  else
-    ok "já estava removido (nada em $DEST_PATH)"
-  fi
-  # Dados do usuário são preservados intencionalmente (uninstall idempotente
-  # e não-destrutivo) — ~/.simplicio nunca é tocado aqui.
-  ok "dados do usuário em \$HOME/.simplicio foram preservados"
-  warn "se você adicionou $BIN_DIR ao PATH no seu ~/.zshrc ou ~/.bashrc, remova a linha manualmente"
-  exit 0
+download_asset() {
+  url=$1
+  destination=$2
+  digest=$3
+  staging="$destination.download-$$"
+  rm -f "$staging"
+  curl -fL --retry 3 --retry-delay 1 -sS "$url" -o "$staging" || fail "download falhou: $url"
+  [ -s "$staging" ] || fail "asset vazio: $url"
+  verify_digest "$staging" "$digest"
+  mv -f "$staging" "$destination"
 }
 
-case "${1:-}" in
-  --doctor) detect_platform; run_doctor ;;
-  --uninstall) run_uninstall ;;
-esac
-
-printf "${GREEN}"
-cat << "EOF"
-  ╔══════════════════════════════════════╗
-  ║        Simplicio Agent v1.8.0       ║
-  ║    Seu assistente pessoal digital    ║
-  ╚══════════════════════════════════════╝
-EOF
-printf "${NC}"
-echo ""
-
-# ─── 1. Detect platform ──────────────────────────────────────────────────────
-detect_platform
-info "Plataforma detectada: $OS-$ARCH"
-
-# ─── 2. Instalar simplicio binary (staged download + SHA256 + atomic swap) ──
-info "Instalando Simplicio Runtime..."
-mkdir -p "$BIN_DIR"
-
-if [ -x "$DEST_PATH" ]; then
-  ok "$BIN_NAME já instalado em $DEST_PATH"
-else
-  VERSION="${SIMPLICIO_VERSION:-latest}"
-  ASSET="simplicio-$OS-$ARCH"
-  if [ "$VERSION" = "latest" ]; then
-    RELEASE_BASE="$GITHUB/releases/latest/download"
+fetch_releases() {
+  repo=$1
+  version=${2:-}
+  if [ -n "$version" ]; then
+    url="$API_ROOT/$repo/releases/tags/$version"
   else
-    RELEASE_BASE="$GITHUB/releases/download/$VERSION"
+    url="$API_ROOT/$repo/releases?per_page=100"
   fi
-  DOWNLOAD_URL="$RELEASE_BASE/$ASSET"
-  MANIFEST_URL="$RELEASE_BASE/simplicio-update-manifest.json"
+  curl -fL --retry 3 --retry-delay 1 -sS \
+    -H 'Accept: application/vnd.github+json' \
+    -H 'User-Agent: simplicio-installer' \
+    "$url"
+}
 
-  fetch() {
-    # fetch <url> <dest-or-'-'>
-    if command -v curl >/dev/null 2>&1; then
-      curl -fsSL "$1" -o "$2"
-    elif command -v wget >/dev/null 2>&1; then
-      wget -q "$1" -O "$2"
-    else
-      err "Precisa de curl ou wget para baixar"
-    fi
-  }
-
-  TARGET_ID="$OS-$ARCH"
-  EXPECTED_SHA256=""
-  SIGNED="false"
-  MANIFEST_TMP="$(mktemp)"
-  trap 'rm -f "$MANIFEST_TMP"' EXIT
-  if fetch "$MANIFEST_URL" "$MANIFEST_TMP" 2>/dev/null; then
-    if command -v python3 >/dev/null 2>&1; then
-      EXPECTED_SHA256="$(python3 -c "
-import json,sys
-try:
-    m = json.load(open('$MANIFEST_TMP'))
-    for a in m.get('artifacts', []):
-        if a.get('target') == '$TARGET_ID':
-            print(a.get('sha256') or '')
-            print('true' if a.get('signed') else 'false')
-            break
-except Exception:
-    pass
-" 2>/dev/null | sed -n '1p')"
-      SIGNED="$(python3 -c "
+# Read a release JSON document from stdin and return:
+# release-tag|asset-name|download-url|sha256-digest
+select_asset() {
+  "$PYTHON" -c '
+import fnmatch
 import json
-try:
-    m = json.load(open('$MANIFEST_TMP'))
-    for a in m.get('artifacts', []):
-        if a.get('target') == '$TARGET_ID':
-            print('true' if a.get('signed') else 'false')
-            break
-except Exception:
-    pass
-" 2>/dev/null)"
-    fi
-  fi
+import sys
 
-  if [ -z "$EXPECTED_SHA256" ]; then
-    if [ "${SIMPLICIO_ALLOW_UNVERIFIED:-}" = "1" ]; then
-      warn "sem checksum publicado para o alvo '$TARGET_ID' — prosseguindo SEM VERIFICAÇÃO (SIMPLICIO_ALLOW_UNVERIFIED=1)"
+payload = json.load(sys.stdin)
+releases = [payload] if isinstance(payload, dict) else payload
+patterns = sys.argv[1:]
+
+for release in releases or []:
+    if not isinstance(release, dict) or release.get("draft") or release.get("prerelease"):
+        continue
+    for asset in release.get("assets") or []:
+        name = asset.get("name", "")
+        if any(fnmatch.fnmatchcase(name, pattern) for pattern in patterns):
+            url = asset.get("browser_download_url")
+            if url:
+                print("|".join([
+                    str(release.get("tag_name", "")),
+                    name,
+                    url,
+                    str(asset.get("digest") or ""),
+                ]))
+                raise SystemExit(0)
+raise SystemExit(1)
+' "$@"
+}
+
+uninstall() {
+  info "Removendo Simplicio Runtime e componentes gerenciados"
+  rm -f "$INSTALL_DIR/simplicio"
+  if [ -d "$VENV_DIR/bin" ]; then
+    for candidate in "$INSTALL_DIR"/simplicio-* "$INSTALL_DIR/sendsprint"; do
+      [ -L "$candidate" ] || continue
+      target=$(readlink "$candidate" 2>/dev/null || true)
+      case "$target" in
+        "$VENV_DIR/bin/"*) rm -f "$candidate" ;;
+      esac
+    done
+  fi
+  rm -rf "$VENV_DIR"
+  rm -f "$MANIFEST"
+  ok "componentes removidos; configurações fora da virtualenv foram preservadas"
+}
+
+doctor() {
+  ok_state=0
+  if [ -x "$INSTALL_DIR/simplicio" ]; then
+    "$INSTALL_DIR/simplicio" version >/dev/null 2>&1 && ok "Runtime executável" || { warn "Runtime não executa"; ok_state=1; }
+  else
+    warn "Runtime ausente: $INSTALL_DIR/simplicio"
+    ok_state=1
+  fi
+  for command_name in simplicio-mapper simplicio-dev-cli simplicio-fast simplicio-loop simplicio-subagents sendsprint; do
+    if [ -x "$INSTALL_DIR/$command_name" ]; then
+      ok "$command_name disponível"
     else
-      err "recusando instalar: nenhum SHA256 publicado no manifest para o alvo '$TARGET_ID'. Defina SIMPLICIO_ALLOW_UNVERIFIED=1 para prosseguir por sua conta e risco."
+      warn "$command_name ausente"
+      ok_state=1
     fi
-  elif [ "$SIGNED" != "true" ]; then
-    warn "checksum será verificado, mas este artefato ainda não é assinado (ed25519 não configurado para $TARGET_ID — ver issue #5)"
-  fi
+  done
+  if [ -f "$MANIFEST" ]; then ok "manifesto: $MANIFEST"; else warn "manifesto ausente: $MANIFEST"; ok_state=1; fi
+  return "$ok_state"
+}
 
-  info "Baixando de $DOWNLOAD_URL ..."
-  STAGING_PATH="$DEST_PATH.download-$$.tmp"
-  fetch "$DOWNLOAD_URL" "$STAGING_PATH"
-
-  if [ ! -s "$STAGING_PATH" ]; then
-    rm -f "$STAGING_PATH"
-    err "download falhou ou arquivo vazio: $DOWNLOAD_URL"
-  fi
-
-  if [ -n "$EXPECTED_SHA256" ]; then
-    ACTUAL_SHA256="$(sha256_of "$STAGING_PATH")"
-    if [ "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]; then
-      rm -f "$STAGING_PATH"
-      err "checksum não confere para $ASSET. esperado $EXPECTED_SHA256, obtido $ACTUAL_SHA256. Recusando instalar binário corrompido ou adulterado."
-    fi
-    ok "SHA256 verificado: $ACTUAL_SHA256"
-  fi
-
-  chmod +x "$STAGING_PATH"
-  # Swap atômico: mv no mesmo filesystem nunca deixa $DEST_PATH parcialmente
-  # escrito, e reexecutar este script (update idempotente) não deixa .tmp
-  # órfãos em caso de sucesso.
-  mv -f "$STAGING_PATH" "$DEST_PATH"
-  ok "Simplicio Runtime instalado em $DEST_PATH"
-fi
-
-# ─── 2.1 Preferir kernel local do simplicio-fast quando disponível ───────────
-FAST_SOURCE_ROOT="${SIMPLICIO_FAST_SOURCE_ROOT:-$HOME/Projetos/ai/simplicio-fast}"
-FAST_KERNEL_PATH="${FAST_SOURCE_ROOT}/target/release/simplicio"
-if [ -x "$FAST_KERNEL_PATH" ]; then
-  FAST_STAGING="$DEST_PATH.fast-$$.tmp"
-  cp "$FAST_KERNEL_PATH" "$FAST_STAGING"
-  chmod +x "$FAST_STAGING"
-  mv -f "$FAST_STAGING" "$DEST_PATH"
-  ok "Simplicio Fast compilado adotado: $FAST_KERNEL_PATH"
-else
-  FAST_KERNEL_PATH=""
-  warn "kernel local do simplicio-fast não encontrado; mantendo Runtime distribuído verificado"
-fi
-
-# Adiciona ao PATH se não estiver
-case ":$PATH:" in
-  *":$BIN_DIR:"*) ;;
-  *) export PATH="$BIN_DIR:$PATH"
-     warn "Adicione export PATH=\"\$HOME/.local/bin:\$PATH\" ao seu ~/.zshrc ou ~/.bashrc"
-     ;;
+action=${1:-install}
+case "$action" in
+  --uninstall|-u)
+    uninstall
+    exit 0
+    ;;
+  --doctor|-d)
+    doctor
+    exit $?
+    ;;
+  --help|-h)
+    printf '%s\n' 'Uso: sh install.sh [--doctor|--uninstall]' 'Variáveis: SIMPLICIO_VERSION, SIMPLICIO_BIN_DIR, SIMPLICIO_STATE_DIR, SIMPLICIO_COMPONENT_VENV'
+    exit 0
+    ;;
+  install)
+    ;;
+  *)
+    fail "argumento desconhecido: $action"
+    ;;
 esac
 
-# ─── 3. Instalar simplicio-agent (Hermes Turbo + Tami) ───────────────────────
-info "Instalando Simplicio Agent (assistente pessoal)..."
-PYTHON="${PYTHON:-python3}"
-
-if command -v pip3 >/dev/null 2>&1; then
-  PIP="pip3"
-elif command -v pip >/dev/null 2>&1; then
-  PIP="pip"
+if [ -n "${SIMPLICIO_PYTHON:-}" ]; then
+  PYTHON=$SIMPLICIO_PYTHON
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON=$(command -v python3)
+elif command -v python >/dev/null 2>&1; then
+  PYTHON=$(command -v python)
 else
-  err "Precisa do Python 3 + pip para instalar o agente"
+  fail 'Python 3.11+ não encontrado'
 fi
 
-# Instala o agente e o control-plane Python completo. O extra ecosystem inclui
-# simplicio-loop, simplicio-mapper e simplicio-dev-cli com versões compatíveis.
-AGENT_SOURCE_ROOT="${SIMPLICIO_AGENT_SOURCE_ROOT:-}"
-AGENT_SPEC="${AGENT_PKG}[voice,ecosystem]"
-if [ -n "$AGENT_SOURCE_ROOT" ] && [ -f "$AGENT_SOURCE_ROOT/pyproject.toml" ]; then
-  info "Instalando Simplicio Agent do checkout explícito: $AGENT_SOURCE_ROOT"
-  $PIP install -e "${AGENT_SOURCE_ROOT}[voice,ecosystem]" 2>/dev/null || $PIP install -e "$AGENT_SOURCE_ROOT" 2>/dev/null || err "falha ao instalar o checkout do Simplicio Agent"
-else
+"$PYTHON" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' \
+  || fail 'Python 3.11 ou superior é necessário para todos os componentes'
+command -v curl >/dev/null 2>&1 || fail 'curl não encontrado'
 
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+case "$OS:$ARCH" in
+  linux:x86_64|linux:amd64)
+    RUNTIME_TARGET='linux-x64'
+    RUNTIME_PATTERNS='simplicio-linux-x64 simplicio-linux-x86_64'
+    ;;
+  linux:aarch64|linux:arm64)
+    RUNTIME_TARGET='linux-arm64'
+    RUNTIME_PATTERNS='simplicio-linux-arm64 simplicio-linux-aarch64'
+    ;;
+  darwin:arm64|darwin:aarch64)
+    RUNTIME_TARGET='macos-arm64'
+    RUNTIME_PATTERNS='simplicio-macos-arm64 simplicio-darwin-arm64'
+    ;;
+  darwin:x86_64|darwin:amd64)
+    RUNTIME_TARGET='macos-x64'
+    RUNTIME_PATTERNS='simplicio-macos-x64 simplicio-darwin-x64'
+    ;;
+  *)
+    fail "plataforma não suportada: $OS/$ARCH"
+    ;;
+esac
 
-  info "Instalando Simplicio Agent + ecossistema Python via PyPI..."
-  $PIP install "$AGENT_SPEC" 2>/dev/null || $PIP install "$AGENT_PKG" 2>/dev/null || {
-    if [ -d "$HOME/Projetos/ai/simplicio-agent" ]; then
-      warn "PyPI indisponível; usando checkout local detectado"
-      $PIP install -e "$HOME/Projetos/ai/simplicio-agent[voice,ecosystem]" 2>/dev/null || $PIP install -e "$HOME/Projetos/ai/simplicio-agent" 2>/dev/null || err "falha ao instalar o Simplicio Agent"
-    else
-      err "Pacote $AGENT_PKG não encontrado no PyPI e nenhum checkout local foi informado"
-    fi
-  }
-fi
+mkdir -p "$INSTALL_DIR" "$STATE_DIR" "$TMP_DIR"
 
-# Verifica os três adaptadores sem inventar sucesso: o manifesto final registra
-# exatamente o caminho resolvido ou "missing".
-for component in simplicio-loop simplicio-mapper simplicio-dev-cli; do
-  if command -v "$component" >/dev/null 2>&1; then
-    ok "$component disponível em $(command -v "$component")"
-  else
-    warn "$component ausente; rode pip install $component ou use [ecosystem]"
-  fi
+info "Procurando o binário Runtime mais recente para $RUNTIME_TARGET"
+runtime_json=$(fetch_releases "$REPO" "${SIMPLICIO_VERSION:-}") || fail 'não foi possível consultar as releases do Runtime'
+set -- $RUNTIME_PATTERNS
+runtime_selection=$(printf '%s' "$runtime_json" | select_asset "$@" 2>/dev/null) \
+  || fail "nenhum asset Runtime encontrado para $RUNTIME_TARGET nas releases disponíveis"
+IFS='|' read -r runtime_release runtime_asset runtime_url runtime_digest <<EOF
+$runtime_selection
+EOF
+runtime_download="$TMP_DIR/$runtime_asset"
+download_asset "$runtime_url" "$runtime_download" "$runtime_digest"
+chmod +x "$runtime_download"
+mv -f "$runtime_download" "$INSTALL_DIR/simplicio"
+ok "Runtime $runtime_release instalado: $INSTALL_DIR/simplicio"
+
+# Prompt is installed before Dev CLI because Dev CLI declares it as a runtime
+# dependency. All six component packages still come from their GitHub release
+# wheels, not from a source checkout.
+COMPONENTS='simplicio-mapper|wesleysimplicio/simplicio-mapper|simplicio_mapper-*.whl
+simplicio-prompt|wesleysimplicio/simplicio-prompt|simplicio_prompt-*.whl
+simplicio-dev-cli|wesleysimplicio/simplicio-dev-cli|simplicio_cli-*.whl
+simplicio-fast|wesleysimplicio/simplicio-fast|simplicio_fast-*.whl
+simplicio-loop|wesleysimplicio/simplicio-loop|simplicio_loop-*.whl
+simplicio-sprint|wesleysimplicio/simplicio-sprint|simplicio_sprint-*.whl'
+
+mkdir -p "$(dirname "$VENV_DIR")"
+"$PYTHON" -m venv "$VENV_DIR" || fail "não foi possível criar a virtualenv: $VENV_DIR"
+VENV_PYTHON="$VENV_DIR/bin/python"
+[ -x "$VENV_PYTHON" ] || fail "Python da virtualenv não encontrado: $VENV_PYTHON"
+"$VENV_PYTHON" -m pip install --disable-pip-version-check --upgrade pip >/dev/null \
+  || fail 'não foi possível preparar o pip da virtualenv'
+
+COMPONENT_RECORDS=''
+while IFS='|' read -r component component_repo wheel_pattern; do
+  [ -n "$component" ] || continue
+  info "Procurando wheel de $component"
+  component_json=$(fetch_releases "$component_repo" '') \
+    || fail "não foi possível consultar as releases de $component_repo"
+  component_selection=$(printf '%s' "$component_json" | select_asset "$wheel_pattern" 2>/dev/null) \
+    || fail "nenhuma wheel encontrada para $component em $component_repo"
+  IFS='|' read -r component_release component_asset component_url component_digest <<EOF
+$component_selection
+EOF
+  wheel_path="$TMP_DIR/$component_asset"
+  download_asset "$component_url" "$wheel_path" "$component_digest"
+  "$VENV_PYTHON" -m pip install --disable-pip-version-check --upgrade --force-reinstall "$wheel_path" \
+    || fail "falha ao instalar $component ($component_release)"
+  COMPONENT_RECORDS="${COMPONENT_RECORDS}${component}|${component_release}|${component_asset}
+"
+  ok "$component $component_release instalado"
+done <<EOF
+$COMPONENTS
+EOF
+
+# Expose every console script generated by the six installed wheels through
+# the same bin directory as the native Runtime. Symlinks keep updates atomic
+# and do not duplicate the Python entry-point files.
+for executable in "$VENV_DIR/bin"/simplicio-* "$VENV_DIR/bin"/sendsprint; do
+  [ -e "$executable" ] || continue
+  name=$(basename "$executable")
+  ln -sfn "$executable" "$INSTALL_DIR/$name"
 done
 
-# ─── 3.1 Inicializar/verificar memória neural pelo Runtime (sem SQL direto) ───
-AGENT_HOME="${SIMPLICIO_AGENT_HOME:-$HOME/.simplicio_agent}"
-mkdir -p "$AGENT_HOME"
-# Preferir o banco neural persistente do usuário; respeitar override explícito.
-export SIMPLICIO_MEMORY_DB="${SIMPLICIO_MEMORY_DB:-$HOME/.simplicio/memory/simplicio-memory.sqlite}"
-MEMORY_STATUS="missing"
-if "$DEST_PATH" memory status --json >"$AGENT_HOME/.memory-status.json" 2>/dev/null; then
-  MEMORY_STATUS="available"
-elif "$DEST_PATH" memory init --json >"$AGENT_HOME/.memory-init.json" 2>/dev/null && "$DEST_PATH" memory status --json >"$AGENT_HOME/.memory-status.json" 2>/dev/null; then
-  MEMORY_STATUS="initialized"
-else
-  warn "memória neural não pôde ser verificada pelo Runtime; instalação continua, doctor reportará o gap"
-fi
+export MANIFEST RUNTIME_TARGET runtime_release runtime_asset VENV_DIR INSTALL_DIR COMPONENT_RECORDS
+"$PYTHON" - "$MANIFEST" <<'PY'
+import json
+import os
+import pathlib
+import sys
 
-# Manifesto idempotente e legível para doctor/diagnóstico; nenhum segredo é salvo.
-LOOP_PATH="$(command -v simplicio-loop 2>/dev/null || true)"
-MAPPER_PATH="$(command -v simplicio-mapper 2>/dev/null || true)"
-DEVCLI_PATH="$(command -v simplicio-dev-cli 2>/dev/null || command -v simplicio-py 2>/dev/null || true)"
-export AGENT_PKG DEST_PATH MEMORY_STATUS LOOP_PATH MAPPER_PATH DEVCLI_PATH FAST_KERNEL_PATH
-python3 - "$AGENT_HOME/components.json" <<'PY'
-import json, os, pathlib, sys
-out = pathlib.Path(sys.argv[1])
-data = {
-  "schema": "simplicio.ecosystem-manifest/v1",
-  "agent": {"package": os.environ.get("AGENT_PKG", "simplicio-agent")},
-  "runtime": {"path": os.environ.get("DEST_PATH", ""), "fast_kernel": os.environ.get("FAST_KERNEL_PATH") or None, "memory": os.environ.get("MEMORY_STATUS", "missing")},
-  "adapters": {
-    "simplicio-loop": os.environ.get("LOOP_PATH") or None,
-    "simplicio-mapper": os.environ.get("MAPPER_PATH") or None,
-    "simplicio-dev-cli": os.environ.get("DEVCLI_PATH") or None,
-  },
-  "seed": {"status": "available" if os.environ.get("MEMORY_STATUS") in ("available", "initialized") else "unverified", "source": "simplicio memory init/status"},
+manifest = pathlib.Path(sys.argv[1])
+records = []
+for line in os.environ.get("COMPONENT_RECORDS", "").splitlines():
+    if line:
+        name, release, asset = line.split("|", 2)
+        records.append({"name": name, "release": release, "asset": asset})
+
+venv = pathlib.Path(os.environ["VENV_DIR"]).resolve()
+bin_dir = pathlib.Path(os.environ["INSTALL_DIR"])
+managed = [str(bin_dir / "simplicio")]
+for candidate in list(bin_dir.glob("simplicio-*")) + [bin_dir / "sendsprint"]:
+    if not candidate.is_symlink():
+        continue
+    try:
+        target = candidate.resolve()
+    except OSError:
+        continue
+    if str(target).startswith(str(venv) + os.sep):
+        managed.append(str(candidate))
+
+payload = {
+    "schema": "simplicio.ecosystem-manifest/v2",
+    "source": "github-releases",
+    "runtime": {
+        "repository": "wesleysimplicio/simplicio",
+        "target": os.environ["RUNTIME_TARGET"],
+        "release": os.environ["runtime_release"],
+        "asset": os.environ["runtime_asset"],
+        "path": str(bin_dir / "simplicio"),
+    },
+    "components": records,
+    "python_venv": str(venv),
+    "managed_paths": sorted(set(managed)),
 }
-out.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+manifest.parent.mkdir(parents=True, exist_ok=True)
+manifest.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
-ok "manifesto do ecossistema: $AGENT_HOME/components.json"
 
-# Instala wake word detector
-info "Instalando wake word 'Simplicio'..."
-$PIP install pvporcupine sounddevice 2>/dev/null && ok "Wake word instalado" || warn "Wake word: instale manualmente com: pip install pvporcupine sounddevice"
-
-# ─── 4. Ativar Tami por padrão ───────────────────────────────────────────────
-info "Ativando Tami (consciência emocional)..."
-TAMI_CONFIG="$HOME/.simplicio/tami-config.json"
-mkdir -p "$HOME/.simplicio"
-cat > "$TAMI_CONFIG" << TAMIEOF
-{
-  "tami": {
-    "enabled": true,
-    "interval_minutes": 30,
-    "deliver_to_chat": true,
-    "personality": "acolhedora",
-    "trust_level_initial": "Initial",
-    "notify_on_failure": true
-  },
-  "guardians": {
-    "isa": { "enabled": true },
-    "helo": { "enabled": true },
-    "levi": { "enabled": true, "auto_acquire": true }
-  },
-  "audio": {
-    "wake_word": "Simplicio",
-    "sensitivity": 0.7,
-    "stt_engine": "faster-whisper",
-    "tts_engine": "piper",
-    "language": "pt"
-  }
-}
-TAMIEOF
-ok "Tami configurada em $TAMI_CONFIG"
-
-# ─── 5. Configurar cron da Tami ──────────────────────────────────────────────
-info "Configurando Tami para aparecer no chat a cada 30min..."
-# Verifica se o simplicio tem suporte a cron
-if command -v "$DEST_PATH" >/dev/null 2>&1; then
-  # Testa se o runtime tem o comando de cron
-  "$DEST_PATH" cron list 2>/dev/null && {
-    # Tenta registrar via simplicio
-    "$DEST_PATH" cron add --name "Tami" --schedule "every 30m" --deliver "origin" 2>/dev/null || {
-      warn "Não foi possível registrar cron automaticamente. Tami será ativada manualmente."
-    }
-  } || {
-    warn "Runtime não suporta cron nativo. Usando fallback..."
-  }
-fi
-
-# ─── 6. Mensagem final ───────────────────────────────────────────────────────
-echo ""
-printf "${GREEN}╔══════════════════════════════════════════════════════════╗${NC}\n"
-printf "${GREEN}║                                                          ║${NC}\n"
-printf "${GREEN}║   Simplicio Agent v1.8.0 instalado com sucesso!         ║${NC}\n"
-printf "${GREEN}║                                                          ║${NC}\n"
-printf "${GREEN}║   💚 Tami está cuidando de você                         ║${NC}\n"
-printf "${GREEN}║   🎤 Diga \"Simplicio\" para começar                      ║${NC}\n"
-printf "${GREEN}║   🖥️  Desktop: simplicio desktop                        ║${NC}\n"
-printf "${GREEN}║   📱 Chat: simplicio agent start                        ║${NC}\n"
-printf "${GREEN}║   🩺 Doctor: sh install.sh --doctor                     ║${NC}\n"
-printf "${GREEN}║                                                          ║${NC}\n"
-printf "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}\n"
-echo ""
-ok "Instalação completa. Bem-vindo ao Simplicio Agent."
+ok "manifesto gravado: $MANIFEST"
+printf '%s\n' '' 'Instalação concluída.' "MCP: simplicio serve --mcp --stdio" "PATH: adicione $INSTALL_DIR ao PATH se necessário."
