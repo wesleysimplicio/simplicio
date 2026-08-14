@@ -1,0 +1,67 @@
+schema_version: 1
+owner: simplicio-runtime
+role: governed-execution
+capabilities:
+  - id: runtime.mcp-invoke
+    intent: [mcp, tool, connector]
+    inputs: [tool, arguments, policy]
+    outputs: [result, raw_evidence]
+    effects: declared-by-tool
+    requires: [runtime.gate]
+    verifies: [tool-schema, policy]
+  - id: runtime.native-execute
+    intent: [native, rust, binary, accelerate]
+    inputs: [executable, arguments, policy]
+    outputs: [stdout, stderr, exit_status]
+    effects: declared-process-effect
+    requires: [runtime.gate]
+    verifies: [executable-identity, exit-status]
+  - id: runtime.gate
+    intent: [gate, policy, authorize, precondition]
+    inputs: [capability, scope, policy]
+    outputs: [gate_verdict]
+    effects: none
+    requires: []
+    verifies: [policy-evaluated]
+  - id: runtime.checkpoint
+    intent: [checkpoint, resume, durable-state]
+    inputs: [run_id, state]
+    outputs: [checkpoint_id]
+    effects: durable-state
+    requires: [runtime.gate]
+    verifies: [durability]
+  - id: runtime.receipt
+    intent: [receipt, evidence, audit]
+    inputs: [execution, evidence]
+    outputs: [receipt_id, receipt]
+    effects: durable-evidence
+    requires: [runtime.checkpoint]
+    verifies: [schema, durability]
+  - id: runtime.reconcile
+    intent: [reconcile, unknown-effect, verify-effect]
+    inputs: [operation, evidence, receipt]
+    outputs: [reported, recomputed, verdict]
+    effects: lock-preserving
+    requires: [runtime.receipt]
+    verifies: [unchanged-before, proven-after]
+  - id: runtime.pool
+    intent: [pool, concurrency, backpressure, queue]
+    inputs: [work, limits, priority]
+    outputs: [admission, scheduling, metrics]
+    effects: task-scheduling
+    requires: [runtime.gate]
+    verifies: [bounds, fairness]
+  - id: runtime.subagent
+    intent: [subagent, worker, delegate]
+    inputs: [task, capability, budget]
+    outputs: [child_result, evidence]
+    effects: child-effects
+    requires: [runtime.gate, runtime.pool]
+    verifies: [budget, isolation, evidence]
+  - id: runtime.mcp-compatibility
+    intent: [mcp-legacy, mcp-new, compatibility]
+    inputs: [tool_shape, request]
+    outputs: [normalized_request, compatibility_record]
+    effects: none
+    requires: [runtime.gate]
+    verifies: [shape-normalized]

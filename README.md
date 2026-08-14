@@ -75,6 +75,22 @@ powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/m
 
 Done. One command. No package manager, no model configuration.
 
+### Plugin marketplace
+
+This public repository also publishes the Simplicio Claude Code marketplace:
+
+```text
+/plugin marketplace add wesleysimplicio/simplicio
+/plugin install simplicio-loop@simplicio
+/plugin install simplicio-prompt@simplicio
+/plugin install simplicio-sprint@simplicio
+```
+
+The plugin bundle is documented in [`PLUGIN.md`](PLUGIN.md). Install the
+compiled Runtime MCP separately with `simplicio install --global`; the plugin
+skills call the Runtime through `simplicio serve --mcp --stdio` when it is
+available.
+
 ---
 
 ## 💰 Token Savings — 96% is Real
