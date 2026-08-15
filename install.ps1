@@ -271,6 +271,16 @@ try {
 }
 Write-Host "  ✓ active Google session and entitlement verified"
 
+# Codex only renders its Authenticate action for an OAuth-capable HTTP server.
+# Other hosts retain their stdio fallback inside `simplicio mcp register`.
+try {
+  & $DestPath mcp register | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "mcp register returned $LASTEXITCODE" }
+  Write-Host "  ✓ local HTTP/OAuth MCP registered for Codex"
+} catch {
+  Write-Warning "could not register MCP automatically; run: simplicio mcp register"
+}
+
 $BundleDir = if ($env:SIMPLICIO_BUNDLE_DIR) { $env:SIMPLICIO_BUNDLE_DIR } else { Join-Path $env:USERPROFILE ".simplicio" }
 New-Item -ItemType Directory -Force -Path $BundleDir | Out-Null
 $BundleReport = Join-Path $BundleDir "ecosystem-bundle.json"
