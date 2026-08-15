@@ -166,40 +166,32 @@ Use `simplicio deliver certify` before declaring done.
 
 Same workflow — Simplicio commands work from any terminal-based AI agent.
 
-## Instalação completa do ecossistema Python
+## Fontes Python no Runtime
 
-A instalação oficial do Runtime também prepara o control-plane do Agent:
-`simplicio-loop`, `simplicio-mapper` e `simplicio-dev-cli`.
-### PyPI (recomendado)
+O binário Runtime é o artefato de instalação e carrega as árvores de fontes
+Python reais de Mapper, Dev CLI, Loop, Fast, Prompt e Sprint. Esses projetos não
+são reescritos como Rust. A instalação padrão não instala pacotes Python, não
+clona `simplicio-*` e não procura checkouts locais.
 
-```bash
-python3 -m pip install --upgrade "simplicio-agent[all,ecosystem]"
-# Runtime compilado + bootstrap de memória/seed:
-curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
-simplicio doctor --json
-simplicio memory status --json
-```
-
-### Clone do repositório
+O Runtime ainda precisa de um interpretador Python 3 disponível para executar
+os fontes embutidos. A sessão do Google é obrigatória, inclusive durante o beta:
 
 ```bash
-git clone https://github.com/wesleysimplicio/simplicio-agent.git ~/Projetos/ai/simplicio-agent
-SIMPLICIO_AGENT_SOURCE_ROOT="$HOME/Projetos/ai/simplicio-agent" \
-  sh install.sh
+simplicio auth login
+simplicio auth status --json
 ```
 
-Para usar o kernel compilado do novo `simplicio-fast` local, sem baixar binário:
+Depois da instalação, valide o bundle e guarde o relatório opcional:
 
 ```bash
-SIMPLICIO_FAST_SOURCE_ROOT="$HOME/Projetos/ai/simplicio-fast" \
-SIMPLICIO_AGENT_SOURCE_ROOT="$HOME/Projetos/ai/simplicio-agent" \
-  sh install.sh
+simplicio ecosystem verify --json
 ```
 
-O instalador é idempotente e cria `~/.simplicio_agent/components.json`. O manifesto
-registra os caminhos reais dos adaptadores, o kernel usado, o estado da memória
-SQLite/FTS5 e a origem runtime-owned dos seeds. Falhas ficam explícitas no manifesto;
-não há download de kernel local não verificado.
+O relatório identifica o digest/tamanho do arquivo-fonte embutido, a versão, o
+commit de proveniência, o modo de implementação e o estado de compatibilidade
+de cada componente. Adaptadores externos/portáveis continuam disponíveis
+somente para fluxos explicitamente legados; eles não são parte do caminho
+normal e não podem substituir o Runtime verificado pelo instalador.
 
 ## Building from Source
 

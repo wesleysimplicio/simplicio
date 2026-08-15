@@ -1,267 +1,307 @@
-#requires -Version 5.1
+#!/usr/bin/env pwsh
+# install.ps1 — Install/update/uninstall/doctor the Simplicio Runtime on Windows
+# The Runtime binary carries the real Python project sources; it does not
+# rewrite them as Rust or download sibling simplicio-* repositories.
+#
+# Usage:
+#   powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex"
+#   pwsh install.ps1 -Doctor
+#   pwsh install.ps1 -Uninstall
+#
+# Environment variables:
+#   SIMPLICIO_VERSION           - pin a specific version (default: latest)
+#   SIMPLICIO_BIN_DIR           - custom install directory
+#   SIMPLICIO_ALLOW_UNVERIFIED  - "1" to proceed even if no checksum is
+#                                 published for this target (default: refuse)
+#   SIMPLICIO_BUNDLE_DIR       - bundle report directory (default: ~/.simplicio)
+#
+# Asset naming follows distribution/targets.json (the canonical target
+# triplet table for the whole ecosystem) — target "windows-x64", asset
+# "simplicio-windows-x64.exe". Any drift between this script, the release
+# workflow and simplicio-update-manifest.json is caught by
+# scripts/verify_distribution_consistency.py in CI.
 
-[CmdletBinding()]
 param(
   [string]$Version = "",
   [switch]$Doctor,
   [switch]$Uninstall
 )
 
-# Simplicio ecosystem installer for Windows.
-# Runtime assets are selected newest-first for Windows. Component wheels are
-# selected newest-first and fall back to older releases when needed.
-
 $ErrorActionPreference = "Stop"
-$RuntimeRepo = "wesleysimplicio/simplicio"
-$ApiRoot = "https://api.github.com/repos"
-$InstallDir = if ($env:SIMPLICIO_BIN_DIR) { $env:SIMPLICIO_BIN_DIR } else { Join-Path $env:USERPROFILE ".local\bin" }
-$StateDir = if ($env:SIMPLICIO_STATE_DIR) { $env:SIMPLICIO_STATE_DIR } else { Join-Path $env:USERPROFILE ".simplicio" }
-$VenvDir = if ($env:SIMPLICIO_COMPONENT_VENV) { $env:SIMPLICIO_COMPONENT_VENV } else { Join-Path $StateDir "components-venv" }
-$ManifestPath = Join-Path $StateDir "components.json"
-$RuntimePath = Join-Path $InstallDir "simplicio.exe"
 
-function Info([string]$Message) { Write-Host "==> $Message" }
-function Ok([string]$Message) { Write-Host "  ✓ $Message" }
-function Warn([string]$Message) { Write-Warning $Message }
-function Fail([string]$Message) { throw $Message }
+$Repo = "wesleysimplicio/simplicio"
+$BinName = "simplicio.exe"
+$Target = "windows-x64"
+$Asset = "simplicio-windows-x64.exe"
 
-function Get-Python {
-  $command = Get-Command python -ErrorAction SilentlyContinue
-  if ($command) {
-    return [PSCustomObject]@{ Exe = $command.Source; Args = @() }
-  }
-  $command = Get-Command py -ErrorAction SilentlyContinue
-  if ($command) {
-    return [PSCustomObject]@{ Exe = $command.Source; Args = @("-3") }
-  }
-  Fail "Python 3.11 ou superior não encontrado"
+if ($env:SIMPLICIO_BIN_DIR) {
+  $InstallDir = $env:SIMPLICIO_BIN_DIR
+} else {
+  $InstallDir = "$env:USERPROFILE\.local\bin"
+}
+$DestPath = Join-Path $InstallDir $BinName
+
+function Test-InPath([string]$dir) {
+  return ($env:Path -split ";") -contains $dir
 }
 
-function Get-Releases {
-  param(
-    [Parameter(Mandatory = $true)][string]$Repository,
-    [string]$PinnedVersion = ""
-  )
-  $headers = @{
-    Accept = "application/vnd.github+json"
-    "User-Agent" = "simplicio-installer"
-  }
-  if ($PinnedVersion) {
-    $url = "$ApiRoot/$Repository/releases/tags/$PinnedVersion"
-    return @(Invoke-RestMethod -Uri $url -Headers $headers -ErrorAction Stop)
-  }
-  $url = "$ApiRoot/$Repository/releases?per_page=100"
-  return @(Invoke-RestMethod -Uri $url -Headers $headers -ErrorAction Stop)
-}
-
-function Find-ReleaseAsset {
-  param(
-    [Parameter(Mandatory = $true)][string]$Repository,
-    [Parameter(Mandatory = $true)][string[]]$Patterns,
-    [string]$PinnedVersion = ""
-  )
-  $releases = Get-Releases -Repository $Repository -PinnedVersion $PinnedVersion
-  foreach ($release in $releases) {
-    if ($release.draft -or $release.prerelease) { continue }
-    foreach ($asset in @($release.assets)) {
-      foreach ($pattern in $Patterns) {
-        if ($asset.name -match $pattern) {
-          return [PSCustomObject]@{
-            Repository = $Repository
-            Release = $release.tag_name
-            Asset = $asset.name
-            Url = $asset.browser_download_url
-            Digest = $asset.digest
-          }
-        }
-      }
-    }
-  }
-  throw "Nenhum asset compatível encontrado em $Repository para: $($Patterns -join ', ')"
-}
-
-function Download-VerifiedAsset {
-  param(
-    [Parameter(Mandatory = $true)]$Asset,
-    [Parameter(Mandatory = $true)][string]$Destination
-  )
-  $staging = "$Destination.download-$([guid]::NewGuid().ToString('N'))"
+function Test-EmbeddedEcosystem {
+  if (-not (Test-Path $DestPath)) { return $false }
   try {
-    Invoke-WebRequest -Uri $Asset.Url -OutFile $staging -UseBasicParsing -ErrorAction Stop
-    if (-not (Test-Path $staging) -or (Get-Item $staging).Length -eq 0) {
-      throw "download vazio: $($Asset.Url)"
-    }
-    if ($Asset.Digest -and $Asset.Digest -match '^sha256:(.+)$') {
-      $expected = $Matches[1].ToLowerInvariant()
-      $actual = (Get-FileHash -Path $staging -Algorithm SHA256).Hash.ToLowerInvariant()
-      if ($actual -ne $expected) {
-        throw "SHA-256 inválido para $($Asset.Asset): esperado $expected, obtido $actual"
-      }
-      Ok "SHA-256 verificado: $($Asset.Asset)"
-    } else {
-      Warn "sem digest SHA-256 publicado para $($Asset.Asset); instalação continua"
-    }
-    Move-Item -Force -Path $staging -Destination $Destination
-  } finally {
-    if (Test-Path $staging) { Remove-Item -Force $staging -ErrorAction SilentlyContinue }
+    $null = & $DestPath ecosystem verify --json 2>$null
+    return ($LASTEXITCODE -eq 0)
+  } catch {
+    return $false
   }
 }
 
-function Remove-ManagedInstall {
-  Info "Removendo Simplicio Runtime e componentes gerenciados"
-  if (Test-Path $ManifestPath) {
-    try {
-      $manifest = Get-Content -Raw -Path $ManifestPath | ConvertFrom-Json
-      foreach ($path in @($manifest.managed_paths)) {
-        if ($path -and (Test-Path $path)) {
-          Remove-Item -Force -Path $path -ErrorAction SilentlyContinue
-        }
-      }
-    } catch {
-      Warn "não foi possível ler o manifesto; removendo apenas os caminhos padrão"
-    }
-  } else {
-    if (Test-Path $RuntimePath) { Remove-Item -Force $RuntimePath }
+function Test-ActiveLogin {
+  if (-not (Test-Path $DestPath)) { return $false }
+  try {
+    $null = & $DestPath auth status --json 2>$null
+    return ($LASTEXITCODE -eq 0)
+  } catch {
+    return $false
   }
-  if (Test-Path $VenvDir) { Remove-Item -Recurse -Force $VenvDir }
-  if (Test-Path $ManifestPath) { Remove-Item -Force $ManifestPath }
-  Ok "componentes removidos; demais configurações foram preservadas"
 }
 
-function Test-Install {
-  $failed = $false
-  if (Test-Path $RuntimePath) {
-    try {
-      & $RuntimePath version | Out-Null
-      Ok "Runtime executável"
-    } catch {
-      Warn "Runtime não executa: $RuntimePath"
-      $failed = $true
-    }
-  } else {
-    Warn "Runtime ausente: $RuntimePath"
-    $failed = $true
+function Require-ActiveLogin {
+  if (Test-ActiveLogin) { return }
+  Write-Host "==> Google login is required to activate Simplicio Runtime"
+  & $DestPath auth login
+  if ($LASTEXITCODE -ne 0 -or -not (Test-ActiveLogin)) {
+    throw "Login ausente, expirado, revogado ou sem entitlement ativo; instalação bloqueada"
   }
-  if (Test-Path $ManifestPath) {
-    $manifest = Get-Content -Raw -Path $ManifestPath | ConvertFrom-Json
-    foreach ($path in @($manifest.managed_paths)) {
-      if ($path -and (Test-Path $path)) { Ok "disponível: $(Split-Path -Leaf $path)" }
-      elseif ($path) { Warn "ausente: $path"; $failed = $true }
-    }
-    Ok "manifesto: $ManifestPath"
-  } else {
-    Warn "manifesto ausente: $ManifestPath"
-    $failed = $true
-  }
-  if ($failed) { exit 1 }
 }
 
-if ($Uninstall) {
-  Remove-ManagedInstall
-  exit 0
-}
+# ─── -Doctor: idempotent, read-only health check ───────────────────────────
 if ($Doctor) {
-  Test-Install
+  Write-Host "==> simplicio doctor"
+  $ok = $true
+
+  if (Test-Path $DestPath) {
+    Write-Host "  [OK] binary present: $DestPath"
+  } else {
+    Write-Host "  [FAIL] binary missing at $DestPath"
+    $ok = $false
+  }
+
+  if (Test-InPath $InstallDir) {
+    Write-Host "  [OK] $InstallDir is on PATH"
+  } else {
+    Write-Host "  [WARN] $InstallDir is not on PATH (current session)"
+  }
+
+  if (Test-Path $DestPath) {
+    try {
+      $verOut = & $DestPath version 2>&1 | Out-String
+      if ($LASTEXITCODE -ne 0) { throw "version command returned $LASTEXITCODE" }
+      Write-Host "  [OK] binary runs: $($verOut.Trim())"
+    } catch {
+      Write-Host "  [FAIL] binary present but failed to execute: $($_.Exception.Message)"
+      $ok = $false
+    }
+
+    if (Test-EmbeddedEcosystem) {
+      Write-Host "  [OK] real Python sources are embedded in the binary"
+    } else {
+      Write-Host "  [FAIL] binary does not contain the expected Python source bundle"
+      $ok = $false
+    }
+
+    if (Test-ActiveLogin) {
+      Write-Host "  [OK] active Google session and entitlement"
+    } else {
+      Write-Host "  [FAIL] missing, expired, revoked, or inactive Google session"
+      $ok = $false
+    }
+  }
+
+  if ($ok) {
+    Write-Host ""
+    Write-Host "  ✓ simplicio looks healthy"
+    exit 0
+  } else {
+    Write-Host ""
+    Write-Host "  ✗ simplicio has problems — re-run the installer"
+    exit 1
+  }
+}
+
+# ─── -Uninstall: idempotent removal, safe to run repeatedly ────────────────
+if ($Uninstall) {
+  Write-Host "==> simplicio uninstall"
+  if (Test-Path $DestPath) {
+    Remove-Item -Force $DestPath
+    Write-Host "  ✓ removed $DestPath"
+  } else {
+    Write-Host "  ✓ already removed (nothing at $DestPath)"
+  }
+  # Data/config is intentionally preserved (idempotent, non-destructive
+  # uninstall) — user data under ~/.simplicio is never touched here.
+  Write-Host "  ✓ user data under `$env:USERPROFILE\.simplicio was preserved"
+  Write-Host ""
+  Write-Host "  Note: if you added $InstallDir to your PowerShell profile's"
+  Write-Host "  `$env:Path, remove that line manually — this script never"
+  Write-Host "  edits your profile."
   exit 0
 }
 
-$python = Get-Python
-$pythonVersion = (& $python.Exe @($python.Args) -c "import sys; print('%d.%d' % sys.version_info[:2])").Trim()
+# ─── Install / update ───────────────────────────────────────────────────────
+Write-Host "==> simplicio installer for Windows ($Target)"
+
+New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+
+if (-not $Version -and $env:SIMPLICIO_VERSION) {
+  $Version = $env:SIMPLICIO_VERSION
+}
+if (-not $Version) {
+  Write-Host "==> fetching latest version..."
+  try {
+    $latest = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -ErrorAction Stop
+    $Version = $latest.tag_name
+    Write-Host "  - latest version: $Version"
+  } catch {
+    $Version = "latest"
+    Write-Host "  ! could not determine latest, using '$Version'"
+  }
+}
+
+# Resolve the release base (pinned tag, or the 'latest' redirect) once so the
+# binary and the manifest we verify it against come from the same place.
+if ($Version -eq "latest") {
+  $ReleaseBase = "https://github.com/$Repo/releases/latest/download"
+} else {
+  $ReleaseBase = "https://github.com/$Repo/releases/download/$Version"
+}
+
+# ─── Fetch update manifest for checksum verification ───────────────────────
+$ManifestUrl = "$ReleaseBase/simplicio-update-manifest.json"
+$Manifest = $null
 try {
-  if ([version]$pythonVersion -lt [version]"3.11") { Fail "Python 3.11 ou superior é necessário; encontrado $pythonVersion" }
+  Write-Host "==> fetching update manifest for verification..."
+  $Manifest = Invoke-RestMethod -Uri $ManifestUrl -ErrorAction Stop
 } catch {
-  if ($_.Exception.Message -like "Python 3.11*") { throw }
-  Fail "não foi possível verificar a versão do Python"
+  Write-Host "  ! could not fetch update manifest: $($_.Exception.Message)"
 }
 
-$pinnedRuntime = if ($Version) { $Version } elseif ($env:SIMPLICIO_VERSION) { $env:SIMPLICIO_VERSION } else { "" }
-$runtimePatterns = @(
-  '^simplicio-windows-x64\.exe$',
-  '^simplicio-windows-x86_64\.exe$',
-  '^simplicio\.exe$'
-)
+$ExpectedSha256 = $null
+$ExpectedSigned = $false
+if ($Manifest) {
+  $artifact = $Manifest.artifacts | Where-Object { $_.target -eq $Target } | Select-Object -First 1
+  if ($artifact) {
+    $ExpectedSha256 = $artifact.sha256
+    $ExpectedSigned = [bool]$artifact.signed
+  }
+}
 
-New-Item -ItemType Directory -Force -Path $InstallDir, $StateDir | Out-Null
-$tempDir = Join-Path $env:TEMP ("simplicio-install-" + [guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
+if (-not $ExpectedSha256) {
+  if ($env:SIMPLICIO_ALLOW_UNVERIFIED -eq "1") {
+    Write-Host "  ! no published checksum for target '$Target' — proceeding UNVERIFIED (SIMPLICIO_ALLOW_UNVERIFIED=1)"
+  } else {
+    Write-Error "Refusing to install: no published SHA256 checksum for target '$Target' in the update manifest. Set SIMPLICIO_ALLOW_UNVERIFIED=1 to override at your own risk."
+    exit 1
+  }
+} elseif (-not $ExpectedSigned) {
+  Write-Host "  ! checksum will be verified, but this artifact is not cryptographically signed yet (ed25519 signing not wired for $Target — see issue #5)"
+}
 
+# ─── Download to a staging file, verify, then atomically swap in ──────────
+$DownloadUrl = "$ReleaseBase/$Asset"
+$StagingPath = "$DestPath.download-$([guid]::NewGuid().ToString('N')).tmp"
+
+Write-Host "==> downloading $DownloadUrl"
 try {
-  Info "Procurando o binário Runtime Windows mais recente"
-  $runtime = Find-ReleaseAsset -Repository $RuntimeRepo -Patterns $runtimePatterns -PinnedVersion $pinnedRuntime
-  $runtimeStaging = Join-Path $tempDir $runtime.Asset
-  Download-VerifiedAsset -Asset $runtime -Destination $runtimeStaging
-  Move-Item -Force -Path $runtimeStaging -Destination $RuntimePath
-  Ok "Runtime $($runtime.Release) instalado: $RuntimePath"
-
-  $components = @(
-    [PSCustomObject]@{ Name = "simplicio-mapper"; Repository = "wesleysimplicio/simplicio-mapper"; Pattern = '^simplicio_mapper-.*\.whl$' },
-    [PSCustomObject]@{ Name = "simplicio-prompt"; Repository = "wesleysimplicio/simplicio-prompt"; Pattern = '^simplicio_prompt-.*\.whl$' },
-    [PSCustomObject]@{ Name = "simplicio-dev-cli"; Repository = "wesleysimplicio/simplicio-dev-cli"; Pattern = '^simplicio_cli-.*\.whl$' },
-    [PSCustomObject]@{ Name = "simplicio-fast"; Repository = "wesleysimplicio/simplicio-fast"; Pattern = '^simplicio_fast-.*\.whl$' },
-    [PSCustomObject]@{ Name = "simplicio-loop"; Repository = "wesleysimplicio/simplicio-loop"; Pattern = '^simplicio_loop-.*\.whl$' },
-    [PSCustomObject]@{ Name = "simplicio-sprint"; Repository = "wesleysimplicio/simplicio-sprint"; Pattern = '^simplicio_sprint-.*\.whl$' }
-  )
-
-  & $python.Exe @($python.Args) -m venv $VenvDir
-  if ($LASTEXITCODE -ne 0) { Fail "não foi possível criar a virtualenv: $VenvDir" }
-  $venvPython = Join-Path $VenvDir "Scripts\python.exe"
-  if (-not (Test-Path $venvPython)) { Fail "Python da virtualenv não encontrado: $venvPython" }
-  & $venvPython -m pip install --disable-pip-version-check --upgrade pip | Out-Host
-  if ($LASTEXITCODE -ne 0) { Fail "não foi possível preparar o pip da virtualenv" }
-
-  $wheelPaths = @()
-  $componentRecords = @()
-  foreach ($component in $components) {
-    Info "Procurando wheel de $($component.Name)"
-    $asset = Find-ReleaseAsset -Repository $component.Repository -Patterns @($component.Pattern)
-    $wheelPath = Join-Path $tempDir $asset.Asset
-    Download-VerifiedAsset -Asset $asset -Destination $wheelPath
-    $wheelPaths += $wheelPath
-    $componentRecords += [PSCustomObject]@{
-      name = $component.Name
-      repository = $component.Repository
-      release = $asset.Release
-      asset = $asset.Asset
-    }
-  }
-
-  & $venvPython -m pip install --disable-pip-version-check --upgrade --force-reinstall $wheelPaths | Out-Host
-  if ($LASTEXITCODE -ne 0) { Fail "falha ao instalar as wheels dos componentes" }
-
-  $managedPaths = New-Object System.Collections.Generic.List[string]
-  $managedPaths.Add($RuntimePath)
-  $scriptsDir = Join-Path $VenvDir "Scripts"
-  foreach ($entry in @(Get-ChildItem -Path $scriptsDir -Filter "simplicio-*.exe" -File -ErrorAction SilentlyContinue)) {
-    $destination = Join-Path $InstallDir $entry.Name
-    Copy-Item -Force -Path $entry.FullName -Destination $destination
-    $managedPaths.Add($destination)
-  }
-  foreach ($entry in @(Get-ChildItem -Path $scriptsDir -Filter "sendsprint.exe" -File -ErrorAction SilentlyContinue)) {
-    $destination = Join-Path $InstallDir $entry.Name
-    Copy-Item -Force -Path $entry.FullName -Destination $destination
-    $managedPaths.Add($destination)
-  }
-
-  $manifest = [ordered]@{
-    schema = "simplicio.ecosystem-manifest/v2"
-    source = "github-releases"
-    runtime = [ordered]@{
-      repository = $RuntimeRepo
-      target = "windows-x64"
-      release = $runtime.Release
-      asset = $runtime.Asset
-      path = $RuntimePath
-    }
-    components = @($componentRecords)
-    python_venv = $VenvDir
-    managed_paths = @($managedPaths)
-  }
-  $manifest | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 -Path $ManifestPath
-  Ok "manifesto gravado: $ManifestPath"
-  Write-Host ""
-  Write-Host "Instalação concluída."
-  Write-Host "MCP: simplicio serve --mcp --stdio"
-  Write-Host "PATH: adicione $InstallDir ao PATH se necessário."
-} finally {
-  if (Test-Path $tempDir) { Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue }
+  Invoke-WebRequest -Uri $DownloadUrl -OutFile $StagingPath -UseBasicParsing -ErrorAction Stop
+} catch {
+  Write-Error "Download failed for $Asset from $DownloadUrl : $($_.Exception.Message)"
+  if (Test-Path $StagingPath) { Remove-Item -Force $StagingPath -ErrorAction SilentlyContinue }
+  exit 1
 }
+
+if (-not (Test-Path $StagingPath) -or (Get-Item $StagingPath).Length -eq 0) {
+  Write-Error "Downloaded file is missing or empty: $StagingPath"
+  if (Test-Path $StagingPath) { Remove-Item -Force $StagingPath -ErrorAction SilentlyContinue }
+  exit 1
+}
+
+if ($ExpectedSha256) {
+  $actualSha256 = (Get-FileHash -Path $StagingPath -Algorithm SHA256).Hash.ToLowerInvariant()
+  if ($actualSha256 -ne $ExpectedSha256.ToLowerInvariant()) {
+    Remove-Item -Force $StagingPath -ErrorAction SilentlyContinue
+    Write-Error "Checksum mismatch for $Asset. Expected $ExpectedSha256, got $actualSha256. Refusing to install a tampered or corrupt binary."
+    exit 1
+  }
+  Write-Host "  ✓ SHA256 verified: $actualSha256"
+}
+
+# Atomic swap: rename into place on the same volume so there is never a
+# window where $DestPath is a half-written file, and re-running this script
+# (idempotent update) never leaves stale .tmp files behind on success.
+try {
+  Move-Item -Force -Path $StagingPath -Destination $DestPath
+} catch {
+  Remove-Item -Force $StagingPath -ErrorAction SilentlyContinue
+  Write-Error "Could not move verified binary into place: $($_.Exception.Message)"
+  exit 1
+}
+Write-Host "  ✓ installed: $DestPath"
+
+# ─── Verify the downloaded Runtime and its embedded Python source bundle ─────
+try {
+  $output = & $DestPath version 2>&1 | Out-String
+  if ($LASTEXITCODE -ne 0) { throw "version command returned $LASTEXITCODE" }
+} catch {
+  Write-Error "Binary installed but version verification failed: $($_.Exception.Message)"
+  exit 1
+}
+
+if (-not (Test-EmbeddedEcosystem)) {
+  Write-Error "This Runtime does not contain the expected embedded Python source bundle; refusing to finish installation. Install a compatible Runtime release."
+  exit 1
+}
+Write-Host "  ✓ real Python source bundle verified in the binary"
+
+# ─── Active login is mandatory; beta does not bypass this gate ──────────────
+try {
+  Require-ActiveLogin
+} catch {
+  Write-Error $_.Exception.Message
+  exit 1
+}
+Write-Host "  ✓ active Google session and entitlement verified"
+
+$BundleDir = if ($env:SIMPLICIO_BUNDLE_DIR) { $env:SIMPLICIO_BUNDLE_DIR } else { Join-Path $env:USERPROFILE ".simplicio" }
+New-Item -ItemType Directory -Force -Path $BundleDir | Out-Null
+$BundleReport = Join-Path $BundleDir "ecosystem-bundle.json"
+try {
+  $bundleJson = & $DestPath ecosystem verify --json 2>&1
+  if ($LASTEXITCODE -ne 0) { throw "ecosystem verify returned $LASTEXITCODE" }
+  $bundleJson | Set-Content -Encoding UTF8 $BundleReport
+  Write-Host "  ✓ embedded Python source report: $BundleReport"
+} catch {
+  if (Test-Path $BundleReport) { Remove-Item -Force $BundleReport -ErrorAction SilentlyContinue }
+  Write-Error "Could not persist the embedded ecosystem verification: $($_.Exception.Message)"
+  exit 1
+}
+
+# PATH hint
+if (-not (Test-InPath $InstallDir)) {
+  Write-Host ""
+  Write-Host "  ! $InstallDir is not in PATH"
+  Write-Host "    Add it to your PowerShell profile:"
+  Write-Host "    `$env:Path += `";$InstallDir`""
+  Write-Host ""
+}
+
+Write-Host ""
+Write-Host "  ✓ simplicio Runtime $Version (windows-x64) installed successfully"
+Write-Host "  ✓ Mapper, Dev CLI, Loop, Fast, Prompt and Sprint Python sources are in the binary"
+Write-Host "  ✓ no pip packages, sibling checkouts or simplicio-* downloads were installed"
+Write-Host "  ✓ active Google login is required for product commands"
+Write-Host ""
+Write-Host "  Run:     simplicio chat 'hello' --repo ."
+Write-Host "  REPL:    simplicio chat --repl --repo ."
+Write-Host "  Doctor:  pwsh install.ps1 -Doctor"
+Write-Host "  Remove:  pwsh install.ps1 -Uninstall"
+Write-Host ""
