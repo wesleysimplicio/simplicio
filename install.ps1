@@ -1,5 +1,5 @@
 #!/usr/bin/env pwsh
-# install.ps1 — Install/update/uninstall/doctor the simplicio binary on Windows
+# install.ps1 — Install/update/uninstall/doctor the Simplicio Runtime on Windows
 #
 # Usage:
 #   powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex"
@@ -11,9 +11,7 @@
 #   SIMPLICIO_BIN_DIR           - custom install directory
 #   SIMPLICIO_ALLOW_UNVERIFIED  - "1" to proceed even if no checksum is
 #                                 published for this target (default: refuse)
-#   SIMPLICIO_AGENT_SOURCE_ROOT - explicit local Agent checkout
-#   SIMPLICIO_FAST_SOURCE_ROOT  - optional local simplicio-fast checkout
-#   SIMPLICIO_AGENT_HOME        - state directory (default: ~/.simplicio_agent)
+#   SIMPLICIO_BUNDLE_DIR       - bundle report directory (default: ~/.simplicio)
 #
 # Asset naming follows distribution/targets.json (the canonical target
 # triplet table for the whole ecosystem) — target "windows-x64", asset
@@ -24,9 +22,7 @@
 param(
   [string]$Version = "",
   [switch]$Doctor,
-  [switch]$Uninstall,
-  [string]$AgentSourceRoot = "",
-  [string]$FastSourceRoot = ""
+  [switch]$Uninstall
 )
 
 $ErrorActionPreference = "Stop"
@@ -45,6 +41,16 @@ $DestPath = Join-Path $InstallDir $BinName
 
 function Test-InPath([string]$dir) {
   return ($env:Path -split ";") -contains $dir
+}
+
+function Test-EmbeddedEcosystem {
+  if (-not (Test-Path $DestPath)) { return $false }
+  try {
+    $null = & $DestPath ecosystem verify --json 2>$null
+    return ($LASTEXITCODE -eq 0)
+  } catch {
+    return $false
+  }
 }
 
 # ─── -Doctor: idempotent, read-only health check ───────────────────────────
@@ -68,9 +74,17 @@ if ($Doctor) {
   if (Test-Path $DestPath) {
     try {
       $verOut = & $DestPath version 2>&1 | Out-String
+      if ($LASTEXITCODE -ne 0) { throw "version command returned $LASTEXITCODE" }
       Write-Host "  [OK] binary runs: $($verOut.Trim())"
     } catch {
       Write-Host "  [FAIL] binary present but failed to execute: $($_.Exception.Message)"
+      $ok = $false
+    }
+
+    if (Test-EmbeddedEcosystem) {
+      Write-Host "  [OK] embedded ecosystem bundle is present"
+    } else {
+      Write-Host "  [FAIL] binary does not contain the expected embedded ecosystem bundle"
       $ok = $false
     }
   }
@@ -205,67 +219,34 @@ try {
 }
 Write-Host "  ✓ installed: $DestPath"
 
-# ─── Preferir kernel local do simplicio-fast quando disponível ────────────────
-if (-not $FastSourceRoot -and $env:SIMPLICIO_FAST_SOURCE_ROOT) { $FastSourceRoot = $env:SIMPLICIO_FAST_SOURCE_ROOT }
-if (-not $FastSourceRoot) { $FastSourceRoot = Join-Path $env:USERPROFILE "Projetos\ai\simplicio-fast" }
-$FastKernelPath = Join-Path $FastSourceRoot "target\release\simplicio.exe"
-if (Test-Path $FastKernelPath) {
-  Copy-Item -Force $FastKernelPath $DestPath
-  Write-Host "  ✓ Simplicio Fast compilado adotado: $FastKernelPath"
-} else {
-  $FastKernelPath = ""
-  Write-Host "  ! kernel local do simplicio-fast não encontrado; mantendo Runtime verificado"
-}
-
-# Verify
+# ─── Verify the downloaded Runtime and its embedded ecosystem ────────────────
 try {
   $output = & $DestPath version 2>&1 | Out-String
-  Write-Host "  ✓ simplicio is ready!"
+  if ($LASTEXITCODE -ne 0) { throw "version command returned $LASTEXITCODE" }
 } catch {
-  Write-Host "  ! binary installed but verification failed"
+  Write-Error "Binary installed but version verification failed: $($_.Exception.Message)"
+  exit 1
 }
 
-# ─── Bootstrap Agent + first-party adapters + neural memory ──────────────────
-if (-not $AgentSourceRoot -and $env:SIMPLICIO_AGENT_SOURCE_ROOT) { $AgentSourceRoot = $env:SIMPLICIO_AGENT_SOURCE_ROOT }
-$AgentHome = if ($env:SIMPLICIO_AGENT_HOME) { $env:SIMPLICIO_AGENT_HOME } else { Join-Path $env:USERPROFILE ".simplicio_agent" }
-New-Item -ItemType Directory -Force -Path $AgentHome | Out-Null
-$PythonCommand = Get-Command py -ErrorAction SilentlyContinue
-if (-not $PythonCommand) { $PythonCommand = Get-Command python -ErrorAction SilentlyContinue }
-$AdapterPaths = [ordered]@{}
-if ($PythonCommand) {
-  $Python = $PythonCommand.Source
-  try {
-    if ($AgentSourceRoot) { & $Python -m pip install -e "${AgentSourceRoot}[voice,ecosystem]" } else { & $Python -m pip install --upgrade "simplicio-agent[voice,ecosystem]" }
-    if ($LASTEXITCODE -ne 0) { throw "pip install returned $LASTEXITCODE" }
-    Write-Host "  ✓ Simplicio Agent + ecosystem Python installed"
-  } catch { Write-Warning "Agent/adapters install failed: $($_.Exception.Message)" }
-  foreach ($name in @("simplicio-loop", "simplicio-mapper", "simplicio-dev-cli")) {
-    $cmd = Get-Command $name -ErrorAction SilentlyContinue
-    $AdapterPath = $null
-    if ($cmd) { $AdapterPath = $cmd.Source }
-    $AdapterPaths[$name] = $AdapterPath
+if (-not (Test-EmbeddedEcosystem)) {
+  Write-Error "This Runtime does not contain the expected embedded ecosystem bundle; refusing to finish installation. Install a compatible Runtime release."
+  exit 1
+}
+Write-Host "  ✓ embedded ecosystem bundle verified in the binary"
 
-  }
-} else { Write-Warning "Python/py not found; install Python 3.11+ to bootstrap adapters" }
-$MemoryStatus = "missing"
+$BundleDir = if ($env:SIMPLICIO_BUNDLE_DIR) { $env:SIMPLICIO_BUNDLE_DIR } else { Join-Path $env:USERPROFILE ".simplicio" }
+New-Item -ItemType Directory -Force -Path $BundleDir | Out-Null
+$BundleReport = Join-Path $BundleDir "ecosystem-bundle.json"
 try {
-  & $DestPath memory status --json | Set-Content -Encoding UTF8 (Join-Path $AgentHome ".memory-status.json")
-  if ($LASTEXITCODE -eq 0) { $MemoryStatus = "available" }
+  $bundleJson = & $DestPath ecosystem verify --json 2>&1
+  if ($LASTEXITCODE -ne 0) { throw "ecosystem verify returned $LASTEXITCODE" }
+  $bundleJson | Set-Content -Encoding UTF8 $BundleReport
+  Write-Host "  ✓ embedded ecosystem report: $BundleReport"
 } catch {
-  try { & $DestPath memory init --json | Set-Content -Encoding UTF8 (Join-Path $AgentHome ".memory-init.json"); $MemoryStatus = "initialized" } catch { Write-Warning "Neural memory bootstrap failed: $($_.Exception.Message)" }
+  if (Test-Path $BundleReport) { Remove-Item -Force $BundleReport -ErrorAction SilentlyContinue }
+  Write-Error "Could not persist the embedded ecosystem verification: $($_.Exception.Message)"
+  exit 1
 }
-$FastManifestPath = $null
-if ($FastKernelPath) { $FastManifestPath = $FastKernelPath }
-$SeedStatus = "unverified"
-if ($MemoryStatus -in @("available", "initialized")) { $SeedStatus = "available" }
-$Manifest = [ordered]@{
-  schema = "simplicio.ecosystem-manifest/v1"
-  runtime = [ordered]@{ path = $DestPath; fast_kernel = $FastManifestPath; memory = $MemoryStatus }
-  adapters = $AdapterPaths
-  seed = [ordered]@{ status = $SeedStatus; source = "simplicio memory init/status" }
-}
-$Manifest | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 (Join-Path $AgentHome "components.json")
-Write-Host "  ✓ ecosystem manifest: $(Join-Path $AgentHome 'components.json')"
 
 # PATH hint
 if (-not (Test-InPath $InstallDir)) {
@@ -277,7 +258,9 @@ if (-not (Test-InPath $InstallDir)) {
 }
 
 Write-Host ""
-Write-Host "  ✓ simplicio $Version (windows-x64) installed successfully"
+Write-Host "  ✓ simplicio Runtime $Version (windows-x64) installed successfully"
+Write-Host "  ✓ Mapper, Dev CLI, Loop, Fast, Prompt and Sprint projection are in the binary"
+Write-Host "  ✓ no Python packages, sibling checkouts or external adapters were installed"
 Write-Host ""
 Write-Host "  Run:     simplicio chat 'hello' --repo ."
 Write-Host "  REPL:    simplicio chat --repl --repo ."

@@ -54,13 +54,6 @@ optional, not required.**
 
 ## 🚀 Installation
 
-### pip / PyPI (any OS)
-
-```bash
-pip install simplicio-installer
-simplicio install
-```
-
 ### macOS / Linux
 
 ```bash
@@ -73,7 +66,36 @@ curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/in
 powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex"
 ```
 
-Done. One command. No package manager, no model configuration.
+Done. One command downloads the Runtime binary, verifies its checksum, and
+validates the embedded ecosystem. No Python package manager, sibling checkout,
+or model configuration is required.
+
+### Embedded ecosystem
+
+The Runtime release is the distribution boundary. The generated binary carries
+the native capability surfaces for:
+
+| Capability | Binary surface |
+|---|---|
+| Mapper | `simplicio map` and MapperStore-backed recall |
+| Dev CLI | Runtime edit/validate/deliver workflows |
+| Loop | `simplicio loop` orchestration and decision flow |
+| Fast | `simplicio fast` snapshot/search/context workflow |
+| Prompt | Prompt contract and runtime prompt handling |
+| Sprint | Sprint projection/compatibility contract |
+
+Verify a release after installation:
+
+```bash
+simplicio ecosystem verify --json
+```
+
+The verification output includes the embedded component versions, upstream
+provenance commits, implementation mode, and compatibility status. Updating the
+Runtime release updates this bundle; the installer does not call or import the
+`simplicio-*` repositories. Legacy Python adapters and portable Claude skills
+may still be used explicitly, but they are outside the normal installation
+path and never replace the verified Runtime binary.
 
 ### Plugin marketplace
 
@@ -86,10 +108,10 @@ This public repository also publishes the Simplicio Claude Code marketplace:
 /plugin install simplicio-sprint@simplicio
 ```
 
-The plugin bundle is documented in [`PLUGIN.md`](PLUGIN.md). Install the
-compiled Runtime MCP separately with `simplicio install --global`; the plugin
-skills call the Runtime through `simplicio serve --mcp --stdio` when it is
-available.
+The plugin bundle is documented in [`PLUGIN.md`](PLUGIN.md). These are optional
+Claude Code skill surfaces; they are not required to obtain the Runtime's
+embedded ecosystem. When present, the skills call the Runtime through
+`simplicio serve --mcp --stdio`.
 
 ---
 
