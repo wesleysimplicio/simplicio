@@ -1,0 +1,14 @@
+interface:
+  display_name: Simplicio Prism
+  short_description: Route tasks across the Simplicio ecosystem
+  default_prompt: Use @simplicio-prism to classify intent and compose Mapper, Fast,
+    Dev CLI, Loop, and Runtime capabilities.
+  icon_small: assets/icon.svg
+  icon_large: assets/icon.svg
+policy:
+  products:
+  - chatgpt
+  - codex
+  - api
+  - atlas
+  allow_implicit_invocation: true

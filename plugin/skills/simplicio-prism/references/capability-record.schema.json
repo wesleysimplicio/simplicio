@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "simplicio.capability-inventory/v1",
+  "type": "object",
+  "required": ["schema_version", "repository", "revision", "capabilities", "generated_at"],
+  "properties": {
+    "schema_version": {"const": "simplicio.capability-inventory/v1"},
+    "repository": {"type": "string"},
+    "revision": {"type": "object"},
+    "package": {"type": "object"},
+    "generated_at": {"type": "string"},
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id", "kind", "name", "status", "source", "interfaces",
+          "inputs", "outputs", "effects", "errors", "fallbacks", "cost",
+          "dependencies", "version", "compatibility", "evidence"
+        ],
+        "properties": {
+          "id": {"type": "string"},
+          "kind": {"enum": ["cli", "mcp", "python_api", "rust_api", "config"]},
+          "name": {"type": "string"},
+          "status": {"enum": ["observed", "inferred", "requires_review", "unavailable"]},
+          "source": {"type": "array", "items": {"type": "string"}},
+          "interfaces": {"type": "object"},
+          "inputs": {"type": "array"},
+          "outputs": {"type": "array"},
+          "effects": {"type": "object"},
+          "errors": {"type": "array"},
+          "fallbacks": {"type": "array"},
+          "cost": {"type": "object"},
+          "dependencies": {"type": "array"},
+          "version": {"type": "object"},
+          "compatibility": {"type": "object"},
+          "evidence": {"type": "array"}
+        }
+      }
+    }
+  }
+}

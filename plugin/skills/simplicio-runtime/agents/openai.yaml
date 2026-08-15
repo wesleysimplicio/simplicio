@@ -1,0 +1,14 @@
+interface:
+  display_name: Simplicio Runtime
+  short_description: Run governed native and MCP execution
+  default_prompt: Use @simplicio-runtime when execution needs MCP, gates, receipts,
+    checkpoints, backpressure, or subagents.
+  icon_small: assets/icon.svg
+  icon_large: assets/icon.svg
+policy:
+  products:
+  - chatgpt
+  - codex
+  - api
+  - atlas
+  allow_implicit_invocation: true

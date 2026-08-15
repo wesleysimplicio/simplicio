@@ -1,0 +1,26 @@
+{
+  "schema": "simplicio.plugin-descriptor/v1",
+  "name": "simplicio-sprint",
+  "displayName": "simplicio-sprint — Sprint-to-PR Delivery",
+  "version": "1.3.2",
+  "description": "Reads Jira, Azure DevOps, or GitHub sprint work, maps each card, delegates edits to simplicio-cli, captures evidence, and opens draft PRs for human review.",
+  "author": {
+    "name": "Wesley Simplicio",
+    "email": "wesleybob4@gmail.com"
+  },
+  "homepage": "https://github.com/wesleysimplicio/simplicio-sprint",
+  "repository": "https://github.com/wesleysimplicio/simplicio-sprint",
+  "license": "MIT",
+  "keywords": [
+    "sprint",
+    "jira",
+    "azure-devops",
+    "github",
+    "draft-pr",
+    "delivery"
+  ],
+  "skills": [
+    "./skills/sendsprint"
+  ],
+  "host": "claude"
+}

@@ -1,0 +1,28 @@
+{
+  "name": "simplicio-prompt",
+  "version": "1.4.0",
+  "description": "Tuple-Space + Yool safe-speed runtime for Claude Code. A UserPromptSubmit hook makes it always-on (injects the runtime contract on every prompt unless the user stands down). Routes any user input through a Hilbert-indexed tuple graph with lazy batch_spawn, LaneWorkerPool, receipt cache, jittered backoff, circuit breakers and context compression. Scales to 1,000,000+ subagents without enumeration, and runs real subagents on any OpenAI-compatible provider.",
+  "author": "Wesley Simplicio",
+  "license": "SEE LICENSE IN LICENSE",
+  "homepage": "https://github.com/wesleysimplicio/simplicio-prompt",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wesleysimplicio/simplicio-prompt"
+  },
+  "keywords": [
+    "tuple-space",
+    "yool",
+    "hamt",
+    "safe-speed",
+    "runtime",
+    "subagents"
+  ],
+  "commands": [
+    "./commands/simplicio.md",
+    "./commands/simplicio-install.md",
+    "./commands/simplicio-status.md"
+  ],
+  "skills": [
+    "./skills/simplicio-runtime"
+  ]
+}

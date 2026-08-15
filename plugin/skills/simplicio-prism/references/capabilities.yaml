@@ -1,0 +1,46 @@
+schema_version: 1
+owner: simplicio-prism
+role: routing
+capabilities:
+  - id: prism.classify
+    intent: [classify, intent, understand-request]
+    inputs: [request, context]
+    outputs: [intent, constraints, risk]
+    effects: none
+    requires: []
+    verifies: [intent-explicit]
+  - id: prism.registry-check
+    intent: [availability, capability, version, route]
+    inputs: [intent, registry, environment]
+    outputs: [candidates, unavailable]
+    effects: none
+    requires: [prism.classify]
+    verifies: [dependency-resolution]
+  - id: prism.compose
+    intent: [compose, workflow, cross-component]
+    inputs: [candidates, constraints]
+    outputs: [ordered-capabilities, dependencies]
+    effects: none
+    requires: [prism.registry-check]
+    verifies: [dependency-order, boundary-check]
+  - id: prism.cost-policy
+    intent: [cheap, tokens, latency, budget]
+    inputs: [ordered-capabilities, budget]
+    outputs: [cost_estimate, selected_plan]
+    effects: none
+    requires: [prism.compose]
+    verifies: [budget-respected]
+  - id: prism.fallback
+    intent: [fallback, unavailable, degraded]
+    inputs: [selected_plan, unavailable]
+    outputs: [fallback_plan, unresolved]
+    effects: none
+    requires: [prism.registry-check]
+    verifies: [degraded-marked]
+  - id: prism.evidence-plan
+    intent: [evidence, verification, completion]
+    inputs: [selected_plan]
+    outputs: [evidence_requirements, completion_oracle]
+    effects: none
+    requires: [prism.compose]
+    verifies: [oracle-defined]
