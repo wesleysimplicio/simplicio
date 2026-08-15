@@ -4,23 +4,24 @@
 Consumidores finais via release do Runtime e, opcionalmente, via `npx @wesleysimplicio/simplicio`.
 
 ## De quem este repo depende
-- [simplicio-runtime](https://github.com/wesleysimplicio/simplicio-runtime) — fonte do binário compilado e do bundle nativo incluído no release
+- [simplicio-runtime](https://github.com/wesleysimplicio/simplicio-runtime) — fonte do binário compilado e do bundle de fontes Python incluído no release
 
 ## Versão atual
 
-3.6.7 (manifest público legado; bundle nativo novo pendente de release)
+3.6.7 (manifest público legado; bundle Python novo pendente de release)
 
 ## Regra de distribuição
 
 O Runtime binário é a fronteira de instalação. Cada release compatível deve
-conter e verificar estas seis superfícies nativas:
+conter e verificar as fontes Python reais destas seis superfícies, sem
+reescrevê-las como Rust nativo:
 
 - Mapper
 - Dev CLI
 - Loop
 - Fast
 - Prompt
-- Sprint projection
+- Sprint
 
 O instalador chama apenas `simplicio ecosystem verify --json`. Ele não instala
 pacotes Python, não clona os repositórios `simplicio-*` e não substitui o
@@ -33,8 +34,8 @@ Validação local:
 simplicio ecosystem verify --json
 ```
 
-O resultado deve listar a versão real, commit de proveniência, modo de
-implementação e compatibilidade de cada componente.
+O resultado deve listar a versão real, commit de proveniência, prefixo do
+pacote, digest do arquivo-fonte e compatibilidade de cada componente.
 
 ## Estado do manifest público
 
