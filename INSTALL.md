@@ -166,11 +166,20 @@ Use `simplicio deliver certify` before declaring done.
 
 Same workflow — Simplicio commands work from any terminal-based AI agent.
 
-## Ecossistema nativo no Runtime
+## Fontes Python no Runtime
 
-O binário Runtime é o artefato de instalação e carrega os contratos nativos de
-Mapper, Dev CLI, Loop, Fast, Prompt e Sprint projection. A instalação padrão
-não instala pacotes Python, não clona `simplicio-*` e não procura checkouts locais.
+O binário Runtime é o artefato de instalação e carrega as árvores de fontes
+Python reais de Mapper, Dev CLI, Loop, Fast, Prompt e Sprint. Esses projetos não
+são reescritos como Rust. A instalação padrão não instala pacotes Python, não
+clona `simplicio-*` e não procura checkouts locais.
+
+O Runtime ainda precisa de um interpretador Python 3 disponível para executar
+os fontes embutidos. A sessão do Google é obrigatória, inclusive durante o beta:
+
+```bash
+simplicio auth login
+simplicio auth status --json
+```
 
 Depois da instalação, valide o bundle e guarde o relatório opcional:
 
@@ -178,11 +187,11 @@ Depois da instalação, valide o bundle e guarde o relatório opcional:
 simplicio ecosystem verify --json
 ```
 
-O relatório identifica a versão, o commit de proveniência, o modo de
-implementação e o estado de compatibilidade de cada componente. Adaptadores
-Python/portáveis continuam disponíveis somente para fluxos explicitamente
-legados; eles não são parte do caminho normal e não podem substituir o Runtime
-verificado pelo instalador.
+O relatório identifica o digest/tamanho do arquivo-fonte embutido, a versão, o
+commit de proveniência, o modo de implementação e o estado de compatibilidade
+de cada componente. Adaptadores externos/portáveis continuam disponíveis
+somente para fluxos explicitamente legados; eles não são parte do caminho
+normal e não podem substituir o Runtime verificado pelo instalador.
 
 ## Building from Source
 

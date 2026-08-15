@@ -67,22 +67,26 @@ powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/m
 ```
 
 Done. One command downloads the Runtime binary, verifies its checksum, and
-validates the embedded ecosystem. No Python package manager, sibling checkout,
-or model configuration is required.
+validates the embedded Python source bundle. The installer does not use a
+Python package manager or sibling checkout. A Google login with an active
+entitlement is mandatory before product commands run; public beta access may
+be free, but it does not bypass login.
 
-### Embedded ecosystem
+### Python projects embedded in the Runtime
 
 The Runtime release is the distribution boundary. The generated binary carries
-the native capability surfaces for:
+the real Python source trees for the six projects below. They remain Python
+projects; the Runtime host is not a native-Rust rewrite and normal installation
+does not clone or download their repositories:
 
 | Capability | Binary surface |
 |---|---|
-| Mapper | `simplicio map` and MapperStore-backed recall |
-| Dev CLI | Runtime edit/validate/deliver workflows |
-| Loop | `simplicio loop` orchestration and decision flow |
-| Fast | `simplicio fast` snapshot/search/context workflow |
-| Prompt | Prompt contract and runtime prompt handling |
-| Sprint | Sprint projection/compatibility contract |
+| Mapper | Embedded Mapper Python source + Runtime bridge |
+| Dev CLI | Embedded Dev CLI Python source + Runtime bridge |
+| Loop | Embedded Loop Python source + Runtime bridge |
+| Fast | Embedded Fast Python source + Runtime bridge |
+| Prompt | Embedded Prompt Python source + Runtime bridge |
+| Sprint | Embedded Sprint Python source + Runtime bridge |
 
 Verify a release after installation:
 
@@ -90,12 +94,20 @@ Verify a release after installation:
 simplicio ecosystem verify --json
 ```
 
-The verification output includes the embedded component versions, upstream
-provenance commits, implementation mode, and compatibility status. Updating the
-Runtime release updates this bundle; the installer does not call or import the
-`simplicio-*` repositories. Legacy Python adapters and portable Claude skills
-may still be used explicitly, but they are outside the normal installation
-path and never replace the verified Runtime binary.
+The verification output includes the source archive size/digest, embedded
+component versions, provenance commits, and compatibility status. Updating the
+Runtime release updates this bundle. The binary still uses an available Python
+3 interpreter to execute the embedded sources; it never downloads packages or
+falls back to sibling checkouts. Legacy external adapters and portable Claude
+skills may still be used explicitly, but they are outside the normal path.
+
+After installation, authenticate with the Google-backed device flow when
+prompted, or run:
+
+```bash
+simplicio auth login
+simplicio auth status --json
+```
 
 ### Plugin marketplace
 
@@ -207,13 +219,14 @@ LLM (Claude/Codex/Gemini)          Simplicio Runtime (Rust)
 
 ---
 
-## 🎁 Free Public Beta
+## 🎁 Public Beta
 
 **Deterministic commands are FREE forever:**
 `map`, `validate`, `edit`, `deliver`, `checkpoint`
 
-**AI features are free during the public beta with no end date.**
-Billing will be defined in future updates.
+AI features may be free while the public beta flag is active. Login and an
+active entitlement are still required; when beta access ends, the entitlement
+must come from an active subscription.
 
 ```bash
 simplicio license status

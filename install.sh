@@ -1,8 +1,9 @@
 #!/usr/bin/env sh
-# install.sh — Simplicio Runtime: instalador do binário e ecossistema nativo
+# install.sh — Simplicio Runtime: instalador do binário e fontes Python embutidos
 #
 # Um comando instala o Runtime. Mapper, Dev CLI, Loop, Fast, Prompt e Sprint
-# projection são entregues pelo próprio binário.
+# são entregues como fontes Python reais dentro do binário; não são reescritos
+# como Rust e não exigem checkout ou download dos repositórios irmãos.
 #
 #   curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
 #
@@ -76,6 +77,19 @@ verify_embedded_ecosystem() {
   return 1
 }
 
+verify_active_login() {
+  "$DEST_PATH" auth status --json >/dev/null 2>&1
+}
+
+require_active_login() {
+  if verify_active_login; then
+    return 0
+  fi
+  info "Login Google obrigatório para ativar o Simplicio Runtime"
+  "$DEST_PATH" auth login || err "login não concluído; instalação bloqueada"
+  verify_active_login || err "sessão ausente, expirada, revogada ou sem entitlement ativo; instalação bloqueada"
+}
+
 # ─── --doctor: idempotent, read-only health check ──────────────────────────
 run_doctor() {
   info "simplicio doctor"
@@ -102,9 +116,16 @@ run_doctor() {
     fi
 
     if verify_embedded_ecosystem; then
-      ok "ecossistema nativo presente no binário"
+      ok "fontes Python do ecossistema presentes no binário"
     else
-      warn "binário não contém o bundle nativo esperado; atualize para um release Runtime compatível"
+      warn "binário não contém o bundle de fontes Python esperado; atualize para um release Runtime compatível"
+      status=1
+    fi
+
+    if verify_active_login; then
+      ok "sessão Google ativa e entitlement válido"
+    else
+      warn "sessão Google ausente, expirada, revogada ou sem entitlement ativo"
       status=1
     fi
   fi
@@ -160,7 +181,7 @@ if [ -x "$DEST_PATH" ] && verify_embedded_ecosystem; then
   ok "$BIN_NAME já instalado em $DEST_PATH"
 else
   if [ -x "$DEST_PATH" ]; then
-    warn "Runtime existente não contém o bundle nativo esperado; baixando uma versão compatível"
+    warn "Runtime existente não contém o bundle Python esperado; baixando uma versão compatível"
   fi
   VERSION="${SIMPLICIO_VERSION:-latest}"
   ASSET="simplicio-$OS-$ARCH"
@@ -252,11 +273,15 @@ except Exception:
   ok "Simplicio Runtime instalado em $DEST_PATH"
 fi
 
-# ─── 2.1 Verificar o bundle nativo antes de anunciar sucesso ─────────────────
+# ─── 2.1 Verificar o bundle Python antes de anunciar sucesso ─────────────────
 if ! verify_embedded_ecosystem; then
-  err "este Runtime não contém o bundle nativo esperado; recusando concluir a instalação"
+  err "este Runtime não contém o bundle de fontes Python esperado; recusando concluir a instalação"
 fi
-ok "ecossistema nativo verificado no binário"
+ok "fontes Python reais do ecossistema verificadas no binário"
+
+# ─── 2.2 Login obrigatório: beta não elimina a sessão ativa ────────────────
+require_active_login
+ok "login Google ativo e entitlement válido"
 
 # Adiciona ao PATH se não estiver
 case ":$PATH:" in
@@ -266,15 +291,15 @@ case ":$PATH:" in
      ;;
 esac
 
-# ─── 3. Registrar e anunciar o bundle nativo ─────────────────────────────────
+# ─── 3. Registrar e anunciar o bundle Python ────────────────────────────────
 BUNDLE_DIR="${SIMPLICIO_BUNDLE_DIR:-$HOME/.simplicio}"
 BUNDLE_REPORT="$BUNDLE_DIR/ecosystem-bundle.json"
 mkdir -p "$BUNDLE_DIR"
 if "$DEST_PATH" ecosystem verify --json >"$BUNDLE_REPORT" 2>/dev/null; then
-  ok "bundle nativo registrado em $BUNDLE_REPORT"
+  ok "bundle Python registrado em $BUNDLE_REPORT"
 else
   rm -f "$BUNDLE_REPORT"
-  err "o binário não passou na verificação do bundle nativo; instalação interrompida"
+  err "o binário não passou na verificação do bundle Python; instalação interrompida"
 fi
 
 # ─── 4. Mensagem final ───────────────────────────────────────────────────────
@@ -283,8 +308,9 @@ printf "${GREEN}╔════════════════════�
 printf "${GREEN}║                                                          ║${NC}\n"
 printf "${GREEN}║   Simplicio Runtime instalado com sucesso!              ║${NC}\n"
 printf "${GREEN}║                                                          ║${NC}\n"
-printf "${GREEN}║   ✓ Ecossistema nativo dentro do binário                 ║${NC}\n"
-printf "${GREEN}║   ✓ Sem pip, clones ou adaptadores externos               ║${NC}\n"
+printf "${GREEN}║   ✓ Fontes Python reais dentro do binário                ║${NC}\n"
+printf "${GREEN}║   ✓ Sem pip, clones ou downloads de simplicio-*          ║${NC}\n"
+printf "${GREEN}║   ✓ Login Google ativo                                   ║${NC}\n"
 printf "${GREEN}║   🩺 Doctor: sh install.sh --doctor                     ║${NC}\n"
 printf "${GREEN}║                                                          ║${NC}\n"
 printf "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}\n"

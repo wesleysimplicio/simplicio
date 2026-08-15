@@ -1,5 +1,7 @@
 #!/usr/bin/env pwsh
 # install.ps1 — Install/update/uninstall/doctor the Simplicio Runtime on Windows
+# The Runtime binary carries the real Python project sources; it does not
+# rewrite them as Rust or download sibling simplicio-* repositories.
 #
 # Usage:
 #   powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex"
@@ -53,6 +55,25 @@ function Test-EmbeddedEcosystem {
   }
 }
 
+function Test-ActiveLogin {
+  if (-not (Test-Path $DestPath)) { return $false }
+  try {
+    $null = & $DestPath auth status --json 2>$null
+    return ($LASTEXITCODE -eq 0)
+  } catch {
+    return $false
+  }
+}
+
+function Require-ActiveLogin {
+  if (Test-ActiveLogin) { return }
+  Write-Host "==> Google login is required to activate Simplicio Runtime"
+  & $DestPath auth login
+  if ($LASTEXITCODE -ne 0 -or -not (Test-ActiveLogin)) {
+    throw "Login ausente, expirado, revogado ou sem entitlement ativo; instalação bloqueada"
+  }
+}
+
 # ─── -Doctor: idempotent, read-only health check ───────────────────────────
 if ($Doctor) {
   Write-Host "==> simplicio doctor"
@@ -82,9 +103,16 @@ if ($Doctor) {
     }
 
     if (Test-EmbeddedEcosystem) {
-      Write-Host "  [OK] embedded ecosystem bundle is present"
+      Write-Host "  [OK] real Python sources are embedded in the binary"
     } else {
-      Write-Host "  [FAIL] binary does not contain the expected embedded ecosystem bundle"
+      Write-Host "  [FAIL] binary does not contain the expected Python source bundle"
+      $ok = $false
+    }
+
+    if (Test-ActiveLogin) {
+      Write-Host "  [OK] active Google session and entitlement"
+    } else {
+      Write-Host "  [FAIL] missing, expired, revoked, or inactive Google session"
       $ok = $false
     }
   }
@@ -219,7 +247,7 @@ try {
 }
 Write-Host "  ✓ installed: $DestPath"
 
-# ─── Verify the downloaded Runtime and its embedded ecosystem ────────────────
+# ─── Verify the downloaded Runtime and its embedded Python source bundle ─────
 try {
   $output = & $DestPath version 2>&1 | Out-String
   if ($LASTEXITCODE -ne 0) { throw "version command returned $LASTEXITCODE" }
@@ -229,10 +257,19 @@ try {
 }
 
 if (-not (Test-EmbeddedEcosystem)) {
-  Write-Error "This Runtime does not contain the expected embedded ecosystem bundle; refusing to finish installation. Install a compatible Runtime release."
+  Write-Error "This Runtime does not contain the expected embedded Python source bundle; refusing to finish installation. Install a compatible Runtime release."
   exit 1
 }
-Write-Host "  ✓ embedded ecosystem bundle verified in the binary"
+Write-Host "  ✓ real Python source bundle verified in the binary"
+
+# ─── Active login is mandatory; beta does not bypass this gate ──────────────
+try {
+  Require-ActiveLogin
+} catch {
+  Write-Error $_.Exception.Message
+  exit 1
+}
+Write-Host "  ✓ active Google session and entitlement verified"
 
 $BundleDir = if ($env:SIMPLICIO_BUNDLE_DIR) { $env:SIMPLICIO_BUNDLE_DIR } else { Join-Path $env:USERPROFILE ".simplicio" }
 New-Item -ItemType Directory -Force -Path $BundleDir | Out-Null
@@ -241,7 +278,7 @@ try {
   $bundleJson = & $DestPath ecosystem verify --json 2>&1
   if ($LASTEXITCODE -ne 0) { throw "ecosystem verify returned $LASTEXITCODE" }
   $bundleJson | Set-Content -Encoding UTF8 $BundleReport
-  Write-Host "  ✓ embedded ecosystem report: $BundleReport"
+  Write-Host "  ✓ embedded Python source report: $BundleReport"
 } catch {
   if (Test-Path $BundleReport) { Remove-Item -Force $BundleReport -ErrorAction SilentlyContinue }
   Write-Error "Could not persist the embedded ecosystem verification: $($_.Exception.Message)"
@@ -259,8 +296,9 @@ if (-not (Test-InPath $InstallDir)) {
 
 Write-Host ""
 Write-Host "  ✓ simplicio Runtime $Version (windows-x64) installed successfully"
-Write-Host "  ✓ Mapper, Dev CLI, Loop, Fast, Prompt and Sprint projection are in the binary"
-Write-Host "  ✓ no Python packages, sibling checkouts or external adapters were installed"
+Write-Host "  ✓ Mapper, Dev CLI, Loop, Fast, Prompt and Sprint Python sources are in the binary"
+Write-Host "  ✓ no pip packages, sibling checkouts or simplicio-* downloads were installed"
+Write-Host "  ✓ active Google login is required for product commands"
 Write-Host ""
 Write-Host "  Run:     simplicio chat 'hello' --repo ."
 Write-Host "  REPL:    simplicio chat --repl --repo ."
