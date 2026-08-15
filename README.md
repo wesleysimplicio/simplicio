@@ -72,6 +72,17 @@ Python package manager or sibling checkout. A Google login with an active
 entitlement is mandatory before product commands run; public beta access may
 be free, but it does not bypass login.
 
+### Codex MCP authentication
+
+After login, the installer registers Simplicio as a local Streamable HTTP MCP
+server at `http://127.0.0.1:8787/mcp`. Open Codex MCP settings: the Simplicio
+row will show **Authenticate**. Click it to use the Google-backed login at
+`simpleti.com.br/simplicio/login`. The Runtime validates the bearer token and
+active entitlement on each MCP request; beta access does not bypass this gate.
+
+Other MCP hosts keep the local `stdio` fallback. If the host was configured
+before this release, run `simplicio mcp register` and reload its MCP settings.
+
 ### Python projects embedded in the Runtime
 
 The Runtime release is the distribution boundary. The generated binary carries

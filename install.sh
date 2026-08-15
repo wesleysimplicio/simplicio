@@ -283,6 +283,14 @@ ok "fontes Python reais do ecossistema verificadas no binário"
 require_active_login
 ok "login Google ativo e entitlement válido"
 
+# Codex only renders its Authenticate action for an OAuth-capable HTTP server.
+# Other hosts retain their stdio fallback inside `simplicio mcp register`.
+if "$DEST_PATH" mcp register >/dev/null 2>&1; then
+  ok "MCP local HTTP/OAuth registrado para o Codex"
+else
+  warn "não foi possível registrar o MCP automaticamente; rode: simplicio mcp register"
+fi
+
 # Adiciona ao PATH se não estiver
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;
