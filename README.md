@@ -8,14 +8,16 @@
   <a href="https://github.com/wesleysimplicio/simplicio/releases/latest"><img src="https://img.shields.io/github/v/release/wesleysimplicio/simplicio?color=blue&label=latest" alt="Latest Release"></a>
   <a href="https://github.com/wesleysimplicio/simplicio/stargazers"><img src="https://img.shields.io/github/stars/wesleysimplicio/simplicio?style=social" alt="Stars"></a>
   <a href="https://github.com/wesleysimplicio/simplicio/releases"><img src="https://img.shields.io/github/downloads/wesleysimplicio/simplicio/total?color=green" alt="Downloads"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="License"></a>
+  <img src="https://img.shields.io/badge/license-Proprietary-red" alt="License">
 </p>
 
 <p align="center">
   <a href="#-installation">Install</a> ·
+  <a href="#-login-and-entitlement">Login</a> ·
+  <a href="#-simplicio-mcp">MCP</a> ·
   <a href="#-what-it-does">Features</a> ·
-  <a href="#-token-savings">96% Savings</a> ·
-  <a href="https://simpleti.com.br/simplicio/#start">Website</a>
+  <a href="#-benchmarks-and-token-savings">Benchmarks</a> ·
+  <a href="https://simpleti.com.br/simplicio/">Website</a>
 </p>
 
 <p align="center">
@@ -49,10 +51,15 @@ evidence-backed PR delivery.
 **Runs on your machine. Your code never leaves your control. Remote models are
 optional, not required.**
 
-> **🔥 Save up to 96% of tokens vs traditional agents — more than Caveman (65%) or RTK (80%).**
-> Every interaction shows exactly how many tokens you saved. Single Rust binary, zero deps.
+> **🔥 Save up to 96% of tokens on controlled workloads.**
+> Simplicio records the baseline and proof type; the actual result depends on the task and model.
 
 ## 🚀 Installation
+
+The official installers download the latest Runtime release from this
+repository, verify the published SHA256 manifest, validate the embedded Python
+bundle, require an active Simplicio account, and attempt to register the local MCP
+endpoint. They do not clone or download the `simplicio-*` sibling repositories.
 
 ### macOS / Linux
 
@@ -66,59 +73,210 @@ curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/in
 powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex"
 ```
 
-Done. One command downloads the Runtime binary, verifies its checksum, and
-validates the embedded Python source bundle. The installer does not use a
-Python package manager or sibling checkout. A Google login with an active
-entitlement is mandatory before product commands run; public beta access may
-be free, but it does not bypass login.
+The default install location is `~/.local/bin/simplicio` on macOS/Linux and
+`%USERPROFILE%\.local\bin\simplicio.exe` on Windows. Add that directory to
+your `PATH` if the installer prints a PATH warning, then open a new terminal.
 
-### Codex MCP authentication
-
-After login, the installer registers Simplicio as a local Streamable HTTP MCP
-server at `http://127.0.0.1:8787/mcp`. Open Codex MCP settings: the Simplicio
-row will show **Authenticate**. Click it to use the Google-backed login at
-`simpleti.com.br/simplicio/login`. The Runtime validates the bearer token and
-active entitlement on each MCP request; beta access does not bypass this gate.
-
-Other MCP hosts keep the local `stdio` fallback. If the host was configured
-before this release, run `simplicio mcp register` and reload its MCP settings.
-
-### Python projects embedded in the Runtime
-
-The Runtime release is the distribution boundary. The generated binary carries
-the real Python source trees for the six projects below. They remain Python
-projects; the Runtime host is not a native-Rust rewrite and normal installation
-does not clone or download their repositories:
-
-| Capability | Binary surface |
-|---|---|
-| Mapper | Embedded Mapper Python source + Runtime bridge |
-| Dev CLI | Embedded Dev CLI Python source + Runtime bridge |
-| Loop | Embedded Loop Python source + Runtime bridge |
-| Fast | Embedded Fast Python source + Runtime bridge |
-| Prompt | Embedded Prompt Python source + Runtime bridge |
-| Sprint | Embedded Sprint Python source + Runtime bridge |
-
-Verify a release after installation:
+To pin a release or use another install directory:
 
 ```bash
-simplicio ecosystem verify --json
+SIMPLICIO_VERSION=v3.8.11 \
+SIMPLICIO_BIN_DIR="$HOME/.local/bin" \
+  sh -c "$(curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh)"
 ```
 
-The verification output includes the source archive size/digest, embedded
-component versions, provenance commits, and compatibility status. Updating the
-Runtime release updates this bundle. The binary still uses an available Python
-3 interpreter to execute the embedded sources; it never downloads packages or
-falls back to sibling checkouts. Legacy external adapters and portable Claude
-skills may still be used explicitly, but they are outside the normal path.
+PowerShell equivalents are available through `SIMPLICIO_VERSION` and
+`SIMPLICIO_BIN_DIR`. Keep checksum verification enabled. Only set
+`SIMPLICIO_ALLOW_UNVERIFIED=1` when you have deliberately accepted an
+unverified artifact and understand the supply-chain risk.
 
-After installation, authenticate with the Google-backed device flow when
-prompted, or run:
+Check the installation:
 
 ```bash
-simplicio auth login
+simplicio --version
+simplicio ecosystem verify --json
+sh install.sh --doctor                 # when running from a checkout
+```
+
+The doctor command is read-only. Uninstalling is idempotent and preserves user
+data under `~/.simplicio`:
+
+```bash
+sh install.sh --uninstall              # macOS/Linux
+pwsh install.ps1 -Uninstall             # Windows
+```
+
+### What the binary contains
+
+The Runtime is the distribution boundary. Each release embeds the real Python
+source trees and a Runtime bridge for Mapper, Dev CLI, Loop, Fast, Prompt, and
+Sprint. They remain Python projects; they are not rewritten as Rust, and a
+normal installation does not download their repositories or install them with
+`pip`. The Runtime may use an available Python 3 interpreter to execute those
+embedded sources.
+
+`simplicio ecosystem verify --json` reports the embedded component versions,
+source archive digest, provenance commits, and compatibility status. Run it
+after every update and attach its JSON to a bug report when an embedded
+component looks stale.
+
+## 🔐 Login and entitlement
+
+Simplicio uses a Google-backed device login. The CLI receives revocable
+Simplicio tokens; your Google password is entered only on Google. Login is
+required before product commands, MCP, and the embedded ecosystem can be used.
+
+Public beta access may be free, but beta does not bypass the active-entitlement
+check. When beta access ends, the entitlement must come from an active
+subscription.
+
+### First login
+
+The installer starts the login flow when no active session exists. To start it
+manually:
+
+```bash
+simplicio login google
+```
+
+The CLI prints a verification URL and a short device code, then waits. Open
+the URL in a normal browser, choose **Continue with Google**, and finish the
+Google authentication or passkey prompt. Do not paste the device code, Google
+password, access token, refresh token, or client secret into an issue, chat,
+terminal log, or public repository.
+
+For scripts that need machine-readable polling output:
+
+```bash
+simplicio login google --json
+```
+
+The website flow is also available at
+[`simpleti.com.br/simplicio/login`](https://simpleti.com.br/simplicio/login).
+
+Confirm only the state, not the full credential payload:
+
+```bash
 simplicio auth status --json
 ```
+
+The successful result must report `active: true`. If it reports `active: false`,
+the session may be missing, expired, revoked, or associated with an account
+without an active entitlement. Run `simplicio login google` again and confirm
+that the browser completed the same device flow. `simplicio auth login` is kept
+as a compatibility alias by installer-era builds.
+
+To revoke the local session:
+
+```bash
+simplicio logout --json
+```
+
+Logout removes the local session; it does not delete your Simplicio account or
+subscription.
+
+## 🔌 Simplicio MCP
+
+MCP (Model Context Protocol) is the interface that lets an AI client discover
+and call Simplicio's governed local tools. The client supplies intent and
+structured arguments; the Simplicio Runtime performs repository mapping,
+memory recall, deterministic edits, validation, and execution under its
+authentication and safety gates. MCP is an invocation surface, not a second
+installation of Mapper, Loop, or the other embedded projects.
+
+The Runtime exposes these tools:
+
+| Tool | Purpose |
+|---|---|
+| `simplicio_map` | Build a compact structural map of a repository |
+| `simplicio_memory` | Recall indexed project memory (FTS/vector backends) |
+| `simplicio_edit` | Apply a structured, deterministic file-edit plan |
+| `simplicio_gate` | Check mission/effect gates before a mutation |
+| `simplicio_validate` | Run contract-oriented validation for a task |
+| `simplicio_run` | Execute a governed task through the Runtime |
+| `simplicio_symbol` | Navigate symbols and declarations |
+| `simplicio_search` | Search repository content semantically/structurally |
+| `simplicio_read` | Read files through the compact Runtime surface |
+| `simplicio_exec` | Run a supervised, compact external command |
+
+The client should call `tools/list` at startup and use the returned schemas;
+the table above is a quick orientation, not a substitute for live schemas.
+
+### Codex: local HTTP/OAuth MCP
+
+The installer runs `simplicio mcp register`, which registers the local
+Streamable HTTP endpoint used by Codex:
+`http://127.0.0.1:8787/mcp`.
+
+1. Complete `simplicio login google` first.
+2. Open Codex **Settings → MCP**.
+3. Find the **simplicio** server and click **Authenticate**.
+4. Complete the Google-backed Simplicio login in the browser.
+5. Reload the MCP settings or restart the host if the tool list was already
+   cached.
+
+If the row is missing, register it again and reload Codex:
+
+```bash
+simplicio mcp register
+```
+
+The Runtime validates the bearer token and active entitlement on every MCP
+request. A visible **Authenticate** button is therefore expected for the
+OAuth-capable Codex server; it is not a replacement for the CLI login.
+
+### Other MCP clients: local STDIO
+
+For Claude Code, Cursor, VS Code, Cline, Continue, and similar clients, add a
+server entry using the installed binary:
+
+```json
+{
+  "mcpServers": {
+    "simplicio": {
+      "command": "simplicio",
+      "args": ["serve", "--mcp", "--stdio"]
+    }
+  }
+}
+```
+
+Typical configuration locations are:
+
+| Client | File |
+|---|---|
+| Claude Code | `~/.claude/settings.json` |
+| Cursor | `~/.cursor/mcp.json` |
+| VS Code | `.vscode/mcp.json` |
+| Cline | `~/.config/cline/mcp_settings.json` |
+| Continue | `~/.continue/config.json` |
+
+Reload the client after saving its configuration. STDIO is local and does not
+need a manually copied bearer token, but the Runtime still requires an active
+Simplicio login.
+
+Smoke-test the local server:
+
+```bash
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \\
+  | simplicio serve --mcp --stdio
+```
+
+The response should contain the ten tool definitions. If the command says
+login is required, authenticate first; do not disable the gate or insert a
+token into a config file.
+
+### MCP request flow
+
+```text
+AI client → tools/list / tools/call
+          → Simplicio Runtime auth + entitlement gate
+          → map / memory / edit / validate / exec surface
+          → structured result + evidence
+```
+
+For the complete client matrix and protocol notes, see
+[`MCP-CONNECT.md`](MCP-CONNECT.md).
 
 ### Plugin marketplace
 
@@ -138,37 +296,110 @@ embedded ecosystem. When present, the skills call the Runtime through
 
 ---
 
-## 💰 Token Savings — 96% is Real
+## 📊 Benchmarks and token savings
 
-**Without Simplicio:** every AI session rediscovers your repo, loads too much
-context, repeats prompts, burns paid tokens.
+The **up to 96%** figure is a headline maximum measured on controlled
+workloads that combine repository mapping, memory recall, deterministic edits,
+local routing, and local fan-out. It is not a promise that every task or model
+will save 96%. The component percentages below are directional measurements;
+they must not be added together.
 
-**With Simplicio:**
+| Mechanism | Reference result | What is measured |
+|---|---:|---|
+| 🗺️ Repo map | ~70% less context | Compact structural context versus raw file reads |
+| 🧠 Memory recall | ~80% less re-derivation | Reused indexed facts versus rediscovering them |
+| ✏️ Deterministic edit | 100% LLM output avoided | Structured file mutation without a generation step |
+| 🏠 Local routing | ~90% fewer remote tokens | Classification/low-risk work handled locally |
+| 📡 Remote routing | ~85% fewer remote tokens | Remote models used for planning and hard decisions |
+| 🔀 Local fan-out | ~95% fewer cloud-agent tokens | Local agents used before cloud escalation |
+| **Combined controlled workload** | **up to 96%** | Baseline-to-Simplicio total token comparison |
 
-| Optimization | Savings |
-|---|---|
-| 🗺️ **Repo Map** — compressed context instead of reading raw files | ~70% |
-| 🧠 **Memory Recall** — known facts are not re-derived | ~80% |
-| ✏️ **Deterministic Editing** — changes without spending LLM tokens | 100% (output) |
-| 🏠 **Local LLM** — classification, summarization, low-risk edits | ~90% |
-| 📡 **Remote LLM** — only for planning and complex decisions | ~85% |
-| 🔀 **Local Fan-out** — 64→600 agents before scaling to cloud | ~95% |
-| **💎 Combined: up to 96% total savings** | **~96%** |
+Every measured run should report its proof type and its baseline:
+`saved = baseline_tokens - actual_tokens` and
+`saving_percent = saved / baseline_tokens * 100`.
 
-**Every Simplicio response shows real savings:** `Simplicio: ~X tokens spent · saved ~Y (Z%)`
+### Run the Runtime benchmark
+
+All Runtime benchmark commands require an active login because they execute
+through the governed Runtime:
+
+```bash
+simplicio benchmark run --sample --json       # deterministic fixture rows
+simplicio benchmark run --json                # measured Runtime timings
+simplicio benchmark savings --json            # savings-oriented summary
+```
+
+For a real model/provider comparison, keep the task, repository snapshot,
+model, temperature, and cold/warm state constant. Record the baseline and the
+Simplicio run separately. Replace the example counts below with the actual
+provider-reported values:
+
+```bash
+simplicio savings record \
+  --spent 120 \
+  --baseline 300 \
+  --source codex \
+  --task "map, recall, edit, and validate a small change" \
+  --proof-kind measured
+
+simplicio savings report --repo . --json
+simplicio savings prove --repo . --json
+```
+
+Use `measured` only when the provider reports actual usage. Use `benchmark` for
+fixed fixture runs, `replayed` for a reproducible recorded run, and
+`estimated` only for a heuristic. Never present an `estimated` result as a
+measured benchmark. To compare a captured run with an explicit baseline:
+
+```bash
+simplicio savings compare \
+  --with-simplicio .simplicio/runs/<run-id> \
+  --without-simplicio baseline.json \
+  --proof-kind measured
+```
+
+### Distribution/tooling benchmark
+
+This public repository also benchmarks its release consistency checker. It is
+separate from AI token savings:
+
+```bash
+python3 scripts/bench_verify_distribution_consistency.py
+```
+
+The reference run used for this README was 25 iterations on the maintainer's
+macOS ARM64 machine: median `4.158 ms`, versus the committed baseline of
+`11.625 ms`, within the default `+150%` regression budget. Wall-clock values
+vary by machine and CI runner; the command and pass/fail threshold are the
+portable result.
+
+The stricter distribution benchmark is:
+
+```bash
+python3 scripts/benchmark_distribution.py --repetitions 5
+```
+
+It intentionally refuses to publish a metric when the distribution audit has
+warnings. A warning is a release-hygiene failure, not evidence of a token
+saving. Inspect the audit before retrying:
+
+```bash
+python3 scripts/verify_distribution_consistency.py
+```
 
 ---
 
 ## 🎯 What It Does
 
-| Command | Description | Tokens |
+| Command | Description | Cost/effect |
 |---|---|---|
-| `simplicio map --repo .` | Maps the repository for LLMs | ~70% savings |
-| `simplicio memory "query"` | Neural recall (FTS + vectors) | ~80% savings |
-| `simplicio edit '{...}'` | Deterministic file editing | **Zero tokens** |
-| `simplicio coding-loop "task"` | Iterates until tests pass | Auto-repair |
-| `simplicio deliver certify` | 5 quality gates before shipping | Deterministic |
-| `simplicio run "task" --agents N` | Multi-agent orchestration | Local-first |
+| `simplicio runtime map --repo . --for-llm markdown` | Maps a repository for an LLM | Compact context |
+| `simplicio memory query "query" --json` | Recalls indexed project memory | Reuses known facts |
+| `simplicio edit --plan plan.json --repo .` | Applies a deterministic edit plan | No generation step |
+| `simplicio validate "task" --repo .` | Runs contract-oriented validation | Deterministic gates |
+| `simplicio run "task" --repo . --agents N` | Runs a governed multi-agent task | Local-first routing |
+| `simplicio sprint sprint.md --repo . --evidence` | Executes a sprint with evidence | Auditable delivery |
+| `simplicio benchmark run --sample --json` | Runs fixed benchmark fixtures | Reproducible rows |
 
 ---
 
@@ -177,7 +408,7 @@ context, repeats prompts, burns paid tokens.
 | | 🪨 Caveman | 🔧 RTK | 🔥 **Simplicio** |
 |---|---|---|---|
 | **Approach** | Output style compression | Shell command proxy | **Full agent runtime** |
-| **Max savings** | ~65% output tokens | ~80% on shell commands | **Up to 96% total** |
+| **Published scope** | Output-token reduction | Shell-command output reduction | **End-to-end controlled workloads** |
 | **Input compression** | ❌ | ✅ (filtered) | ✅ **Repo map + neural memory** |
 | **Output compression** | ✅ (caveman-speak) | ❌ | ✅ **Zero-token deterministic edits** |
 | **Local LLM** | ❌ | ❌ | ✅ **Built-in llama.cpp** |
@@ -186,27 +417,26 @@ context, repeats prompts, burns paid tokens.
 | **Evidence chain** | ❌ | ❌ | ✅ **sha256 sealed receipts** |
 | **Language** | JS/Python (skill) | Rust (binary) | **Rust (single binary)** |
 | **License** | MIT | Apache 2.0 | Proprietary |
-| **Stars** | 72.5k | 62.2k | ⭐ **You're early** |
 
-**Bottom line:** Caveman makes the AI *talk* less. RTK makes commands *output* less.
-Simplicio makes the AI *think* less — by remembering, mapping, editing deterministically,
-and running locally before ever touching a paid LLM.
-
-| **Simplicio saves 96% where Caveman saves 65% and RTK saves 80%.** |
+These tools measure different surfaces, so this repository does not claim an
+apples-to-apples Caveman/RTK benchmark. Caveman reduces how much an agent says;
+RTK reduces command output; Simplicio also reduces repeated context and
+deterministic mutation work. Use the reproducible commands in the benchmark
+section when comparing a real workload.
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-LLM (Claude/Codex/Gemini)          Simplicio Runtime (Rust)
+LLM (Claude/Codex/Gemini)          Simplicio Runtime
   |                                   |
-  | 1. Orient                         | simplicio map
-  | 2. Recall                         | simplicio memory
+  | 1. Orient                         | runtime map / MCP
+  | 2. Recall                         | memory query / MCP
   | 3. Decide                         |
-  | 4. Edit  ───────────────────────> | simplicio edit (0 tokens)
-  | 5. Verify <─────────────────────  | simplicio deliver certify
-  | 6. Iterate                        | simplicio coding-loop
+  | 4. Edit  ───────────────────────> | structured edit
+  | 5. Verify <─────────────────────  | validate / evidence
+  | 6. Iterate                        | run / sprint
 ```
 
 **The LLM reasons. Simplicio executes deterministically.**
@@ -230,6 +460,59 @@ LLM (Claude/Codex/Gemini)          Simplicio Runtime (Rust)
 
 ---
 
+## 🔄 Updates, diagnostics, and troubleshooting
+
+Re-running the official installer is the simplest update path. It is
+idempotent: it downloads the latest release, verifies the checksum, validates
+the embedded bundle, and keeps `~/.simplicio` user data. A pinned installer
+command updates only when you intentionally choose that version.
+
+The Runtime also exposes an authenticated update surface:
+
+```bash
+simplicio update check --json
+simplicio update apply --json
+simplicio update status --json
+simplicio update rollback --json
+```
+
+Use `rollback` only when you have a verified previous release and understand
+the compatibility trade-off. After any update, repeat:
+
+```bash
+simplicio --version
+simplicio ecosystem verify --json
+simplicio auth status --json
+simplicio mcp register
+```
+
+Common failures:
+
+| Symptom | Resolution |
+|---|---|
+| `login required` | Run `simplicio login google`; confirm `active: true`. |
+| Codex has no **Authenticate** button | Run `simplicio mcp register`, then reload Codex MCP settings. |
+| `tools/list` is empty or stale | Restart/reload the MCP host and verify its command resolves to the intended `simplicio` binary. |
+| Embedded bundle verification fails | Re-run the official installer; do not install sibling repos with `pip` or clone them as a workaround. |
+| Google says the browser is not secure | Use a normal Safari/Chrome window for the Google step, not an embedded webview; never disable the account security gate. |
+| A command behaves differently across terminals | Run `which simplicio`, `simplicio --version`, and inspect `PATH` for an older binary. |
+
+Useful diagnostic commands:
+
+```bash
+simplicio doctor --json
+simplicio self-test --json
+simplicio status --json
+simplicio security --json
+```
+
+When reporting a problem, include the operating system, architecture,
+`simplicio --version`, the redacted output of `simplicio auth status --json`,
+and `simplicio ecosystem verify --json`. Remove email addresses, device codes,
+authorization headers, and every credential before sharing logs.
+
+---
+
 ## 🎁 Public Beta
 
 **Deterministic commands are FREE forever:**
@@ -250,8 +533,10 @@ simplicio license status
 | Requirement | Minimum | Recommended |
 |---|---|---|
 | RAM | 8 GB | 16 GB+ |
-| Storage | 5 MB | 1.5 GB (with local LLM) |
-| OS | macOS 13+, Linux, Windows 10+ | macOS ARM64 |
+| Storage | ~35–50 MB for the release binary | 1.5 GB+ with a local LLM |
+| OS | macOS Apple Silicon, Linux x64, Windows x64 | macOS ARM64 |
+| Python | Python 3 for embedded Python surfaces | Current CPython 3 |
+| Browser | Safari, Chrome, or another supported browser for Google login | Current Safari/Chrome |
 | Terminal | any modern terminal | WezTerm / Alacritty / Ghostty |
 
 ---
@@ -265,25 +550,32 @@ The official command to run that tooling's unit test suite:
 ```bash
 pip install -r requirements-dev.txt
 python -m pytest tests/unit -v --cov=scripts --cov-report=term-missing --cov-fail-under=85
+python3 scripts/bench_verify_distribution_consistency.py
+python3 scripts/verify_distribution_consistency.py
 ```
 
 See [docs/testing-strategy.md](docs/testing-strategy.md) for what's covered,
 what's intentionally out of scope, and the plan for the rest of the testing
-epic. See also [CONTRIBUTING.md](CONTRIBUTING.md).
+epic. The consistency audit may report release-hygiene warnings even when the
+unit suite is green; resolve those warnings before treating the stricter
+`benchmark_distribution.py` gate as a release pass. See also
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
 ## 🌐 Ecosystem
 
-- [Website](https://simpleti.com.br/simplicio/#start) — full docs, benchmarks, install
+- [Website](https://simpleti.com.br/simplicio/) — product overview, benchmarks, install
 - [Discord](https://discord.gg/wM6tr7xVb) — community and support
 
 ---
 
 ## 📄 License
 
-Proprietary. Binary free to download and use. AI features free during the
-public beta. See [LICENSE](LICENSE).
+The root Runtime distribution and its release artifacts are proprietary.
+The binary is free to download and use during the public beta; AI feature
+access still requires an active Simplicio entitlement. Plugin subdirectories
+may carry their own license files and terms.
 
 ---
 
@@ -307,5 +599,5 @@ public beta. See [LICENSE](LICENSE).
 ---
 
 <p align="center">
-  <strong>🔥 Simplicio — Your code, your machine, 96% cheaper. 🔥</strong>
+  <strong>🔥 Simplicio — Your code, your machine, up to 96% fewer tokens on controlled workloads. 🔥</strong>
 </p>
