@@ -6,6 +6,10 @@ Consumidores finais via release do Runtime e, opcionalmente, via `npx @wesleysim
 ## De quem este repo depende
 - [simplicio-runtime](https://github.com/wesleysimplicio/simplicio-runtime) — fonte do binário compilado e do bundle nativo incluído no release
 
+## Versão atual
+
+3.6.7 (manifest público legado; bundle nativo novo pendente de release)
+
 ## Regra de distribuição
 
 O Runtime binário é a fronteira de instalação. Cada release compatível deve
