@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
-
 
 PACKAGE_ROOT = Path(__file__).parents[2] / "pypi" / "simplicio"
 REPO_ROOT = Path(__file__).parents[2]
@@ -16,7 +14,7 @@ sys.path.insert(0, str(PACKAGE_ROOT))
 import simplicio  # noqa: E402
 from simplicio import __main__ as installer  # noqa: E402
 
-TEST_TRUST = {"3.5.2": "fixture-digest"}
+TEST_TRUST = {"3.8.11": "fixture-digest"}
 
 
 @pytest.fixture(autouse=True)
@@ -26,7 +24,7 @@ def fixture_manifest_trust(monkeypatch, request):
 
 
 def trusted_digest(payload):
-    TEST_TRUST["3.5.2"] = hashlib.sha256(payload).hexdigest()
+    TEST_TRUST["3.8.11"] = hashlib.sha256(payload).hexdigest()
     return TEST_TRUST
 
 
@@ -37,7 +35,7 @@ class FakeReleaseClient:
         trusted_digest(manifest)
         self.release_data = (
             {
-                "tag_name": "v3.5.2",
+                "tag_name": "v3.8.11",
                 "assets": [
                     {"name": installer.MANIFEST_ASSET},
                     {"name": "simplicio-linux-x64"},
@@ -72,7 +70,7 @@ class Response:
         return self.payload
 
 
-def manifest_for(payload, version="3.5.2", target="linux-x64", asset="simplicio-linux-x64"):
+def manifest_for(payload, version="3.8.11", target="linux-x64", asset="simplicio-linux-x64"):
     return json_bytes(
         {
             "version": version,
@@ -90,7 +88,7 @@ def json_bytes(value):
 def valid_runner(command, **kwargs):
     assert command[1:] == ["version", "--json"]
     assert kwargs["check"] and kwargs["capture_output"] and kwargs["text"]
-    return subprocess.CompletedProcess(command, 0, '{"runtime":{"version":"3.5.2"}}', "")
+    return subprocess.CompletedProcess(command, 0, '{"runtime":{"version":"3.8.11"}}', "")
 
 
 def test_install_verifies_then_atomically_replaces_binary(tmp_path, monkeypatch):
@@ -173,7 +171,7 @@ def test_target_uses_canonical_distribution_asset_names():
 def test_install_rejects_missing_release_before_any_download(tmp_path, monkeypatch):
     client = FakeReleaseClient(manifest_for(b"runtime"), release=False)
     monkeypatch.setattr(installer, "_target", lambda: ("linux-x64", "simplicio-linux-x64"))
-    with pytest.raises(installer.InstallError, match="Release v3.5.2 was not found"):
+    with pytest.raises(installer.InstallError, match="Release v3.8.11 was not found"):
         installer.do_install(client=client, install_dir=tmp_path, runner=valid_runner)
     assert client.downloaded == []
 
@@ -255,18 +253,18 @@ def test_release_client_fetches_versioned_release_and_asset():
     def opener(url):
         calls.append(url)
         return (
-            Response(b'{"tag_name":"v3.5.2"}')
-            if url.endswith("/v3.5.2")
+            Response(b'{"tag_name":"v3.8.11"}')
+            if url.endswith("/v3.8.11")
             else Response(b"binary")
         )
 
     client = installer.ReleaseClient("https://api.example/releases", opener)
-    assert client.release("v3.5.2")["tag_name"] == "v3.5.2"
+    assert client.release("v3.8.11")["tag_name"] == "v3.8.11"
     assert client.download_asset(
         {"browser_download_url": "https://github.com/org/repo/releases/download/v3/a"}
     ) == b"binary"
     assert calls == [
-        "https://api.example/releases/v3.5.2",
+        "https://api.example/releases/v3.8.11",
         "https://github.com/org/repo/releases/download/v3/a",
     ]
 
@@ -280,7 +278,7 @@ def test_release_client_rejects_non_github_asset_url():
 
 def test_default_manifest_pin_matches_versioned_checkout():
     payload = (REPO_ROOT / "simplicio-update-manifest.json").read_bytes()
-    assert installer.TRUSTED_MANIFEST_SHA256["3.5.2"] == hashlib.sha256(payload).hexdigest()
+    assert installer.TRUSTED_MANIFEST_SHA256["3.8.11"] == hashlib.sha256(payload).hexdigest()
 
 
 def test_install_rejects_substituted_or_unpinned_manifest_before_runtime_download(
@@ -294,7 +292,7 @@ def test_install_rejects_substituted_or_unpinned_manifest_before_runtime_downloa
             client=client,
             install_dir=tmp_path,
             runner=valid_runner,
-            trusted_manifest_sha256={"3.5.2": "0" * 64},
+            trusted_manifest_sha256={"3.8.11": "0" * 64},
         )
     assert client.downloaded == [installer.MANIFEST_ASSET]
 
@@ -313,16 +311,16 @@ def test_target_rejects_unsupported_platform():
 
 def test_artifact_rejects_wrong_name_and_invalid_digest():
     with pytest.raises(installer.InstallError, match="asset mismatch"):
-        installer._artifact(json.loads(manifest_for(b"x")), "linux-x64", "other", "3.5.2")
+        installer._artifact(json.loads(manifest_for(b"x")), "linux-x64", "other", "3.8.11")
     manifest = json.loads(manifest_for(b"x"))
     manifest["artifacts"][0]["sha256"] = "not-a-digest"
     with pytest.raises(installer.InstallError, match="valid SHA-256"):
-        installer._artifact(manifest, "linux-x64", "simplicio-linux-x64", "3.5.2")
+        installer._artifact(manifest, "linux-x64", "simplicio-linux-x64", "3.8.11")
 
 
 @pytest.mark.parametrize(
     "manifest",
-    [[], {"version": "3.5.2", "artifacts": {}}, {"artifacts": ["bad"]}],
+    [[], {"version": "3.8.11", "artifacts": {}}, {"artifacts": ["bad"]}],
 )
 def test_install_rejects_invalid_manifest_structure(tmp_path, monkeypatch, manifest):
     client = FakeReleaseClient(json_bytes(manifest))
@@ -350,7 +348,7 @@ def test_windows_staging_uses_exe_suffix(tmp_path, monkeypatch):
 
     def runner(command, **kwargs):
         staged_paths.append(command[0])
-        return subprocess.CompletedProcess(command, 0, '{"runtime":{"version":"3.5.2"}}', "")
+        return subprocess.CompletedProcess(command, 0, '{"runtime":{"version":"3.8.11"}}', "")
 
     installer.do_install(client=client, install_dir=tmp_path, runner=runner)
     assert staged_paths[0].endswith(".exe")

@@ -1,7 +1,8 @@
 #!/usr/bin/env pwsh
 # install.ps1 — Install/update/uninstall/doctor the Simplicio Runtime on Windows
-# The Runtime binary carries the real Python project sources; it does not
-# rewrite them as Rust or download sibling simplicio-* repositories.
+# The installer accepts only a Runtime release whose own readiness contract
+# confirms embedded sources, active Google login support, and signed updates.
+# It never downloads sibling simplicio-* repositories.
 #
 # Usage:
 #   powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex"
@@ -13,7 +14,7 @@
 #   SIMPLICIO_BIN_DIR           - custom install directory
 #   SIMPLICIO_ALLOW_UNVERIFIED  - "1" to proceed even if no checksum is
 #                                 published for this target (default: refuse)
-#   SIMPLICIO_BUNDLE_DIR       - bundle report directory (default: ~/.simplicio)
+#   SIMPLICIO_BUNDLE_DIR       - Runtime report directory (default: ~/.simplicio)
 #
 # Asset naming follows distribution/targets.json (the canonical target
 # triplet table for the whole ecosystem) — target "windows-x64", asset
@@ -45,21 +46,51 @@ function Test-InPath([string]$dir) {
   return ($env:Path -split ";") -contains $dir
 }
 
-function Test-EmbeddedEcosystem {
-  if (-not (Test-Path $DestPath)) { return $false }
+function Get-RuntimeVersionJson([string]$BinaryPath) {
   try {
-    $null = & $DestPath ecosystem verify --json 2>$null
-    return ($LASTEXITCODE -eq 0)
+    $raw = & $BinaryPath version --json 2>$null | Out-String
+    if ($LASTEXITCODE -ne 0) { return $null }
+    return ($raw | ConvertFrom-Json)
   } catch {
-    return $false
+    return $null
   }
+}
+
+function Test-RuntimeReleaseContract([string]$BinaryPath) {
+  if (-not (Test-Path $BinaryPath)) { return $false }
+  $meta = Get-RuntimeVersionJson $BinaryPath
+  if ($null -eq $meta) { return $false }
+  $distribution = $meta.auto_update.distribution
+  $identity = $meta.identity
+  $security = if ($null -ne $meta.security) { $meta.security } else { $meta.auto_update.security }
+  if ($null -eq $distribution -or $null -eq $identity -or $null -eq $security) { return $false }
+  return [bool](
+    $distribution.source_code_distributed -eq $true -and
+    $identity.enabled -eq $true -and
+    $identity.login_enabled -eq $true -and
+    $security.signature_required -eq $true -and
+    $security.public_key_configured -eq $true
+  )
 }
 
 function Test-ActiveLogin {
   if (-not (Test-Path $DestPath)) { return $false }
   try {
-    $null = & $DestPath auth status --json 2>$null
-    return ($LASTEXITCODE -eq 0)
+    $raw = & $DestPath auth status --json 2>$null | Out-String
+    if ($LASTEXITCODE -ne 0) { return $false }
+    $status = $raw | ConvertFrom-Json
+    $identity = $status.identity
+    if ($null -eq $identity) { return $false }
+    $active = (
+      $identity.enabled -eq $true -and
+      $identity.login_enabled -eq $true -and
+      $identity.status -notin @("disabled", "logged_out", "revoked") -and
+      -not [string]::IsNullOrWhiteSpace([string]$identity.email)
+    )
+    if ($null -ne $status.entitlement -and $null -ne $status.entitlement.updates_allowed) {
+      $active = $active -and ($status.entitlement.updates_allowed -eq $true)
+    }
+    return [bool]$active
   } catch {
     return $false
   }
@@ -68,7 +99,7 @@ function Test-ActiveLogin {
 function Require-ActiveLogin {
   if (Test-ActiveLogin) { return }
   Write-Host "==> Google login is required to activate Simplicio Runtime"
-  & $DestPath auth login
+  & $DestPath login google
   if ($LASTEXITCODE -ne 0 -or -not (Test-ActiveLogin)) {
     throw "Login ausente, expirado, revogado ou sem entitlement ativo; instalação bloqueada"
   }
@@ -102,10 +133,10 @@ if ($Doctor) {
       $ok = $false
     }
 
-    if (Test-EmbeddedEcosystem) {
-      Write-Host "  [OK] real Python sources are embedded in the binary"
+    if (Test-RuntimeReleaseContract $DestPath) {
+      Write-Host "  [OK] Runtime release contract is ready"
     } else {
-      Write-Host "  [FAIL] binary does not contain the expected Python source bundle"
+      Write-Host "  [FAIL] release is missing embedded sources, login activation, or update key"
       $ok = $false
     }
 
@@ -187,15 +218,22 @@ try {
 
 $ExpectedSha256 = $null
 $ExpectedSigned = $false
+$ExpectedSignature = $null
+$SignatureRequired = $false
 if ($Manifest) {
   $artifact = $Manifest.artifacts | Where-Object { $_.target -eq $Target } | Select-Object -First 1
   if ($artifact) {
     $ExpectedSha256 = $artifact.sha256
     $ExpectedSigned = [bool]$artifact.signed
+    $ExpectedSignature = $artifact.signature
   }
+  $SignatureRequired = [bool]$Manifest.security.signature_required
 }
 
-if (-not $ExpectedSha256) {
+if ($SignatureRequired -and (-not $ExpectedSigned -or [string]::IsNullOrWhiteSpace([string]$ExpectedSignature))) {
+  Write-Error "Refusing to install: the manifest requires an Ed25519 signature, but target '$Target' has no published signature."
+  exit 1
+} elseif (-not $ExpectedSha256) {
   if ($env:SIMPLICIO_ALLOW_UNVERIFIED -eq "1") {
     Write-Host "  ! no published checksum for target '$Target' — proceeding UNVERIFIED (SIMPLICIO_ALLOW_UNVERIFIED=1)"
   } else {
@@ -203,12 +241,12 @@ if (-not $ExpectedSha256) {
     exit 1
   }
 } elseif (-not $ExpectedSigned) {
-  Write-Host "  ! checksum will be verified, but this artifact is not cryptographically signed yet (ed25519 signing not wired for $Target — see issue #5)"
+  Write-Host "  ! checksum will be verified, but this release channel does not yet require an Ed25519 signature for $Target"
 }
 
 # ─── Download to a staging file, verify, then atomically swap in ──────────
 $DownloadUrl = "$ReleaseBase/$Asset"
-$StagingPath = "$DestPath.download-$([guid]::NewGuid().ToString('N')).tmp"
+$StagingPath = "$DestPath.download-$([guid]::NewGuid().ToString('N')).exe"
 
 Write-Host "==> downloading $DownloadUrl"
 try {
@@ -235,6 +273,15 @@ if ($ExpectedSha256) {
   Write-Host "  ✓ SHA256 verified: $actualSha256"
 }
 
+# Validate the staged executable before the atomic swap. A release that lacks
+# embedded sources, Google login activation, or the signed-update key must not
+# replace a working installation and then fail its post-install checks.
+if (-not (Test-RuntimeReleaseContract $StagingPath)) {
+  Remove-Item -Force $StagingPath -ErrorAction SilentlyContinue
+  Write-Error "Runtime release does not meet the distribution contract (embedded sources, Google login, and signed-update key); installation aborted."
+  exit 1
+}
+
 # Atomic swap: rename into place on the same volume so there is never a
 # window where $DestPath is a half-written file, and re-running this script
 # (idempotent update) never leaves stale .tmp files behind on success.
@@ -247,7 +294,7 @@ try {
 }
 Write-Host "  ✓ installed: $DestPath"
 
-# ─── Verify the downloaded Runtime and its embedded Python source bundle ─────
+# ─── Verify the downloaded Runtime ──────────────────────────────────────────
 try {
   $output = & $DestPath version 2>&1 | Out-String
   if ($LASTEXITCODE -ne 0) { throw "version command returned $LASTEXITCODE" }
@@ -256,11 +303,11 @@ try {
   exit 1
 }
 
-if (-not (Test-EmbeddedEcosystem)) {
-  Write-Error "This Runtime does not contain the expected embedded Python source bundle; refusing to finish installation. Install a compatible Runtime release."
+if (-not (Test-RuntimeReleaseContract $DestPath)) {
+  Write-Error "This Runtime does not meet the distribution contract; refusing to finish installation. Install a compatible Runtime release."
   exit 1
 }
-Write-Host "  ✓ real Python source bundle verified in the binary"
+Write-Host "  ✓ Runtime release contract verified"
 
 # ─── Active login is mandatory; beta does not bypass this gate ──────────────
 try {
@@ -283,15 +330,15 @@ try {
 
 $BundleDir = if ($env:SIMPLICIO_BUNDLE_DIR) { $env:SIMPLICIO_BUNDLE_DIR } else { Join-Path $env:USERPROFILE ".simplicio" }
 New-Item -ItemType Directory -Force -Path $BundleDir | Out-Null
-$BundleReport = Join-Path $BundleDir "ecosystem-bundle.json"
+$RuntimeReport = Join-Path $BundleDir "runtime-release.json"
 try {
-  $bundleJson = & $DestPath ecosystem verify --json 2>&1
-  if ($LASTEXITCODE -ne 0) { throw "ecosystem verify returned $LASTEXITCODE" }
-  $bundleJson | Set-Content -Encoding UTF8 $BundleReport
-  Write-Host "  ✓ embedded Python source report: $BundleReport"
+  $runtimeJson = & $DestPath version --json 2>&1
+  if ($LASTEXITCODE -ne 0) { throw "version --json returned $LASTEXITCODE" }
+  $runtimeJson | Set-Content -Encoding UTF8 $RuntimeReport
+  Write-Host "  ✓ Runtime release report: $RuntimeReport"
 } catch {
-  if (Test-Path $BundleReport) { Remove-Item -Force $BundleReport -ErrorAction SilentlyContinue }
-  Write-Error "Could not persist the embedded ecosystem verification: $($_.Exception.Message)"
+  if (Test-Path $RuntimeReport) { Remove-Item -Force $RuntimeReport -ErrorAction SilentlyContinue }
+  Write-Error "Could not persist the Runtime release report: $($_.Exception.Message)"
   exit 1
 }
 
@@ -306,8 +353,8 @@ if (-not (Test-InPath $InstallDir)) {
 
 Write-Host ""
 Write-Host "  ✓ simplicio Runtime $Version (windows-x64) installed successfully"
-Write-Host "  ✓ Mapper, Dev CLI, Loop, Fast, Prompt and Sprint Python sources are in the binary"
-Write-Host "  ✓ no pip packages, sibling checkouts or simplicio-* downloads were installed"
+Write-Host "  ✓ Runtime release contract is active"
+Write-Host "  ✓ no pip packages or sibling checkouts were installed"
 Write-Host "  ✓ active Google login is required for product commands"
 Write-Host ""
 Write-Host "  Run:     simplicio chat 'hello' --repo ."

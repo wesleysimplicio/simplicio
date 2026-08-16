@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import json
 import contextlib
 import io
+import json
 import subprocess
 import sys
 import tempfile
@@ -11,9 +11,7 @@ from datetime import date
 from pathlib import Path
 
 from scripts import benchmark_distribution as benchmark
-from scripts import flaky_check
-from scripts import quality_policy
-from scripts import security_scan
+from scripts import flaky_check, quality_policy, security_scan
 
 
 class QualityPolicyTests(unittest.TestCase):
@@ -67,10 +65,19 @@ class QualityPolicyTests(unittest.TestCase):
             "# JUSTIFICATION: external service\n"
             "# https://github.com/wesleysimplicio/simplicio/issues/10\n"
         )
-        self.assertEqual(quality_policy.justification_error(base + "# REMOVE-BY: 2026-07-20", date(2026, 7, 14)), "missing OWNER")
+        self.assertEqual(
+            quality_policy.justification_error(base + "# REMOVE-BY: 2026-07-20", date(2026, 7, 14)),
+            "missing OWNER",
+        )
         complete = base + "# OWNER: @maintainer\n"
-        self.assertEqual(quality_policy.justification_error(complete + "# REMOVE-BY: 2026-07-01", date(2026, 7, 14)), "REMOVE-BY is expired")
-        self.assertEqual(quality_policy.justification_error(complete + "# REMOVE-BY: 2026-09-01", date(2026, 7, 14)), "REMOVE-BY exceeds 30 days")
+        self.assertEqual(
+            quality_policy.justification_error(complete + "# REMOVE-BY: 2026-07-01", date(2026, 7, 14)),
+            "REMOVE-BY is expired",
+        )
+        self.assertEqual(
+            quality_policy.justification_error(complete + "# REMOVE-BY: 2026-09-01", date(2026, 7, 14)),
+            "REMOVE-BY exceeds 30 days",
+        )
 
     def test_policy_junit_records_violation(self):
         with tempfile.TemporaryDirectory() as directory:

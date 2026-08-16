@@ -217,7 +217,10 @@ class ReleaseProvenanceTests(unittest.TestCase):
             self.assertEqual(provenance.verify_staged_files(working, root), ["staging set is missing: simplicio-macos-arm64"])
             artifact = root / "simplicio-macos-arm64"
             artifact.write_bytes(b"wrong")
-            self.assertEqual(provenance.verify_staged_files(working, root), ["staged artifact digest mismatch for simplicio-macos-arm64"])
+            self.assertEqual(
+                provenance.verify_staged_files(working, root),
+                ["staged artifact digest mismatch for simplicio-macos-arm64"],
+            )
             artifact.write_bytes(payload)
             self.assertEqual(provenance.verify_staged_files(working, root), [])
 

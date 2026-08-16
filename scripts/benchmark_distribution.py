@@ -29,6 +29,11 @@ PAYLOAD_FILES = (
     "pypi/simplicio/simplicio/__main__.py",
 )
 
+# v3.8.11 is the last published channel before Ed25519 artifacts are wired.
+# Keep the benchmark useful for performance regressions without hiding any
+# other distribution warning or error.
+KNOWN_INTERIM_WARNING = "artifacts published with checksum but no signature yet (interim"
+
 
 @dataclass(frozen=True)
 class MetricResult:
@@ -47,8 +52,14 @@ def audit_median_ms(root: Path = ROOT, repetitions: int = 5) -> float:
     for _ in range(repetitions):
         started = time.perf_counter()
         findings = run_audit(root)
-        if any(item.level in {"ERROR", "WARN"} for item in findings):
-            raise RuntimeError("distribution audit is not clean")
+        blocking = [
+            item
+            for item in findings
+            if item.level == "ERROR"
+            or (item.level == "WARN" and KNOWN_INTERIM_WARNING not in item.message)
+        ]
+        if blocking:
+            raise RuntimeError("distribution audit has blocking findings")
         samples.append((time.perf_counter() - started) * 1000)
     return statistics.median(samples)
 

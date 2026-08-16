@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.8.11] - 2026-08-14
+
+### Changed
+
+- Synchronized the committed macOS ARM64, Linux x64, and Windows x64 binaries
+  with the published Runtime v3.8.11 release.
+- Updated the root checksum/manifest files and installation documentation to
+  match the same release.
+- Documented the mandatory Google login, Codex MCP registration, the current
+  compiled-only Runtime limitation, and the current macOS Intel asset
+  limitation.
+
+### Security
+
+- v3.8.11 artifacts verify against SHA256, but the binary reports disabled
+  Google login, no distributed source bundle, and no configured public update
+  key. The installers fail closed on those readiness gaps; missing checksums
+  remain fail-closed as well.
+
 ## [3.6.7] - 2026-08-05
 
 ### Changed
@@ -80,4 +99,3 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Auto-built release from `simplicio-runtime`, including refreshed binaries
   for macOS, Linux, and Windows and an updated signed update manifest.
-

@@ -68,14 +68,11 @@ Platform: Windows AMD64
 summary: 9/10 scenarios passed
 ```
 
-**Known finding (not introduced by this change):** scenario 7b currently
-fails for a real reason — `version.txt` (3.0.2) is stale relative to
-`simplicio-update-manifest.json` (3.5.2, published in commit `e24b426`), and
-the npm/PyPI wrapper versions lag both. This is exactly the
-contract-incompatibility failure mode issue #9 asks the pipeline to catch
-("Contratos incompatíveis fazem o pipeline falhar"), so scenario 7b is
-intentionally left failing rather than papered over — see "Next steps"
-below.
+This output is historical evidence from the v1.6.4 Windows snapshot. The
+version drift shown there was corrected in the public v3.8.11 synchronization:
+`version.txt`, the npm/PyPI source metadata, `SIMPLICIO_ECOSYSTEM.md`, and the
+published update manifest now agree. Re-run the command against the current
+root binary before using this transcript as release evidence.
 
 ## CI
 
@@ -87,10 +84,6 @@ attached diagnostics.
 
 ## Next steps (out of scope for this PR)
 
-- Fix the real version drift found by 7b (`version.txt`, wrapper
-  `package.json`/`pyproject.toml`, and
-  `SIMPLICIO_ECOSYSTEM.md` vs. `simplicio-update-manifest.json`) — separate
-  from the testing work in this issue.
 - Add macOS/Linux CI legs once hosted runners for this repo have `git`
   available in the default image path used by the ephemeral repo bootstrap
   (currently only exercised locally on those OSes).

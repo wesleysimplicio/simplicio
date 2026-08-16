@@ -1,7 +1,10 @@
 # Installing Simplicio
 
 Simplicio is a terminal-based AI coding agent and runtime. It ships as a single
-compiled binary with no external dependencies.
+compiled binary with no runtime package dependencies. A compliant release must
+also carry the six Python projects, activate Google login, and publish the key
+needed for signed updates; the published v3.8.11 snapshot does not yet satisfy
+those gates and the installers refuse to finish with it.
 
 ## Quick Install
 
@@ -38,6 +41,13 @@ running the binary. Then place it somewhere on your `PATH` (e.g.
 `/usr/local/bin` or `~/.local/bin`), naming it `simplicio` (or `simplicio.exe`
 on Windows).
 
+The latest published `v3.8.11` release contains macOS Apple Silicon, Linux
+x64, and Windows x64 assets. It does not contain a macOS Intel asset; the
+installer refuses a target with no manifest checksum instead of using the
+stale legacy `simplicio-darwin-x64` binary. Its runtime readiness metadata also
+reports `source_code_distributed=false`, `login_enabled=false`, and
+`public_key_configured=false`; do not treat it as the final user-facing release.
+
 ## Doctor / Uninstall
 
 Both installers are idempotent and expose a health check and a clean,
@@ -64,7 +74,7 @@ config under `~/.simplicio`.
 simplicio help
 ```
 
-Expected output starts with `simplicio 0.9.2`.
+Expected output starts with `simplicio 3.8.11`.
 
 ## Configuration
 
@@ -168,30 +178,52 @@ Same workflow — Simplicio commands work from any terminal-based AI agent.
 
 ## Fontes Python no Runtime
 
-O binário Runtime é o artefato de instalação e carrega as árvores de fontes
-Python reais de Mapper, Dev CLI, Loop, Fast, Prompt e Sprint. Esses projetos não
-são reescritos como Rust. A instalação padrão não instala pacotes Python, não
-clona `simplicio-*` e não procura checkouts locais.
+A política do produto exige que o binário carregue as árvores de fontes Python
+reais de Mapper, Dev CLI, Loop, Fast, Prompt e Sprint. Esses projetos não devem
+ser reescritos como Rust, instalados via `pip` ou baixados como `simplicio-*`.
+O snapshot público v3.8.11 informa `source_code_distributed=false`, portanto os
+fontes ainda não estão neste binário e o instalador o recusa.
 
-O Runtime ainda precisa de um interpretador Python 3 disponível para executar
-os fontes embutidos. A sessão do Google é obrigatória, inclusive durante o beta:
+Quando uma release compatível estiver publicada, a sessão do Google será
+obrigatória, inclusive durante o beta:
 
 ```bash
-simplicio auth login
+simplicio login google
 simplicio auth status --json
 ```
 
-Depois da instalação, valide o bundle e guarde o relatório opcional:
+Depois da instalação, valide o contrato e guarde o relatório opcional:
 
 ```bash
-simplicio ecosystem verify --json
+simplicio version --json
+simplicio ecosystem doctor --json
 ```
 
-O relatório identifica o digest/tamanho do arquivo-fonte embutido, a versão, o
-commit de proveniência, o modo de implementação e o estado de compatibilidade
-de cada componente. Adaptadores externos/portáveis continuam disponíveis
+O relatório identifica a versão, o commit de proveniência, o contrato de
+segurança e o estado de compatibilidade de cada componente. Adaptadores externos/portáveis continuam disponíveis
 somente para fluxos explicitamente legados; eles não são parte do caminho
 normal e não podem substituir o Runtime verificado pelo instalador.
+
+## Login e MCP
+
+O login Google é obrigatório, inclusive durante o beta:
+
+```bash
+simplicio login google
+simplicio auth status --json
+```
+
+Depois do login, registre o MCP local para o Codex e recarregue as configurações
+de MCP:
+
+```bash
+simplicio mcp register
+```
+
+No Codex, abra Settings → MCP e use Authenticate quando o servidor
+`simplicio` exibir esse botão. Para clientes STDIO, use
+`simplicio serve --mcp --stdio`; nunca copie tokens manualmente para arquivos
+de configuração.
 
 ## Building from Source
 

@@ -30,6 +30,7 @@ MANIFEST_ASSET = "simplicio-update-manifest.json"
 # The wheel anchors each release manifest before trusting its artifact hashes.
 TRUSTED_MANIFEST_SHA256 = {
     "3.5.2": "85a486b1210d3610365ce78279f3b964c5713ab311407efa8812cd6eeda4fc1f",
+    "3.8.11": "22e535fb3875bad6af98af1b156975b25f2a4a5b0cbd32462ca2d9d0f2c3a9f0",
 }
 
 # Kept in lockstep with distribution/targets.json.  The PyPI wheel must retain

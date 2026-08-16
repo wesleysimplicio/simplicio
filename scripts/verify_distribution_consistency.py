@@ -41,7 +41,7 @@ PUBLISH_BODY = (
     "Free public beta. All features remain unlocked during the public-beta phase.\n\n"
     "Windows: `irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex`\n"
     "macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh`\n\n"
-    "Signed update manifest included (`simplicio update check`).\n"
+    "Checksum-verified update manifest included (`simplicio update check`).\n"
 )
 CANONICAL_PUBLISH_WITH = {
     "tag_name": "v${{ steps.state.outputs.version }}",
@@ -260,7 +260,10 @@ def check_target_triplet_consistency(root: Path, findings: list[Finding]) -> Non
     # reintroducing a target-specific allowlist that could drift from this
     # table.
     if "dist/*" not in release_yml:
-        offenders.append("release.yml no longer publishes the generic dist/* glob (asset naming may have drifted from distribution/targets.json)")
+        offenders.append(
+            "release.yml no longer publishes the generic dist/* glob "
+            "(asset naming may have drifted from distribution/targets.json)"
+        )
 
     for t in targets:
         target_id = t["id"]
@@ -288,7 +291,11 @@ def check_target_triplet_consistency(root: Path, findings: list[Finding]) -> Non
         findings.append(Finding("ERROR", "target-triplet drift detected: " + "; ".join(offenders)))
     else:
         findings.append(
-            Finding("OK", f"release.yml, installers and manifest all agree with distribution/targets.json ({len(targets)} targets).")
+            Finding(
+                "OK",
+                "release.yml, installers and manifest all agree with "
+                f"distribution/targets.json ({len(targets)} targets).",
+            )
         )
 
     # Unsigned-but-checksummed artifacts are allowed as an interim step, but
