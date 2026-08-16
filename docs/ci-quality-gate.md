@@ -140,10 +140,9 @@ dropped:
   install-script E2E smoke tests (actually running `install.sh` /
   `install.ps1` in disposable containers/VMs) are wanted, that's a
   distinct, heavier job worth its own PR.
-- **Wrapper/version auto-fix**: the audit still WARNs (non-blocking) that
-  the npm packages and `pypi/simplicio` lag the
-  manifest version, and that the beta-until date/README copy are stale.
-  Those are real product/release decisions (what version to actually
-  publish where), not CI-gate plumbing, and are left for a separate PR.
+- **Wrapper/version auto-fix**: the public source metadata is now aligned with
+  the published v3.8.11 manifest. Publishing the corresponding npm/PyPI
+  packages remains a separate registry operation and must not be inferred from
+  a source-repository commit alone.
 - **Branch protection activation**: see above — requires admin action
   outside this PR.

@@ -57,9 +57,9 @@ optional, not required.**
 ## 🚀 Installation
 
 The official installers download the latest Runtime release from this
-repository, verify the published SHA256 manifest, validate the embedded Python
-bundle, require an active Simplicio account, and attempt to register the local MCP
-endpoint. They do not clone or download the `simplicio-*` sibling repositories.
+repository, verify the published SHA256 manifest, validate the Runtime release
+contract, require an active Simplicio account, and attempt to register the local
+MCP endpoint. They do not clone or download the `simplicio-*` sibling repositories.
 
 ### macOS / Linux
 
@@ -90,11 +90,24 @@ PowerShell equivalents are available through `SIMPLICIO_VERSION` and
 `SIMPLICIO_ALLOW_UNVERIFIED=1` when you have deliberately accepted an
 unverified artifact and understand the supply-chain risk.
 
+The latest published release is `v3.8.11`. It currently publishes macOS Apple
+Silicon, Linux x64, and Windows x64 assets. The release manifest contains
+SHA256 checksums, but the binary itself reports `source_code_distributed=false`,
+`login_enabled=false`, and `public_key_configured=false`. It therefore does not
+meet the Simplicio launch contract and the installers refuse to finish with it.
+Never override a missing checksum or a failed readiness gate.
+
+The next public release must contain the six Python projects in the binary,
+enable Google login, and ship the configured public key plus signed update
+artifacts. A Runtime source build or a private candidate is not a substitute
+for a published, verifiable release.
+
 Check the installation:
 
 ```bash
 simplicio --version
-simplicio ecosystem verify --json
+simplicio version --json
+simplicio ecosystem doctor --json
 sh install.sh --doctor                 # when running from a checkout
 ```
 
@@ -108,32 +121,39 @@ pwsh install.ps1 -Uninstall             # Windows
 
 ### What the binary contains
 
-The Runtime is the distribution boundary. Each release embeds the real Python
-source trees and a Runtime bridge for Mapper, Dev CLI, Loop, Fast, Prompt, and
-Sprint. They remain Python projects; they are not rewritten as Rust, and a
-normal installation does not download their repositories or install them with
-`pip`. The Runtime may use an available Python 3 interpreter to execute those
-embedded sources.
+The Runtime is the intended distribution boundary. A compliant release embeds
+the real Python source trees and a Runtime bridge for Mapper, Dev CLI, Loop,
+Fast, Prompt, and Sprint. They remain Python projects; they are not rewritten
+as Rust, and a normal installation must not download their repositories or
+install them with `pip`.
 
-`simplicio ecosystem verify --json` reports the embedded component versions,
-source archive digest, provenance commits, and compatibility status. Run it
-after every update and attach its JSON to a bug report when an embedded
-component looks stale.
+The published v3.8.11 binary is an older compiled-only snapshot: its
+`version --json` contract explicitly says `source_code_distributed=false` and
+marks those components optional. It is retained as historical release data, not
+as the final no-download installer. Use `simplicio version --json` and
+`simplicio ecosystem doctor --json` after every future update.
 
 ## 🔐 Login and entitlement
 
 Simplicio uses a Google-backed device login. The CLI receives revocable
 Simplicio tokens; your Google password is entered only on Google. Login is
-required before product commands, MCP, and the embedded ecosystem can be used.
+required before product commands, MCP, and the ecosystem integration can be used.
 
 Public beta access may be free, but beta does not bypass the active-entitlement
 check. When beta access ends, the entitlement must come from an active
 subscription.
 
-### First login
+### Current published-release status
 
-The installer starts the login flow when no active session exists. To start it
-manually:
+The v3.8.11 binary reports the Google identity contract as disabled. Its
+`simplicio login google --json` response is `status: disabled`, so there is no
+successful login flow in that published asset yet. The installer blocks it
+instead of allowing an unauthenticated or unsigned launch.
+
+### First login (compatible releases)
+
+On a compatible release, the installer starts the login flow when no active
+session exists. To start it manually:
 
 ```bash
 simplicio login google
@@ -160,11 +180,10 @@ Confirm only the state, not the full credential payload:
 simplicio auth status --json
 ```
 
-The successful result must report `active: true`. If it reports `active: false`,
-the session may be missing, expired, revoked, or associated with an account
-without an active entitlement. Run `simplicio login google` again and confirm
-that the browser completed the same device flow. `simplicio auth login` is kept
-as a compatibility alias by installer-era builds.
+The successful result must report an enabled identity, an active login state,
+and an allowed entitlement. If it reports `status: disabled` or any inactive
+state, the session is not usable. Do not treat a zero process exit code alone
+as proof of authentication; inspect the structured fields.
 
 To revoke the local session:
 
@@ -182,7 +201,7 @@ and call Simplicio's governed local tools. The client supplies intent and
 structured arguments; the Simplicio Runtime performs repository mapping,
 memory recall, deterministic edits, validation, and execution under its
 authentication and safety gates. MCP is an invocation surface, not a second
-installation of Mapper, Loop, or the other embedded projects.
+installation of Mapper, Loop, or the other projects.
 
 The Runtime exposes these tools:
 
@@ -290,8 +309,8 @@ This public repository also publishes the Simplicio Claude Code marketplace:
 ```
 
 The plugin bundle is documented in [`PLUGIN.md`](PLUGIN.md). These are optional
-Claude Code skill surfaces; they are not required to obtain the Runtime's
-embedded ecosystem. When present, the skills call the Runtime through
+Claude Code skill surfaces; they are not proof that the Runtime binary contains
+the ecosystem sources. When present, the skills call the Runtime through
 `simplicio serve --mcp --stdio`.
 
 ---
@@ -462,10 +481,19 @@ LLM (Claude/Codex/Gemini)          Simplicio Runtime
 
 ## 🔄 Updates, diagnostics, and troubleshooting
 
-Re-running the official installer is the simplest update path. It is
-idempotent: it downloads the latest release, verifies the checksum, validates
-the embedded bundle, and keeps `~/.simplicio` user data. A pinned installer
-command updates only when you intentionally choose that version.
+Re-running the official installer is the simplest update path. It downloads
+the latest release, verifies the checksum, validates the Runtime release
+contract, and keeps `~/.simplicio` user data. A pinned installer command
+updates only when you intentionally choose that version. The installer refuses
+to replace a working binary with a release that lacks the embedded bundle,
+Google login activation, or the signed-update key.
+
+When the Runtime's background update checks are enabled, it checks in its
+scheduled windows, notifies once per release, stages the verified asset, and
+applies it on the next session. The current release channel is checksum
+verified. The current v3.8.11 executable already declares signed updates
+mandatory but reports `public_key_configured=false`; that mismatch is a release
+blocker, not a reason to disable verification.
 
 The Runtime also exposes an authenticated update surface:
 
@@ -481,7 +509,8 @@ the compatibility trade-off. After any update, repeat:
 
 ```bash
 simplicio --version
-simplicio ecosystem verify --json
+simplicio version --json
+simplicio ecosystem doctor --json
 simplicio auth status --json
 simplicio mcp register
 ```
@@ -493,7 +522,7 @@ Common failures:
 | `login required` | Run `simplicio login google`; confirm `active: true`. |
 | Codex has no **Authenticate** button | Run `simplicio mcp register`, then reload Codex MCP settings. |
 | `tools/list` is empty or stale | Restart/reload the MCP host and verify its command resolves to the intended `simplicio` binary. |
-| Embedded bundle verification fails | Re-run the official installer; do not install sibling repos with `pip` or clone them as a workaround. |
+| Runtime release contract fails | Wait for a release with embedded sources, enabled Google login, and a configured public update key; do not bypass the gate. |
 | Google says the browser is not secure | Use a normal Safari/Chrome window for the Google step, not an embedded webview; never disable the account security gate. |
 | A command behaves differently across terminals | Run `which simplicio`, `simplicio --version`, and inspect `PATH` for an older binary. |
 
@@ -508,7 +537,8 @@ simplicio security --json
 
 When reporting a problem, include the operating system, architecture,
 `simplicio --version`, the redacted output of `simplicio auth status --json`,
-and `simplicio ecosystem verify --json`. Remove email addresses, device codes,
+and `simplicio version --json` plus `simplicio ecosystem doctor --json`.
+Remove email addresses, device codes,
 authorization headers, and every credential before sharing logs.
 
 ---
@@ -535,7 +565,7 @@ simplicio license status
 | RAM | 8 GB | 16 GB+ |
 | Storage | ~35–50 MB for the release binary | 1.5 GB+ with a local LLM |
 | OS | macOS Apple Silicon, Linux x64, Windows x64 | macOS ARM64 |
-| Python | Python 3 for embedded Python surfaces | Current CPython 3 |
+| Python | Python 3 only for external adapters in the current v3.8.11 snapshot | Current CPython 3; a compliant release will embed the six projects |
 | Browser | Safari, Chrome, or another supported browser for Google login | Current Safari/Chrome |
 | Terminal | any modern terminal | WezTerm / Alacritty / Ghostty |
 
@@ -557,7 +587,8 @@ python3 scripts/verify_distribution_consistency.py
 See [docs/testing-strategy.md](docs/testing-strategy.md) for what's covered,
 what's intentionally out of scope, and the plan for the rest of the testing
 epic. The consistency audit may report release-hygiene warnings even when the
-unit suite is green; resolve those warnings before treating the stricter
+unit suite is green; resolve all warnings other than the explicitly tracked
+v3.8.11 unsigned-channel warning before treating the stricter
 `benchmark_distribution.py` gate as a release pass. See also
 [CONTRIBUTING.md](CONTRIBUTING.md).
 

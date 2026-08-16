@@ -95,7 +95,7 @@ jobs:
             Windows: `irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex`
             macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh`
 
-            Signed update manifest included (`simplicio update check`).
+            Checksum-verified update manifest included (`simplicio update check`).
           prerelease: false
           make_latest: "true"
           fail_on_unmatched_files: true
@@ -218,7 +218,12 @@ class DistributionConsistencyTests(unittest.TestCase):
         download["run"] += "\nCopy-Item simplicio dist/simplicio-macos-arm64"
         workflow.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
         errors = [item.message for item in audit.run_audit(self.root) if item.level == "ERROR"]
-        self.assertTrue(any("release workflow provenance" in message and "canonical single command" in message for message in errors))
+        self.assertTrue(
+            any(
+                "release workflow provenance" in message and "canonical single command" in message
+                for message in errors
+            )
+        )
 
     def test_regression_release_must_be_manual_only(self):
         workflow = self.root / ".github/workflows/release.yml"
@@ -291,7 +296,10 @@ env:
         document = yaml.safe_load(workflow.read_text(encoding="utf-8"))
         provenance_step = next(step for step in document["jobs"]["release"]["steps"] if step.get("id") == "provenance")
         provenance_step["env"] = {"SPOOF": "scripts/verify_release_provenance.py plan --tag-exists"}
-        provenance_step["run"] = "# python scripts/verify_release_provenance.py plan --working-manifest --tag-manifest --remote-release --artifact-base-url --github-output --tag-exists"
+        provenance_step["run"] = (
+            "# python scripts/verify_release_provenance.py plan --working-manifest "
+            "--tag-manifest --remote-release --artifact-base-url --github-output --tag-exists"
+        )
         errors = audit.release_workflow_errors(yaml.safe_dump(document, sort_keys=False))
         self.assertTrue(any("canonical single command" in error for error in errors))
         self.assertTrue(any("env must match" in error for error in errors))
@@ -341,22 +349,30 @@ env:
         duplicate["jobs"]["release"]["steps"].append({"id": "state", "run": "echo duplicate"})
         variants.append(duplicate)
         missing = json.loads(json.dumps(clean))
-        missing["jobs"]["release"]["steps"] = [step for step in missing["jobs"]["release"]["steps"] if step.get("id") != "publish"]
+        missing["jobs"]["release"]["steps"] = [
+            step for step in missing["jobs"]["release"]["steps"] if step.get("id") != "publish"
+        ]
         variants.append(missing)
         no_install = json.loads(json.dumps(clean))
         no_install["jobs"]["release"]["steps"][0]["run"] = "echo no dependencies"
         variants.append(no_install)
         bad_state = json.loads(json.dumps(clean))
-        next(step for step in bad_state["jobs"]["release"]["steps"] if step.get("id") == "state")["run"] = "echo remote-release.json"
+        next(step for step in bad_state["jobs"]["release"]["steps"] if step.get("id") == "state")["run"] = (
+            "echo remote-release.json"
+        )
         variants.append(bad_state)
         bad_guard = json.loads(json.dumps(clean))
         next(step for step in bad_guard["jobs"]["release"]["steps"] if step.get("id") == "download")["if"] = "always()"
         variants.append(bad_guard)
         bad_download = json.loads(json.dumps(clean))
-        next(step for step in bad_download["jobs"]["release"]["steps"] if step.get("id") == "download")["run"] = "Invoke-WebRequest -Uri $artifact.url # releases/download"
+        next(step for step in bad_download["jobs"]["release"]["steps"] if step.get("id") == "download")["run"] = (
+            "Invoke-WebRequest -Uri $artifact.url # releases/download"
+        )
         variants.append(bad_download)
         bad_staged = json.loads(json.dumps(clean))
-        next(step for step in bad_staged["jobs"]["release"]["steps"] if step.get("id") == "verify_staged")["run"] = "echo unchecked"
+        next(step for step in bad_staged["jobs"]["release"]["steps"] if step.get("id") == "verify_staged")["run"] = (
+            "echo unchecked"
+        )
         variants.append(bad_staged)
         bad_action = json.loads(json.dumps(clean))
         next(step for step in bad_action["jobs"]["release"]["steps"] if step.get("id") == "publish")["uses"] = "example/unsafe@v1"

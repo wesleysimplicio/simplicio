@@ -8,12 +8,18 @@ This is the **public distribution repo** for [Simplicio](https://github.com/wesl
 
 **Not the source code.** The Rust runtime source lives in the private [`simplicio-runtime`](https://github.com/wesleysimplicio/simplicio-runtime) repo.
 
-## Current Version: v3.6.7
+## Current Version: v3.8.11
 
-- **Release:** v3.6.7 — Windows x64 Runtime (operator routing and separate Mapper/Fast/Loop; Dev CLI nested under Loop)
-- **Previous:** v3.6.5 — Windows x64 Runtime (read-only doctor effect gate)
+- **Release:** v3.8.11 — Runtime assets for macOS ARM64, Linux x64, and Windows x64
+- **Previous:** v3.8.10 — Runtime multi-platform release
 - **Default branch:** `master`
-- **Assets this release:** Windows x86_64 (refreshed). macOS/Linux binaries remain from prior multi-platform train until next full rebuild.
+- **Assets this release:** macOS ARM64, Linux x64, and Windows x64. macOS Intel
+  is not published in this release and has no supported installer asset.
+- **Release readiness:** this published snapshot reports
+  `source_code_distributed=false`, `login_enabled=false`, and
+  `public_key_configured=false`; it is not approved for user launch. The
+  installers refuse to finish until a published Runtime satisfies all three
+  gates and ships signed artifacts.
 
 ### Product law (v3.6.0)
 
@@ -30,7 +36,9 @@ This is the **public distribution repo** for [Simplicio](https://github.com/wesl
 ├── READMEs/                  # README translations
 ├── install.sh / install.ps1  # Installers
 ├── VERSION.md                # This file — READ ME FIRST
-├── simplicio-windows-x64.exe # Windows binary
+├── simplicio                 # macOS ARM64 snapshot
+├── simplicio-linux-x64       # Linux x64 snapshot
+├── simplicio-windows-x64.exe # Windows x64 snapshot
 └── …
 ```
 

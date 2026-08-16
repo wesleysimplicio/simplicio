@@ -1,9 +1,10 @@
 #!/usr/bin/env sh
-# install.sh — Simplicio Runtime: instalador do binário e fontes Python embutidos
+# install.sh — Simplicio Runtime: instalador do binário com readiness fail-closed
 #
-# Um comando instala o Runtime. Mapper, Dev CLI, Loop, Fast, Prompt e Sprint
-# são entregues como fontes Python reais dentro do binário; não são reescritos
-# como Rust e não exigem checkout ou download dos repositórios irmãos.
+# A política de distribuição exige que uma release aprovada traga Mapper, Dev
+# CLI, Loop, Fast, Prompt e Sprint no binário, login Google habilitado e chave
+# pública de updates. O instalador recusa releases que não provem esses campos;
+# não reescreve projetos Python como Rust nem baixa repositórios irmãos.
 #
 #   curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
 #
@@ -70,15 +71,82 @@ sha256_of() {
   fi
 }
 
-verify_embedded_ecosystem() {
-  if "$DEST_PATH" ecosystem verify --json >/dev/null 2>&1; then
+verify_runtime_contract() {
+  binary_path="$1"
+  if [ ! -x "$binary_path" ] || ! command -v python3 >/dev/null 2>&1; then
+    return 1
+  fi
+  "$binary_path" version --json 2>/dev/null | python3 -c '
+import json, sys
+try:
+    payload = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(1)
+distribution = ((payload.get("auto_update") or {}).get("distribution") or {})
+identity = payload.get("identity") or {}
+security = payload.get("security") or ((payload.get("auto_update") or {}).get("security") or {})
+ready = (
+    distribution.get("source_code_distributed") is True
+    and identity.get("enabled") is True
+    and identity.get("login_enabled") is True
+    and security.get("signature_required") is True
+    and security.get("public_key_configured") is True
+)
+raise SystemExit(0 if ready else 1)
+' >/dev/null 2>&1
+}
+
+report_runtime_contract() {
+  binary_path="$1"
+  if [ ! -x "$binary_path" ] || ! command -v python3 >/dev/null 2>&1; then
+    warn "não foi possível ler o contrato de readiness do Runtime"
     return 0
   fi
-  return 1
+  "$binary_path" version --json 2>/dev/null | python3 -c '
+import json, sys
+try:
+    payload = json.load(sys.stdin)
+except Exception:
+    print("contrato de readiness ausente ou inválido")
+    raise SystemExit(0)
+distribution = ((payload.get("auto_update") or {}).get("distribution") or {})
+identity = payload.get("identity") or {}
+security = payload.get("security") or ((payload.get("auto_update") or {}).get("security") or {})
+checks = {
+    "source_code_distributed": distribution.get("source_code_distributed"),
+    "identity.enabled": identity.get("enabled"),
+    "identity.login_enabled": identity.get("login_enabled"),
+    "security.signature_required": security.get("signature_required"),
+    "security.public_key_configured": security.get("public_key_configured"),
+}
+for key, value in checks.items():
+    if value is not True:
+        print("readiness ausente: %s=%s" % (key, value))
+' >&2 || true
 }
 
 verify_active_login() {
-  "$DEST_PATH" auth status --json >/dev/null 2>&1
+  if [ ! -x "$DEST_PATH" ] || ! command -v python3 >/dev/null 2>&1; then
+    return 1
+  fi
+  "$DEST_PATH" auth status --json 2>/dev/null | python3 -c '
+import json, sys
+try:
+    payload = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(1)
+identity = payload.get("identity") or {}
+entitlement = payload.get("entitlement") or {}
+active = (
+    identity.get("enabled") is True
+    and identity.get("login_enabled") is True
+    and identity.get("status") not in {"disabled", "logged_out", "revoked"}
+    and bool(identity.get("email"))
+)
+if "updates_allowed" in entitlement:
+    active = active and entitlement.get("updates_allowed") is True
+raise SystemExit(0 if active else 1)
+'
 }
 
 require_active_login() {
@@ -86,7 +154,7 @@ require_active_login() {
     return 0
   fi
   info "Login Google obrigatório para ativar o Simplicio Runtime"
-  "$DEST_PATH" auth login || err "login não concluído; instalação bloqueada"
+  "$DEST_PATH" login google || err "login não concluído; instalação bloqueada"
   verify_active_login || err "sessão ausente, expirada, revogada ou sem entitlement ativo; instalação bloqueada"
 }
 
@@ -115,10 +183,11 @@ run_doctor() {
       status=1
     fi
 
-    if verify_embedded_ecosystem; then
-      ok "fontes Python do ecossistema presentes no binário"
+    if verify_runtime_contract "$DEST_PATH"; then
+      ok "contrato de release do Runtime verificado"
     else
-      warn "binário não contém o bundle de fontes Python esperado; atualize para um release Runtime compatível"
+      warn "release não está pronta para distribuição (bundle/login/chave de updates)"
+      report_runtime_contract "$DEST_PATH"
       status=1
     fi
 
@@ -162,7 +231,7 @@ esac
 printf "${GREEN}"
 cat << "EOF"
   ╔══════════════════════════════════════╗
-  ║        Simplicio Agent v1.8.0       ║
+  ║          Simplicio Runtime           ║
   ║    Seu assistente pessoal digital    ║
   ╚══════════════════════════════════════╝
 EOF
@@ -172,18 +241,33 @@ echo ""
 # ─── 1. Detect platform ──────────────────────────────────────────────────────
 detect_platform
 info "Plataforma detectada: $OS-$ARCH"
+if [ "$OS" = "macos" ] && [ "$ARCH" = "x64" ]; then
+  err "esta release publica apenas macOS Apple Silicon; não há asset macOS Intel com checksum"
+fi
 
 # ─── 2. Instalar simplicio binary (staged download + SHA256 + atomic swap) ──
 info "Instalando Simplicio Runtime..."
 mkdir -p "$BIN_DIR"
 
-if [ -x "$DEST_PATH" ] && verify_embedded_ecosystem; then
-  ok "$BIN_NAME já instalado em $DEST_PATH"
-else
-  if [ -x "$DEST_PATH" ]; then
-    warn "Runtime existente não contém o bundle Python esperado; baixando uma versão compatível"
+# A plain re-run means "update to latest". Only skip the download when the
+# caller explicitly pins the version already installed; otherwise an older
+# healthy Runtime would incorrectly look current forever.
+REQUESTED_VERSION="${SIMPLICIO_VERSION:-}"
+SKIP_EXISTING="false"
+if [ -x "$DEST_PATH" ] && verify_runtime_contract "$DEST_PATH" && [ -n "$REQUESTED_VERSION" ]; then
+  INSTALLED_VERSION="$("$DEST_PATH" --version 2>/dev/null | awk 'NR == 1 {print $2; exit}' | sed 's/^v//')"
+  REQUESTED_VERSION_NORMALIZED="${REQUESTED_VERSION#v}"
+  if [ "$REQUESTED_VERSION_NORMALIZED" = "$INSTALLED_VERSION" ]; then
+    SKIP_EXISTING="true"
+    ok "$BIN_NAME $INSTALLED_VERSION já instalado em $DEST_PATH"
   fi
-  VERSION="${SIMPLICIO_VERSION:-latest}"
+fi
+
+if [ "$SKIP_EXISTING" != "true" ]; then
+  if [ -x "$DEST_PATH" ]; then
+    warn "Runtime existente será atualizado ou validado contra a release solicitada"
+  fi
+  VERSION="${REQUESTED_VERSION:-latest}"
   ASSET="simplicio-$OS-$ARCH"
   if [ "$VERSION" = "latest" ]; then
     RELEASE_BASE="$GITHUB/releases/latest/download"
@@ -207,6 +291,8 @@ else
   TARGET_ID="$OS-$ARCH"
   EXPECTED_SHA256=""
   SIGNED="false"
+  SIGNATURE=""
+  SIGNATURE_REQUIRED="false"
   MANIFEST_TMP="$(mktemp)"
   trap 'rm -f "$MANIFEST_TMP"' EXIT
   if fetch "$MANIFEST_URL" "$MANIFEST_TMP" 2>/dev/null; then
@@ -234,17 +320,38 @@ try:
 except Exception:
     pass
 " 2>/dev/null)"
+      SIGNATURE="$(python3 -c "
+import json
+try:
+    m = json.load(open('$MANIFEST_TMP'))
+    for a in m.get('artifacts', []):
+        if a.get('target') == '$TARGET_ID':
+            print(a.get('signature') or '')
+            break
+except Exception:
+    pass
+" 2>/dev/null)"
+      SIGNATURE_REQUIRED="$(python3 -c "
+import json
+try:
+    m = json.load(open('$MANIFEST_TMP'))
+    print('true' if m.get('security', {}).get('signature_required') else 'false')
+except Exception:
+    pass
+" 2>/dev/null)"
     fi
   fi
 
-  if [ -z "$EXPECTED_SHA256" ]; then
+  if [ "$SIGNATURE_REQUIRED" = "true" ] && { [ "$SIGNED" != "true" ] || [ -z "$SIGNATURE" ]; }; then
+    err "recusando instalar: o manifest exige assinatura Ed25519, mas o artefato '$TARGET_ID' não tem uma assinatura publicada"
+  elif [ -z "$EXPECTED_SHA256" ]; then
     if [ "${SIMPLICIO_ALLOW_UNVERIFIED:-}" = "1" ]; then
       warn "sem checksum publicado para o alvo '$TARGET_ID' — prosseguindo SEM VERIFICAÇÃO (SIMPLICIO_ALLOW_UNVERIFIED=1)"
     else
       err "recusando instalar: nenhum SHA256 publicado no manifest para o alvo '$TARGET_ID'. Defina SIMPLICIO_ALLOW_UNVERIFIED=1 para prosseguir por sua conta e risco."
     fi
   elif [ "$SIGNED" != "true" ]; then
-    warn "checksum será verificado, mas este artefato ainda não é assinado (ed25519 não configurado para $TARGET_ID — ver issue #5)"
+    warn "checksum será verificado, mas este artefato ainda não exige assinatura Ed25519 neste canal"
   fi
 
   info "Baixando de $DOWNLOAD_URL ..."
@@ -266,6 +373,14 @@ except Exception:
   fi
 
   chmod +x "$STAGING_PATH"
+  # Validate the staged executable before the atomic swap. A release that lacks
+  # embedded sources, Google login activation, or the signed-update key must
+  # not replace a working installation and then fail its post-install checks.
+  if ! verify_runtime_contract "$STAGING_PATH"; then
+    report_runtime_contract "$STAGING_PATH"
+    rm -f "$STAGING_PATH"
+    err "release Runtime não atende ao contrato de distribuição; instalação interrompida"
+  fi
   # Swap atômico: mv no mesmo filesystem nunca deixa $DEST_PATH parcialmente
   # escrito, e reexecutar este script (update idempotente) não deixa .tmp
   # órfãos em caso de sucesso.
@@ -273,11 +388,12 @@ except Exception:
   ok "Simplicio Runtime instalado em $DEST_PATH"
 fi
 
-# ─── 2.1 Verificar o bundle Python antes de anunciar sucesso ─────────────────
-if ! verify_embedded_ecosystem; then
-  err "este Runtime não contém o bundle de fontes Python esperado; recusando concluir a instalação"
+# ─── 2.1 Verificar o contrato de release antes de anunciar sucesso ──────────
+if ! verify_runtime_contract "$DEST_PATH"; then
+  report_runtime_contract "$DEST_PATH"
+  err "este Runtime não atende ao contrato de distribuição (fontes embutidas, login Google e chave pública de updates); instalação interrompida"
 fi
-ok "fontes Python reais do ecossistema verificadas no binário"
+ok "contrato de release do Runtime verificado"
 
 # ─── 2.2 Login obrigatório: beta não elimina a sessão ativa ────────────────
 require_active_login
@@ -299,15 +415,15 @@ case ":$PATH:" in
      ;;
 esac
 
-# ─── 3. Registrar e anunciar o bundle Python ────────────────────────────────
+# ─── 3. Registrar e anunciar o contrato do Runtime ──────────────────────────
 BUNDLE_DIR="${SIMPLICIO_BUNDLE_DIR:-$HOME/.simplicio}"
-BUNDLE_REPORT="$BUNDLE_DIR/ecosystem-bundle.json"
+RUNTIME_REPORT="$BUNDLE_DIR/runtime-release.json"
 mkdir -p "$BUNDLE_DIR"
-if "$DEST_PATH" ecosystem verify --json >"$BUNDLE_REPORT" 2>/dev/null; then
-  ok "bundle Python registrado em $BUNDLE_REPORT"
+if "$DEST_PATH" version --json >"$RUNTIME_REPORT" 2>/dev/null; then
+  ok "contrato de release registrado em $RUNTIME_REPORT"
 else
-  rm -f "$BUNDLE_REPORT"
-  err "o binário não passou na verificação do bundle Python; instalação interrompida"
+  rm -f "$RUNTIME_REPORT"
+  err "não foi possível persistir o contrato de release; instalação interrompida"
 fi
 
 # ─── 4. Mensagem final ───────────────────────────────────────────────────────
@@ -316,8 +432,8 @@ printf "${GREEN}╔════════════════════�
 printf "${GREEN}║                                                          ║${NC}\n"
 printf "${GREEN}║   Simplicio Runtime instalado com sucesso!              ║${NC}\n"
 printf "${GREEN}║                                                          ║${NC}\n"
-printf "${GREEN}║   ✓ Fontes Python reais dentro do binário                ║${NC}\n"
-printf "${GREEN}║   ✓ Sem pip, clones ou downloads de simplicio-*          ║${NC}\n"
+printf "${GREEN}║   ✓ Contrato de release verificado                       ║${NC}\n"
+printf "${GREEN}║   ✓ Sem pip ou clones durante a instalação               ║${NC}\n"
 printf "${GREEN}║   ✓ Login Google ativo                                   ║${NC}\n"
 printf "${GREEN}║   🩺 Doctor: sh install.sh --doctor                     ║${NC}\n"
 printf "${GREEN}║                                                          ║${NC}\n"

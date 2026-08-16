@@ -1,13 +1,33 @@
 {
-  "version": "3.6.7",
+  "version": "3.8.11",
   "artifacts": [
     {
       "signed": false,
       "signature": null,
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.6.7/simplicio-windows-x64.exe",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.11/simplicio-macos-arm64",
       "signature_algorithm": null,
-      "signing_note": "Checksum verified from Simplicio Runtime v3.6.7 Windows release binary; Ed25519 signing pending.",
-      "sha256": "ad7edd17349f78225b73f19b4a86654e8dabfaf66ced8730cb806a11fafe6afc",
+      "signing_note": "Checksum verified from Simplicio Runtime v3.8.11 macOS arm64 release binary; Ed25519 signing pending.",
+      "sha256": "3ae7a450703b431577d022229b02041967edef691d60683281db194e0534c5dd",
+      "target": "macos-arm64",
+      "artifact": "simplicio-macos-arm64"
+    },
+    {
+      "signed": false,
+      "signature": null,
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.11/simplicio-linux-x64",
+      "signature_algorithm": null,
+      "signing_note": "Checksum verified from Simplicio Runtime v3.8.11 Linux x64 release binary; Ed25519 signing pending.",
+      "sha256": "34231ac6ba5d0bfee4ceef31c7ef9bf493384b2a81633f1a145134960dfb4346",
+      "target": "linux-x64",
+      "artifact": "simplicio-linux-x64"
+    },
+    {
+      "signed": false,
+      "signature": null,
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.11/simplicio-windows-x64.exe",
+      "signature_algorithm": null,
+      "signing_note": "Checksum verified from Simplicio Runtime v3.8.11 Windows x64 release binary; Ed25519 signing pending.",
+      "sha256": "00e8c22426476684aed7bbc4a65bb7ff0ab0bc2ba4fbbabb5e211c64531f53ef",
       "target": "windows-x64",
       "artifact": "simplicio-windows-x64.exe"
     }
@@ -25,5 +45,5 @@
     "refuse_unsigned": false
   },
   "schema": "simplicio.update-manifest/v1",
-  "release_scope": "windows-x64"
+  "release_scope": "macos-arm64,linux-x64,windows-x64"
 }

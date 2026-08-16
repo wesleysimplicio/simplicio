@@ -61,7 +61,7 @@ jobs:
             Windows: `irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex`
             macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh`
 
-            Signed update manifest included (`simplicio update check`).
+            Checksum-verified update manifest included (`simplicio update check`).
           prerelease: false
           make_latest: "true"
           fail_on_unmatched_files: true
