@@ -1,33 +1,46 @@
 {
-  "version": "3.8.11",
+  "version": "3.8.13",
+  "schema": "simplicio.update-manifest/v1",
+  "channel": "stable",
+  "release_scope": "macos-arm64,macos-x64,linux-x64,windows-x64",
   "artifacts": [
     {
-      "signed": false,
-      "signature": null,
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.11/simplicio-macos-arm64",
-      "signature_algorithm": null,
-      "signing_note": "Checksum verified from Simplicio Runtime v3.8.11 macOS arm64 release binary; Ed25519 signing pending.",
-      "sha256": "3ae7a450703b431577d022229b02041967edef691d60683281db194e0534c5dd",
+      "signed": true,
+      "signature": "ed25519:+lJtyvFHLQ2J1BSSjOhJNYp9ggNR6Brys969a7BVnfdVZk88fA3wkjZVY5Q19huZNu1Cl4DAyFmckkJp2tuFAQ==",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.13/simplicio-macos-arm64",
+      "signature_algorithm": "ed25519",
+      "signing_note": "Signed with the official release Ed25519 private key; public key registered in the runtime binary and this manifest.",
+      "sha256": "14427d9a4717468dedacb0025cf67c62b973c2552d7d70241fb851f2cfab5d02",
       "target": "macos-arm64",
       "artifact": "simplicio-macos-arm64"
     },
     {
-      "signed": false,
-      "signature": null,
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.11/simplicio-linux-x64",
-      "signature_algorithm": null,
-      "signing_note": "Checksum verified from Simplicio Runtime v3.8.11 Linux x64 release binary; Ed25519 signing pending.",
-      "sha256": "34231ac6ba5d0bfee4ceef31c7ef9bf493384b2a81633f1a145134960dfb4346",
+      "signed": true,
+      "signature": "ed25519:lqSAaU/nQMLRTwB9+KHRNodrXXm56q5pj6GiVS2AgerdhxxrX5M9waHPIA1o2QMr8C31wGaXGJX6gEGmb7hnCA==",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.13/simplicio-macos-x64",
+      "signature_algorithm": "ed25519",
+      "signing_note": "Signed with the official release Ed25519 private key; public key registered in the runtime binary and this manifest.",
+      "sha256": "2b454da8179266e65640088802329be9bb55f31b3167b4c37fccdf5e7dee88bd",
+      "target": "macos-x64",
+      "artifact": "simplicio-macos-x64"
+    },
+    {
+      "signed": true,
+      "signature": "ed25519:fkp0S83eChpWMdOIm1gawtgScCwPtITUbdKefK7QczgGOUM3+F5XKHAhxAF/T/BnYBbi/9ymM4Yiq0sxLsMDAw==",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.13/simplicio-linux-x64",
+      "signature_algorithm": "ed25519",
+      "signing_note": "Signed with the official release Ed25519 private key; public key registered in the runtime binary and this manifest.",
+      "sha256": "6df309002e6e1243668de64d696ec22b8bffa42cd5b9d103a0e06269ef1e6a43",
       "target": "linux-x64",
       "artifact": "simplicio-linux-x64"
     },
     {
-      "signed": false,
-      "signature": null,
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.11/simplicio-windows-x64.exe",
-      "signature_algorithm": null,
-      "signing_note": "Checksum verified from Simplicio Runtime v3.8.11 Windows x64 release binary; Ed25519 signing pending.",
-      "sha256": "00e8c22426476684aed7bbc4a65bb7ff0ab0bc2ba4fbbabb5e211c64531f53ef",
+      "signed": true,
+      "signature": "ed25519:6T8Asn9EZqxt0kJ8ivsoDw9M/zZseVzdjIVwAGLV1eV0e0xrhJxskdsb2kLIHl1haa3oKa3wZMm1/1ADiHAMDg==",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.13/simplicio-windows-x64.exe",
+      "signature_algorithm": "ed25519",
+      "signing_note": "Signed with the official release Ed25519 private key; public key registered in the runtime binary and this manifest.",
+      "sha256": "82fd2215e965e515a7a4e41c90721385302bf615a611c046d2efa18b01a6cd0c",
       "target": "windows-x64",
       "artifact": "simplicio-windows-x64.exe"
     }
@@ -37,13 +50,11 @@
     "updates_allowed": true,
     "beta_until": null
   },
-  "channel": "stable",
   "security": {
     "signature_algorithm": "ed25519",
     "checksum_algorithm": "SHA256",
-    "signature_required": false,
-    "refuse_unsigned": false
+    "signature_required": true,
+    "refuse_unsigned": true
   },
-  "schema": "simplicio.update-manifest/v1",
-  "release_scope": "macos-arm64,linux-x64,windows-x64"
+  "signing_pubkey": "2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok="
 }
