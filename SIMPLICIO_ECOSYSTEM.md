@@ -8,7 +8,7 @@ Consumidores finais via release do Runtime e, opcionalmente, via `npx @wesleysim
 
 ## Versão atual
 
-3.8.11 (manifest público atual; snapshot compilado legado)
+3.8.13 (manifest público oficial assinado; quatro alvos)
 
 ## Regra de distribuição
 
@@ -43,16 +43,13 @@ release, não uma advertência ignorável.
 
 ## Estado do manifest público
 
-O manifest atualmente publicado neste repositório é o `3.8.11`. Esta release
-publica os binários macOS Apple Silicon, Linux x64 e Windows x64, mas o próprio
-binário informa `source_code_distributed=false`, `login_enabled=false` e
-`public_key_configured=false`. Portanto, ela não cumpre a regra de distribuição
-sem download dos seis projetos, nem está pronta para lançamento aos usuários;
-os instaladores falham antes de anunciar sucesso.
-
-O próximo release público só deve substituir este snapshot quando trouxer as
-fontes Python no binário, login Google ativo e a chave pública configurada para
-updates assinados, além de artefatos com assinaturas verificáveis.
+O manifest atualmente preparado neste repositório é o `3.8.13`. Esta release
+publica os quatro alvos canônicos (macOS Apple Silicon, macOS Intel, Linux x64
+e Windows x64), cada um com SHA256 e sidecar Ed25519. O binário informa
+`source_code_distributed=true`, `identity.enabled/login_enabled=true` e
+`security.signature_required/public_key_configured=true`. O instalador continua
+fail-closed: exige bundle Python embutido, login Google ativo e manifest
+assinado.
 
 ## Versão mínima esperada pelos dependentes
 Nenhuma — repo é ponto de entrada para usuários finais.
