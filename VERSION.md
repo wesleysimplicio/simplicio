@@ -10,15 +10,17 @@ This is the **public distribution repo** for [Simplicio](https://github.com/wesl
 
 ## Runtime snapshot: v3.8.14
 
+## Current Version: v3.8.14
+
 - **Source:** `simplicio-runtime` main at commit
-  `23b54b0fd068ed55c1de934bbb89eacb5083a4dc`.
+  `79bff8b153b010a8187deec12eda5a7b565c3e8d`.
 - **Targets:** macOS ARM64, macOS x64, Linux x64, and Windows x64. The
   repository-root binaries and `SHA256SUMS` were regenerated from this same
   Runtime source and verified locally.
-- **Release status:** this is a distribution snapshot, not yet the official
-  signed GitHub Release. Installers and the update command continue resolving
-  GitHub's `latest` release and require its signed manifest; do not treat the
-  root snapshot as proof that the signed release channel has been published.
+- **Release status:** this snapshot is prepared for the official signed GitHub
+  Release `v3.8.14`. Installers and the update command resolve GitHub's
+  `latest` release and require its signed manifest; the release is user-facing
+  only after the post-publish gates in `docs/RELEASE_RUNBOOK.md` pass.
 - **Default branch:** `master`
 - **Release-channel gates:** signed artifacts, active Google login, the
   configured `update_public_key`, and the embedded ecosystem bundle must still
