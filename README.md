@@ -77,30 +77,25 @@ The default install location is `~/.local/bin/simplicio` on macOS/Linux and
 `%USERPROFILE%\.local\bin\simplicio.exe` on Windows. Add that directory to
 your `PATH` if the installer prints a PATH warning, then open a new terminal.
 
-To pin a release or use another install directory:
+The installer intentionally does not pin a release. Every normal installation
+and update resolves GitHub's `latest` release, verifies it, and keeps the
+existing user data. To use another install directory:
 
 ```bash
-SIMPLICIO_VERSION=v3.8.11 \
 SIMPLICIO_BIN_DIR="$HOME/.local/bin" \
   sh -c "$(curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh)"
 ```
 
-PowerShell equivalents are available through `SIMPLICIO_VERSION` and
-`SIMPLICIO_BIN_DIR`. Keep checksum verification enabled. Only set
+PowerShell supports the equivalent `SIMPLICIO_BIN_DIR` setting. Keep checksum
+verification enabled. Only set
 `SIMPLICIO_ALLOW_UNVERIFIED=1` when you have deliberately accepted an
 unverified artifact and understand the supply-chain risk.
 
-The latest published release is `v3.8.11`. It currently publishes macOS Apple
-Silicon, Linux x64, and Windows x64 assets. The release manifest contains
-SHA256 checksums, but the binary itself reports `source_code_distributed=false`,
-`login_enabled=false`, and `public_key_configured=false`. It therefore does not
-meet the Simplicio launch contract and the installers refuse to finish with it.
-Never override a missing checksum or a failed readiness gate.
-
-The next public release must contain the six Python projects in the binary,
+The resolved latest release must contain the six Python projects in the binary,
 enable Google login, and ship the configured public key plus signed update
-artifacts. A Runtime source build or a private candidate is not a substitute
-for a published, verifiable release.
+artifacts. The installer refuses to finish when any of these requirements,
+checksums, or the release manifest is missing. A Runtime source build or a
+private candidate is not a substitute for a published, verifiable release.
 
 Check the installation:
 
@@ -127,11 +122,9 @@ Fast, Prompt, and Sprint. They remain Python projects; they are not rewritten
 as Rust, and a normal installation must not download their repositories or
 install them with `pip`.
 
-The published v3.8.11 binary is an older compiled-only snapshot: its
-`version --json` contract explicitly says `source_code_distributed=false` and
-marks those components optional. It is retained as historical release data, not
-as the final no-download installer. Use `simplicio version --json` and
-`simplicio ecosystem doctor --json` after every future update.
+Use `simplicio version --json` and `simplicio ecosystem doctor --json` after
+every update to confirm that the resolved latest release contains the embedded
+projects and active distribution contract.
 
 ## 🔐 Login and entitlement
 
@@ -142,13 +135,6 @@ required before product commands, MCP, and the ecosystem integration can be used
 Public beta access may be free, but beta does not bypass the active-entitlement
 check. When beta access ends, the entitlement must come from an active
 subscription.
-
-### Current published-release status
-
-The v3.8.11 binary reports the Google identity contract as disabled. Its
-`simplicio login google --json` response is `status: disabled`, so there is no
-successful login flow in that published asset yet. The installer blocks it
-instead of allowing an unauthenticated or unsigned launch.
 
 ### First login (compatible releases)
 
@@ -483,17 +469,17 @@ LLM (Claude/Codex/Gemini)          Simplicio Runtime
 
 Re-running the official installer is the simplest update path. It downloads
 the latest release, verifies the checksum, validates the Runtime release
-contract, and keeps `~/.simplicio` user data. A pinned installer command
-updates only when you intentionally choose that version. The installer refuses
+contract, and keeps `~/.simplicio` user data. Re-running the installer keeps
+the installation on GitHub's `latest` release. The installer refuses
 to replace a working binary with a release that lacks the embedded bundle,
 Google login activation, or the signed-update key.
 
 When the Runtime's background update checks are enabled, it checks in its
 scheduled windows, notifies once per release, stages the verified asset, and
 applies it on the next session. The current release channel is checksum
-verified. The current v3.8.11 executable already declares signed updates
-mandatory but reports `public_key_configured=false`; that mismatch is a release
-blocker, not a reason to disable verification.
+verified. If the latest executable reports a missing public update key or an
+unsigned channel, that mismatch is a release blocker, not a reason to disable
+verification.
 
 The Runtime also exposes an authenticated update surface:
 
@@ -565,7 +551,7 @@ simplicio license status
 | RAM | 8 GB | 16 GB+ |
 | Storage | ~35–50 MB for the release binary | 1.5 GB+ with a local LLM |
 | OS | macOS Apple Silicon, Linux x64, Windows x64 | macOS ARM64 |
-| Python | Python 3 only for external adapters in the current v3.8.11 snapshot | Current CPython 3; a compliant release will embed the six projects |
+| Python | Not required for the embedded Runtime projects | Current CPython 3 for optional external adapters |
 | Browser | Safari, Chrome, or another supported browser for Google login | Current Safari/Chrome |
 | Terminal | any modern terminal | WezTerm / Alacritty / Ghostty |
 
@@ -587,8 +573,7 @@ python3 scripts/verify_distribution_consistency.py
 See [docs/testing-strategy.md](docs/testing-strategy.md) for what's covered,
 what's intentionally out of scope, and the plan for the rest of the testing
 epic. The consistency audit may report release-hygiene warnings even when the
-unit suite is green; resolve all warnings other than the explicitly tracked
-v3.8.11 unsigned-channel warning before treating the stricter
+unit suite is green; resolve all release warnings before treating the stricter
 `benchmark_distribution.py` gate as a release pass. See also
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
