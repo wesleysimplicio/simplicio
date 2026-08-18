@@ -8,22 +8,22 @@ This is the **public distribution repo** for [Simplicio](https://github.com/wesl
 
 **Not the source code.** The Rust runtime source lives in the private [`simplicio-runtime`](https://github.com/wesleysimplicio/simplicio-runtime) repo.
 
-## Current Version: v3.8.13
+## Runtime snapshot: v3.8.14
 
-- **Release:** v3.8.13 — Official signed release. All four canonical targets
-  (`macos-arm64`, `macos-x64`, `linux-x64`, `windows-x64`) are built from
-  current `simplicio-runtime` main with the canonical release Ed25519 public
-  key embedded and the update manifest signed (`signed: true`,
-  `security.signature_required: true`, `security.refuse_unsigned: true`).
-- **Previous:** v3.8.11 — Transition snapshot (unsigned, 3 targets, readiness
-  contracts still off)
+- **Source:** `simplicio-runtime` main at commit
+  `23b54b0fd068ed55c1de934bbb89eacb5083a4dc`.
+- **Targets:** macOS ARM64, macOS x64, Linux x64, and Windows x64. The
+  repository-root binaries and `SHA256SUMS` were regenerated from this same
+  Runtime source and verified locally.
+- **Release status:** this is a distribution snapshot, not yet the official
+  signed GitHub Release. Installers and the update command continue resolving
+  GitHub's `latest` release and require its signed manifest; do not treat the
+  root snapshot as proof that the signed release channel has been published.
 - **Default branch:** `master`
-- **Assets this release:** macOS ARM64, macOS x64, Linux x64, and Windows x64 —
-  each Ed25519-signed against its real SHA256. Identity/login is active
-  (`simplicio login google --json`, `require_active_login` in the installers),
-  the readiness contract reports `source_code_distributed: true`, and
-  `simplicio ecosystem verify --json` gates installation on the real embedded
-  ecosystem bundle + active Google login.
+- **Release-channel gates:** signed artifacts, active Google login, the
+  configured `update_public_key`, and the embedded ecosystem bundle must still
+  be verified in the official release workflow before this snapshot is called
+  a user-facing release.
 
 ### Product law (v3.6.0)
 
