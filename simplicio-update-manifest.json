@@ -1,46 +1,46 @@
 {
-  "version": "3.8.13",
+  "version": "3.8.14",
   "schema": "simplicio.update-manifest/v1",
   "channel": "stable",
   "release_scope": "macos-arm64,macos-x64,linux-x64,windows-x64",
   "artifacts": [
     {
       "signed": true,
-      "signature": "ed25519:+lJtyvFHLQ2J1BSSjOhJNYp9ggNR6Brys969a7BVnfdVZk88fA3wkjZVY5Q19huZNu1Cl4DAyFmckkJp2tuFAQ==",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.13/simplicio-macos-arm64",
+      "signature": "ed25519:FhyWla68nZFS166JRqIqMadpREPFezunES5H4h+JuNeKBuoKArIYzcGDhAX/sTNKCVLUCGkwaIBFTQ1zEuDbBA==",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.14/simplicio-macos-arm64",
       "signature_algorithm": "ed25519",
       "signing_note": "Signed with the official release Ed25519 private key; public key registered in the runtime binary and this manifest.",
-      "sha256": "14427d9a4717468dedacb0025cf67c62b973c2552d7d70241fb851f2cfab5d02",
+      "sha256": "a66751339f49ebb02c8655d9af790d04de2fdb99c282ec06f572bc340c0a01f8",
       "target": "macos-arm64",
       "artifact": "simplicio-macos-arm64"
     },
     {
       "signed": true,
-      "signature": "ed25519:lqSAaU/nQMLRTwB9+KHRNodrXXm56q5pj6GiVS2AgerdhxxrX5M9waHPIA1o2QMr8C31wGaXGJX6gEGmb7hnCA==",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.13/simplicio-macos-x64",
+      "signature": "ed25519:9zalBFN59dKAiqQ1jBRUEqUxS2d31GyGlKiwjVMXcEXPqR6NUBaVbSSz46E29hyxfG9e2DIAWhKlm5LUgUYPAw==",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.14/simplicio-macos-x64",
       "signature_algorithm": "ed25519",
       "signing_note": "Signed with the official release Ed25519 private key; public key registered in the runtime binary and this manifest.",
-      "sha256": "2b454da8179266e65640088802329be9bb55f31b3167b4c37fccdf5e7dee88bd",
+      "sha256": "4da058d483f40e4ebb4f19031f5e1cc11d09e3ab399a4e6d1c9ce65f6a3e5a5e",
       "target": "macos-x64",
       "artifact": "simplicio-macos-x64"
     },
     {
       "signed": true,
-      "signature": "ed25519:fkp0S83eChpWMdOIm1gawtgScCwPtITUbdKefK7QczgGOUM3+F5XKHAhxAF/T/BnYBbi/9ymM4Yiq0sxLsMDAw==",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.13/simplicio-linux-x64",
+      "signature": "ed25519:j1oBFZUXmBjCc9OcPC2k49SDR/iD9zj/6xWhpMJncfOiIfqhcNh54wJR3sM4J8EF57oJ2KfkgHnWRd0qhQxxDQ==",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.14/simplicio-linux-x64",
       "signature_algorithm": "ed25519",
       "signing_note": "Signed with the official release Ed25519 private key; public key registered in the runtime binary and this manifest.",
-      "sha256": "6df309002e6e1243668de64d696ec22b8bffa42cd5b9d103a0e06269ef1e6a43",
+      "sha256": "b528db8a02779ca93b162d5372be4517d9fc60e3a109b49fc44798a3a3e49f81",
       "target": "linux-x64",
       "artifact": "simplicio-linux-x64"
     },
     {
       "signed": true,
-      "signature": "ed25519:6T8Asn9EZqxt0kJ8ivsoDw9M/zZseVzdjIVwAGLV1eV0e0xrhJxskdsb2kLIHl1haa3oKa3wZMm1/1ADiHAMDg==",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.13/simplicio-windows-x64.exe",
+      "signature": "ed25519:c7UoRf00Rg85htXnNR6c9K/qQYfBqwRRZP/cooqlG50dGQOs9P8xLRCcu7ZxA2sdCdjzqQy5qQFRT8E7CzyXBA==",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.14/simplicio-windows-x64.exe",
       "signature_algorithm": "ed25519",
       "signing_note": "Signed with the official release Ed25519 private key; public key registered in the runtime binary and this manifest.",
-      "sha256": "82fd2215e965e515a7a4e41c90721385302bf615a611c046d2efa18b01a6cd0c",
+      "sha256": "fd521ac3b66e840b5719c01b11df648da99d8ec95c13ff1f12ef5fb58e435814",
       "target": "windows-x64",
       "artifact": "simplicio-windows-x64.exe"
     }

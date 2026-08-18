@@ -106,6 +106,10 @@ simplicio ecosystem doctor --json
 sh install.sh --doctor                 # when running from a checkout
 ```
 
+Maintainers: the exact manual order for building, signing, tagging, publishing,
+and verifying a public release is documented in
+[docs/RELEASE_RUNBOOK.md](docs/RELEASE_RUNBOOK.md).
+
 The doctor command is read-only. Uninstalling is idempotent and preserves user
 data under `~/.simplicio`:
 
