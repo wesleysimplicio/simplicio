@@ -1,10 +1,10 @@
 # Installing Simplicio
 
 Simplicio is a terminal-based AI coding agent and runtime. It ships as a single
-compiled binary with no runtime package dependencies. A compliant release must
-also carry the six Python projects, activate Google login, and publish the key
-needed for signed updates; the published v3.8.11 snapshot does not yet satisfy
-those gates and the installers refuse to finish with it.
+compiled binary with no runtime package dependencies. The installer always
+resolves GitHub's `latest` release and refuses to finish unless that release
+carries the six embedded Python projects, active Google login, the public key
+for signed updates, and a valid signed manifest.
 
 ## Quick Install
 
@@ -41,12 +41,9 @@ running the binary. Then place it somewhere on your `PATH` (e.g.
 `/usr/local/bin` or `~/.local/bin`), naming it `simplicio` (or `simplicio.exe`
 on Windows).
 
-The latest published `v3.8.11` release contains macOS Apple Silicon, Linux
-x64, and Windows x64 assets. It does not contain a macOS Intel asset; the
-installer refuses a target with no manifest checksum instead of using the
-stale legacy `simplicio-darwin-x64` binary. Its runtime readiness metadata also
-reports `source_code_distributed=false`, `login_enabled=false`, and
-`public_key_configured=false`; do not treat it as the final user-facing release.
+The installer does not pin a version. It resolves the current `latest` release,
+selects the canonical asset for the host, verifies its SHA256 and signature, and
+then checks the Runtime readiness contract before completing installation.
 
 ## Doctor / Uninstall
 
@@ -74,7 +71,7 @@ config under `~/.simplicio`.
 simplicio help
 ```
 
-Expected output starts with `simplicio 3.8.11`.
+Expected output starts with `simplicio <latest-runtime-version>`.
 
 ## Configuration
 
@@ -181,8 +178,9 @@ Same workflow — Simplicio commands work from any terminal-based AI agent.
 A política do produto exige que o binário carregue as árvores de fontes Python
 reais de Mapper, Dev CLI, Loop, Fast, Prompt e Sprint. Esses projetos não devem
 ser reescritos como Rust, instalados via `pip` ou baixados como `simplicio-*`.
-O snapshot público v3.8.11 informa `source_code_distributed=false`, portanto os
-fontes ainda não estão neste binário e o instalador o recusa.
+O instalador valida o release `latest` antes de concluir. Se o contrato indicar
+`source_code_distributed=false`, login inativo ou chave pública ausente, ele
+recusa o binário em vez de instalar um snapshot incompleto.
 
 Quando uma release compatível estiver publicada, a sessão do Google será
 obrigatória, inclusive durante o beta:
