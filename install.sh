@@ -261,6 +261,50 @@ raise SystemExit(0 if ready else 1)
 ' >/dev/null 2>&1
 }
 
+verify_mcp_tools() {
+  binary_path="$1"
+  if [ ! -x "$binary_path" ] || ! command -v python3 >/dev/null 2>&1; then
+    return 1
+  fi
+  python3 - "$binary_path" <<'PY'
+import json
+import subprocess
+import sys
+
+required = {
+    "simplicio_map", "simplicio_memory", "simplicio_edit", "simplicio_gate",
+    "simplicio_validate", "simplicio_run", "simplicio_symbol", "simplicio_search",
+    "simplicio_read", "simplicio_exec",
+}
+payload = "".join(json.dumps(request) + "\n" for request in (
+    {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+    {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+))
+try:
+    result = subprocess.run(
+        [sys.argv[1], "serve", "--mcp", "--stdio", "--json"],
+        input=payload, capture_output=True, text=True, timeout=30, check=False,
+    )
+    responses = []
+    for line in result.stdout.splitlines():
+        try:
+            value = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            responses.append(value)
+    tools_result = next((r.get("result") for r in responses if r.get("id") == 2), {})
+    names = {t.get("name") for t in (tools_result or {}).get("tools", []) if isinstance(t, dict)}
+    missing = sorted(required - names)
+    if result.returncode != 0 or missing:
+        print("MCP tool surface incomplete: missing=" + ",".join(missing), file=sys.stderr)
+        raise SystemExit(1)
+except (OSError, subprocess.TimeoutExpired) as exc:
+    print("MCP tools/list failed: " + str(exc), file=sys.stderr)
+    raise SystemExit(1)
+PY
+}
+
 report_runtime_contract() {
   binary_path="$1"
   if [ ! -x "$binary_path" ] || ! command -v python3 >/dev/null 2>&1; then
@@ -354,6 +398,13 @@ run_doctor() {
     else
       warn "release não está pronta para distribuição (bundle/login/chave de updates)"
       report_runtime_contract "$DEST_PATH"
+      status=1
+    fi
+
+    if verify_mcp_tools "$DEST_PATH"; then
+      ok "MCP expõe as 10 tools documentadas"
+    else
+      warn "MCP incompleto: o binário não expõe todas as tools documentadas"
       status=1
     fi
 
@@ -545,6 +596,10 @@ except Exception:
     rm -f "$STAGING_PATH"
     err "release Runtime não atende ao contrato de distribuição; instalação interrompida"
   fi
+  if ! verify_mcp_tools "$STAGING_PATH"; then
+    rm -f "$STAGING_PATH"
+    err "release Runtime não expõe a superfície MCP completa; instalação interrompida"
+  fi
   # Swap atômico: mv no mesmo filesystem nunca deixa $DEST_PATH parcialmente
   # escrito, e reexecutar este script (update idempotente) não deixa .tmp
   # órfãos em caso de sucesso.
@@ -558,6 +613,10 @@ if ! verify_runtime_contract "$DEST_PATH"; then
   err "este Runtime não atende ao contrato de distribuição (fontes embutidas, login Google e chave pública de updates); instalação interrompida"
 fi
 ok "contrato de release do Runtime verificado"
+if ! verify_mcp_tools "$DEST_PATH"; then
+  err "este Runtime não expõe a superfície MCP completa; instalação interrompida"
+fi
+ok "superfície MCP verificada (10 tools documentadas)"
 
 # ─── 2.2 Login obrigatório: beta não elimina a sessão ativa ────────────────
 require_active_login
