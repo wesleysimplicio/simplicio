@@ -496,7 +496,7 @@ if [ "$SKIP_EXISTING" != "true" ]; then
 
   TARGET_ID="$OS-$ARCH"
   # Keep installer/distribution IDs stable while accepting aliases emitted by
-  # the v3.8.15 release manifest. A valid signed artifact must not be treated
+  # the v3.8.16 release manifest. A valid signed artifact must not be treated
   # as unsigned merely because the manifest uses a Rust-style target name.
   MANIFEST_TARGET_ID="$TARGET_ID"
   case "$TARGET_ID" in
