@@ -81,11 +81,15 @@ function Test-ActiveLogin {
     $status = $raw | ConvertFrom-Json
     $identity = $status.identity
     if ($null -eq $identity) { return $false }
+    $identityEmail = [string]$identity.email
+    if ([string]::IsNullOrWhiteSpace($identityEmail)) {
+      $identityEmail = [string]$status.user.email
+    }
     $active = (
       $identity.enabled -eq $true -and
       $identity.login_enabled -eq $true -and
       $identity.status -notin @("disabled", "logged_out", "revoked") -and
-      -not [string]::IsNullOrWhiteSpace([string]$identity.email)
+      -not [string]::IsNullOrWhiteSpace($identityEmail)
     )
     if ($null -ne $status.entitlement -and $null -ne $status.entitlement.updates_allowed) {
       $active = $active -and ($status.entitlement.updates_allowed -eq $true)
