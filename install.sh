@@ -22,9 +22,11 @@
 # Asset naming follows distribution/targets.json (the canonical target
 # triplet table for the whole ecosystem): id "macos-arm64" -> asset
 # "simplicio-macos-arm64", id "macos-x64" -> "simplicio-macos-x64", id
-# "linux-x64" -> "simplicio-linux-x64". Drift between this script, the
-# release workflow and simplicio-update-manifest.json is caught by
-# scripts/verify_distribution_consistency.py in CI.
+# "linux-x64" -> "simplicio-linux-x64". Published manifests from older
+# release tooling may use Rust-style aliases (macos-aarch64, macos-x86_64,
+# linux-x86_64); the lookup below accepts both without changing asset URLs.
+# Drift between this script, the release workflow and
+# simplicio-update-manifest.json is caught by CI.
 
 set -eu
 
@@ -442,6 +444,15 @@ if [ "$SKIP_EXISTING" != "true" ]; then
   MANIFEST_URL="$RELEASE_BASE/simplicio-update-manifest.json"
 
   TARGET_ID="$OS-$ARCH"
+  # Keep installer/distribution IDs stable while accepting aliases emitted by
+  # the v3.8.15 release manifest. A valid signed artifact must not be treated
+  # as unsigned merely because the manifest uses a Rust-style target name.
+  MANIFEST_TARGET_ID="$TARGET_ID"
+  case "$TARGET_ID" in
+    macos-arm64) MANIFEST_TARGET_ID="macos-aarch64" ;;
+    macos-x64) MANIFEST_TARGET_ID="macos-x86_64" ;;
+    linux-x64) MANIFEST_TARGET_ID="linux-x86_64" ;;
+  esac
   EXPECTED_SHA256=""
   SIGNED="false"
   SIGNATURE=""
@@ -455,7 +466,7 @@ import json,sys
 try:
     m = json.load(open('$MANIFEST_TMP'))
     for a in m.get('artifacts', []):
-        if a.get('target') == '$TARGET_ID':
+        if a.get('target') in {'$MANIFEST_TARGET_ID', '$TARGET_ID'}:
             print(a.get('sha256') or '')
             print('true' if a.get('signed') or str(a.get('signature') or '').startswith('ed25519:') else 'false')
             break
@@ -467,7 +478,7 @@ import json
 try:
     m = json.load(open('$MANIFEST_TMP'))
     for a in m.get('artifacts', []):
-        if a.get('target') == '$TARGET_ID':
+        if a.get('target') in {'$MANIFEST_TARGET_ID', '$TARGET_ID'}:
             print('true' if a.get('signed') or str(a.get('signature') or '').startswith('ed25519:') else 'false')
             break
 except Exception:
@@ -478,7 +489,7 @@ import json
 try:
     m = json.load(open('$MANIFEST_TMP'))
     for a in m.get('artifacts', []):
-        if a.get('target') == '$TARGET_ID':
+        if a.get('target') in {'$MANIFEST_TARGET_ID', '$TARGET_ID'}:
             print(a.get('signature') or '')
             break
 except Exception:
