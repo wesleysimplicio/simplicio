@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- Public installers now configure Codex to launch the installed Simplicio
+  binary over local STDIO and merge Simplicio lifecycle/PreToolUse hooks into
+  `~/.codex/hooks.json` without replacing unrelated user configuration.
+- Added cross-platform Codex routing hooks for macOS/Linux and Windows, with a
+  documented `SIMPLICIO_MCP_ROUTE=0` escape hatch and first-write backups.
+
 ## [3.8.11] - 2026-08-14
 
 ### Changed

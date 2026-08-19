@@ -211,28 +211,32 @@ The Runtime exposes these tools:
 The client should call `tools/list` at startup and use the returned schemas;
 the table above is a quick orientation, not a substitute for live schemas.
 
-### Codex: local HTTP/OAuth MCP
+### Codex: local STDIO MCP and hooks
 
-The installer runs `simplicio mcp register`, which registers the local
-Streamable HTTP endpoint used by Codex:
-`http://127.0.0.1:8787/mcp`.
+The installer configures Codex to launch the installed binary directly:
 
-1. Complete `simplicio login google` first.
-2. Open Codex **Settings → MCP**.
-3. Find the **simplicio** server and click **Authenticate**.
-4. Complete the Google-backed Simplicio login in the browser.
-5. Reload the MCP settings or restart the host if the tool list was already
-   cached.
-
-If the row is missing, register it again and reload Codex:
-
-```bash
-simplicio mcp register
+```toml
+[mcp_servers.simplicio]
+command = "/path/to/simplicio"
+args = ["serve", "--mcp", "--stdio"]
 ```
 
-The Runtime validates the bearer token and active entitlement on every MCP
-request. A visible **Authenticate** button is therefore expected for the
-OAuth-capable Codex server; it is not a replacement for the CLI login.
+This keeps MCP execution local and avoids the latency of the local HTTP daemon.
+The Runtime still enforces Google login and entitlement for every MCP session.
+The installer also merges Simplicio `SessionStart`, `UserPromptSubmit`,
+`SubagentStart`, and `PreToolUse` hooks into `~/.codex/hooks.json`; existing
+Codex hooks are preserved and the Simplicio entries are updated idempotently.
+
+After installation, restart Codex and open **Settings → Hooks** to review or
+approve the installed hooks. Verify the MCP command with:
+
+```bash
+codex mcp list
+```
+
+To repair only this integration, rerun the installer. The original
+`config.toml` and `hooks.json` are kept in `.simplicio.bak` files on the first
+managed write. Set `SIMPLICIO_MCP_ROUTE=0` for a temporary hook escape hatch.
 
 ### Other MCP clients: local STDIO
 
@@ -502,7 +506,7 @@ simplicio --version
 simplicio version --json
 simplicio ecosystem doctor --json
 simplicio auth status --json
-simplicio mcp register
+codex mcp list
 ```
 
 Common failures:
@@ -510,7 +514,7 @@ Common failures:
 | Symptom | Resolution |
 |---|---|
 | `login required` | Run `simplicio login google`; confirm `active: true`. |
-| Codex has no **Authenticate** button | Run `simplicio mcp register`, then reload Codex MCP settings. |
+| Codex does not show Simplicio tools | Restart Codex, inspect **Settings → Hooks**, and verify `codex mcp list` points to `serve --mcp --stdio`. |
 | `tools/list` is empty or stale | Restart/reload the MCP host and verify its command resolves to the intended `simplicio` binary. |
 | Runtime release contract fails | Wait for a release with embedded sources, enabled Google login, and a configured public update key; do not bypass the gate. |
 | Google says the browser is not secure | Use a normal Safari/Chrome window for the Google step, not an embedded webview; never disable the account security gate. |

@@ -71,6 +71,132 @@ sha256_of() {
   fi
 }
 
+fetch_url() {
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$1" -o "$2"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q "$1" -O "$2"
+  else
+    err "Precisa de curl ou wget para baixar"
+  fi
+}
+
+configure_codex_stdio() {
+  codex_dir="${CODEX_HOME:-$HOME/.codex}"
+  codex_config="$codex_dir/config.toml"
+  codex_hooks="$codex_dir/hooks.json"
+  hook_dir="$HOME/.simplicio/hooks"
+  hook_path="$hook_dir/mcp-route.sh"
+  hook_tmp="$hook_path.download-$$.tmp"
+  mkdir -p "$codex_dir" "$hook_dir"
+
+  info "Configurando MCP stdio e hooks do Codex"
+  hook_ref="${SIMPLICIO_CODEX_HOOK_REF:-master}"
+  fetch_url "$GITHUB/raw/$hook_ref/codex/mcp-route.sh" "$hook_tmp" || err "não foi possível baixar o hook do Codex"
+  chmod 755 "$hook_tmp"
+  mv -f "$hook_tmp" "$hook_path"
+
+  python3 - "$codex_config" "$codex_hooks" "$DEST_PATH" "$hook_path" <<'PY'
+import json
+import os
+import re
+import shlex
+import shutil
+import sys
+from pathlib import Path
+
+config_path, hooks_path, binary, hook_path = map(Path, sys.argv[1:])
+
+
+def backup_once(path: Path) -> None:
+    if path.exists():
+        backup = Path(str(path) + ".simplicio.bak")
+        if not backup.exists():
+            shutil.copy2(path, backup)
+
+
+def atomic_write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = Path(str(path) + ".simplicio.tmp")
+    temp.write_text(text, encoding="utf-8")
+    os.replace(temp, path)
+
+
+backup_once(config_path)
+config = config_path.read_text(encoding="utf-8") if config_path.exists() else ""
+toml_binary = str(binary).replace("\\", "\\\\").replace('"', '\\"')
+stdio_block = (
+    "[mcp_servers.simplicio]\n"
+    f'command = "{toml_binary}"\n'
+    'args = ["serve", "--mcp", "--stdio"]\n'
+)
+section = re.compile(r"(?ms)^\[mcp_servers\.simplicio\]\r?\n.*?(?=^\[|\Z)")
+if section.search(config):
+    config = section.sub(stdio_block, config, count=1)
+else:
+    config = config.rstrip() + ("\n\n" if config.strip() else "") + stdio_block
+atomic_write(config_path, config)
+
+
+backup_once(hooks_path)
+if hooks_path.exists():
+    try:
+        root = json.loads(hooks_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise SystemExit(f"hooks.json inválido; preservado sem alteração: {exc}")
+else:
+    root = {}
+if not isinstance(root, dict):
+    raise SystemExit("hooks.json precisa conter um objeto JSON; preservado sem alteração")
+hooks = root.setdefault("hooks", {})
+if not isinstance(hooks, dict):
+    raise SystemExit("hooks.json: campo hooks inválido; preservado sem alteração")
+
+command = f"bash {shlex.quote(str(hook_path))}"
+hook_command = {
+    "command": command,
+    "timeout": 8,
+    "type": "command",
+    "statusMessage": "Routing through Simplicio MCP",
+}
+
+
+def upsert(event: str, entry: dict) -> None:
+    items = hooks.get(event, [])
+    if isinstance(items, dict):
+        items = [items]
+    if not isinstance(items, list):
+        raise SystemExit(f"hooks.json: evento {event} inválido; preservado sem alteração")
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        existing_hooks = item.get("hooks", [])
+        if not isinstance(existing_hooks, list):
+            continue
+        for existing in existing_hooks:
+            if isinstance(existing, dict) and "mcp-route.sh" in str(existing.get("command", "")):
+                existing.update(hook_command)
+                if "matcher" in entry:
+                    item["matcher"] = entry["matcher"]
+                hooks[event] = items
+                return
+    entry = dict(entry)
+    entry["hooks"] = [dict(hook_command)]
+    items.append(entry)
+    hooks[event] = items
+
+
+upsert("PreToolUse", {"matcher": "Bash|apply_patch|Edit|Write"})
+for event, matcher in (("SessionStart", "startup|resume|clear|compact"),
+                       ("SubagentStart", ""),
+                       ("UserPromptSubmit", "")):
+    upsert(event, {"matcher": matcher})
+atomic_write(hooks_path, json.dumps(root, indent=2, ensure_ascii=False) + "\n")
+PY
+  ok "Codex configurado para simplicio serve --mcp --stdio"
+  ok "hooks do Codex instalados em $hook_path"
+}
+
 verify_runtime_contract() {
   binary_path="$1"
   if [ ! -x "$binary_path" ] || ! command -v python3 >/dev/null 2>&1; then
@@ -278,17 +404,6 @@ if [ "$SKIP_EXISTING" != "true" ]; then
   DOWNLOAD_URL="$RELEASE_BASE/$ASSET"
   MANIFEST_URL="$RELEASE_BASE/simplicio-update-manifest.json"
 
-  fetch() {
-    # fetch <url> <dest-or-'-'>
-    if command -v curl >/dev/null 2>&1; then
-      curl -fsSL "$1" -o "$2"
-    elif command -v wget >/dev/null 2>&1; then
-      wget -q "$1" -O "$2"
-    else
-      err "Precisa de curl ou wget para baixar"
-    fi
-  }
-
   TARGET_ID="$OS-$ARCH"
   EXPECTED_SHA256=""
   SIGNED="false"
@@ -296,7 +411,7 @@ if [ "$SKIP_EXISTING" != "true" ]; then
   SIGNATURE_REQUIRED="false"
   MANIFEST_TMP="$(mktemp)"
   trap 'rm -f "$MANIFEST_TMP"' EXIT
-  if fetch "$MANIFEST_URL" "$MANIFEST_TMP" 2>/dev/null; then
+  if fetch_url "$MANIFEST_URL" "$MANIFEST_TMP" 2>/dev/null; then
     if command -v python3 >/dev/null 2>&1; then
       EXPECTED_SHA256="$(python3 -c "
 import json,sys
@@ -357,7 +472,7 @@ except Exception:
 
   info "Baixando de $DOWNLOAD_URL ..."
   STAGING_PATH="$DEST_PATH.download-$$.tmp"
-  fetch "$DOWNLOAD_URL" "$STAGING_PATH"
+  fetch_url "$DOWNLOAD_URL" "$STAGING_PATH"
 
   if [ ! -s "$STAGING_PATH" ]; then
     rm -f "$STAGING_PATH"
@@ -400,13 +515,10 @@ ok "contrato de release do Runtime verificado"
 require_active_login
 ok "login Google ativo e entitlement válido"
 
-# Codex only renders its Authenticate action for an OAuth-capable HTTP server.
-# Other hosts retain their stdio fallback inside `simplicio mcp register`.
-if "$DEST_PATH" mcp register >/dev/null 2>&1; then
-  ok "MCP local HTTP/OAuth registrado para o Codex"
-else
-  warn "não foi possível registrar o MCP automaticamente; rode: simplicio mcp register"
-fi
+# Codex runs the installed binary directly over STDIO. This avoids the local
+# HTTP daemon latency and keeps the same Google login/entitlement gate in the
+# Runtime process. Existing Codex settings and hooks are merged, not replaced.
+configure_codex_stdio
 
 # Adiciona ao PATH se não estiver
 case ":$PATH:" in

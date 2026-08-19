@@ -211,17 +211,18 @@ simplicio login google
 simplicio auth status --json
 ```
 
-Depois do login, registre o MCP local para o Codex e recarregue as configurações
-de MCP:
+Depois do login, o instalador configura o Codex para executar diretamente o
+binário local por STDIO e instala os hooks Simplicio em `~/.codex/hooks.json`.
+Reinicie o Codex, abra Settings → Hooks para revisar os hooks e confirme:
 
 ```bash
-simplicio mcp register
+codex mcp list
 ```
 
-No Codex, abra Settings → MCP e use Authenticate quando o servidor
-`simplicio` exibir esse botão. Para clientes STDIO, use
-`simplicio serve --mcp --stdio`; nunca copie tokens manualmente para arquivos
-de configuração.
+O registro deve apontar para `simplicio serve --mcp --stdio`. O Runtime ainda
+exige login Google e entitlement ativo; nunca copie tokens manualmente para
+arquivos. Para desativar temporariamente o roteamento do hook, use
+`SIMPLICIO_MCP_ROUTE=0`.
 
 ## Building from Source
 
