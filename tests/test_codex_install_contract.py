@@ -47,6 +47,18 @@ def test_unix_installer_migrates_legacy_hook_events():
     assert "del hooks[event]" in shell
 
 
+def test_unix_installer_accepts_release_manifest_target_aliases():
+    shell = (ROOT / "install.sh").read_text(encoding="utf-8")
+    # The v3.8.15 manifest uses Rust-style target names while the public
+    # distribution table uses stable installer IDs. Keep signature lookup
+    # fail-closed, but accept both names.
+    assert 'MANIFEST_TARGET_ID="$TARGET_ID"' in shell
+    assert 'macos-arm64) MANIFEST_TARGET_ID="macos-aarch64"' in shell
+    assert 'macos-x64) MANIFEST_TARGET_ID="macos-x86_64"' in shell
+    assert 'linux-x64) MANIFEST_TARGET_ID="linux-x86_64"' in shell
+    assert "a.get('target') in {'$MANIFEST_TARGET_ID', '$TARGET_ID'}" in shell
+
+
 def test_codex_hooks_have_all_required_lifecycle_events():
     shell_hook = (ROOT / "codex/mcp-route.sh").read_text(encoding="utf-8")
     powershell_hook = (ROOT / "codex/mcp-route.ps1").read_text(encoding="utf-8")
