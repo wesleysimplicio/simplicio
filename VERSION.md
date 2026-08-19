@@ -17,15 +17,14 @@ This is the **public distribution repo** for [Simplicio](https://github.com/wesl
 - **Targets:** macOS ARM64, macOS x64, Linux x64, and Windows x64. The
   repository-root binaries and `SHA256SUMS` were regenerated from this same
   Runtime source and verified locally.
-- **Release status:** this snapshot is prepared for the official signed GitHub
-  Release `v3.8.15`. Installers and the update command resolve GitHub's
-  `latest` release and require its signed manifest; the release is user-facing
-  only after the post-publish gates in `docs/RELEASE_RUNBOOK.md` pass.
+- **Release status:** official signed GitHub Release `v3.8.15` is published.
+  Installers and the update command resolve GitHub's `latest` release and
+  require its signed manifest; the post-publish release gates have passed.
 - **Default branch:** `master`
-- **Release-channel gates:** signed artifacts, active Google login, the
-  configured `update_public_key`, and the embedded ecosystem bundle must still
-  be verified in the official release workflow before this snapshot is called
-  a user-facing release.
+- **Release-channel gates:** signed artifacts, the configured
+  `update_public_key`, and the embedded ecosystem bundle were verified for
+  this user-facing release. Each installation still requires active Google
+  login and entitlement validation.
 
 ### Product law (v3.6.0)
 
