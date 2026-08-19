@@ -137,11 +137,12 @@ except Exception:
     raise SystemExit(1)
 identity = payload.get("identity") or {}
 entitlement = payload.get("entitlement") or {}
+identity_email = identity.get("email") or (payload.get("user") or {}).get("email")
 active = (
     identity.get("enabled") is True
     and identity.get("login_enabled") is True
     and identity.get("status") not in {"disabled", "logged_out", "revoked"}
-    and bool(identity.get("email"))
+    and bool(identity_email)
 )
 if "updates_allowed" in entitlement:
     active = active and entitlement.get("updates_allowed") is True

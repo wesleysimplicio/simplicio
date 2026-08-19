@@ -303,7 +303,11 @@ def check_target_triplet_consistency(root: Path, findings: list[Finding]) -> Non
     unsigned = [
         a["target"]
         for a in manifest.get("artifacts", [])
-        if a.get("sha256") and not a.get("signed", False)
+        if a.get("sha256")
+        and not (
+            a.get("signed", False)
+            or str(a.get("signature") or "").startswith("ed25519:")
+        )
     ]
     if unsigned:
         findings.append(

@@ -1,6 +1,6 @@
 {
   "name": "@wesleysimplicio/simplicio",
-  "version": "3.8.14",
+  "version": "3.8.15",
   "description": "Simplicio CLI \u2014 up to 96% token savings on any LLM. One command install.",
   "bin": {
     "simplicio": "./install.js"
