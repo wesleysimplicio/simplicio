@@ -109,6 +109,110 @@ function Require-ActiveLogin {
   }
 }
 
+function Backup-Once([string]$Path) {
+  if ((Test-Path -LiteralPath $Path) -and -not (Test-Path -LiteralPath "$Path.simplicio.bak")) {
+    Copy-Item -LiteralPath $Path -Destination "$Path.simplicio.bak" -Force
+  }
+}
+
+function Write-AtomicText([string]$Path, [string]$Content) {
+  $parent = Split-Path -Parent $Path
+  New-Item -ItemType Directory -Force -Path $parent | Out-Null
+  $temp = "$Path.simplicio.tmp"
+  Set-Content -LiteralPath $temp -Value $Content -Encoding UTF8
+  Move-Item -Force -LiteralPath $temp -Destination $Path
+}
+
+function Install-CodexIntegration {
+  $codexDir = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE ".codex" }
+  $codexConfig = Join-Path $codexDir "config.toml"
+  $codexHooks = Join-Path $codexDir "hooks.json"
+  $hookDir = Join-Path $env:USERPROFILE ".simplicio\hooks"
+  $hookPath = Join-Path $hookDir "mcp-route.ps1"
+  $hookTemp = "$hookPath.download-$([guid]::NewGuid().ToString('N')).tmp"
+  New-Item -ItemType Directory -Force -Path $codexDir, $hookDir | Out-Null
+
+  Write-Host "==> configuring Codex STDIO MCP and hooks"
+  $hookRef = if ($env:SIMPLICIO_CODEX_HOOK_REF) { $env:SIMPLICIO_CODEX_HOOK_REF } else { "master" }
+  $hookUrl = "https://raw.githubusercontent.com/$Repo/$hookRef/codex/mcp-route.ps1"
+  try {
+    Invoke-WebRequest -Uri $hookUrl -OutFile $hookTemp -UseBasicParsing -ErrorAction Stop
+    Move-Item -Force -LiteralPath $hookTemp -Destination $hookPath
+  } catch {
+    if (Test-Path -LiteralPath $hookTemp) { Remove-Item -Force -LiteralPath $hookTemp -ErrorAction SilentlyContinue }
+    throw "could not download the Codex hook: $($_.Exception.Message)"
+  }
+
+  Backup-Once $codexConfig
+  $config = if (Test-Path -LiteralPath $codexConfig) { Get-Content -Raw -LiteralPath $codexConfig } else { "" }
+  $escapedBinary = $DestPath.Replace('\', '\\').Replace('"', '\"')
+  $stdioBlock = '[mcp_servers.simplicio]' + [Environment]::NewLine +
+    'command = "' + $escapedBinary + '"' + [Environment]::NewLine +
+    'args = ["serve", "--mcp", "--stdio"]' + [Environment]::NewLine
+  $sectionRegex = '(?ms)^\[mcp_servers\.simplicio\]\r?\n.*?(?=^\[|\z)'
+  if ([regex]::IsMatch($config, $sectionRegex)) {
+    $config = [regex]::Replace($config, $sectionRegex, [System.Text.RegularExpressions.MatchEvaluator]{ param($match) $stdioBlock }, 1)
+  } else {
+    $separator = if ([string]::IsNullOrWhiteSpace($config)) { "" } else { [Environment]::NewLine + [Environment]::NewLine }
+    $config = $config.TrimEnd() + $separator + $stdioBlock
+  }
+  Write-AtomicText $codexConfig $config
+
+  Backup-Once $codexHooks
+  try {
+    $root = if (Test-Path -LiteralPath $codexHooks) {
+      (Get-Content -Raw -LiteralPath $codexHooks | ConvertFrom-Json)
+    } else {
+      [pscustomobject]@{}
+    }
+  } catch {
+    throw "hooks.json is invalid and was preserved: $($_.Exception.Message)"
+  }
+  if ($null -eq $root) { $root = [pscustomobject]@{} }
+  if (-not $root.PSObject.Properties["hooks"]) {
+    $root | Add-Member -MemberType NoteProperty -Name hooks -Value ([pscustomobject]@{})
+  }
+  $hooks = $root.hooks
+  if ($null -eq $hooks -or -not $hooks.PSObject) { throw "hooks.json has an invalid hooks object" }
+  $hookCommand = 'powershell -NoProfile -ExecutionPolicy Bypass -File "' + $hookPath + '"'
+
+  function Upsert-CodexHook([string]$Event, [string]$Matcher) {
+    $property = $hooks.PSObject.Properties[$Event]
+    $items = if ($property) { @($property.Value) } else { @() }
+    foreach ($item in $items) {
+      if ($null -eq $item -or -not $item.PSObject.Properties["hooks"]) { continue }
+      foreach ($existing in @($item.hooks)) {
+        if ($existing -and ([string]$existing.command).Contains("mcp-route.ps1")) {
+          $existing.command = $hookCommand
+          $existing.timeout = 8
+          $existing.type = "command"
+          $existing.statusMessage = "Routing through Simplicio MCP"
+          if ($Matcher) { $item.matcher = $Matcher }
+          $hooks | Add-Member -MemberType NoteProperty -Name $Event -Value $items -Force
+          return
+        }
+      }
+    }
+    $hook = [pscustomobject]@{
+      type = "command"
+      command = $hookCommand
+      timeout = 8
+      statusMessage = "Routing through Simplicio MCP"
+    }
+    $entry = [pscustomobject]@{ hooks = @($hook) }
+    if ($Matcher) { $entry | Add-Member -MemberType NoteProperty -Name matcher -Value $Matcher }
+    $items += $entry
+    $hooks | Add-Member -MemberType NoteProperty -Name $Event -Value $items -Force
+  }
+
+  Upsert-CodexHook "PreToolUse" "Bash|apply_patch|Edit|Write"
+  Upsert-CodexHook "SessionStart" "startup|resume|clear|compact"
+  Upsert-CodexHook "SubagentStart" ""
+  Upsert-CodexHook "UserPromptSubmit" ""
+  Write-AtomicText $codexHooks ($root | ConvertTo-Json -Depth 20)
+  Write-Host "  ✓ Codex configured for simplicio serve --mcp --stdio"
+  Write-Host "  ✓ Codex hooks installed at $hookPath"
+}
 # ─── -Doctor: idempotent, read-only health check ───────────────────────────
 if ($Doctor) {
   Write-Host "==> simplicio doctor"
@@ -322,15 +426,10 @@ try {
 }
 Write-Host "  ✓ active Google session and entitlement verified"
 
-# Codex only renders its Authenticate action for an OAuth-capable HTTP server.
-# Other hosts retain their stdio fallback inside `simplicio mcp register`.
-try {
-  & $DestPath mcp register | Out-Null
-  if ($LASTEXITCODE -ne 0) { throw "mcp register returned $LASTEXITCODE" }
-  Write-Host "  ✓ local HTTP/OAuth MCP registered for Codex"
-} catch {
-  Write-Warning "could not register MCP automatically; run: simplicio mcp register"
-}
+# Codex runs the installed binary directly over STDIO. This avoids the local
+# HTTP daemon latency and keeps the same Google login/entitlement gate in the
+# Runtime process. Existing Codex settings and hooks are merged, not replaced.
+Install-CodexIntegration
 
 $BundleDir = if ($env:SIMPLICIO_BUNDLE_DIR) { $env:SIMPLICIO_BUNDLE_DIR } else { Join-Path $env:USERPROFILE ".simplicio" }
 New-Item -ItemType Directory -Force -Path $BundleDir | Out-Null

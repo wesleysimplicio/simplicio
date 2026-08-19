@@ -13,29 +13,31 @@ simplicio auth status --json
 
 Continue only when the status reports `active: true`. Never copy a password, device code, bearer token, refresh token, or client secret into an MCP config.
 
-## Codex: local HTTP/OAuth
+## Codex: local STDIO MCP and hooks
 
-The official installer registers an OAuth-capable local Streamable HTTP server:
+The official installer configures Codex to launch the installed binary directly:
 
-```text
-http://127.0.0.1:8787/mcp
+```toml
+[mcp_servers.simplicio]
+command = "/path/to/simplicio"
+args = ["serve", "--mcp", "--stdio"]
 ```
 
-In Codex:
+The installer also merges Simplicio `SessionStart`, `UserPromptSubmit`,
+`SubagentStart`, and `PreToolUse` hooks into `~/.codex/hooks.json`, preserving
+unrelated user hooks. Restart Codex and review the result in **Settings →
+Hooks**. The Runtime still validates Google login and entitlement on every
+local MCP session; never paste tokens into either config file.
 
-1. Open **Settings → MCP**.
-2. Find **simplicio**.
-3. Click **Authenticate**.
-4. Complete the Google-backed browser login.
-5. Reload MCP settings if the server was already cached.
-
-If the server is missing, run:
+To verify the registration:
 
 ```bash
-simplicio mcp register
+codex mcp list
 ```
 
-The Runtime validates the active bearer session on each request. The **Authenticate** button is expected; do not replace it with a pasted token.
+Set `SIMPLICIO_MCP_ROUTE=0` for a temporary hook escape hatch. Rerunning the
+installer repairs the integration idempotently and leaves `.simplicio.bak`
+copies of the original Codex files.
 
 ## Other clients: local STDIO
 
@@ -92,7 +94,9 @@ A successful response contains the tool definitions. A `login required` error me
 
 ## Automatic setup
 
-The official installers perform the binary checksum and embedded-bundle checks, require active login, and attempt MCP registration:
+The official installers perform the binary checksum and embedded-bundle checks,
+require active login, and configure Codex's local STDIO MCP plus Simplicio
+hooks:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
