@@ -56,4 +56,4 @@ Nenhuma — repo é ponto de entrada para usuários finais.
 
 ---
 
-_Last updated: 2026-08-16_
+_Last updated: 2026-08-18_
