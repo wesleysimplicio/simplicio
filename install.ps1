@@ -73,6 +73,41 @@ function Test-RuntimeReleaseContract([string]$BinaryPath) {
   )
 }
 
+function Test-McpToolSurface([string]$BinaryPath) {
+  if (-not (Test-Path $BinaryPath)) { return $false }
+  $required = @(
+    "simplicio_map", "simplicio_memory", "simplicio_edit", "simplicio_gate",
+    "simplicio_validate", "simplicio_run", "simplicio_symbol", "simplicio_search",
+    "simplicio_read", "simplicio_exec"
+  )
+  $payload = @(
+    '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}',
+    '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+  ) -join [Environment]::NewLine
+  try {
+    $raw = $payload | & $BinaryPath serve --mcp --stdio --json 2>$null | Out-String
+    if ($LASTEXITCODE -ne 0) { return $false }
+    $response = $null
+    foreach ($line in ($raw -split "\r?\n")) {
+      if ([string]::IsNullOrWhiteSpace($line)) { continue }
+      try {
+        $candidate = $line | ConvertFrom-Json
+        if ($candidate.id -eq 2) { $response = $candidate }
+      } catch { continue }
+    }
+    if ($null -eq $response -or $null -eq $response.result) { return $false }
+    $names = @($response.result.tools | ForEach-Object { [string]$_.name })
+    $missing = @($required | Where-Object { $_ -notin $names })
+    if ($missing.Count -gt 0) {
+      Write-Host "  [FAIL] MCP tool surface incomplete; missing: $($missing -join ', ')"
+      return $false
+    }
+    return $true
+  } catch {
+    return $false
+  }
+}
+
 function Test-ActiveLogin {
   if (-not (Test-Path $DestPath)) { return $false }
   try {
@@ -287,6 +322,13 @@ if ($Doctor) {
       $ok = $false
     }
 
+    if (Test-McpToolSurface $DestPath) {
+      Write-Host "  [OK] MCP exposes the 10 documented tools"
+    } else {
+      Write-Host "  [FAIL] MCP does not expose the complete documented tool surface"
+      $ok = $false
+    }
+
     if (Test-ActiveLogin) {
       Write-Host "  [OK] active Google session and entitlement"
     } else {
@@ -428,6 +470,11 @@ if (-not (Test-RuntimeReleaseContract $StagingPath)) {
   Write-Error "Runtime release does not meet the distribution contract (embedded sources, Google login, and signed-update key); installation aborted."
   exit 1
 }
+if (-not (Test-McpToolSurface $StagingPath)) {
+  Remove-Item -Force $StagingPath -ErrorAction SilentlyContinue
+  Write-Error "Runtime release does not expose the complete MCP tool surface; installation aborted."
+  exit 1
+}
 
 # Atomic swap: rename into place on the same volume so there is never a
 # window where $DestPath is a half-written file, and re-running this script
@@ -455,6 +502,11 @@ if (-not (Test-RuntimeReleaseContract $DestPath)) {
   exit 1
 }
 Write-Host "  ✓ Runtime release contract verified"
+if (-not (Test-McpToolSurface $DestPath)) {
+  Write-Error "This Runtime does not expose the complete MCP tool surface; refusing to finish installation."
+  exit 1
+}
+Write-Host "  ✓ MCP tool surface verified (10 documented tools)"
 
 # ─── Active login is mandatory; beta does not bypass this gate ──────────────
 try {
