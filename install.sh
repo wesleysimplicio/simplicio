@@ -152,6 +152,43 @@ hooks = root.setdefault("hooks", {})
 if not isinstance(hooks, dict):
     raise SystemExit("hooks.json: campo hooks inválido; preservado sem alteração")
 
+def remove_legacy_hooks() -> None:
+    for event in list(hooks):
+        items = hooks.get(event, [])
+        if isinstance(items, dict):
+            items = [items]
+        if not isinstance(items, list):
+            raise SystemExit(f"hooks.json: evento {event} inválido; preservado sem alteração")
+        kept_items = []
+        for item in items:
+            if not isinstance(item, dict):
+                kept_items.append(item)
+                continue
+            existing_hooks = item.get("hooks")
+            if not isinstance(existing_hooks, list):
+                kept_items.append(item)
+                continue
+            kept_hooks = []
+            for legacy_hook in existing_hooks:
+                command_text = str(legacy_hook.get("command", "")) if isinstance(legacy_hook, dict) else ""
+                lowered = command_text.lower()
+                is_legacy_simplicio = (
+                    re.search(r"mcp-route\.sh|simplicio-mcp-route", command_text, re.I)
+                    or ("/bin/bash" in lowered and "simplicio" in lowered)
+                )
+                if not is_legacy_simplicio:
+                    kept_hooks.append(legacy_hook)
+            if kept_hooks:
+                item["hooks"] = kept_hooks
+                kept_items.append(item)
+        if kept_items:
+            hooks[event] = kept_items
+        else:
+            del hooks[event]
+
+
+remove_legacy_hooks()
+
 command = f"bash {shlex.quote(str(hook_path))}"
 hook_command = {
     "command": command,
