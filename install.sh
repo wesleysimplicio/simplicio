@@ -305,7 +305,7 @@ try:
     for a in m.get('artifacts', []):
         if a.get('target') == '$TARGET_ID':
             print(a.get('sha256') or '')
-            print('true' if a.get('signed') else 'false')
+            print('true' if a.get('signed') or str(a.get('signature') or '').startswith('ed25519:') else 'false')
             break
 except Exception:
     pass
@@ -316,7 +316,7 @@ try:
     m = json.load(open('$MANIFEST_TMP'))
     for a in m.get('artifacts', []):
         if a.get('target') == '$TARGET_ID':
-            print('true' if a.get('signed') else 'false')
+            print('true' if a.get('signed') or str(a.get('signature') or '').startswith('ed25519:') else 'false')
             break
 except Exception:
     pass

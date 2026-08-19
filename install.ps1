@@ -228,7 +228,7 @@ if ($Manifest) {
   $artifact = $Manifest.artifacts | Where-Object { $_.target -eq $Target } | Select-Object -First 1
   if ($artifact) {
     $ExpectedSha256 = $artifact.sha256
-    $ExpectedSigned = [bool]$artifact.signed
+    $ExpectedSigned = [bool]$artifact.signed -or ([string]$artifact.signature).StartsWith("ed25519:")
     $ExpectedSignature = $artifact.signature
   }
   $SignatureRequired = [bool]$Manifest.security.signature_required
