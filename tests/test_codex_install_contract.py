@@ -36,6 +36,17 @@ def test_windows_installer_migrates_legacy_unix_hooks():
     assert "mcp-route.ps1" in powershell
 
 
+def test_unix_installer_migrates_legacy_hook_events():
+    shell = (ROOT / "install.sh").read_text(encoding="utf-8")
+    # The same stale global entry can survive under a legacy snake_case event
+    # on macOS/Linux; the shell installer must remove it before upserting the
+    # current command.
+    assert "def remove_legacy_hooks" in shell
+    assert "simplicio-mcp-route" in shell
+    assert "list(hooks)" in shell
+    assert "del hooks[event]" in shell
+
+
 def test_codex_hooks_have_all_required_lifecycle_events():
     shell_hook = (ROOT / "codex/mcp-route.sh").read_text(encoding="utf-8")
     powershell_hook = (ROOT / "codex/mcp-route.ps1").read_text(encoding="utf-8")
