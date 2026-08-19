@@ -25,6 +25,17 @@ def test_installers_preserve_existing_codex_state():
     assert "Write-AtomicText" in powershell
 
 
+def test_windows_installer_migrates_legacy_unix_hooks():
+    powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
+    # Existing Windows users may have the old global hook, which invokes
+    # /bin/bash against a .sh path. The installer must remove only that legacy
+    # Simplicio entry before adding the PowerShell hook.
+    assert "mcp-route\\.sh" in powershell
+    assert "/bin/bash" in powershell
+    assert "Remove-Legacy-CodexHooks" in powershell
+    assert "mcp-route.ps1" in powershell
+
+
 def test_codex_hooks_have_all_required_lifecycle_events():
     shell_hook = (ROOT / "codex/mcp-route.sh").read_text(encoding="utf-8")
     powershell_hook = (ROOT / "codex/mcp-route.ps1").read_text(encoding="utf-8")

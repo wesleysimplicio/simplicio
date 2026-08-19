@@ -123,6 +123,44 @@ function Write-AtomicText([string]$Path, [string]$Content) {
   Move-Item -Force -LiteralPath $temp -Destination $Path
 }
 
+function Remove-Legacy-CodexHooks([object]$Root) {
+  if ($null -eq $Root -or -not $Root.PSObject.Properties["hooks"]) { return }
+  $hooks = $Root.hooks
+  if ($null -eq $hooks -or -not $hooks.PSObject) { return }
+  $eventNames = @($hooks.PSObject.Properties | ForEach-Object { $_.Name })
+  foreach ($eventName in $eventNames) {
+    $eventProperty = $hooks.PSObject.Properties[$eventName]
+    if ($null -eq $eventProperty) { continue }
+    $items = @($eventProperty.Value)
+    $keptItems = @()
+    foreach ($item in $items) {
+      if ($null -eq $item -or -not $item.PSObject.Properties["hooks"]) {
+        $keptItems += $item
+        continue
+      }
+      $keptHooks = @()
+      foreach ($legacyHook in @($item.hooks)) {
+        $command = [string]$legacyHook.command
+        $isLegacySimplicio = (
+          $command -match '(?i)mcp-route\.sh|simplicio-mcp-route' -or
+          (($command -match '(?i)/bin/bash') -and ($command -match '(?i)simplicio'))
+        )
+        if (-not $isLegacySimplicio) { $keptHooks += $legacyHook }
+      }
+      if ($keptHooks.Count -gt 0) {
+        $item.hooks = $keptHooks
+        $keptItems += $item
+      }
+    }
+    if ($keptItems.Count -gt 0) {
+      $hooks | Add-Member -MemberType NoteProperty -Name $eventName -Value $keptItems -Force
+    } else {
+      $hooks.PSObject.Properties.Remove($eventName)
+    }
+  }
+}
+
+
 function Install-CodexIntegration {
   $codexDir = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE ".codex" }
   $codexConfig = Join-Path $codexDir "config.toml"
@@ -169,6 +207,7 @@ function Install-CodexIntegration {
     throw "hooks.json is invalid and was preserved: $($_.Exception.Message)"
   }
   if ($null -eq $root) { $root = [pscustomobject]@{} }
+  Remove-Legacy-CodexHooks $root
   if (-not $root.PSObject.Properties["hooks"]) {
     $root | Add-Member -MemberType NoteProperty -Name hooks -Value ([pscustomobject]@{})
   }

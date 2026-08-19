@@ -9,6 +9,9 @@
   `~/.codex/hooks.json` without replacing unrelated user configuration.
 - Added cross-platform Codex routing hooks for macOS/Linux and Windows, with a
   documented `SIMPLICIO_MCP_ROUTE=0` escape hatch and first-write backups.
+- Windows installation now migrates legacy global hooks that invoke
+  `/bin/bash` or `mcp-route.sh`, preventing stale Unix commands from failing
+  after an update.
 
 ## [3.8.11] - 2026-08-14
 
