@@ -24,6 +24,11 @@ def installer_active(payload):
     )
 
 
+def manifest_signature_present(payload):
+    artifact = next(item for item in payload["artifacts"] if item["target"] == "windows-x64")
+    return bool(artifact.get("signed")) or str(artifact.get("signature") or "").startswith("ed25519:")
+
+
 def test_legacy_identity_shape_is_accepted_after_successful_login():
     payload = {
         "active": True,
@@ -53,3 +58,20 @@ def test_both_published_installers_include_legacy_email_fallback():
     shell = (ROOT / "install.sh").read_text(encoding="utf-8")
     assert "$status.user.email" in powershell
     assert "payload.get(\"user\")" in shell
+
+
+def test_manifest_signature_field_is_accepted_without_signed_boolean():
+    payload = {
+        "artifacts": [{
+            "target": "windows-x64",
+            "signature": "ed25519:valid-signature",
+        }]
+    }
+    assert manifest_signature_present(payload)
+
+
+def test_installers_use_ed25519_signature_when_signed_boolean_is_absent():
+    powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
+    shell = (ROOT / "install.sh").read_text(encoding="utf-8")
+    assert 'StartsWith("ed25519:")' in powershell
+    assert "startswith('ed25519:')" in shell
