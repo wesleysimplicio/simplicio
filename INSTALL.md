@@ -47,23 +47,25 @@ then checks the Runtime readiness contract before completing installation.
 
 ## Doctor / Uninstall
 
-Both installers are idempotent and expose a health check and a clean,
-data-preserving uninstall — safe to re-run at any time:
+Both installers are idempotent and expose a read-only health check plus an
+explicit data-preserving uninstall:
 
-```bash
+~~~bash
 # macOS / Linux
 sh install.sh --doctor
-sh install.sh --uninstall
-```
+sh install.sh --uninstall --keep-data
+sh install.sh --uninstall --purge       # confirmation required
+~~~
 
-```powershell
+~~~powershell
 # Windows
 pwsh install.ps1 -Doctor
-pwsh install.ps1 -Uninstall
-```
+pwsh install.ps1 -Uninstall -KeepData
+pwsh install.ps1 -Uninstall -Purge      # confirmation required
+~~~
 
-Uninstall only removes the installed binary; it never deletes user data or
-config under `~/.simplicio`.
+Uninstall removes the installed binary and keeps user data by default. Set
+SIMPLICIO_CONFIRM_PURGE=1 for a non-interactive purge.
 
 ## Verify Installation
 
@@ -211,18 +213,18 @@ simplicio login google
 simplicio auth status --json
 ```
 
-Depois do login, o instalador configura o Codex para executar diretamente o
-binário local por STDIO e instala os hooks Simplicio em `~/.codex/hooks.json`.
-Reinicie o Codex, abra Settings → Hooks para revisar os hooks e confirme:
+Codex integration is opt-in; the base installer does not modify another
+product's configuration. To enable versioned MCP registration and managed hooks:
 
-```bash
-codex mcp list
-```
+~~~bash
+SIMPLICIO_INSTALL_CODEX=1 sh install.sh
+~~~
 
-O registro deve apontar para `simplicio serve --mcp --stdio`. O Runtime ainda
-exige login Google e entitlement ativo; nunca copie tokens manualmente para
-arquivos. Para desativar temporariamente o roteamento do hook, use
-`SIMPLICIO_MCP_ROUTE=0`.
+The registration points to simplicio serve --mcp --stdio. The Runtime still
+requires Google login and active entitlement for every local MCP session; never
+copy tokens into config files. Review enabled hooks in Settings → Hooks and use
+codex mcp list. To repair, rerun with SIMPLICIO_INSTALL_CODEX=1. Use
+SIMPLICIO_MCP_ROUTE=0 for a temporary hook escape hatch.
 
 ## Building from Source
 
@@ -253,11 +255,18 @@ cargo build --release --no-default-features --features tui
 
 ## Uninstall
 
-```bash
-# Remove the binary
-rm $(which simplicio)
+Use the installer so the binary and transaction journal are handled together:
 
-# Remove data (optional)
-rm -rf ~/.simplicio
-rm -rf .simplicio  # per-project data
-```
+~~~bash
+sh install.sh --uninstall --keep-data       # default, preserves ~/.simplicio
+sh install.sh --uninstall --purge            # removes ~/.simplicio after confirmation
+~~~
+
+~~~powershell
+pwsh install.ps1 -Uninstall -KeepData
+pwsh install.ps1 -Uninstall -Purge
+~~~
+
+Interactive purge requires typing PURGE. For non-interactive use, set
+SIMPLICIO_CONFIRM_PURGE=1. Project-local .simplicio data is not removed by
+--keep-data; inspect the target before choosing --purge.

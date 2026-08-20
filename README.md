@@ -56,10 +56,11 @@ optional, not required.**
 
 ## 🚀 Installation
 
-The official installers download the latest Runtime release from this
-repository, verify the published SHA256 manifest, validate the Runtime release
-contract, require an active Simplicio account, and attempt to register the local
-MCP endpoint. They do not clone or download the `simplicio-*` sibling repositories.
+The official installers download one canonical asset from the latest
+Runtime release, verify its SHA256 checksum and Ed25519 signature, validate the
+Runtime release contract, and require an active Simplicio account. They do not
+clone sibling repositories, install the embedded Python projects with pip, or
+modify Codex configuration unless SIMPLICIO_INSTALL_CODEX=1 is explicitly set.
 
 ### macOS / Linux
 
@@ -110,13 +111,21 @@ Maintainers: the exact manual order for building, signing, tagging, publishing,
 and verifying a public release is documented in
 [docs/RELEASE_RUNBOOK.md](docs/RELEASE_RUNBOOK.md).
 
-The doctor command is read-only. Uninstalling is idempotent and preserves user
-data under `~/.simplicio`:
+The doctor command is read-only. Uninstalling is idempotent; the default
+keep-data mode removes the installed binary and preserves ~/.simplicio:
 
-```bash
-sh install.sh --uninstall              # macOS/Linux
-pwsh install.ps1 -Uninstall             # Windows
-```
+~~~bash
+sh install.sh --uninstall --keep-data       # macOS/Linux
+sh install.sh --uninstall --purge            # also removes ~/.simplicio after confirmation
+~~~
+
+~~~powershell
+pwsh install.ps1 -Uninstall -KeepData         # Windows
+pwsh install.ps1 -Uninstall -Purge            # also removes user data after confirmation
+~~~
+
+For non-interactive purge, set SIMPLICIO_CONFIRM_PURGE=1 explicitly. The
+installer never edits PATH profiles.
 
 ### What the binary contains
 
@@ -213,30 +222,36 @@ the table above is a quick orientation, not a substitute for live schemas.
 
 ### Codex: local STDIO MCP and hooks
 
-The installer configures Codex to launch the installed binary directly:
+Codex integration is opt-in. A normal installation does not modify Codex
+configuration or hooks. To enable the versioned, reversible integration:
 
-```toml
+~~~bash
+SIMPLICIO_INSTALL_CODEX=1 sh install.sh
+~~~
+
+When enabled, the installer configures Codex to launch the installed binary
+directly:
+
+~~~toml
 [mcp_servers.simplicio]
 command = "/path/to/simplicio"
 args = ["serve", "--mcp", "--stdio"]
-```
+~~~
 
 This keeps MCP execution local and avoids the latency of the local HTTP daemon.
 The Runtime still enforces Google login and entitlement for every MCP session.
-The installer also merges Simplicio `SessionStart`, `UserPromptSubmit`,
-`SubagentStart`, and `PreToolUse` hooks into `~/.codex/hooks.json`; existing
-Codex hooks are preserved and the Simplicio entries are updated idempotently.
+The managed Codex hooks are versioned with the release, existing hooks are
+preserved, and repeated setup is idempotent. Review the result in Settings →
+Hooks and verify the MCP command with:
 
-After installation, restart Codex and open **Settings → Hooks** to review or
-approve the installed hooks. Verify the MCP command with:
-
-```bash
+~~~bash
 codex mcp list
-```
+~~~
 
-To repair only this integration, rerun the installer. The original
-`config.toml` and `hooks.json` are kept in `.simplicio.bak` files on the first
-managed write. Set `SIMPLICIO_MCP_ROUTE=0` for a temporary hook escape hatch.
+To repair the integration, rerun the installer with SIMPLICIO_INSTALL_CODEX=1.
+The managed integration has a separate status/install/uninstall/repair helper in
+scripts/codex_integration.py; user data remains separate from the integration.
+Set SIMPLICIO_MCP_ROUTE=0 for a temporary hook escape hatch.
 
 ### Other MCP clients: local STDIO
 
@@ -476,11 +491,11 @@ LLM (Claude/Codex/Gemini)          Simplicio Runtime
 ## 🔄 Updates, diagnostics, and troubleshooting
 
 Re-running the official installer is the simplest update path. It downloads
-the latest release, verifies the checksum, validates the Runtime release
-contract, and keeps `~/.simplicio` user data. Re-running the installer keeps
-the installation on GitHub's `latest` release. The installer refuses
+the latest release, verifies the SHA256 checksum and Ed25519 signature, validates
+the Runtime release contract, and keeps ~/.simplicio user data. Re-running the
+installer keeps the installation on GitHub's latest release. The installer refuses
 to replace a working binary with a release that lacks the embedded bundle,
-Google login activation, or the signed-update key.
+Google login activation, a configured update key, or a verifiable signature.
 
 When the Runtime's background update checks are enabled, it checks in its
 scheduled windows, notifies once per release, stages the verified asset, and
