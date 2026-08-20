@@ -38,7 +38,7 @@ $Target = "windows-x64"
 $Asset = "simplicio-windows-x64.exe"
 $Ed25519PublicKey = "2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok="
 $Ed25519HelperUrl = "https://raw.githubusercontent.com/$Repo/master/scripts/verify_ed25519.py"
-$Ed25519HelperSha256 = "6d25fed7ea3d45db4a184d0c499511d235931b2693e5d8369851d27b349d932b"
+$Ed25519HelperSha256 = "f03a0719dd557ddea27dc4cf1456d6f06a47b9056505e4d4b8453090697600d0"
 if ($env:SIMPLICIO_BIN_DIR) {
   $InstallDir = $env:SIMPLICIO_BIN_DIR
 } else {

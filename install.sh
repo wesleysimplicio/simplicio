@@ -36,7 +36,7 @@ REPO="wesleysimplicio/simplicio"
 GITHUB="https://github.com/$REPO"
 ED25519_PUBLIC_KEY="2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok="
 ED25519_HELPER_URL="https://raw.githubusercontent.com/$REPO/master/scripts/verify_ed25519.py"
-ED25519_HELPER_SHA256="6d25fed7ea3d45db4a184d0c499511d235931b2693e5d8369851d27b349d932b"
+ED25519_HELPER_SHA256="f03a0719dd557ddea27dc4cf1456d6f06a47b9056505e4d4b8453090697600d0"
 BIN_NAME="simplicio"
 
 GREEN='\033[0;32m'
