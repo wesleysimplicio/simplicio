@@ -103,13 +103,33 @@ function Test-Ed25519Signature([string]$BinaryPath, [string]$Signature, [string]
   try {
     $python = $null
     $pythonArgs = @()
-    if (Get-Command python3 -ErrorAction SilentlyContinue) { $python = "python3" }
-    elseif (Get-Command py -ErrorAction SilentlyContinue) { $python = "py"; $pythonArgs = @('-3') }
-    if (-not $python) { return $false }
+    # Windows commonly exposes Python as `py` or `python`, while `python3`
+    # may resolve to the Microsoft Store alias. Probe the interpreter before
+    # trusting its command name, then fail closed if no Python 3 is usable.
+    foreach ($candidate in @(
+      @{ Name = "py"; Args = @('-3') },
+      @{ Name = "python3"; Args = @() },
+      @{ Name = "python"; Args = @() }
+    )) {
+      if (-not (Get-Command $candidate.Name -ErrorAction SilentlyContinue)) { continue }
+      & $candidate.Name @($candidate.Args) -c "import sys; raise SystemExit(0 if sys.version_info[0] == 3 else 1)" 2>$null
+      if ($LASTEXITCODE -eq 0) {
+        $python = $candidate.Name
+        $pythonArgs = @($candidate.Args)
+        break
+      }
+    }
+    if (-not $python) {
+      Write-Host "  ! Ed25519 verification requires Python 3 (tried py -3, python3, python)"
+      return $false
+    }
     Invoke-WebRequest -Uri $Ed25519HelperUrl -OutFile $helperPath -UseBasicParsing -ErrorAction Stop
     $helperHash = (Get-FileHash -Path $helperPath -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($helperHash -ne $Ed25519HelperSha256.ToLowerInvariant()) { return $false }
-    & $python @pythonArgs $helperPath --public-key $PublicKey --signature $Signature --sha256 $Digest
+    $normalizedSignature = ([string]$Signature).Trim()
+    $normalizedPublicKey = ([string]$PublicKey).Trim()
+    $normalizedDigest = ([string]$Digest).Trim().ToLowerInvariant()
+    & $python @pythonArgs $helperPath --public-key $normalizedPublicKey --signature $normalizedSignature --sha256 $normalizedDigest
     return ($LASTEXITCODE -eq 0)
   } catch {
     return $false
