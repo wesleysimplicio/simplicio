@@ -401,20 +401,20 @@ run_doctor() {
       status=1
     fi
 
-    if verify_mcp_tools "$DEST_PATH"; then
-      ok "MCP expõe as 10 tools documentadas"
-    else
-      warn "MCP incompleto: o binário não expõe todas as tools documentadas"
-      status=1
-    fi
-
     if verify_active_login; then
       ok "sessão Google ativa e entitlement válido"
     else
       warn "sessão Google ausente, expirada, revogada ou sem entitlement ativo"
       status=1
     fi
-  fi
+
+    if verify_mcp_tools "$DEST_PATH"; then
+      ok "MCP expõe as 10 tools documentadas"
+    else
+      warn "MCP incompleto após autenticação: o binário não expõe todas as tools documentadas"
+      status=1
+    fi
+    fi
 
   if [ "$status" -eq 0 ]; then
     ok "simplicio está saudável"
@@ -588,17 +588,13 @@ except Exception:
   fi
 
   chmod +x "$STAGING_PATH"
-  # Validate the staged executable before the atomic swap. A release that lacks
-  # embedded sources, Google login activation, or the signed-update key must
-  # not replace a working installation and then fail its post-install checks.
+  # A clean HOME has no authenticated session yet. Validate only the offline
+  # Runtime release contract before the swap; MCP initialize/tools/list is an
+  # authenticated gate and runs after require_active_login below.
   if ! verify_runtime_contract "$STAGING_PATH"; then
     report_runtime_contract "$STAGING_PATH"
     rm -f "$STAGING_PATH"
     err "release Runtime não atende ao contrato de distribuição; instalação interrompida"
-  fi
-  if ! verify_mcp_tools "$STAGING_PATH"; then
-    rm -f "$STAGING_PATH"
-    err "release Runtime não expõe a superfície MCP completa; instalação interrompida"
   fi
   # Swap atômico: mv no mesmo filesystem nunca deixa $DEST_PATH parcialmente
   # escrito, e reexecutar este script (update idempotente) não deixa .tmp
@@ -613,14 +609,17 @@ if ! verify_runtime_contract "$DEST_PATH"; then
   err "este Runtime não atende ao contrato de distribuição (fontes embutidas, login Google e chave pública de updates); instalação interrompida"
 fi
 ok "contrato de release do Runtime verificado"
-if ! verify_mcp_tools "$DEST_PATH"; then
-  err "este Runtime não expõe a superfície MCP completa; instalação interrompida"
-fi
-ok "superfície MCP verificada (10 tools documentadas)"
 
-# ─── 2.2 Login obrigatório: beta não elimina a sessão ativa ────────────────
+# ─── 2.2 Login obrigatório antes do handshake MCP ───────────────────────────
 require_active_login
 ok "login Google ativo e entitlement válido"
+
+# MCP tools/list is intentionally post-login: clean installs must bootstrap the
+# binary and establish the session before invoking the authenticated surface.
+if ! verify_mcp_tools "$DEST_PATH"; then
+  err "este Runtime não expõe a superfície MCP completa após o login; instalação interrompida"
+fi
+ok "superfície MCP verificada (10 tools documentadas)"
 
 # Codex runs the installed binary directly over STDIO. This avoids the local
 # HTTP daemon latency and keeps the same Google login/entitlement gate in the
