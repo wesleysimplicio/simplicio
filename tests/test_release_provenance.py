@@ -14,6 +14,8 @@ from scripts import verify_release_provenance as provenance
 
 REPOSITORY = "wesleysimplicio/simplicio"
 STAGING = "https://artifacts.example/simplicio/v3.5.2"
+SIGNED_TEST_PUBLIC_KEY = "A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg="
+SIGNED_TEST_SIGNATURE = "ed25519:UKIyIZkSH3nmk+E1LybN3bjQlPpiumLoLIu+bdQUC/j4/6nQkNX3MBhU7kZv+OZ6S9iLYVGwwzPZD5n//MGGAQ=="
 
 
 class FakeResponse:
@@ -55,6 +57,26 @@ def remote_release(value: dict, *, digest: str | None = None) -> dict:
             {
                 "name": artifact["artifact"],
                 "digest": digest or f"sha256:{artifact['sha256']}",
+            }
+        ],
+    }
+
+
+def signed_manifest(payload: bytes = b"signed release bytes") -> dict:
+    digest = hashlib.sha256(payload).hexdigest()
+    return {
+        "version": "3.8.17",
+        "security": {
+            "signature_algorithm": "ed25519",
+            "signature_required": True,
+        },
+        "signing_pubkey": SIGNED_TEST_PUBLIC_KEY,
+        "artifacts": [
+            {
+                "artifact": "simplicio-macos-arm64",
+                "url": f"https://github.com/{REPOSITORY}/releases/download/v3.8.17/simplicio-macos-arm64",
+                "sha256": digest,
+                "signature": SIGNED_TEST_SIGNATURE,
             }
         ],
     }
@@ -223,6 +245,18 @@ class ReleaseProvenanceTests(unittest.TestCase):
             )
             artifact.write_bytes(payload)
             self.assertEqual(provenance.verify_staged_files(working, root), [])
+
+    def test_staged_artifact_verifies_runtime_domain_separated_signature(self):
+        payload = b"signed release bytes"
+        working = signed_manifest(payload)
+        with tempfile.TemporaryDirectory() as directory:
+            artifact = Path(directory) / "simplicio-macos-arm64"
+            artifact.write_bytes(payload)
+            self.assertEqual(provenance.verify_staged_files(working, Path(directory)), [])
+
+            working["artifacts"][0]["signature"] = working["artifacts"][0]["signature"].replace("UKIy", "UKIz")
+            errors = provenance.verify_staged_files(working, Path(directory))
+            self.assertTrue(any("invalid Ed25519 signature" in error for error in errors))
 
     def test_download_and_metadata_use_verified_staging(self):
         payload = b"immutable staged bytes"

@@ -22,13 +22,30 @@ refuse unsigned artifacts, and match the checksums and sidecars byte-for-byte.
 Do not publish a new release from a checkout where `version.txt` and the
 manifest disagree.
 
+## Signature payload contract
+
+The compiled Runtime command `update sign <sha256>` signs this exact UTF-8
+payload, including the domain prefix and the lowercase hexadecimal digest:
+
+```text
+simplicio-release-v1:<lowercase-sha256>
+```
+
+The `.sig` sidecar and the manifest `signature` field must contain the same
+`ed25519:<base64>` value. The bootstrap verifier used by both `install.ps1`
+and `install.sh` validates this domain-separated payload and is pinned by its
+SHA-256 in the installers. A raw 32-byte SHA-256 digest is not a valid release
+signature payload. The publication gate also verifies every signature before a
+release can be staged; never bypass it with `SIMPLICIO_ALLOW_UNVERIFIED=1`.
+
 ## Manual publication order
 
 1. Build and sign the artifacts from the intended `simplicio-runtime` main
    commit.
 2. Copy only the required public files into a release branch.
-3. Run `python3 scripts/verify_distribution_consistency.py` and the release
-   provenance tests.
+3. Run `python3 scripts/verify_distribution_consistency.py`,
+   `python3 -m unittest discover -s tests -p 'test_verify_ed25519.py'`, and
+   the release provenance tests.
 4. Open and merge a PR into `master`.
 5. Create the immutable `vX.Y.Z` tag at that merge commit.
 6. Upload the exact files from the merged tree with `gh release create`.

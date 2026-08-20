@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import binascii
 import hashlib
 import json
 import os
@@ -16,6 +17,11 @@ from typing import Sequence
 from urllib.error import HTTPError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
+
+try:
+    from scripts.verify_ed25519 import verify_signature_for_digest
+except ModuleNotFoundError:  # direct execution: python scripts/verify_release_provenance.py
+    from verify_ed25519 import verify_signature_for_digest
 
 PROVENANCE_FIELDS = ("artifact", "url", "sha256", "signature")
 
@@ -247,6 +253,27 @@ def verify_staged_files(working: dict, staging_dir: Path) -> list[str]:
         actual = hashlib.sha256(path.read_bytes()).hexdigest()
         if actual != expected_sha256:
             errors.append(f"staged artifact digest mismatch for {name}")
+    if errors:
+        return errors
+
+    security = working.get("security")
+    if not isinstance(security, dict) or security.get("signature_required") is not True:
+        return errors
+    if security.get("signature_algorithm") != "ed25519":
+        return ["manifest requires an unsupported signature algorithm"]
+    public_key = str(working.get("signing_pubkey") or "").strip()
+    if not public_key:
+        return ["manifest requires Ed25519 but signing_pubkey is missing"]
+    for name, _, expected_sha256, signature in artifacts:
+        try:
+            valid = verify_signature_for_digest(public_key, signature, expected_sha256)
+        except (ValueError, TypeError, binascii.Error) as exc:
+            valid = False
+            reason = str(exc)
+        else:
+            reason = "signature verification failed"
+        if not valid:
+            errors.append(f"invalid Ed25519 signature for {name}: {reason}")
     return errors
 
 

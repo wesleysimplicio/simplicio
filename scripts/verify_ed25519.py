@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Minimal RFC 8032 Ed25519 verifier for installer bootstrap trust."""
+"""Minimal RFC 8032 Ed25519 verifier for installer bootstrap trust.
+
+The Runtime signs a domain-separated UTF-8 payload, not the raw 32-byte
+SHA-256 digest.  Keeping this contract here prevents the Windows and
+macOS/Linux bootstrap installers from drifting from the compiled Runtime:
+
+    simplicio-release-v1:<lowercase sha256>
+
+The sidecar and manifest carry the resulting ``ed25519:<base64>`` signature.
+"""
 from __future__ import annotations
 
 import argparse
@@ -12,6 +21,7 @@ L = 2**252 + 27742317777372353535851937790883648493
 D = (-121665 * pow(121666, Q - 2, Q)) % Q
 I = pow(2, (Q - 1) // 4, Q)
 B_Y = 4 * pow(5, Q - 2, Q) % Q
+SIGNATURE_DOMAIN = "simplicio-release-v1:"
 
 def inv(x: int) -> int:
     return pow(x, Q - 2, Q)
@@ -83,22 +93,44 @@ def parse_signature(value: str) -> bytes:
         raise ValueError("signature must use ed25519:<base64> format")
     return base64.b64decode(value[8:], validate=True)
 
+
+def canonical_sha256(value: str) -> str:
+    """Return the canonical lowercase SHA-256 text accepted by the Runtime."""
+    digest = value.strip().lower()
+    if len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
+        raise ValueError("SHA-256 digest must be exactly 64 hexadecimal characters")
+    return digest
+
+
+def signature_payload(sha256_hex: str) -> bytes:
+    """Build the exact domain-separated payload signed by Runtime ``update sign``."""
+    digest = canonical_sha256(sha256_hex)
+    return f"{SIGNATURE_DOMAIN}{digest}".encode("ascii")
+
+
+def verify_signature_for_digest(public_key_value: str, signature_value: str, sha256_hex: str) -> bool:
+    """Verify a Runtime release signature for a hexadecimal artifact digest."""
+    public_key = base64.b64decode(public_key_value.strip(), validate=True)
+    signature = parse_signature(signature_value.strip())
+    return verify(public_key, signature, signature_payload(sha256_hex))
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--public-key", required=True, help="base64 raw Ed25519 public key")
     parser.add_argument("--signature", required=True, help="ed25519:<base64> manifest signature")
-    parser.add_argument("--sha256", required=True, help="hex SHA-256 digest; the raw 32-byte digest is signed")
+    parser.add_argument(
+        "--sha256",
+        required=True,
+        help="lowercase hex SHA-256 digest; Runtime signs simplicio-release-v1:<digest>",
+    )
     args = parser.parse_args(argv)
     try:
-        digest = bytes.fromhex(args.sha256)
-        if len(digest) != 32:
-            raise ValueError("SHA-256 digest must be 32 bytes")
-        public_key = base64.b64decode(args.public_key, validate=True)
-        signature = parse_signature(args.signature)
+        digest = canonical_sha256(args.sha256)
+        verified = verify_signature_for_digest(args.public_key, args.signature, digest)
     except (ValueError, base64.binascii.Error) as exc:
         print(f"invalid Ed25519 verification input: {exc}", file=sys.stderr)
         return 2
-    if not verify(public_key, signature, digest):
+    if not verified:
         print("Ed25519 signature verification failed", file=sys.stderr)
         return 1
     return 0
