@@ -111,7 +111,7 @@ the focused hook tests when changing it.
 
 <!-- SIMPLICIO-LLM-ORIENTATION:BEGIN -->
 Orientação operacional do Loop (MAX SPEED — detail: docs/LLM_MAX_SPEED_ORIENTATION.md):
-- Runtime first: `simplicio loop decide --json`; honor `.simplicio/runtime/loop-decision.json` (não bypass Runtime).
+- Runtime first when available: consult `simplicio loop decide --json` and honor `.simplicio/runtime/loop-decision.json`; when Runtime is absent, continue through the standalone Loop operators and report Runtime integration as degraded (never claim Runtime authority).
 - Economy-parallel: `simplicio-loop economy apply --json` + `preflight --strict` antes de trabalho autônomo.
 - Hot path: Mapper (scan/handoff) → Fast (understand|plan|apply se up) → dev-cli/edit --plan (STRICT; sem hand-edit).
 - Trabalhe só na tarefa/ACs atuais; menor alteração segura; preserve dirty work, lease e ownership.
@@ -815,11 +815,11 @@ iteration 1 immediately.
 
 ## Runtime integration boundary (normative, 2026-08-05)
 
-Runtime decides whether Loop is active. Mapper and Fast remain separate peer
+Runtime decides whether Loop is active when Runtime is available. Mapper and Fast remain separate peer
 decisions, while Dev CLI is nested only under `loop.dev_cli`. A typical active
 implementation path may be `mapper -> fast (when anchored) -> loop.dev_cli ->
 simplicio edit -> validate`; the actual hops remain evidence-driven.
 
-The Loop package remains standalone-capable when Runtime is absent, but that path
-must report degraded Runtime-backed completion rather than claiming Runtime
-activation or consolidated Runtime evidence.
+The Loop package remains standalone-capable when Runtime is absent. In that mode
+use the portable Loop operators, mark `runtime-integration=degraded`, and never
+claim Runtime activation, Runtime authority, or consolidated Runtime evidence.
