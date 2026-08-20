@@ -1,1 +1,34 @@
-{"spdxVersion":"SPDX-2.3","dataLicense":"CC0-1.0","SPDXID":"SPDXRef-DOCUMENT","name":"simplicio-simplicio-windows-x64.exe-3.8.16","documentNamespace":"https://simpleti.com.br/simplicio/releases/v3.8.16/simplicio-windows-x64.exe","creationInfo":{"created":"2026-08-19T20:46:10.627556Z","creators":["Organization: Simple TI"]},"packages":[{"SPDXID":"SPDXRef-Package","name":"simplicio-runtime","versionInfo":"3.8.16","downloadLocation":"NOASSERTION","filesAnalyzed":false,"licenseConcluded":"NOASSERTION","licenseDeclared":"NOASSERTION","annotations":[{"annotationType":"OTHER","annotator":"Tool: manual-release-v1","annotationDate":"2026-08-19T20:46:10.627556Z","comment":"build source commit 5c178b3945fa758669452a4d2d9ed9b64cbdd3b8"}]}]}
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "simplicio-3.8.17-windows-x64",
+  "documentNamespace": "https://simplicio.dev/sbom/cf130c3347f4fd91b2882d9f0718a2403438924fb69dedeed2f1df3bddd9f262",
+  "creationInfo": {
+    "created": "2026-08-20T10:40:10.650633Z",
+    "creators": [
+      "Tool: Simplicio manual release evidence"
+    ]
+  },
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package-simplicio-runtime",
+      "name": "simplicio-windows-x64.exe",
+      "versionInfo": "3.8.17",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": true
+    }
+  ],
+  "files": [
+    {
+      "SPDXID": "SPDXRef-File-simplicio-runtime",
+      "fileName": "simplicio-windows-x64.exe",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "cf130c3347f4fd91b2882d9f0718a2403438924fb69dedeed2f1df3bddd9f262"
+        }
+      ]
+    }
+  ]
+}

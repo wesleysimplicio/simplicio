@@ -1,1 +1,16 @@
-{"schema":"simplicio.provenance/v1","artifact":"simplicio-macos-x64","version":"3.8.16","source":{"repository":"wesleysimplicio/simplicio-runtime","commit":"5c178b3945fa758669452a4d2d9ed9b64cbdd3b8","feature":"official-runtime"},"build":{"target":"x86_64-apple-darwin","profile":"release","toolchain":"rustc 1.94.1","command":"cargo build --release --locked --no-default-features --features official-runtime","reproducibility":"source-and-command-recorded"},"verification":{"ecosystem":"embedded-and-verified-on-macOS-arm64","mcp_tools":"46 on macOS arm64/x86_64; cross targets format-verified only","signature":"ed25519","platform_signing":"not_available"},"source_state":{"tracked_source_commit_match":true,"unrelated_local_state_present":true}}
+{
+  "schema": "simplicio.provenance/v1",
+  "subject": {
+    "name": "simplicio-macos-x64",
+    "sha256": "4ed72f33ed1e28381e9f1c7488753c11c131ed9d8ca5ae6b3d1127aefe74a9b3",
+    "size": 52164940
+  },
+  "build": {
+    "version": "3.8.17",
+    "target": "macos-x86_64",
+    "source_commit": "35f1dec5968d1d00fa49dbc298e1d9daf1dad2e0",
+    "builder": "local manual release build",
+    "workflow": "cargo release build with CARGO_BUILD_JOBS=1"
+  },
+  "generated_at": "2026-08-20T10:40:10.528584Z"
+}
