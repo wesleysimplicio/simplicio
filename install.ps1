@@ -25,7 +25,9 @@
 param(
   [string]$Version = "",
   [switch]$Doctor,
-  [switch]$Uninstall
+  [switch]$Uninstall,
+  [switch]$KeepData,
+  [switch]$Purge
 )
 
 $ErrorActionPreference = "Stop"
@@ -43,6 +45,27 @@ if ($env:SIMPLICIO_BIN_DIR) {
   $InstallDir = "$env:USERPROFILE\.local\bin"
 }
 $DestPath = Join-Path $InstallDir $BinName
+$PreviousPath = "$DestPath.simplicio.previous"
+$InstallTransactionActive = $false
+
+function Invoke-Rollback {
+  if (-not $InstallTransactionActive) { return }
+  if (Test-Path $PreviousPath) {
+    Move-Item -Force -Path $PreviousPath -Destination $DestPath
+    Write-Warning "rollback complete: restored previous Runtime at $DestPath"
+  } elseif (Test-Path $DestPath) {
+    Remove-Item -Force $DestPath
+    Write-Warning "rollback complete: removed new Runtime; no previous version existed"
+  }
+  if ($StagingPath -and (Test-Path $StagingPath)) { Remove-Item -Force $StagingPath -ErrorAction SilentlyContinue }
+  $script:InstallTransactionActive = $false
+}
+
+function Confirm-Purge {
+  if ($env:SIMPLICIO_CONFIRM_PURGE -eq "1") { return }
+  $answer = Read-Host "Type PURGE to delete user data under $BundleDir"
+  if ($answer -ne "PURGE") { throw "purge cancelled; confirmation must be PURGE" }
+}
 
 function Test-InPath([string]$dir) {
   return ($env:Path -split ";") -contains $dir
@@ -371,8 +394,14 @@ if ($Doctor) {
   }
 }
 
-# ─── -Uninstall: idempotent removal, safe to run repeatedly ────────────────
+# ─── -Uninstall: transactional removal with explicit data policy ────────────
 if ($Uninstall) {
+  if ($Purge -and $KeepData) { Write-Error "-KeepData and -Purge are mutually exclusive"; exit 1 }
+  $purgeData = $Purge.IsPresent
+  $bundleDir = if ($env:SIMPLICIO_BUNDLE_DIR) { $env:SIMPLICIO_BUNDLE_DIR } else { Join-Path $env:USERPROFILE ".simplicio" }
+  if ($purgeData) {
+    try { Confirm-Purge } catch { Write-Error $_.Exception.Message; exit 1 }
+  }
   Write-Host "==> simplicio uninstall"
   if (Test-Path $DestPath) {
     Remove-Item -Force $DestPath
@@ -380,13 +409,15 @@ if ($Uninstall) {
   } else {
     Write-Host "  ✓ already removed (nothing at $DestPath)"
   }
-  # Data/config is intentionally preserved (idempotent, non-destructive
-  # uninstall) — user data under ~/.simplicio is never touched here.
-  Write-Host "  ✓ user data under `$env:USERPROFILE\.simplicio was preserved"
-  Write-Host ""
-  Write-Host "  Note: if you added $InstallDir to your PowerShell profile's"
-  Write-Host "  `$env:Path, remove that line manually — this script never"
-  Write-Host "  edits your profile."
+  if (Test-Path $PreviousPath) { Remove-Item -Force $PreviousPath }
+  if ($purgeData) {
+    if ([string]::IsNullOrWhiteSpace($bundleDir) -or $bundleDir -eq $env:USERPROFILE -or $bundleDir -eq "\") { Write-Error "refusing to purge a broad directory: $bundleDir"; exit 1 }
+    if (Test-Path $bundleDir) { Remove-Item -Recurse -Force $bundleDir }
+    Write-Host "  ✓ user data removed from $bundleDir"
+  } else {
+    Write-Host "  ✓ user data under $env:USERPROFILE\.simplicio was preserved (-KeepData)"
+  }
+  Write-Host "  Note: this script never edits your PATH profile."
   exit 0
 }
 
@@ -510,12 +541,18 @@ if (-not (Test-RuntimeReleaseContract $StagingPath)) {
   exit 1
 }
 
-# Atomic swap: rename into place on the same volume so there is never a
-# window where $DestPath is a half-written file, and re-running this script
-# (idempotent update) never leaves stale .tmp files behind on success.
+# Journal the previous executable before the atomic swap. Any later
+# fail-closed path restores it through Invoke-Rollback.
+if (Test-Path $DestPath) {
+  Copy-Item -Force -Path $DestPath -Destination $PreviousPath
+} elseif (Test-Path $PreviousPath) {
+  Remove-Item -Force $PreviousPath
+}
+$InstallTransactionActive = $true
 try {
   Move-Item -Force -Path $StagingPath -Destination $DestPath
 } catch {
+  Invoke-Rollback
   Remove-Item -Force $StagingPath -ErrorAction SilentlyContinue
   Write-Error "Could not move verified binary into place: $($_.Exception.Message)"
   exit 1
@@ -532,6 +569,7 @@ try {
 }
 
 if (-not (Test-RuntimeReleaseContract $DestPath)) {
+  Invoke-Rollback
   Write-Error "This Runtime does not meet the distribution contract; refusing to finish installation. Install a compatible Runtime release."
   exit 1
 }
@@ -543,19 +581,27 @@ Write-Host "  ✓ Runtime release contract verified"
 try {
   Require-ActiveLogin
 } catch {
+  Invoke-Rollback
   Write-Error $_.Exception.Message
   exit 1
 }
 Write-Host "  ✓ active Google session and entitlement verified"
 
 if (-not (Test-McpToolSurface $DestPath)) {
+  Invoke-Rollback
   Write-Error "This Runtime does not expose the complete MCP tool surface after login; refusing to finish installation."
   exit 1
 }
 # Codex integration is opt-in. MCP registration and routing hooks remain
 # separate, and the hook reference is versioned/pinned inside the function.
 if ($env:SIMPLICIO_INSTALL_CODEX -eq "1") {
-  Install-CodexIntegration
+  try {
+    Install-CodexIntegration
+  } catch {
+    Invoke-Rollback
+    Write-Error $_.Exception.Message
+    exit 1
+  }
 } else {
   Write-Host "==> Codex integration not installed automatically; set SIMPLICIO_INSTALL_CODEX=1 to enable"
 }
@@ -570,8 +616,13 @@ try {
   Write-Host "  ✓ Runtime release report: $RuntimeReport"
 } catch {
   if (Test-Path $RuntimeReport) { Remove-Item -Force $RuntimeReport -ErrorAction SilentlyContinue }
+  Invoke-Rollback
   Write-Error "Could not persist the Runtime release report: $($_.Exception.Message)"
   exit 1
+}
+if ($InstallTransactionActive) {
+  if (Test-Path $PreviousPath) { Remove-Item -Force $PreviousPath }
+  $InstallTransactionActive = $false
 }
 
 # PATH hint
