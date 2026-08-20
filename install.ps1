@@ -34,7 +34,9 @@ $Repo = "wesleysimplicio/simplicio"
 $BinName = "simplicio.exe"
 $Target = "windows-x64"
 $Asset = "simplicio-windows-x64.exe"
-
+$Ed25519PublicKey = "2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok="
+$Ed25519HelperUrl = "https://raw.githubusercontent.com/$Repo/master/scripts/verify_ed25519.py"
+$Ed25519HelperSha256 = "6d25fed7ea3d45db4a184d0c499511d235931b2693e5d8369851d27b349d932b"
 if ($env:SIMPLICIO_BIN_DIR) {
   $InstallDir = $env:SIMPLICIO_BIN_DIR
 } else {
@@ -73,6 +75,25 @@ function Test-RuntimeReleaseContract([string]$BinaryPath) {
   )
 }
 
+function Test-Ed25519Signature([string]$BinaryPath, [string]$Signature, [string]$PublicKey, [string]$Digest) {
+  $helperPath = Join-Path ([IO.Path]::GetTempPath()) ("simplicio-verify-$([guid]::NewGuid().ToString('N')).py")
+  try {
+    $python = $null
+    $pythonArgs = @()
+    if (Get-Command python3 -ErrorAction SilentlyContinue) { $python = "python3" }
+    elseif (Get-Command py -ErrorAction SilentlyContinue) { $python = "py"; $pythonArgs = @('-3') }
+    if (-not $python) { return $false }
+    Invoke-WebRequest -Uri $Ed25519HelperUrl -OutFile $helperPath -UseBasicParsing -ErrorAction Stop
+    $helperHash = (Get-FileHash -Path $helperPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($helperHash -ne $Ed25519HelperSha256.ToLowerInvariant()) { return $false }
+    & $python @pythonArgs $helperPath --public-key $PublicKey --signature $Signature --sha256 $Digest
+    return ($LASTEXITCODE -eq 0)
+  } catch {
+    return $false
+  } finally {
+    Remove-Item -Force $helperPath -ErrorAction SilentlyContinue
+  }
+}
 function Test-McpToolSurface([string]$BinaryPath) {
   if (-not (Test-Path $BinaryPath)) { return $false }
   $required = @(
@@ -408,6 +429,7 @@ try {
 $ExpectedSha256 = $null
 $ExpectedSigned = $false
 $ExpectedSignature = $null
+$ExpectedPublicKey = $null
 $SignatureRequired = $false
 if ($Manifest) {
   $artifact = $Manifest.artifacts | Where-Object { $_.target -eq $Target } | Select-Object -First 1
@@ -416,14 +438,21 @@ if ($Manifest) {
     $ExpectedSigned = [bool]$artifact.signed -or ([string]$artifact.signature).StartsWith("ed25519:")
     $ExpectedSignature = $artifact.signature
   }
+  $ExpectedPublicKey = [string]$Manifest.signing_pubkey
   $SignatureRequired = [bool]$Manifest.security.signature_required
 }
 
 if ($SignatureRequired -and (-not $ExpectedSigned -or [string]::IsNullOrWhiteSpace([string]$ExpectedSignature))) {
   Write-Error "Refusing to install: the manifest requires an Ed25519 signature, but target '$Target' has no published signature."
   exit 1
+} elseif ($SignatureRequired -and $ExpectedPublicKey -ne $Ed25519PublicKey) {
+  Write-Error "Refusing to install: manifest Ed25519 public key does not match the pinned installer key."
+  exit 1
 } elseif (-not $ExpectedSha256) {
-  if ($env:SIMPLICIO_ALLOW_UNVERIFIED -eq "1") {
+  if ($ExpectedSigned) {
+    Write-Error "Refusing to install: published Ed25519 signature has no verifiable SHA256 digest."
+    exit 1
+  } elseif ($env:SIMPLICIO_ALLOW_UNVERIFIED -eq "1") {
     Write-Host "  ! no published checksum for target '$Target' — proceeding UNVERIFIED (SIMPLICIO_ALLOW_UNVERIFIED=1)"
   } else {
     Write-Error "Refusing to install: no published SHA256 checksum for target '$Target' in the update manifest. Set SIMPLICIO_ALLOW_UNVERIFIED=1 to override at your own risk."
@@ -462,6 +491,14 @@ if ($ExpectedSha256) {
   Write-Host "  ✓ SHA256 verified: $actualSha256"
 }
 
+if ($ExpectedSigned) {
+  if ($ExpectedPublicKey -ne $Ed25519PublicKey -or -not (Test-Ed25519Signature $StagingPath ([string]$ExpectedSignature) $Ed25519PublicKey ([string]$ExpectedSha256))) {
+    Remove-Item -Force $StagingPath -ErrorAction SilentlyContinue
+    Write-Error "Ed25519 signature verification failed; refusing to install."
+    exit 1
+  }
+  Write-Host "  ✓ Ed25519 signature verified over SHA256 digest"
+}
 # A clean HOME has no authenticated session yet. Validate only the offline
 # Runtime release contract before the swap; MCP initialize/tools/list runs
 # after Require-ActiveLogin below.
