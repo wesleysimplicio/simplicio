@@ -49,12 +49,26 @@ release can be staged; never bypass it with `SIMPLICIO_ALLOW_UNVERIFIED=1`.
 4. Open and merge a PR into `master`.
 5. Create the immutable `vX.Y.Z` tag at that merge commit.
 6. Upload the exact files from the merged tree with `gh release create`.
-7. Re-download every asset, verify SHA-256 and Ed25519, and test both
-   installers plus `simplicio ecosystem verify --json`.
+7. Run the mandatory post-release smoke on the published GitHub Release:
+   `VERSION=vX.Y.Z; python3 scripts/post_release_smoke.py --version "$VERSION" --execute --json`.
+   Run it once on each native host in the support matrix; this re-downloads
+   the release and checks every artifact, sidecar, SBOM, provenance record,
+   version, clean-home login gate, and MCP login gate.
 
 The release is not ready for users if any check is skipped or unverified. Do
 not force-move a published tag; use a new patch release if published bytes
 need correction.
+
+The post-release receipt is part of the release evidence. It must contain a
+successful result for all four targets from static verification and a
+successful native result for macOS arm64, macOS x64, Linux x64, and Windows
+x64. A green pre-publish build does not replace this test: the test validates
+the bytes and metadata actually served to users.
+
+The installer target ID and the build target in provenance are separate
+namespaces. Their approved aliases are maintained in
+`distribution/targets.json`; the smoke test accepts only those explicit
+aliases, never an arbitrary target string.
 
 ## Latest-only installation
 

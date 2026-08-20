@@ -1,12 +1,13 @@
 {
   "schema": "simplicio.target-triplets/v1",
-  "$comment": "Single source of truth for platform naming across the ecosystem. Any script, workflow or manifest that needs an asset name for a platform MUST derive it from this table (id -> asset) instead of hard-coding its own convention. scripts/verify_distribution_consistency.py enforces that release.yml, install.sh, install.ps1 and simplicio-update-manifest.json all agree with this table.",
+  "$comment": "Single source of truth for platform naming across the ecosystem. Any script, workflow or manifest that needs an asset name for a platform MUST derive it from this table (id -> asset) instead of hard-coding its own convention. provenance_target_aliases lists the only build-target names accepted in published provenance. scripts/verify_distribution_consistency.py enforces that release.yml, install.sh, install.ps1 and simplicio-update-manifest.json all agree with this table.",
   "targets": [
     {
       "id": "windows-x64",
       "os": "windows",
       "arch": "x64",
       "rust_triple": "x86_64-pc-windows-msvc",
+      "provenance_target_aliases": ["windows-x64"],
       "asset": "simplicio-windows-x64.exe",
       "installer": "install.ps1",
       "manifest_target": "windows-x64"
@@ -16,6 +17,7 @@
       "os": "macos",
       "arch": "arm64",
       "rust_triple": "aarch64-apple-darwin",
+      "provenance_target_aliases": ["macos-aarch64"],
       "asset": "simplicio-macos-arm64",
       "installer": "install.sh",
       "manifest_target": "macos-arm64"
@@ -25,6 +27,7 @@
       "os": "macos",
       "arch": "x64",
       "rust_triple": "x86_64-apple-darwin",
+      "provenance_target_aliases": ["macos-x86_64"],
       "asset": "simplicio-macos-x64",
       "installer": "install.sh",
       "manifest_target": "macos-x64",
@@ -35,6 +38,7 @@
       "os": "linux",
       "arch": "x64",
       "rust_triple": "x86_64-unknown-linux-gnu",
+      "provenance_target_aliases": ["linux-x86_64"],
       "asset": "simplicio-linux-x64",
       "installer": "install.sh",
       "manifest_target": "linux-x64"
