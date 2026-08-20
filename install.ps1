@@ -322,17 +322,17 @@ if ($Doctor) {
       $ok = $false
     }
 
-    if (Test-McpToolSurface $DestPath) {
-      Write-Host "  [OK] MCP exposes the 10 documented tools"
-    } else {
-      Write-Host "  [FAIL] MCP does not expose the complete documented tool surface"
-      $ok = $false
-    }
-
     if (Test-ActiveLogin) {
       Write-Host "  [OK] active Google session and entitlement"
     } else {
       Write-Host "  [FAIL] missing, expired, revoked, or inactive Google session"
+      $ok = $false
+    }
+
+    if (Test-McpToolSurface $DestPath) {
+      Write-Host "  [OK] MCP exposes the 10 documented tools after authentication"
+    } else {
+      Write-Host "  [FAIL] MCP does not expose the complete documented tool surface after login"
       $ok = $false
     }
   }
@@ -462,17 +462,12 @@ if ($ExpectedSha256) {
   Write-Host "  ✓ SHA256 verified: $actualSha256"
 }
 
-# Validate the staged executable before the atomic swap. A release that lacks
-# embedded sources, Google login activation, or the signed-update key must not
-# replace a working installation and then fail its post-install checks.
+# A clean HOME has no authenticated session yet. Validate only the offline
+# Runtime release contract before the swap; MCP initialize/tools/list runs
+# after Require-ActiveLogin below.
 if (-not (Test-RuntimeReleaseContract $StagingPath)) {
   Remove-Item -Force $StagingPath -ErrorAction SilentlyContinue
   Write-Error "Runtime release does not meet the distribution contract (embedded sources, Google login, and signed-update key); installation aborted."
-  exit 1
-}
-if (-not (Test-McpToolSurface $StagingPath)) {
-  Remove-Item -Force $StagingPath -ErrorAction SilentlyContinue
-  Write-Error "Runtime release does not expose the complete MCP tool surface; installation aborted."
   exit 1
 }
 
@@ -502,13 +497,10 @@ if (-not (Test-RuntimeReleaseContract $DestPath)) {
   exit 1
 }
 Write-Host "  ✓ Runtime release contract verified"
-if (-not (Test-McpToolSurface $DestPath)) {
-  Write-Error "This Runtime does not expose the complete MCP tool surface; refusing to finish installation."
-  exit 1
-}
-Write-Host "  ✓ MCP tool surface verified (10 documented tools)"
+# MCP initialize/tools/list is authenticated and is intentionally deferred until
+# after Require-ActiveLogin below for clean-HOME bootstrap.
 
-# ─── Active login is mandatory; beta does not bypass this gate ──────────────
+# ─── Active login precedes the authenticated MCP handshake ──────────────────
 try {
   Require-ActiveLogin
 } catch {
@@ -517,9 +509,14 @@ try {
 }
 Write-Host "  ✓ active Google session and entitlement verified"
 
-# Codex runs the installed binary directly over STDIO. This avoids the local
-# HTTP daemon latency and keeps the same Google login/entitlement gate in the
-# Runtime process. Existing Codex settings and hooks are merged, not replaced.
+if (-not (Test-McpToolSurface $DestPath)) {
+  Write-Error "This Runtime does not expose the complete MCP tool surface after login; refusing to finish installation."
+  exit 1
+}
+Write-Host "  ✓ MCP tool surface verified (10 documented tools)"
+
+# Codex runs the installed binary directly over STDIO. Existing settings and
+# hooks are merged, not replaced.
 Install-CodexIntegration
 
 $BundleDir = if ($env:SIMPLICIO_BUNDLE_DIR) { $env:SIMPLICIO_BUNDLE_DIR } else { Join-Path $env:USERPROFILE ".simplicio" }
