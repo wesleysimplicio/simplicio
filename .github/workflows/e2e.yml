@@ -1,61 +1,57 @@
 name: e2e-ecosystem
 
-# Real integration/E2E checks against the already-compiled `simplicio`
-# binary committed in this repo (see docs/e2e-integration.md). Deliberately
-# does NOT invoke cargo build/test/check — this repo only distributes the
-# runtime, it doesn't build it.
+# Cross-platform clean-install smoke. Authentication is deliberately not
+# automated in CI: the isolated HOME must report login-required instead of
+# silently accepting an unauthenticated MCP session.
 on:
   pull_request:
     paths:
-      - simplicio.exe
-      - simplicio
-      - simplicio-windows-x64.exe
-      - simplicio-darwin-x64
-      - simplicio-linux-x64
-      - simplicio-macos-arm64
+      - install.sh
+      - install.ps1
       - simplicio-update-manifest.json
-      - version.txt
-      - "npm/**"
-      - "pypi/**"
-      - "scripts/e2e_ecosystem.py"
-      - "scripts/verify_distribution_consistency.py"
-      - ".github/workflows/e2e.yml"
+      - distribution/targets.json
+      - scripts/e2e_clean_install.py
+      - tests/node/**
+      - .github/workflows/e2e.yml
   push:
     branches: [master, main]
     paths:
-      - simplicio.exe
-      - simplicio-windows-x64.exe
+      - install.sh
+      - install.ps1
       - simplicio-update-manifest.json
-      - version.txt
-      - "npm/**"
-      - "pypi/**"
-      - "scripts/e2e_ecosystem.py"
-      - "scripts/verify_distribution_consistency.py"
+      - distribution/targets.json
+      - scripts/e2e_clean_install.py
+      - .github/workflows/e2e.yml
   workflow_dispatch: {}
 
 permissions:
   contents: read
 
 jobs:
-  e2e:
-    runs-on: windows-latest
+  clean-install:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-latest, target: linux-x64}
+          - {os: windows-latest, target: windows-x64}
+          - {os: macos-13, target: macos-x64}
+          - {os: macos-14, target: macos-arm64}
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Run ecosystem E2E integration tests
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Clean install and release smoke
         id: e2e
         shell: bash
         run: |
-          python scripts/e2e_ecosystem.py --json | tee e2e-output.txt
-        continue-on-error: true
-
+          set -o pipefail
+          python scripts/e2e_clean_install.py --target "${{ matrix.target }}" --download --json | tee e2e-${{ matrix.target }}.json
       - name: Upload E2E evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-ecosystem-evidence
-          path: e2e-output.txt
-
-      - name: Fail the job if any scenario failed
-        if: steps.e2e.outcome == 'failure'
-        run: exit 1
+          name: e2e-clean-install-${{ matrix.target }}
+          path: e2e-${{ matrix.target }}.json
