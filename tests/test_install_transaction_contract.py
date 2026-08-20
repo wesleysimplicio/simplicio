@@ -59,3 +59,11 @@ def test_shell_purge_removes_simplicio_state_but_preserves_provider_env(tmp_path
     assert dotenv.exists()
     assert not (bundle / 'runtime-state.json').exists()
     assert not binary.exists()
+def test_powershell_signature_verifier_probes_all_python3_command_names():
+    script = (ROOT / 'install.ps1').read_text(encoding='utf-8')
+    assert '@{ Name = "py"; Args = @(' in script
+    assert '@{ Name = "python3"; Args = @() }' in script
+    assert '@{ Name = "python"; Args = @() }' in script
+    assert 'sys.version_info[0] == 3' in script
+    assert '([string]$Signature).Trim()' in script
+    assert 'ToLowerInvariant()' in script
