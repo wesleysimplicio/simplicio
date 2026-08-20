@@ -15,29 +15,28 @@ Continue only when the status reports `active: true`. Never copy a password, dev
 
 ## Codex: local STDIO MCP and hooks
 
-The official installer configures Codex to launch the installed binary directly:
+Codex integration is opt-in. The base installer leaves Codex unchanged. Enable
+the versioned, reversible integration explicitly:
 
-```toml
+~~~bash
+SIMPLICIO_INSTALL_CODEX=1 sh install.sh
+~~~
+
+When enabled, Codex launches the installed binary directly:
+
+~~~toml
 [mcp_servers.simplicio]
 command = "/path/to/simplicio"
 args = ["serve", "--mcp", "--stdio"]
-```
+~~~
 
-The installer also merges Simplicio `SessionStart`, `UserPromptSubmit`,
-`SubagentStart`, and `PreToolUse` hooks into `~/.codex/hooks.json`, preserving
-unrelated user hooks. Restart Codex and review the result in **Settings →
-Hooks**. The Runtime still validates Google login and entitlement on every
-local MCP session; never paste tokens into either config file.
+STDIO is local and avoids a local HTTP daemon, but the Runtime still validates
+Google login and entitlement on every MCP session. Existing user hooks remain
+preserved; review enabled Simplicio hooks in Settings → Hooks and run codex mcp
+list. Never paste tokens into either config file.
 
-To verify the registration:
-
-```bash
-codex mcp list
-```
-
-Set `SIMPLICIO_MCP_ROUTE=0` for a temporary hook escape hatch. Rerunning the
-installer repairs the integration idempotently and leaves `.simplicio.bak`
-copies of the original Codex files.
+To repair the managed integration, rerun with SIMPLICIO_INSTALL_CODEX=1. Set
+SIMPLICIO_MCP_ROUTE=0 for a temporary hook escape hatch.
 
 ## Other clients: local STDIO
 
@@ -94,12 +93,14 @@ A successful response contains the tool definitions. A `login required` error me
 
 ## Automatic setup
 
-The official installers perform the binary checksum and embedded-bundle checks,
-require active login, and configure Codex's local STDIO MCP plus Simplicio
-hooks:
+The official installers verify the binary checksum, Ed25519 signature, and
+embedded-bundle contract, then require active login. Codex MCP registration and
+routing hooks are opt-in; enable them explicitly with SIMPLICIO_INSTALL_CODEX=1.
+Other MCP clients can use the local STDIO entry above without copying tokens.
 
-```bash
+A quick installer bootstrap is:
+~~~bash
 curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
-```
+~~~
 
 For the full installation, update, benchmark, and troubleshooting guide, see [`README.md`](README.md).

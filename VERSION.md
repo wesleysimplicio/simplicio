@@ -15,16 +15,16 @@ This is the **public distribution repo** for [Simplicio](https://github.com/wesl
 - **Source:** `simplicio-runtime` main at commit
   `5c178b39` (merged Runtime MCP routing, hook, release-gate, and version fixes).
 - **Targets:** macOS ARM64, macOS x64, Linux x64, and Windows x64. The
-  repository-root binaries and `SHA256SUMS` were regenerated from this same
-  Runtime source and verified locally.
-- **Release status:** signed GitHub Release `v3.8.16` is published.
-  Installers and the update command resolve GitHub's `latest` release and
-  require its signed manifest; the post-publish release gates have passed.
-- **Default branch:** `master`
-- **Release-channel gates:** signed artifacts, the configured
-  `update_public_key`, and the embedded ecosystem bundle were verified for
-  this user-facing release. Each installation still requires active Google
-  login and entitlement validation.
+  canonical target table and release manifest define the asset, checksum,
+  signature, SBOM, and provenance for each platform.
+- **Release status:** GitHub Release v3.8.16 metadata is published. Installers
+  and the update command resolve GitHub's latest release, verify its signed
+  manifest, and fail closed if an artifact signature or checksum is invalid.
+- **Default branch:** master
+- **Release-channel gates:** the installer enforces embedded ecosystem sources,
+  the configured update key, SHA256, Ed25519 signatures, and active Google login.
+  Publication alone is not a bypass for a failed verification; the release
+  metadata must be regenerated when a signed artifact does not validate.
 
 ### Product law (v3.6.0)
 
@@ -35,17 +35,19 @@ This is the **public distribution repo** for [Simplicio](https://github.com/wesl
 
 ## Repository Structure
 
-```
+~~~
 /
 ├── README.md                 # Main English README
 ├── READMEs/                  # README translations
 ├── install.sh / install.ps1  # Installers
-├── VERSION.md                # This file — READ ME FIRST
-├── simplicio                 # macOS ARM64 snapshot
-├── simplicio-linux-x64       # Linux x64 snapshot
-├── simplicio-windows-x64.exe # Windows x64 snapshot
-└── …
-```
+├── distribution/targets.json # Canonical platform-to-asset mapping
+├── simplicio-update-manifest.json # Checksums, signatures, provenance
+└── release binaries           # Published in GitHub Releases per target
+~~~
+
+The current release targets are macOS ARM64, macOS x64 (Intel), Linux x64,
+and Windows x64. The installers consume the canonical mapping and do not
+rewrite or download the embedded Python projects separately.
 
 ## Key Branches
 

@@ -1,7 +1,14 @@
 # 🌌 Integração Asolaria — Binary/Host-8 Distribution
 
 > **Documento de Arquitetura e Implementação**
-> _Simplicio Public Distribution Repository — `wesleysimplicio/simplicio`_
+> _Simplicio Public Distribution Repository — simplicio_
+>
+> **Nota de alinhamento público (v3.8.16):** este documento contém arquitetura,
+> histórico e roadmap Host-8/Asolaria. Para instalar o produto atual, prevalecem
+> INSTALL.md, MCP-CONNECT.md, distribution/targets.json e
+> simplicio-update-manifest.json. A release pública é um binário único por
+> target; o instalador verifica SHA256 + Ed25519, exige login Google para MCP,
+> e só configura Codex quando SIMPLICIO_INSTALL_CODEX=1.
 
 ---
 
