@@ -32,6 +32,9 @@ set -eu
 
 REPO="wesleysimplicio/simplicio"
 GITHUB="https://github.com/$REPO"
+ED25519_PUBLIC_KEY="2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok="
+ED25519_HELPER_URL="https://raw.githubusercontent.com/$REPO/master/scripts/verify_ed25519.py"
+ED25519_HELPER_SHA256="6d25fed7ea3d45db4a184d0c499511d235931b2693e5d8369851d27b349d932b"
 BIN_NAME="simplicio"
 
 GREEN='\033[0;32m'
@@ -83,6 +86,20 @@ fetch_url() {
   fi
 }
 
+verify_ed25519_signature() {
+  binary_path="$1"
+  signature="$2"
+  public_key="$3"
+  digest="$4"
+  helper_path="$5"
+  if ! command -v python3 >/dev/null 2>&1 || ! fetch_url "$ED25519_HELPER_URL" "$helper_path" 2>/dev/null; then
+    return 1
+  fi
+  if [ "$(sha256_of "$helper_path")" != "$ED25519_HELPER_SHA256" ]; then
+    return 1
+  fi
+  python3 "$helper_path" --public-key "$public_key" --signature "$signature" --sha256 "$digest" >/dev/null 2>&1
+}
 configure_codex_stdio() {
   codex_dir="${CODEX_HOME:-$HOME/.codex}"
   codex_config="$codex_dir/config.toml"
@@ -507,6 +524,7 @@ if [ "$SKIP_EXISTING" != "true" ]; then
   EXPECTED_SHA256=""
   SIGNED="false"
   SIGNATURE=""
+  SIGNING_PUBKEY=""
   SIGNATURE_REQUIRED="false"
   MANIFEST_TMP="$(mktemp)"
   trap 'rm -f "$MANIFEST_TMP"' EXIT
@@ -546,6 +564,14 @@ try:
 except Exception:
     pass
 " 2>/dev/null)"
+      SIGNING_PUBKEY="$(python3 -c "
+import json
+try:
+    m = json.load(open('$MANIFEST_TMP'))
+    print(m.get('signing_pubkey') or '')
+except Exception:
+    pass
+" 2>/dev/null)"
       SIGNATURE_REQUIRED="$(python3 -c "
 import json
 try:
@@ -559,8 +585,12 @@ except Exception:
 
   if [ "$SIGNATURE_REQUIRED" = "true" ] && { [ "$SIGNED" != "true" ] || [ -z "$SIGNATURE" ]; }; then
     err "recusando instalar: o manifest exige assinatura Ed25519, mas o artefato '$TARGET_ID' não tem uma assinatura publicada"
+  elif [ "$SIGNATURE_REQUIRED" = "true" ] && [ "$SIGNING_PUBKEY" != "$ED25519_PUBLIC_KEY" ]; then
+    err "recusando instalar: a chave pública Ed25519 do manifest não corresponde à chave pinada"
   elif [ -z "$EXPECTED_SHA256" ]; then
-    if [ "${SIMPLICIO_ALLOW_UNVERIFIED:-}" = "1" ]; then
+    if [ "$SIGNED" = "true" ]; then
+      err "recusando instalar: assinatura Ed25519 publicada sem digest SHA256 verificável"
+    elif [ "${SIMPLICIO_ALLOW_UNVERIFIED:-}" = "1" ]; then
       warn "sem checksum publicado para o alvo '$TARGET_ID' — prosseguindo SEM VERIFICAÇÃO (SIMPLICIO_ALLOW_UNVERIFIED=1)"
     else
       err "recusando instalar: nenhum SHA256 publicado no manifest para o alvo '$TARGET_ID'. Defina SIMPLICIO_ALLOW_UNVERIFIED=1 para prosseguir por sua conta e risco."
@@ -587,6 +617,15 @@ except Exception:
     ok "SHA256 verificado: $ACTUAL_SHA256"
   fi
 
+  if [ "$SIGNED" = "true" ]; then
+    SIGNATURE_HELPER_TMP="$(mktemp)"
+    if [ "$SIGNING_PUBKEY" != "$ED25519_PUBLIC_KEY" ] || ! verify_ed25519_signature "$STAGING_PATH" "$SIGNATURE" "$ED25519_PUBLIC_KEY" "$EXPECTED_SHA256" "$SIGNATURE_HELPER_TMP"; then
+      rm -f "$STAGING_PATH" "$SIGNATURE_HELPER_TMP"
+      err "assinatura Ed25519 inválida ou não verificável; instalação recusada"
+    fi
+    rm -f "$SIGNATURE_HELPER_TMP"
+    ok "assinatura Ed25519 verificada sobre o digest SHA256"
+  fi
   chmod +x "$STAGING_PATH"
   # A clean HOME has no authenticated session yet. Validate only the offline
   # Runtime release contract before the swap; MCP initialize/tools/list is an
