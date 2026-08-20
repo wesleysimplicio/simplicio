@@ -110,7 +110,9 @@ configure_codex_stdio() {
   mkdir -p "$codex_dir" "$hook_dir"
 
   info "Configurando MCP stdio e hooks do Codex"
-  hook_ref="${SIMPLICIO_CODEX_HOOK_REF:-master}"
+  installed_version="$("$DEST_PATH" --version 2>/dev/null | awk 'NR == 1 {print $2; exit}' | sed 's/^v//')"
+  hook_ref="${SIMPLICIO_CODEX_HOOK_REF:-v${installed_version:-unknown}}"
+  [ "$hook_ref" != "vunknown" ] || err "não foi possível derivar uma referência versionada para o hook do Codex"
   fetch_url "$GITHUB/raw/$hook_ref/codex/mcp-route.sh" "$hook_tmp" || err "não foi possível baixar o hook do Codex"
   chmod 755 "$hook_tmp"
   mv -f "$hook_tmp" "$hook_path"
@@ -659,11 +661,13 @@ if ! verify_mcp_tools "$DEST_PATH"; then
   err "este Runtime não expõe a superfície MCP completa após o login; instalação interrompida"
 fi
 ok "superfície MCP verificada (10 tools documentadas)"
-
-# Codex runs the installed binary directly over STDIO. This avoids the local
-# HTTP daemon latency and keeps the same Google login/entitlement gate in the
-# Runtime process. Existing Codex settings and hooks are merged, not replaced.
-configure_codex_stdio
+# Codex integration is opt-in. MCP registration and routing hooks remain
+# separate, and the hook reference is versioned/pinned inside the function.
+if [ "${SIMPLICIO_INSTALL_CODEX:-0}" = "1" ]; then
+  configure_codex_stdio
+else
+  info "integração Codex não instalada automaticamente; use SIMPLICIO_INSTALL_CODEX=1 para ativá-la"
+fi
 
 # Adiciona ao PATH se não estiver
 case ":$PATH:" in

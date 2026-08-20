@@ -227,7 +227,9 @@ function Install-CodexIntegration {
   New-Item -ItemType Directory -Force -Path $codexDir, $hookDir | Out-Null
 
   Write-Host "==> configuring Codex STDIO MCP and hooks"
-  $hookRef = if ($env:SIMPLICIO_CODEX_HOOK_REF) { $env:SIMPLICIO_CODEX_HOOK_REF } else { "master" }
+  $installedVersion = (& $DestPath --version 2>$null | Select-Object -First 1).Split(' ')[1].TrimStart('v')
+  $hookRef = if ($env:SIMPLICIO_CODEX_HOOK_REF) { $env:SIMPLICIO_CODEX_HOOK_REF } else { "v$installedVersion" }
+  if ([string]::IsNullOrWhiteSpace($installedVersion)) { throw "could not derive a versioned Codex hook ref" }
   $hookUrl = "https://raw.githubusercontent.com/$Repo/$hookRef/codex/mcp-route.ps1"
   try {
     Invoke-WebRequest -Uri $hookUrl -OutFile $hookTemp -UseBasicParsing -ErrorAction Stop
@@ -550,11 +552,13 @@ if (-not (Test-McpToolSurface $DestPath)) {
   Write-Error "This Runtime does not expose the complete MCP tool surface after login; refusing to finish installation."
   exit 1
 }
-Write-Host "  ✓ MCP tool surface verified (10 documented tools)"
-
-# Codex runs the installed binary directly over STDIO. Existing settings and
-# hooks are merged, not replaced.
-Install-CodexIntegration
+# Codex integration is opt-in. MCP registration and routing hooks remain
+# separate, and the hook reference is versioned/pinned inside the function.
+if ($env:SIMPLICIO_INSTALL_CODEX -eq "1") {
+  Install-CodexIntegration
+} else {
+  Write-Host "==> Codex integration not installed automatically; set SIMPLICIO_INSTALL_CODEX=1 to enable"
+}
 
 $BundleDir = if ($env:SIMPLICIO_BUNDLE_DIR) { $env:SIMPLICIO_BUNDLE_DIR } else { Join-Path $env:USERPROFILE ".simplicio" }
 New-Item -ItemType Directory -Force -Path $BundleDir | Out-Null
