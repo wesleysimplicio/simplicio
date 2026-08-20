@@ -545,9 +545,8 @@ echo ""
 # ─── 1. Detect platform ──────────────────────────────────────────────────────
 detect_platform
 info "Plataforma detectada: $OS-$ARCH"
-if [ "$OS" = "macos" ] && [ "$ARCH" = "x64" ]; then
-  err "esta release publica apenas macOS Apple Silicon; não há asset macOS Intel com checksum"
-fi
+# macOS Intel is a supported distribution target. The canonical target
+# table and signed manifest provide the macos-x64 asset/checksum mapping.
 
 # ─── 2. Instalar simplicio binary (staged download + SHA256 + atomic swap) ──
 info "Instalando Simplicio Runtime..."

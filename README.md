@@ -558,7 +558,7 @@ simplicio license status
 |---|---|---|
 | RAM | 8 GB | 16 GB+ |
 | Storage | ~35–50 MB for the release binary | 1.5 GB+ with a local LLM |
-| OS | macOS Apple Silicon, Linux x64, Windows x64 | macOS ARM64 |
+| OS | macOS Apple Silicon and Intel, Linux x64, Windows x64 | macOS ARM64 and x64 |
 | Python | Not required for the embedded Runtime projects | Current CPython 3 for optional external adapters |
 | Browser | Safari, Chrome, or another supported browser for Google login | Current Safari/Chrome |
 | Terminal | any modern terminal | WezTerm / Alacritty / Ghostty |
