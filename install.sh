@@ -9,15 +9,17 @@
 #   curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
 #
 # Idempotent subcommands:
-#   sh install.sh --doctor      # health check, safe to re-run
-#   sh install.sh --uninstall   # removes the binary, preserves user data
+#   sh install.sh --doctor                    # read-only health check
+#   sh install.sh --uninstall --keep-data     # removes binary, keeps data
+#   sh install.sh --uninstall --purge         # removes binary and data (confirmed)
 #
 # Environment variables:
 #   SIMPLICIO_VERSION           - pin a specific version (default: latest)
 #   SIMPLICIO_BIN_DIR           - custom install directory
 #   SIMPLICIO_ALLOW_UNVERIFIED  - "1" to proceed even if no checksum is
 #                                 published for this target (default: refuse)
-#   SIMPLICIO_BUNDLE_DIR       - bundle report directory (default: ~/.simplicio)
+#   SIMPLICIO_BUNDLE_DIR        - bundle report/data directory
+#   SIMPLICIO_CONFIRM_PURGE     - "1" confirms non-interactive --purge
 #
 # Asset naming follows distribution/targets.json (the canonical target
 # triplet table for the whole ecosystem): id "macos-arm64" -> asset
@@ -46,10 +48,18 @@ NC='\033[0m'
 info()  { printf "${CYAN}==>${NC} %s\n" "$*"; }
 ok()    { printf "${GREEN}  ✓${NC} %s\n" "$*"; }
 warn()  { printf "${YELLOW}  ⚠${NC} %s\n" "$*"; }
-err()   { printf "${RED}  ✗${NC} %s\n" "$*"; exit 1; }
+err() {
+  printf "${RED}  ✗${NC} %s\n" "$*"
+  if [ "${INSTALL_TRANSACTION_ACTIVE:-false}" = true ]; then rollback_install; fi
+  exit 1
+}
 
 BIN_DIR="${SIMPLICIO_BIN_DIR:-$HOME/.local/bin}"
 DEST_PATH="$BIN_DIR/$BIN_NAME"
+PREVIOUS_PATH="$DEST_PATH.simplicio.previous"
+PURGE_DIR="${SIMPLICIO_BUNDLE_DIR:-$HOME/.simplicio}"
+INSTALL_TRANSACTION_ACTIVE=false
+UNINSTALL_KEEP_DATA=true
 
 # ─── Detect platform (canonical os/arch naming, matches distribution/targets.json) ──
 detect_platform() {
@@ -84,6 +94,19 @@ fetch_url() {
   else
     err "Precisa de curl ou wget para baixar"
   fi
+}
+
+rollback_install() {
+  [ "${INSTALL_TRANSACTION_ACTIVE:-false}" = true ] || return 0
+  if [ -f "${PREVIOUS_PATH:-}" ]; then
+    mv -f "$PREVIOUS_PATH" "$DEST_PATH" || true
+    warn "rollback concluído: versão anterior restaurada em $DEST_PATH"
+  else
+    rm -f "$DEST_PATH"
+    warn "rollback concluído: binário novo removido; não havia versão anterior"
+  fi
+  if [ -n "${STAGING_PATH:-}" ]; then rm -f "$STAGING_PATH"; fi
+  INSTALL_TRANSACTION_ACTIVE=false
 }
 
 verify_ed25519_signature() {
@@ -383,8 +406,8 @@ require_active_login() {
     return 0
   fi
   info "Login Google obrigatório para ativar o Simplicio Runtime"
-  "$DEST_PATH" login google || err "login não concluído; instalação bloqueada"
-  verify_active_login || err "sessão ausente, expirada, revogada ou sem entitlement ativo; instalação bloqueada"
+  "$DEST_PATH" login google || return 1
+  verify_active_login
 }
 
 # ─── --doctor: idempotent, read-only health check ──────────────────────────
@@ -443,26 +466,71 @@ run_doctor() {
   exit "$status"
 }
 
-# ─── --uninstall: idempotent removal, safe to run repeatedly ──────────────
+# ─── --uninstall: transactional removal with explicit data policy ──────────
+confirm_purge() {
+  if [ "${SIMPLICIO_CONFIRM_PURGE:-0}" = "1" ]; then
+    return 0
+  fi
+  if [ -t 0 ]; then
+    printf 'Digite PURGE para apagar os dados em %s: ' "$PURGE_DIR" >&2
+    IFS= read -r answer
+    [ "$answer" = "PURGE" ] || err "purge cancelado; confirme digitando PURGE"
+    return 0
+  fi
+  err "--purge exige SIMPLICIO_CONFIRM_PURGE=1 em execução não interativa"
+}
+
 run_uninstall() {
   info "simplicio uninstall"
+  if [ "$UNINSTALL_PURGE" = true ]; then
+    confirm_purge
+  fi
   if [ -e "$DEST_PATH" ]; then
     rm -f "$DEST_PATH"
     ok "removido $DEST_PATH"
   else
     ok "já estava removido (nada em $DEST_PATH)"
   fi
-  # Dados do usuário são preservados intencionalmente (uninstall idempotente
-  # e não-destrutivo) — ~/.simplicio nunca é tocado aqui.
-  ok "dados do usuário em \$HOME/.simplicio foram preservados"
-  warn "se você adicionou $BIN_DIR ao PATH no seu ~/.zshrc ou ~/.bashrc, remova a linha manualmente"
+  rm -f "$PREVIOUS_PATH"
+  if [ "$UNINSTALL_PURGE" = true ]; then
+    case "$PURGE_DIR" in
+      ""|"/"|"$HOME") err "recusando purge de um diretório amplo: $PURGE_DIR" ;;
+    esac
+    rm -rf "$PURGE_DIR"
+    ok "dados do usuário removidos de $PURGE_DIR"
+  else
+    ok "dados do usuário em $PURGE_DIR foram preservados (--keep-data)"
+  fi
+  warn "se você adicionou $BIN_DIR ao PATH no seu perfil, remova a linha manualmente"
   exit 0
 }
 
-case "${1:-}" in
-  --doctor) detect_platform; run_doctor ;;
-  --uninstall) run_uninstall ;;
-esac
+DOCTOR=false
+UNINSTALL=false
+UNINSTALL_PURGE=false
+for arg in "$@"; do
+  case "$arg" in
+    --doctor) DOCTOR=true ;;
+    --uninstall) UNINSTALL=true ;;
+    --keep-data) UNINSTALL_KEEP_DATA=true ;;
+    --purge) UNINSTALL_PURGE=true ;;
+    --help|-h)
+      printf '%s\n' 'uso: sh install.sh [--doctor] [--uninstall [--keep-data|--purge]]'
+      exit 0
+      ;;
+    *) err "argumento desconhecido: $arg" ;;
+  esac
+done
+if [ "$UNINSTALL_PURGE" = true ] && [ "${UNINSTALL:-false}" != true ]; then
+  err "--purge só pode ser usado com --uninstall"
+fi
+if [ "$DOCTOR" = true ]; then
+  detect_platform
+  run_doctor
+fi
+if [ "$UNINSTALL" = true ]; then
+  run_uninstall
+fi
 
 printf "${GREEN}"
 cat << "EOF"
@@ -637,9 +705,14 @@ except Exception:
     rm -f "$STAGING_PATH"
     err "release Runtime não atende ao contrato de distribuição; instalação interrompida"
   fi
-  # Swap atômico: mv no mesmo filesystem nunca deixa $DEST_PATH parcialmente
-  # escrito, e reexecutar este script (update idempotente) não deixa .tmp
-  # órfãos em caso de sucesso.
+  # Journal the previous executable before the atomic swap. Any later
+  # fail-closed error calls rollback_install through err().
+  if [ -e "$DEST_PATH" ]; then
+    cp -p "$DEST_PATH" "$PREVIOUS_PATH" || err "não foi possível guardar a versão anterior para rollback"
+  else
+    rm -f "$PREVIOUS_PATH"
+  fi
+  INSTALL_TRANSACTION_ACTIVE=true
   mv -f "$STAGING_PATH" "$DEST_PATH"
   ok "Simplicio Runtime instalado em $DEST_PATH"
 fi
@@ -652,7 +725,9 @@ fi
 ok "contrato de release do Runtime verificado"
 
 # ─── 2.2 Login obrigatório antes do handshake MCP ───────────────────────────
-require_active_login
+if ! require_active_login; then
+  err "login não concluído ou sessão sem entitlement ativo; instalação bloqueada"
+fi
 ok "login Google ativo e entitlement válido"
 
 # MCP tools/list is intentionally post-login: clean installs must bootstrap the
@@ -686,6 +761,10 @@ if "$DEST_PATH" version --json >"$RUNTIME_REPORT" 2>/dev/null; then
 else
   rm -f "$RUNTIME_REPORT"
   err "não foi possível persistir o contrato de release; instalação interrompida"
+fi
+if [ "${INSTALL_TRANSACTION_ACTIVE:-false}" = true ]; then
+  rm -f "$PREVIOUS_PATH"
+  INSTALL_TRANSACTION_ACTIVE=false
 fi
 
 # ─── 4. Mensagem final ───────────────────────────────────────────────────────
