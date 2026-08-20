@@ -496,8 +496,18 @@ run_uninstall() {
     case "$PURGE_DIR" in
       ""|"/"|"$HOME") err "recusando purge de um diretório amplo: $PURGE_DIR" ;;
     esac
-    rm -rf "$PURGE_DIR"
-    ok "dados do usuário removidos de $PURGE_DIR"
+    if [ -d "$PURGE_DIR" ]; then
+      # Provider credentials may live in ~/.simplicio/.env.  Purge only
+      # Simplicio-managed state and keep that user-owned secret file intact.
+      for _entry in "$PURGE_DIR"/* "$PURGE_DIR"/.[!.]* "$PURGE_DIR"/..?*; do
+        [ -e "$_entry" ] || [ -L "$_entry" ] || continue
+        [ "$(basename "$_entry")" = ".env" ] && continue
+        rm -rf "$_entry"
+      done
+      ok "dados do Simplicio removidos de $PURGE_DIR (.env preservado)"
+    else
+      ok "não havia dados do Simplicio em $PURGE_DIR (.env inexistente)"
+    fi
   else
     ok "dados do usuário em $PURGE_DIR foram preservados (--keep-data)"
   fi

@@ -412,8 +412,16 @@ if ($Uninstall) {
   if (Test-Path $PreviousPath) { Remove-Item -Force $PreviousPath }
   if ($purgeData) {
     if ([string]::IsNullOrWhiteSpace($bundleDir) -or $bundleDir -eq $env:USERPROFILE -or $bundleDir -eq "\") { Write-Error "refusing to purge a broad directory: $bundleDir"; exit 1 }
-    if (Test-Path $bundleDir) { Remove-Item -Recurse -Force $bundleDir }
-    Write-Host "  ✓ user data removed from $bundleDir"
+    if (Test-Path $bundleDir) {
+      # Provider credentials may live in ~/.simplicio/.env. Purge only
+      # Simplicio-managed state and keep that user-owned secret file intact.
+      Get-ChildItem -LiteralPath $bundleDir -Force |
+        Where-Object { $_.Name -ne ".env" } |
+        Remove-Item -Recurse -Force
+      Write-Host "  ✓ Simplicio data removed from $bundleDir (.env preserved)"
+    } else {
+      Write-Host "  ✓ no Simplicio data found at $bundleDir (.env absent)"
+    }
   } else {
     Write-Host "  ✓ user data under $env:USERPROFILE\.simplicio was preserved (-KeepData)"
   }
