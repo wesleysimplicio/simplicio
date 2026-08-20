@@ -14,7 +14,8 @@ sys.path.insert(0, str(PACKAGE_ROOT))
 import simplicio  # noqa: E402
 from simplicio import __main__ as installer  # noqa: E402
 
-TEST_TRUST = {"3.8.11": "fixture-digest"}
+CURRENT_VERSION = "3.8.17"
+TEST_TRUST = {CURRENT_VERSION: "fixture-digest"}
 
 
 @pytest.fixture(autouse=True)
@@ -24,7 +25,7 @@ def fixture_manifest_trust(monkeypatch, request):
 
 
 def trusted_digest(payload):
-    TEST_TRUST["3.8.11"] = hashlib.sha256(payload).hexdigest()
+    TEST_TRUST[CURRENT_VERSION] = hashlib.sha256(payload).hexdigest()
     return TEST_TRUST
 
 
@@ -35,7 +36,7 @@ class FakeReleaseClient:
         trusted_digest(manifest)
         self.release_data = (
             {
-                "tag_name": "v3.8.11",
+                "tag_name": "v3.8.17",
                 "assets": [
                     {"name": installer.MANIFEST_ASSET},
                     {"name": "simplicio-linux-x64"},
@@ -70,7 +71,7 @@ class Response:
         return self.payload
 
 
-def manifest_for(payload, version="3.8.11", target="linux-x64", asset="simplicio-linux-x64"):
+def manifest_for(payload, version=CURRENT_VERSION, target="linux-x64", asset="simplicio-linux-x64"):
     return json_bytes(
         {
             "version": version,
@@ -88,7 +89,7 @@ def json_bytes(value):
 def valid_runner(command, **kwargs):
     assert command[1:] == ["version", "--json"]
     assert kwargs["check"] and kwargs["capture_output"] and kwargs["text"]
-    return subprocess.CompletedProcess(command, 0, '{"runtime":{"version":"3.8.11"}}', "")
+    return subprocess.CompletedProcess(command, 0, '{"runtime":{"version":"3.8.17"}}', "")
 
 
 def test_install_verifies_then_atomically_replaces_binary(tmp_path, monkeypatch):
@@ -171,7 +172,7 @@ def test_target_uses_canonical_distribution_asset_names():
 def test_install_rejects_missing_release_before_any_download(tmp_path, monkeypatch):
     client = FakeReleaseClient(manifest_for(b"runtime"), release=False)
     monkeypatch.setattr(installer, "_target", lambda: ("linux-x64", "simplicio-linux-x64"))
-    with pytest.raises(installer.InstallError, match="Release v3.8.11 was not found"):
+    with pytest.raises(installer.InstallError, match=f"GitHub Release v{CURRENT_VERSION}"):
         installer.do_install(client=client, install_dir=tmp_path, runner=valid_runner)
     assert client.downloaded == []
 
@@ -278,7 +279,7 @@ def test_release_client_rejects_non_github_asset_url():
 
 def test_default_manifest_pin_matches_versioned_checkout():
     payload = (REPO_ROOT / "simplicio-update-manifest.json").read_bytes()
-    assert installer.TRUSTED_MANIFEST_SHA256["3.8.11"] == hashlib.sha256(payload).hexdigest()
+    assert installer.TRUSTED_MANIFEST_SHA256[CURRENT_VERSION] == hashlib.sha256(payload).hexdigest()
 
 
 def test_install_rejects_substituted_or_unpinned_manifest_before_runtime_download(
@@ -292,7 +293,7 @@ def test_install_rejects_substituted_or_unpinned_manifest_before_runtime_downloa
             client=client,
             install_dir=tmp_path,
             runner=valid_runner,
-            trusted_manifest_sha256={"3.8.11": "0" * 64},
+            trusted_manifest_sha256={CURRENT_VERSION: "0" * 64},
         )
     assert client.downloaded == [installer.MANIFEST_ASSET]
 
@@ -311,11 +312,11 @@ def test_target_rejects_unsupported_platform():
 
 def test_artifact_rejects_wrong_name_and_invalid_digest():
     with pytest.raises(installer.InstallError, match="asset mismatch"):
-        installer._artifact(json.loads(manifest_for(b"x")), "linux-x64", "other", "3.8.11")
+        installer._artifact(json.loads(manifest_for(b"x")), "linux-x64", "other", CURRENT_VERSION)
     manifest = json.loads(manifest_for(b"x"))
     manifest["artifacts"][0]["sha256"] = "not-a-digest"
     with pytest.raises(installer.InstallError, match="valid SHA-256"):
-        installer._artifact(manifest, "linux-x64", "simplicio-linux-x64", "3.8.11")
+        installer._artifact(manifest, "linux-x64", "simplicio-linux-x64", CURRENT_VERSION)
 
 
 @pytest.mark.parametrize(
@@ -348,7 +349,7 @@ def test_windows_staging_uses_exe_suffix(tmp_path, monkeypatch):
 
     def runner(command, **kwargs):
         staged_paths.append(command[0])
-        return subprocess.CompletedProcess(command, 0, '{"runtime":{"version":"3.8.11"}}', "")
+        return subprocess.CompletedProcess(command, 0, '{"runtime":{"version":"3.8.17"}}', "")
 
     installer.do_install(client=client, install_dir=tmp_path, runner=runner)
     assert staged_paths[0].endswith(".exe")

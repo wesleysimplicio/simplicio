@@ -1,4 +1,3 @@
-import base64
 import subprocess
 import sys
 from pathlib import Path
@@ -6,25 +5,25 @@ from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 HELPER = ROOT / 'scripts' / 'verify_ed25519.py'
-# RFC 8032 public key, with a deterministic 32-byte zero digest payload.
-RFC_PUBLIC_KEY = base64.b64encode(bytes.fromhex('d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a')).decode()
-RFC_SIGNATURE = 'NVx0BTo4CrWLKY3iOtzKSfObfKUKLOxbhh9sf934fIpTt4x7s5WSaMDbHt6wRAeGg5713vqtYjKQB2GYVgs8Ag=='
+RUNTIME_PUBLIC_KEY = 'A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg='
+RUNTIME_SIGNATURE = 'UKIyIZkSH3nmk+E1LybN3bjQlPpiumLoLIu+bdQUC/j4/6nQkNX3MBhU7kZv+OZ6S9iLYVGwwzPZD5n//MGGAQ=='
+RUNTIME_DIGEST = '3ba84e1d362618f0e9f45064634a1594485bca3298b8182b5a7eaa3fded4688f'
 
 
-def run(signature=RFC_SIGNATURE, digest='00' * 32):
+def run(signature=RUNTIME_SIGNATURE, digest=RUNTIME_DIGEST):
     return subprocess.run([
-        sys.executable, str(HELPER), '--public-key', RFC_PUBLIC_KEY,
+        sys.executable, str(HELPER), '--public-key', RUNTIME_PUBLIC_KEY,
         '--signature', 'ed25519:' + signature, '--sha256', digest,
     ], capture_output=True, text=True)
 
 
-def test_rfc8032_signature_is_accepted():
+def test_runtime_domain_separated_signature_is_accepted():
     result = run()
     assert result.returncode == 0, result.stderr
 
 
 def test_tampered_signature_is_rejected():
-    tampered = ('A' if RFC_SIGNATURE[0] != 'A' else 'B') + RFC_SIGNATURE[1:]
+    tampered = ('A' if RUNTIME_SIGNATURE[0] != 'A' else 'B') + RUNTIME_SIGNATURE[1:]
     assert run(tampered).returncode != 0
 
 
