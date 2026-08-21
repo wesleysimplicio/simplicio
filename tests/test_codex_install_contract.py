@@ -25,6 +25,15 @@ def test_installers_preserve_existing_codex_state():
     assert "Write-AtomicText" in powershell
 
 
+def test_installers_preserve_stable_login_state_during_upgrades():
+    shell = (ROOT / "install.sh").read_text(encoding="utf-8")
+    powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
+    assert "SIMPLICIO_AUTH_FILE" in shell
+    assert "SIMPLICIO_AUTH_FILE" in powershell
+    assert "login.json" in shell
+    assert "login.json" in powershell
+
+
 def test_windows_installer_migrates_legacy_unix_hooks():
     powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
     # Existing Windows users may have the old global hook, which invokes
@@ -62,11 +71,24 @@ def test_unix_installer_accepts_release_manifest_target_aliases():
 def test_codex_hooks_have_all_required_lifecycle_events():
     shell_hook = (ROOT / "codex/mcp-route.sh").read_text(encoding="utf-8")
     powershell_hook = (ROOT / "codex/mcp-route.ps1").read_text(encoding="utf-8")
+    # Claude's current PreToolUse protocol rejects the legacy top-level
+    # {decision: allow|deny} response. Both platform hooks must emit the
+    # event-specific permissionDecision envelope.
+    assert "permissionDecision" in shell_hook
+    assert "permissionDecision" in powershell_hook
+    assert "hookEventName" in shell_hook
+    assert "hookEventName" in powershell_hook
+    assert "Use simplicio_file_read / simplicio_read / simplicio_search instead of" in shell_hook
+    assert "Use simplicio_file_read / simplicio_read / simplicio_search instead of" in powershell_hook
     for event in ("SessionStart", "UserPromptSubmit", "SubagentStart"):
         assert event in shell_hook
         assert event in powershell_hook
     assert "PreToolUse" in (ROOT / "install.sh").read_text(encoding="utf-8")
     assert "PreToolUse" in (ROOT / "install.ps1").read_text(encoding="utf-8")
+    assert '"matcher": ".*"' in (ROOT / "install.sh").read_text(encoding="utf-8")
+    assert '".*"' in (ROOT / "install.ps1").read_text(encoding="utf-8")
+    assert "simplicio_map" in shell_hook
+    assert "simplicio_context" in shell_hook
 
 
 def test_docs_describe_stdio_instead_of_codex_http_authenticate_flow():

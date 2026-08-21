@@ -54,17 +54,21 @@ explicit data-preserving uninstall:
 # macOS / Linux
 sh install.sh --doctor
 sh install.sh --uninstall --keep-data
-sh install.sh --uninstall --purge       # confirmation required
+sh install.sh --uninstall --purge       # confirmation required; preserves ~/.simplicio/.env
 ~~~
 
 ~~~powershell
 # Windows
 pwsh install.ps1 -Doctor
 pwsh install.ps1 -Uninstall -KeepData
-pwsh install.ps1 -Uninstall -Purge      # confirmation required
+pwsh install.ps1 -Uninstall -Purge      # confirmation required; preserves .env
 ~~~
 
-Uninstall removes the installed binary and keeps user data by default. Set
+Uninstall removes the installed binary and keeps user data by default. This
+includes the 30-day Google login state at `~/.simplicio/login.json`, which is
+outside the executable and survives upgrades. Even an explicit purge removes
+only Simplicio-managed state and preserves `~/.simplicio/.env`, where provider
+credentials may live; purge intentionally removes the login state too. Set
 SIMPLICIO_CONFIRM_PURGE=1 for a non-interactive purge.
 
 ## Verify Installation
@@ -220,11 +224,16 @@ product's configuration. To enable versioned MCP registration and managed hooks:
 SIMPLICIO_INSTALL_CODEX=1 sh install.sh
 ~~~
 
-The registration points to simplicio serve --mcp --stdio. The Runtime still
+The registration points to `simplicio serve --mcp --stdio`. The Runtime still
 requires Google login and active entitlement for every local MCP session; never
-copy tokens into config files. Review enabled hooks in Settings → Hooks and use
-codex mcp list. To repair, rerun with SIMPLICIO_INSTALL_CODEX=1. Use
-SIMPLICIO_MCP_ROUTE=0 for a temporary hook escape hatch.
+copy tokens into config files. The managed Codex hooks cover all tool events,
+are versioned with the release, preserve existing user hooks, and are updated
+idempotently. The route is mandatory and has no environment-variable escape:
+native reads, edits, shell commands, and directory exploration are denied; use
+the Simplicio MCP tools. Review enabled hooks in Settings → Hooks and verify
+the MCP command with `codex mcp list`. To repair, rerun with
+`SIMPLICIO_INSTALL_CODEX=1`; the integration helper keeps user data separate
+and `.simplicio.bak` copies are created for managed Codex files.
 
 ## Building from Source
 
@@ -259,14 +268,15 @@ Use the installer so the binary and transaction journal are handled together:
 
 ~~~bash
 sh install.sh --uninstall --keep-data       # default, preserves ~/.simplicio
-sh install.sh --uninstall --purge            # removes ~/.simplicio after confirmation
+sh install.sh --uninstall --purge            # removes Simplicio state; preserves ~/.simplicio/.env
 ~~~
 
 ~~~powershell
 pwsh install.ps1 -Uninstall -KeepData
-pwsh install.ps1 -Uninstall -Purge
+pwsh install.ps1 -Uninstall -Purge            # preserves ~/.simplicio/.env
 ~~~
 
 Interactive purge requires typing PURGE. For non-interactive use, set
 SIMPLICIO_CONFIRM_PURGE=1. Project-local .simplicio data is not removed by
---keep-data; inspect the target before choosing --purge.
+--keep-data; inspect the target before choosing --purge. Provider credentials
+stored in `.simplicio/.env` are preserved by both installers.
