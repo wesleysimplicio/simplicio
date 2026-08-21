@@ -9,8 +9,9 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": ".*",
         "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/mcp-route.sh\"" },
           { "type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/action_gate.py\"" },
           { "type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/orient_rewrite.py\"" }
         ]

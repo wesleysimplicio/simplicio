@@ -19,6 +19,7 @@
 #   SIMPLICIO_ALLOW_UNVERIFIED  - "1" to proceed even if no checksum is
 #                                 published for this target (default: refuse)
 #   SIMPLICIO_BUNDLE_DIR        - bundle report/data directory
+#   SIMPLICIO_AUTH_FILE         - optional stable login state path
 #   SIMPLICIO_CONFIRM_PURGE     - "1" confirms non-interactive --purge
 #
 # Asset naming follows distribution/targets.json (the canonical target
@@ -58,6 +59,9 @@ BIN_DIR="${SIMPLICIO_BIN_DIR:-$HOME/.local/bin}"
 DEST_PATH="$BIN_DIR/$BIN_NAME"
 PREVIOUS_PATH="$DEST_PATH.simplicio.previous"
 PURGE_DIR="${SIMPLICIO_BUNDLE_DIR:-$HOME/.simplicio}"
+AUTH_FILE="${SIMPLICIO_AUTH_FILE:-$HOME/.simplicio/login.json}"
+AUTH_FILE_WAS_PRESENT=false
+[ -s "$AUTH_FILE" ] && AUTH_FILE_WAS_PRESENT=true
 INSTALL_TRANSACTION_ACTIVE=false
 UNINSTALL_KEEP_DATA=true
 
@@ -504,7 +508,7 @@ run_uninstall() {
         [ "$(basename "$_entry")" = ".env" ] && continue
         rm -rf "$_entry"
       done
-      ok "dados do Simplicio removidos de $PURGE_DIR (.env preservado)"
+      ok "dados do Simplicio removidos de $PURGE_DIR (.env e login removidos pelo purge explícito)"
     else
       ok "não havia dados do Simplicio em $PURGE_DIR (.env inexistente)"
     fi
@@ -724,6 +728,9 @@ except Exception:
   INSTALL_TRANSACTION_ACTIVE=true
   mv -f "$STAGING_PATH" "$DEST_PATH"
   ok "Simplicio Runtime instalado em $DEST_PATH"
+  if [ "$AUTH_FILE_WAS_PRESENT" = true ] && [ ! -s "$AUTH_FILE" ]; then
+    err "o estado de login desapareceu durante a atualização: $AUTH_FILE; rollback executado"
+  fi
 fi
 
 # ─── 2.1 Verificar o contrato de release antes de anunciar sucesso ──────────
@@ -738,6 +745,10 @@ if ! require_active_login; then
   err "login não concluído ou sessão sem entitlement ativo; instalação bloqueada"
 fi
 ok "login Google ativo e entitlement válido"
+if [ "$AUTH_FILE_WAS_PRESENT" = true ] && [ ! -s "$AUTH_FILE" ]; then
+  err "o estado de login desapareceu durante a atualização: $AUTH_FILE; rollback executado"
+fi
+ok "estado de login preservado fora do binário: $AUTH_FILE"
 
 # MCP tools/list is intentionally post-login: clean installs must bootstrap the
 # binary and establish the session before invoking the authenticated surface.

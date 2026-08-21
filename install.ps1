@@ -15,6 +15,7 @@
 #   SIMPLICIO_ALLOW_UNVERIFIED  - "1" to proceed even if no checksum is
 #                                 published for this target (default: refuse)
 #   SIMPLICIO_BUNDLE_DIR       - Runtime report directory (default: ~/.simplicio)
+#   SIMPLICIO_AUTH_FILE        - optional stable login state path
 #
 # Asset naming follows distribution/targets.json (the canonical target
 # triplet table for the whole ecosystem) — target "windows-x64", asset
@@ -46,6 +47,8 @@ if ($env:SIMPLICIO_BIN_DIR) {
 }
 $DestPath = Join-Path $InstallDir $BinName
 $PreviousPath = "$DestPath.simplicio.previous"
+$AuthFile = if ($env:SIMPLICIO_AUTH_FILE) { $env:SIMPLICIO_AUTH_FILE } else { Join-Path $env:USERPROFILE ".simplicio\login.json" }
+$AuthFileWasPresent = Test-Path -LiteralPath $AuthFile
 $InstallTransactionActive = $false
 
 function Invoke-Rollback {
@@ -345,7 +348,7 @@ function Install-CodexIntegration {
     $hooks | Add-Member -MemberType NoteProperty -Name $Event -Value $items -Force
   }
 
-  Upsert-CodexHook "PreToolUse" "Bash|apply_patch|Edit|Write"
+  Upsert-CodexHook "PreToolUse" ".*"
   Upsert-CodexHook "SessionStart" "startup|resume|clear|compact"
   Upsert-CodexHook "SubagentStart" ""
   Upsert-CodexHook "UserPromptSubmit" ""
@@ -438,7 +441,7 @@ if ($Uninstall) {
       Get-ChildItem -LiteralPath $bundleDir -Force |
         Where-Object { $_.Name -ne ".env" } |
         Remove-Item -Recurse -Force
-      Write-Host "  ✓ Simplicio data removed from $bundleDir (.env preserved)"
+      Write-Host "  ✓ Simplicio data removed from $bundleDir (.env and login state removed by explicit purge)"
     } else {
       Write-Host "  ✓ no Simplicio data found at $bundleDir (.env absent)"
     }
@@ -586,6 +589,11 @@ try {
   exit 1
 }
 Write-Host "  ✓ installed: $DestPath"
+if ($AuthFileWasPresent -and -not (Test-Path -LiteralPath $AuthFile)) {
+  Invoke-Rollback
+  Write-Error "Login state disappeared during the upgrade: $AuthFile. Previous Runtime restored."
+  exit 1
+}
 
 # ─── Verify the downloaded Runtime ──────────────────────────────────────────
 try {
@@ -614,6 +622,11 @@ try {
   exit 1
 }
 Write-Host "  ✓ active Google session and entitlement verified"
+if ($AuthFileWasPresent -and -not (Test-Path -LiteralPath $AuthFile)) {
+  Invoke-Rollback
+  Write-Error "Login state disappeared during the upgrade: $AuthFile. Previous Runtime restored."
+  exit 1
+}
 
 if (-not (Test-McpToolSurface $DestPath)) {
   Invoke-Rollback
@@ -665,6 +678,7 @@ if (-not (Test-InPath $InstallDir)) {
 Write-Host ""
 Write-Host "  ✓ simplicio Runtime $Version (windows-x64) installed successfully"
 Write-Host "  ✓ Runtime release contract is active"
+Write-Host "  ✓ login state preserved outside the binary: $AuthFile"
 Write-Host "  ✓ no pip packages or sibling checkouts were installed"
 Write-Host "  ✓ active Google login is required for product commands"
 Write-Host ""

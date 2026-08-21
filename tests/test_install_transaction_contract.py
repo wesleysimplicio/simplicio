@@ -14,6 +14,9 @@ def test_shell_uninstall_policy_and_rollback_are_explicit():
     assert 'for _entry in "$PURGE_DIR"/*' in text
     assert 'basename "$_entry"' in text
     assert 'dados do Simplicio removidos' in text
+    assert 'AUTH_FILE' in text
+    assert 'AUTH_FILE_WAS_PRESENT' in text
+    assert 'estado de login desapareceu' in text
 
 
 def test_powershell_uninstall_policy_and_rollback_are_explicit():
@@ -24,7 +27,10 @@ def test_powershell_uninstall_policy_and_rollback_are_explicit():
     assert '$PreviousPath' in text
     assert 'Invoke-Rollback' in text
     assert 'Where-Object { $_.Name -ne ".env" }' in text
-    assert 'Simpli' in text and '.env preserved' in text
+    assert 'Simpli' in text and '.env and login state removed by explicit purge' in text
+    assert '$AuthFile' in text
+    assert '$AuthFileWasPresent' in text
+    assert 'Login state disappeared during the upgrade' in text
 
 
 def test_shell_purge_removes_simplicio_state_but_preserves_provider_env(tmp_path):

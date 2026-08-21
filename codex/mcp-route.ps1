@@ -1,82 +1,67 @@
-# Simplicio MCP route hook for Codex on Windows.
-$ErrorActionPreference = "SilentlyContinue"
-
-function Allow-Hook {
-  Write-Output '{"decision":"allow"}'
-  exit 0
-}
-
-function Deny-Hook([string]$Reason) {
-  $payload = @{ decision = "deny"; reason = $Reason } | ConvertTo-Json -Compress
-  Write-Output $payload
-  [Console]::Error.WriteLine($Reason)
-  exit 2
-}
-
-if ($env:SIMPLICIO_MCP_ROUTE -eq "0" -or $env:SIMPLICIO_MCP_ROUTE -eq "off") {
-  Allow-Hook
-}
-
+# Simplicio MCP route — mandatory PreToolUse policy for Windows hosts.
+# simplicio-hook-version: 3240-v1
+$ErrorActionPreference = 'Stop'
 $raw = [Console]::In.ReadToEnd()
-if ([string]::IsNullOrWhiteSpace($raw)) { Allow-Hook }
-try { $hook = $raw | ConvertFrom-Json } catch { Allow-Hook }
-
-$event = [string]($hook.hookEventName)
-if ([string]::IsNullOrWhiteSpace($event)) { $event = [string]$hook.hook_event_name }
-if ([string]::IsNullOrWhiteSpace($event)) { $event = [string]$hook.event }
-$eventKey = $event.Replace("-", "_").ToLowerInvariant()
-
-$context = "Use Simplicio MCP for this hop. Orient: simplicio_orient (or map --task). Create: simplicio_edit. Read one file: simplicio_file_read. Do not run simplicio --help / edit --help / runtime map / search_tool for simplicio. Do not read SKILL.md / simplicio-orient / simplicio-runtime/src. Escape: SIMPLICIO_MCP_ROUTE=0 or # simplicio:allow."
-$contextEvents = @{
-  "sessionstart" = "SessionStart"; "session_start" = "SessionStart"
-  "userpromptsubmit" = "UserPromptSubmit"; "user_prompt_submit" = "UserPromptSubmit"
-  "subagentstart" = "SubagentStart"; "subagent_start" = "SubagentStart"
-}
-if ($contextEvents.ContainsKey($eventKey)) {
-  @{ hookSpecificOutput = @{ hookEventName = $contextEvents[$eventKey]; additionalContext = $context } } | ConvertTo-Json -Compress
-  exit 0
-}
-
+if ([string]::IsNullOrWhiteSpace($raw)) { exit 0 }
+try { $hook = $raw | ConvertFrom-Json } catch { [Console]::Error.WriteLine('Simplicio MCP hook received invalid input JSON.'); exit 2 }
+if ($null -eq $hook) { [Console]::Error.WriteLine('Simplicio MCP hook received an empty input payload.'); exit 2 }
 $tool = [string]$hook.toolName
 if ([string]::IsNullOrWhiteSpace($tool)) { $tool = [string]$hook.tool_name }
-if ($tool.ToLowerInvariant().Contains("simplicio")) { Allow-Hook }
-$toolInput = $hook.toolInput
-if ($null -eq $toolInput) { $toolInput = $hook.tool_input }
-$command = [string]$toolInput.command
-$path = [string]$toolInput.target_file
-if ([string]::IsNullOrWhiteSpace($path)) { $path = [string]$toolInput.file_path }
-if ([string]::IsNullOrWhiteSpace($path)) { $path = [string]$toolInput.path }
-if ([string]::IsNullOrWhiteSpace($path)) { $path = [string]$toolInput.file }
-$blob = "$command $path"
-if ($blob.Contains("simplicio:allow") -or $blob.Contains("SIMPLICIO_MCP_ROUTE=0")) { Allow-Hook }
-
-$pathNorm = $path.Replace("\", "/")
-if ($pathNorm.EndsWith("/simplicio/SKILL.md") -or $path -match "AGENTS\.md|CLAUDE\.md|USER\.md|mcp-route\.ps1|[\\/]\.grok[\\/]docs[\\/]|[\\/]\.claude[\\/]hooks[\\/]|[\\/]\.simplicio[\\/]hooks[\\/]") { Allow-Hook }
-
-$lower = $tool.ToLowerInvariant()
-$base = ($lower -split "__|/")[-1] -replace "[^a-z0-9_]", ""
-if ($base -in @("list_dir", "listdir", "readdirectory")) { Allow-Hook }
-if ($base -in @("read", "grep", "glob", "readdirectory", "filesearch", "read_file", "readfile") -or $lower.EndsWith("_read") -or $lower.Contains("read_file")) {
-  Deny-Hook ("Use simplicio_file_read / simplicio_read / simplicio_search / simplicio_orient. " + $context)
+$input = $hook.toolInput
+if ($null -eq $input) { $input = $hook.tool_input }
+$event = [string]$hook.hookEventName
+if ([string]::IsNullOrWhiteSpace($event)) { $event = [string]$hook.hook_event_name }
+if ([string]::IsNullOrWhiteSpace($event)) { $event = [string]$hook.event }
+$event = $event.Replace('-','_').ToLowerInvariant()
+$isPreToolUse = $event -in @('pretooluse','pre_tool_use')
+$command = if ($input) { [string]$input.command } else { '' }
+$path = if ($input) {
+  $candidate = [string]$input.target_file
+  if ([string]::IsNullOrWhiteSpace($candidate)) { $candidate = [string]$input.file_path }
+  if ([string]::IsNullOrWhiteSpace($candidate)) { $candidate = [string]$input.path }
+  if ([string]::IsNullOrWhiteSpace($candidate)) { $candidate = [string]$input.file }
+  $candidate
+} else { '' }
+$context = 'Simplicio MCP is mandatory. Use simplicio_map first, then simplicio_context for the bounded Fast context packet and simplicio_memory for recall; use simplicio_file_read or simplicio_read, simplicio_search, simplicio_edit, simplicio_run/simplicio_exec, and simplicio_validate. There is no host-tool escape hatch.'
+$events = @{'sessionstart'='SessionStart';'session_start'='SessionStart';'userpromptsubmit'='UserPromptSubmit';'user_prompt_submit'='UserPromptSubmit';'subagentstart'='SubagentStart';'subagent_start'='SubagentStart'}
+if ($events.ContainsKey($event)) {
+  @{hookSpecificOutput=@{hookEventName=$events[$event];additionalContext=$context}} | ConvertTo-Json -Compress
+  exit 0
 }
-
-if ($base -in @("write") -or $lower.EndsWith("_write")) {
-  $destination = $path
-  if (-not [System.IO.Path]::IsPathRooted($destination) -and $hook.cwd) { $destination = Join-Path ([string]$hook.cwd) $destination }
-  if ($destination -and -not (Test-Path -LiteralPath $destination)) { Allow-Hook }
+function Deny([string]$detail) {
+  $reason = '[Simplicio MCP required] ' + $detail + ' ' + $context
+  EmitDecision 'deny' $reason
+  [Console]::Error.WriteLine($reason)
+  exit 2
 }
-if ($base -in @("search_replace", "searchreplace", "strreplace") -or $lower.Contains("search_replace")) { Allow-Hook }
-if ($base -in @("edit", "write", "multiedit", "strreplace", "search_replace", "searchreplace", "applypatch", "apply_patch") -or $lower.EndsWith("_write")) {
-  Deny-Hook ("Use simplicio_edit for mutations. " + $context)
+function EmitDecision([string]$decision, [string]$reason = '') {
+  if ($isPreToolUse) {
+    $specific = @{hookEventName='PreToolUse';permissionDecision=$decision}
+    if ($reason) { $specific.permissionDecisionReason = $reason }
+    @{hookSpecificOutput=$specific} | ConvertTo-Json -Compress
+  } else {
+    $result = @{decision=$decision}
+    if ($reason) { $result.reason = $reason }
+    $result | ConvertTo-Json -Compress
+  }
 }
-
-if ($base -in @("bash", "run_terminal_command", "shell", "run")) {
-  if ($command -match "(^|[;&|`n])\s*\S*simplicio(\s+--help|\s+-h|\s+serve\s+--help|\s+\S+\s+--help)\b") { Deny-Hook ("Do not dump simplicio --help. " + $context) }
-  if ($command -match "(^|[;&|`n])\s*(?:\S*[\\/])?simplicio(?![\w./-])\s*([;&`n]|$)") { Deny-Hook ("Do not run bare simplicio. " + $context) }
-  if ($command -match "simplicio-runtime[\\/](src|schemas|crates)|edit-plan\.schema|operations\.rs") { Deny-Hook ("Do not search Simplicio source to learn edit. " + $context) }
-  $lead = (($command.Trim() -split "\s+") | Where-Object { $_ -notmatch "^[A-Za-z_][A-Za-z0-9_]*=" } | Select-Object -First 1)
-  if ($lead -in @("cat", "head", "tail", "less", "more", "bat", "nl", "rg", "grep", "ag", "find")) { Deny-Hook ("Use simplicio_file_read / simplicio_search instead of " + $lead + ". " + $context) }
-  if ($lead -in @("sed", "awk", "perl")) { Deny-Hook ("Use simplicio_edit instead of " + $lead + ". " + $context) }
+if ($tool.ToLowerInvariant().Contains('simplicio')) { EmitDecision 'allow'; exit 0 }
+$normalized = $path.Replace('\','/')
+if ((Split-Path -Leaf $normalized) -in @('AGENTS.md','CLAUDE.md','GEMINI.md','USER.md') -or $normalized.Contains('/.simplicio/hooks/')) { EmitDecision 'allow'; exit 0 }
+$tokens = $command.Trim() -split '\s+' | Where-Object { $_ -ne '' }
+$index = 0
+while ($index -lt $tokens.Count -and $tokens[$index] -match '^[A-Za-z_][A-Za-z0-9_]*=') { $index++ }
+$lead = if ($index -lt $tokens.Count) { Split-Path -Leaf $tokens[$index] } else { '' }
+$base = $tool.ToLowerInvariant().Split('__')[-1].Split('/')[-1] -replace '[^a-z0-9_]',''
+if ($base -in @('bash','shell','run','runterminalcommand','run_terminal_command','terminal')) {
+  if ($lead -in @('simplicio','simplicio.exe')) {
+    if ($command -match '(^|\s)(--help|-h)(\s|$)' -or $command.Trim() -in @('simplicio','simplicio.exe')) { Deny 'Use a specific Simplicio MCP tool; do not dump CLI help or run the bare CLI.' }
+    EmitDecision 'allow'; exit 0
+  }
+  if ($lead -in @('sed','awk','perl')) {
+    if ($command -match '(^|\s)(--in-place|-i|-[A-Za-z]*i[A-Za-z]*)(\s|$)') { Deny ('Use simplicio_edit instead of ' + $lead + '.') }
+    Deny ('Use simplicio_file_read / simplicio_read / simplicio_search instead of ' + $lead + '.')
+  }
+  Deny 'Native shell commands are disabled; use simplicio_exec, simplicio_run, or the matching Simplicio MCP tool.'
 }
-
-Allow-Hook
+Deny ("Native host tool '" + $(if ($tool) { $tool } else { 'unknown' }) + "' is disabled; use the matching Simplicio MCP tool.")

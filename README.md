@@ -116,16 +116,16 @@ keep-data mode removes the installed binary and preserves ~/.simplicio:
 
 ~~~bash
 sh install.sh --uninstall --keep-data       # macOS/Linux
-sh install.sh --uninstall --purge            # also removes ~/.simplicio after confirmation
+sh install.sh --uninstall --purge            # removes Simplicio state; preserves ~/.simplicio/.env
 ~~~
 
 ~~~powershell
 pwsh install.ps1 -Uninstall -KeepData         # Windows
-pwsh install.ps1 -Uninstall -Purge            # also removes user data after confirmation
+pwsh install.ps1 -Uninstall -Purge            # removes Simplicio state; preserves .env
 ~~~
 
 For non-interactive purge, set SIMPLICIO_CONFIRM_PURGE=1 explicitly. The
-installer never edits PATH profiles.
+installer never edits PATH profiles or removes provider credentials from `.simplicio/.env`.
 
 ### What the binary contains
 
@@ -148,6 +148,13 @@ required before product commands, MCP, and the ecosystem integration can be used
 Public beta access may be free, but beta does not bypass the active-entitlement
 check. When beta access ends, the entitlement must come from an active
 subscription.
+
+A completed login remains usable for 30 days through the rotating refresh token.
+The Runtime stores that revocable state at `~/.simplicio/login.json`, outside the
+executable, so reinstalling or upgrading to another release does not require a
+new Google login. The official installers preserve this file; an explicit
+`--purge` is the only installer mode that removes it. To use another location,
+set `SIMPLICIO_AUTH_FILE` consistently before logging in and before upgrading.
 
 ### First login (compatible releases)
 
@@ -240,18 +247,27 @@ args = ["serve", "--mcp", "--stdio"]
 
 This keeps MCP execution local and avoids the latency of the local HTTP daemon.
 The Runtime still enforces Google login and entitlement for every MCP session.
-The managed Codex hooks are versioned with the release, existing hooks are
-preserved, and repeated setup is idempotent. Review the result in Settings →
-Hooks and verify the MCP command with:
+The installer also merges Simplicio `SessionStart`, `UserPromptSubmit`,
+`SubagentStart`, and `PreToolUse` hooks into `~/.codex/hooks.json`; existing
+Codex hooks are preserved and the Simplicio entries are updated idempotently.
+The `PreToolUse` route is mandatory: native host reads, edits, shell commands,
+and directory exploration are denied; use Simplicio MCP. Lifecycle events also
+start a bounded `map -> fast` context warm-up in the background.
+The managed hooks are versioned with the release, and repeated setup is
+idempotent. Review the result in Settings → Hooks and verify the MCP command
+with:
 
 ~~~bash
 codex mcp list
 ~~~
 
-To repair the integration, rerun the installer with SIMPLICIO_INSTALL_CODEX=1.
-The managed integration has a separate status/install/uninstall/repair helper in
-scripts/codex_integration.py; user data remains separate from the integration.
-Set SIMPLICIO_MCP_ROUTE=0 for a temporary hook escape hatch.
+To repair the integration, rerun the installer with
+`SIMPLICIO_INSTALL_CODEX=1`. The managed integration has a separate
+status/install/uninstall/repair helper in `scripts/codex_integration.py`; user
+data remains separate from the integration. Original `config.toml` and
+`hooks.json` files are kept in `.simplicio.bak` copies on the first managed
+write. There is no environment-variable escape hatch; rerun the installer to
+repair a missing or stale route.
 
 ### Other MCP clients: local STDIO
 
@@ -492,7 +508,8 @@ LLM (Claude/Codex/Gemini)          Simplicio Runtime
 
 Re-running the official installer is the simplest update path. It downloads
 the latest release, verifies the SHA256 checksum and Ed25519 signature, validates
-the Runtime release contract, and keeps ~/.simplicio user data. Re-running the
+the Runtime release contract, preserves `~/.simplicio/login.json`, and keeps
+the remaining ~/.simplicio user data. Re-running the
 installer keeps the installation on GitHub's latest release. The installer refuses
 to replace a working binary with a release that lacks the embedded bundle,
 Google login activation, a configured update key, or a verifiable signature.

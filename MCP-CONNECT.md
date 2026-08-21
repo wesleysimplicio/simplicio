@@ -35,8 +35,18 @@ Google login and entitlement on every MCP session. Existing user hooks remain
 preserved; review enabled Simplicio hooks in Settings → Hooks and run codex mcp
 list. Never paste tokens into either config file.
 
-To repair the managed integration, rerun with SIMPLICIO_INSTALL_CODEX=1. Set
-SIMPLICIO_MCP_ROUTE=0 for a temporary hook escape hatch.
+To verify the registration:
+
+```bash
+codex mcp list
+```
+
+The hook route is mandatory and has no environment-variable escape hatch.
+Native reads, edits, shell commands, and directory exploration are denied; use
+the Simplicio MCP tools. Rerunning the installer repairs the integration
+idempotently. To repair the managed integration, rerun with
+`SIMPLICIO_INSTALL_CODEX=1`. The integration helper keeps user data separate
+and leaves `.simplicio.bak` copies of the original Codex files.
 
 ## Other clients: local STDIO
 
