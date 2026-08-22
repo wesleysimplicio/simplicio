@@ -2,15 +2,15 @@
   "schema": "simplicio.provenance/v1",
   "subject": {
     "name": "simplicio-linux-x64",
-    "sha256": "1f6b029796e0002a7718b5244e2f9e39797eba4fe168bbc090d8ca1b861dad99",
-    "size": 59599216
+    "sha256": "be0a7eef0737205cf9c0b2088d06033e9736eeefa5ca24a1e2b36b6006cf821d",
+    "size": 60017856
   },
   "build": {
-    "version": "3.8.17",
+    "version": "3.8.19",
     "target": "linux-x86_64",
-    "source_commit": "35f1dec5968d1d00fa49dbc298e1d9daf1dad2e0",
-    "builder": "local manual release build",
-    "workflow": "cargo release build with CARGO_BUILD_JOBS=1"
+    "source_commit": "65abb2fd1f5c1954adc9c90c28919b686e8b58b0",
+    "builder": "manual maintainer release (no GitHub Actions)",
+    "method": "local cargo/cargo-zigbuild build from the pinned Rust toolchain"
   },
-  "generated_at": "2026-08-20T10:40:10.591031Z"
+  "generated_at": "2026-08-22T08:36:36.440858Z"
 }

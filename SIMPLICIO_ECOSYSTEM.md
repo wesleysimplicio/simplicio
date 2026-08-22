@@ -8,7 +8,7 @@ Consumidores finais via release do Runtime e, opcionalmente, via `npx @wesleysim
 
 ## Versão atual
 
-3.8.17 (release pública assinada; quatro alvos)
+3.8.19 (release pública assinada; quatro alvos)
 
 ## Regra de distribuição
 
@@ -43,7 +43,7 @@ release, não uma advertência ignorável.
 
 ## Estado do manifest público
 
-O manifest atualmente publicado neste repositório é o `3.8.17`. Esta release
+O manifest atualmente publicado neste repositório é o `3.8.19`. Esta release
 publica os quatro alvos canônicos (macOS Apple Silicon, macOS Intel, Linux x64
 e Windows x64), cada um com SHA256 e sidecar Ed25519. O binário informa
 `source_code_distributed=true`, `identity.enabled/login_enabled=true` e
