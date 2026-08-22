@@ -1,122 +1,144 @@
 {
-  "schema": "simplicio.update-manifest/v1",
-  "version": "3.8.19",
-  "channel": "stable",
-  "release_tag": "v3.8.19",
-  "repository": "wesleysimplicio/simplicio",
-  "commit": "65abb2fd1f5c1954adc9c90c28919b686e8b58b0",
-  "generated_at": "2026-08-22T08:36:36.697756Z",
-  "source": {
-    "version": "Cargo.toml",
-    "tag": "v3.8.19",
-    "commit": "65abb2fd1f5c1954adc9c90c28919b686e8b58b0"
-  },
-  "security": {
-    "checksum_algorithm": "SHA256",
-    "signature_algorithm": "ed25519",
-    "signature_required": true,
-    "refuse_unsigned": true,
-    "sbom_required": true,
-    "provenance_required": true
-  },
   "artifacts": [
     {
-      "target": "macos-aarch64",
       "artifact": "simplicio-macos-arm64",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.19/simplicio-macos-arm64",
-      "size": 47876992,
       "checksum_file": "SHA256SUMS",
-      "sha256": "2613dd4fe5d0eb4dc5d56a0e613895ea42487de68eb66055f17044c88f9c6625",
-      "signature": "ed25519:sc2bS9Ywgod9klw28ha42V91Ym/emXNO31A0vnTNSCubMTgy1QYEH4VDhlLvLNC9txAjrx4r4dKbXZzcl7mCBg==",
-      "signature_file": "simplicio-macos-arm64.sig",
-      "signature_algorithm": "ed25519",
-      "sbom": {
-        "file": "simplicio-macos-arm64.spdx.json",
-        "format": "SPDX-2.3"
+      "platform_signing": {
+        "kind": "codesign-notarization",
+        "required": true,
+        "status": "verified"
       },
       "provenance": {
         "file": "simplicio-macos-arm64.provenance.json",
         "format": "simplicio.provenance/v1"
       },
-      "platform_signing": {
-        "kind": "codesign-notarization",
-        "status": "not_available",
-        "required": true
-      }
+      "sbom": {
+        "file": "simplicio-macos-arm64.spdx.json",
+        "format": "SPDX-2.3"
+      },
+      "sha256": "a7ccc2c7c59f10384474606405a62e38fba8b0b1b7d576ad5b63e6df1d3aee9f",
+      "signature": "ed25519:mG+DECQFGdtf0pGH8hK5ipphvoA4m/pdvLSTouKzrTLHg1ThAyFqjYBBLE3Z7ZWkXWHcv/qG6M9fo1Me+nSmDQ==",
+      "signature_algorithm": "ed25519",
+      "signature_file": "simplicio-macos-arm64.sig",
+      "size": 47860384,
+      "target": "macos-arm64",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.20/simplicio-macos-arm64"
     },
     {
-      "target": "macos-x86_64",
       "artifact": "simplicio-macos-x64",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.19/simplicio-macos-x64",
-      "size": 52575508,
       "checksum_file": "SHA256SUMS",
-      "sha256": "cdaa9764248b922f91fcb5e9a0c751cb1ac0874af7ba4ceccf28d45ed9a611c6",
-      "signature": "ed25519:F5Dacj3n7BQOqIZe4bDr7euxvwJgUXyQL+eYRaBaGbmxqP/A6pO9vqukrt46LrgAw3jjxtPBaGOcQLA+53VPCQ==",
-      "signature_file": "simplicio-macos-x64.sig",
-      "signature_algorithm": "ed25519",
-      "sbom": {
-        "file": "simplicio-macos-x64.spdx.json",
-        "format": "SPDX-2.3"
+      "platform_signing": {
+        "kind": "codesign-notarization",
+        "required": true,
+        "status": "verified"
       },
       "provenance": {
         "file": "simplicio-macos-x64.provenance.json",
         "format": "simplicio.provenance/v1"
       },
-      "platform_signing": {
-        "kind": "codesign-notarization",
-        "status": "not_available",
-        "required": true
-      }
+      "sbom": {
+        "file": "simplicio-macos-x64.spdx.json",
+        "format": "SPDX-2.3"
+      },
+      "sha256": "7173206772365eba28adf66275051dbef479f4e3d0c063341e35b2b831f6d172",
+      "signature": "ed25519:oaZgWxIXtKVkOC1pTjMSfOGA0qO7LlZKhDKioI77k0O2cL1z9ILuhPB4HZQVsqSxS3Id3ps6urKIpT+b262yBw==",
+      "signature_algorithm": "ed25519",
+      "signature_file": "simplicio-macos-x64.sig",
+      "size": 52424820,
+      "target": "macos-x64",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.20/simplicio-macos-x64"
     },
     {
-      "target": "linux-x86_64",
       "artifact": "simplicio-linux-x64",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.19/simplicio-linux-x64",
-      "size": 60017856,
       "checksum_file": "SHA256SUMS",
-      "sha256": "be0a7eef0737205cf9c0b2088d06033e9736eeefa5ca24a1e2b36b6006cf821d",
-      "signature": "ed25519:f9ZzbfrkgYGBAEztl+jXePxJPrJ6X72XiIm17hoOVCZ2hUrmHqgOO4qnEEVMrzzsnhUJ+2JfKeTovWpfW2a6Bw==",
-      "signature_file": "simplicio-linux-x64.sig",
-      "signature_algorithm": "ed25519",
-      "sbom": {
-        "file": "simplicio-linux-x64.spdx.json",
-        "format": "SPDX-2.3"
+      "platform_signing": {
+        "kind": "none",
+        "required": true,
+        "status": "verified"
       },
       "provenance": {
         "file": "simplicio-linux-x64.provenance.json",
         "format": "simplicio.provenance/v1"
       },
-      "platform_signing": {
-        "kind": "none",
-        "status": "not_applicable",
-        "required": false
-      }
+      "sbom": {
+        "file": "simplicio-linux-x64.spdx.json",
+        "format": "SPDX-2.3"
+      },
+      "sha256": "52f67fa60b11664aa4bcbdfa80cf0511b18148ff53a26c059e4abb1bb2150328",
+      "signature": "ed25519:j/MkBakF9g6ZSiZG58F8gIGybA+RggaGZMnU5TKt6QkWgNJXR3HjtxHh4TmA5YoVDSJhyothjDzdsCOpRE79Bw==",
+      "signature_algorithm": "ed25519",
+      "signature_file": "simplicio-linux-x64.sig",
+      "size": 60017808,
+      "target": "linux-x64",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.20/simplicio-linux-x64"
     },
     {
-      "target": "windows-x64",
       "artifact": "simplicio-windows-x64.exe",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.19/simplicio-windows-x64.exe",
-      "size": 54544384,
       "checksum_file": "SHA256SUMS",
-      "sha256": "8775ff06560131ddddcba2dd558bcb444d6401ac949059d7fc26077a9fb3429c",
-      "signature": "ed25519:QlX30tgWEFwtwxrS99mgQXufBpViPxeqHEzXK1xw948LO0DU9XcU2dBf9rYH086yS6sJNQvjZL52E8XQXle2BA==",
-      "signature_file": "simplicio-windows-x64.exe.sig",
-      "signature_algorithm": "ed25519",
-      "sbom": {
-        "file": "simplicio-windows-x64.exe.spdx.json",
-        "format": "SPDX-2.3"
+      "platform_signing": {
+        "kind": "authenticode",
+        "required": true,
+        "status": "verified"
       },
       "provenance": {
         "file": "simplicio-windows-x64.exe.provenance.json",
         "format": "simplicio.provenance/v1"
       },
-      "platform_signing": {
-        "kind": "authenticode",
-        "status": "not_available",
-        "required": true
-      }
+      "sbom": {
+        "file": "simplicio-windows-x64.exe.spdx.json",
+        "format": "SPDX-2.3"
+      },
+      "sha256": "f065550d215cc83dc1152e1a038535e439533dd8f636824dc75d302ed4d6a9ee",
+      "signature": "ed25519:4ckCEH3+fLySgNqqFoNfGjYc5JakMod0SjkLzkjbqQbXJoL1kPeg0Hwga86x+RxjOI36+B/upQZre5MVrfLBBA==",
+      "signature_algorithm": "ed25519",
+      "signature_file": "simplicio-windows-x64.exe.sig",
+      "size": 54544384,
+      "target": "windows-x64",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.20/simplicio-windows-x64.exe"
     }
   ],
+  "channel": "stable",
+  "commit": "e698eca507edc3b356344410ed7888503bbf9b7e",
+  "generated_at": "2026-08-22T13:33:56.910264Z",
+  "platform_signing": {
+    "linux-x64": {
+      "required": false,
+      "status": "not_applicable"
+    },
+    "macos-arm64": {
+      "required": true,
+      "status": "not_available"
+    },
+    "macos-x64": {
+      "required": true,
+      "status": "not_available"
+    },
+    "windows-x64": {
+      "required": true,
+      "status": "not_available"
+    }
+  },
+  "provenance": {
+    "builder": "manual maintainer release (no GitHub Actions)",
+    "method": "local cargo/cargo-zigbuild build from the pinned Rust toolchain"
+  },
+  "release_tag": "v3.8.20",
+  "repository": "wesleysimplicio/simplicio",
+  "schema": "simplicio.update-manifest/v1",
+  "security": {
+    "checksum_algorithm": "SHA256",
+    "provenance_required": true,
+    "refuse_unsigned": true,
+    "sbom_required": true,
+    "signature_algorithm": "ed25519",
+    "signature_required": true
+  },
+  "signing_note": "Ed25519 integrity verified; platform publisher signing is a separate desktop release gate.",
   "signing_pubkey": "2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok=",
-  "signing_note": "Ed25519 integrity is verified. Platform publisher signing is not included in this manual Runtime release; Windows SmartScreen and macOS notarization remain separate desktop gates."
+  "source": {
+    "commit": "e698eca507edc3b356344410ed7888503bbf9b7e",
+    "tag": "v3.8.20",
+    "version": "Cargo.toml"
+  },
+  "version": "3.8.20"
 }
