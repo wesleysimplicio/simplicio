@@ -13,6 +13,24 @@
   `/bin/bash` or `mcp-route.sh`, preventing stale Unix commands from failing
   after an update.
 
+## [3.8.20] - 2026-08-22
+
+### Fixed
+
+- Corrected the public distribution manifest target IDs to match
+  `distribution/targets.json` (`macos-arm64`, `macos-x64`, `linux-x64`, and
+  `windows-x64`).
+- Republished all four Runtime targets and Ed25519 sidecars from Runtime main
+  commit `e698eca5`, manually and without GitHub Actions.
+- Superseded the immutable v3.8.19 release after its post-release smoke exposed
+  the target-ID mismatch; the prior tag remains unchanged.
+
+### Security
+
+- SHA-256, Ed25519, SBOM, provenance, and immutable release URLs are included
+  for every target. macOS notarization and Windows Authenticode remain
+  separate platform-publisher gates.
+
 ## [3.8.19] - 2026-08-22
 
 ### Changed
