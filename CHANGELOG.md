@@ -13,6 +13,21 @@
   `/bin/bash` or `mcp-route.sh`, preventing stale Unix commands from failing
   after an update.
 
+## [3.8.19] - 2026-08-22
+
+### Changed
+
+- Published the four canonical Runtime targets and Ed25519 sidecars manually
+  from Runtime main commit `65abb2fd`, without GitHub Actions.
+- Published the Runtime deterministic-only default with explicit supertool
+  execution available to the user/LLM.
+
+### Security
+
+- SHA-256, Ed25519, SBOM, provenance, and immutable release URLs are included
+  for every target. macOS notarization and Windows Authenticode remain
+  separate platform-publisher gates.
+
 ## [3.8.11] - 2026-08-14
 
 ### Changed
