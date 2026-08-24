@@ -1,17 +1,22 @@
 {
-  "build": {
-    "builder": "GitHub Actions",
-    "source_commit": "e698eca507edc3b356344410ed7888503bbf9b7e",
-    "target": "macos-x86_64",
-    "version": "3.8.20"
-  },
-  "builder": "manual maintainer release (no GitHub Actions)",
-  "generated_at": "2026-08-22T13:33:47.458555Z",
-  "method": "local cargo/cargo-zigbuild build from the pinned Rust toolchain",
   "schema": "simplicio.provenance/v1",
   "subject": {
     "name": "simplicio-macos-x64",
-    "sha256": "7173206772365eba28adf66275051dbef479f4e3d0c063341e35b2b831f6d172",
-    "size": 52424820
-  }
+    "sha256": "9f0e61337fa6602d85dd78e6867a91f0f8c76277514882095ea8b5bdf3485a69",
+    "size": 48481044
+  },
+  "build": {
+    "version": "3.8.24",
+    "target": "macos-x64",
+    "source_commit": "5e87e6f8f3cd8142b1609b964bb6495dc9b9b89f",
+    "builder": "manual maintainer release (no GitHub Actions)",
+    "method": "local cargo/cargo-zigbuild build from the pinned Rust toolchain"
+  },
+  "optimization_profile": {
+    "status": "BLOCKED",
+    "blockers": [
+      "optimization_profile_receipt_not_supplied"
+    ]
+  },
+  "generated_at": "2026-08-24T21:33:04.915398Z"
 }
