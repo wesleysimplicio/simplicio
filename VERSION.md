@@ -14,7 +14,7 @@ This is the **public distribution repo** for [Simplicio](https://github.com/wesl
 
 - **Source:** `simplicio-runtime` main at commit
   `5e87e6f8f3cd8142b1609b964bb6495dc9b9b89f` (merged Runtime v3.8.24 release metadata).
-- **Targets:** macOS ARM64, macOS x64, Linux x64, and Windows x64. The
+- **Runtime targets:** macOS ARM64, macOS x64, Linux x64, and Windows x64.\n  The canonical target table and release manifest define the asset, checksum,\n  signature, SBOM, and provenance for each Runtime platform.\n- **Desktop assets:** macOS ARM64 DMG and ZIP are published alongside the\n  Runtime release and tracked by exact filename, SHA-256, size, and signing\n  status in `docs/RELEASE_RUNBOOK.md`. The
   canonical target table and release manifest define the asset, checksum,
   signature, SBOM, and provenance for each platform.
 - **Release status:** GitHub Release v3.8.24 metadata is published manually, without GitHub Actions. Installers
@@ -42,7 +42,7 @@ This is the **public distribution repo** for [Simplicio](https://github.com/wesl
 ├── install.sh / install.ps1  # Installers
 ├── distribution/targets.json # Canonical platform-to-asset mapping
 ├── simplicio-update-manifest.json # Checksums, signatures, provenance
-└── release binaries           # Published in GitHub Releases per target
+├── release binaries           # Runtime assets published in GitHub Releases\n└── Desktop DMG/ZIP             # Desktop assets published in GitHub Releases
 ~~~
 
 The current release targets are macOS ARM64, macOS x64 (Intel), Linux x64,

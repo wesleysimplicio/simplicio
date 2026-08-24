@@ -13,6 +13,23 @@
   `/bin/bash` or `mcp-route.sh`, preventing stale Unix commands from failing
   after an update.
 
+## [3.8.24] - 2026-08-24
+
+### Added
+
+- Published the four Runtime targets from `simplicio-runtime` v3.8.24
+  manually and without GitHub Actions.
+- Added the macOS ARM64 Desktop DMG and ZIP release records with exact
+  SHA-256 values and sizes.
+
+### Desktop artifacts
+
+- `Simplicio-3.8.24-arm64.dmg` — 135,726,628 bytes —
+  `c4d8b2164f1bf6239ecd993f8b7cb6de2ef36b7413f6566611f265e4f17d0d54`;
+- `Simplicio-3.8.24-arm64.zip` — 134,909,582 bytes —
+  `4148e1402a61ec4635279beea0c712ce0c5a1c7710374f89d6239c19dce056e9`;
+- Apple Developer ID signing and notarization were unavailable for this build.
+
 ## [3.8.20] - 2026-08-22
 
 ### Fixed

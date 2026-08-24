@@ -8,7 +8,7 @@ Consumidores finais via release do Runtime e, opcionalmente, via `npx @wesleysim
 
 ## Versão atual
 
-3.8.24 (release pública assinada; quatro alvos)
+3.8.24 (release pública; quatro alvos Runtime + Desktop macOS ARM64 DMG/ZIP)
 
 ## Regra de distribuição
 
@@ -43,9 +43,10 @@ release, não uma advertência ignorável.
 
 ## Estado do manifest público
 
-O manifest atualmente publicado neste repositório é o `3.8.20`. Esta release
-publica os quatro alvos canônicos (macOS Apple Silicon, macOS Intel, Linux x64
-e Windows x64), cada um com SHA256 e sidecar Ed25519. O binário informa
+O manifest atualmente publicado neste repositório é o `3.8.24`. Esta release
+publica os quatro alvos Runtime canônicos (macOS Apple Silicon, macOS Intel, Linux x64
+e Windows x64), cada um com SHA256 e sidecar Ed25519, além dos assets Desktop
+macOS ARM64 DMG e ZIP registrados em `docs/RELEASE_RUNBOOK.md`. O binário informa
 `source_code_distributed=true`, `identity.enabled/login_enabled=true` e
 `security.signature_required/public_key_configured=true`. O instalador continua
 fail-closed: exige bundle Python embutido, login Google ativo e manifest
@@ -56,4 +57,4 @@ Nenhuma — repo é ponto de entrada para usuários finais.
 
 ---
 
-_Last updated: 2026-08-20_
+_Last updated: 2026-08-24_

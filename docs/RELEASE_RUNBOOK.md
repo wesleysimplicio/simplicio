@@ -3,7 +3,7 @@
 This repository is the public distribution surface for Simplicio Runtime. It
 does not build source from sibling `simplicio-*` repositories during install.
 The release files committed here and attached to the GitHub Release must be
-the same four signed binaries.
+the four signed Runtime binaries plus the Desktop artifacts listed for the release.
 
 ## Required release files
 
@@ -15,12 +15,31 @@ For each release `vX.Y.Z`, publish:
 - `simplicio-windows-x64.exe` and `.sig`;
 - `SHA256SUMS`;
 - `simplicio-update-manifest.json`;
-- matching `version.txt` and `VERSION.md`.
+- matching `version.txt` and `VERSION.md`;
+- `Simplicio-X.Y.Z-arm64.dmg` and `.zip` when the Desktop build is published;
+- SHA-256 and signing/notarization status for each Desktop artifact.
 
 The manifest must use the immutable `vX.Y.Z` download URLs, require Ed25519,
 refuse unsigned artifacts, and match the checksums and sidecars byte-for-byte.
 Do not publish a new release from a checkout where `version.txt` and the
 manifest disagree.
+
+## Desktop release assets
+
+Desktop artifacts are published as assets of the public GitHub Release. They
+are not part of the signed Runtime update manifest because they are consumed
+by the Desktop distribution path. The release record must include their exact
+filename, SHA-256, size, and platform signing/notarization status.
+
+For `v3.8.24`:
+
+- `Simplicio-3.8.24-arm64.dmg` — 135,726,628 bytes —
+  `c4d8b2164f1bf6239ecd993f8b7cb6de2ef36b7413f6566611f265e4f17d0d54`;
+- `Simplicio-3.8.24-arm64.zip` — 134,909,582 bytes —
+  `4148e1402a61ec4635279beea0c712ce0c5a1c7710374f89d6239c19dce056e9`;
+- Apple Developer ID signing and notarization: unavailable for this build.
+
+Both files must be attached to the public `v3.8.24` GitHub Release.
 
 ## Signature payload contract
 
@@ -42,7 +61,8 @@ release can be staged; never bypass it with `SIMPLICIO_ALLOW_UNVERIFIED=1`.
 
 1. Build and sign the artifacts from the intended `simplicio-runtime` main
    commit.
-2. Copy only the required public files into a release branch.
+2. Commit the Runtime metadata and release record into a release branch;
+   keep oversized Desktop artifacts in staging for GitHub Release upload.
 3. Run `python3 scripts/verify_distribution_consistency.py`,
    `python3 -m unittest discover -s tests -p 'test_verify_ed25519.py'`, and
    the release provenance tests.
