@@ -8,7 +8,7 @@ Consumidores finais via release do Runtime e, opcionalmente, via `npx @wesleysim
 
 ## Versão atual
 
-3.8.20 (release pública assinada; quatro alvos)
+3.8.24 (release pública assinada; quatro alvos)
 
 ## Regra de distribuição
 
