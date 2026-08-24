@@ -655,6 +655,9 @@ try:
 except Exception:
     pass
 " 2>/dev/null)"
+      if [ -z "$SIGNING_PUBKEY" ]; then
+        SIGNING_PUBKEY="$ED25519_PUBLIC_KEY"
+      fi
       SIGNATURE_REQUIRED="$(python3 -c "
 import json
 try:
