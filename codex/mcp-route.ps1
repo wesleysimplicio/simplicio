@@ -1,6 +1,8 @@
 # Simplicio MCP route — mandatory PreToolUse policy for Windows hosts.
 # simplicio-hook-version: 3240-v1
 $ErrorActionPreference = 'Stop'
+$defaultBinDir = if ($env:SIMPLICIO_BIN_DIR) { $env:SIMPLICIO_BIN_DIR } else { Join-Path $env:USERPROFILE '.simplicio\bin' }
+$script:SimplicioBin = if ($env:SIMPLICIO_BIN) { $env:SIMPLICIO_BIN } else { Join-Path $defaultBinDir 'simplicio.exe' }
 $raw = [Console]::In.ReadToEnd()
 if ([string]::IsNullOrWhiteSpace($raw)) { exit 0 }
 try { $hook = $raw | ConvertFrom-Json } catch { [Console]::Error.WriteLine('Simplicio MCP hook received invalid input JSON.'); exit 2 }

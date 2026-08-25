@@ -3,6 +3,9 @@
 # simplicio-hook-version: 3240-v1
 set -uo pipefail
 
+SIMPLICIO_BIN="${SIMPLICIO_BIN:-${SIMPLICIO_BIN_DIR:-${HOME}/.simplicio/bin}/simplicio}"
+export SIMPLICIO_BIN
+
 INPUT="$(cat 2>/dev/null || true)"
 [ -n "$INPUT" ] || exit 0
 if ! command -v python3 >/dev/null 2>&1; then
@@ -14,6 +17,7 @@ python3 - <<'PY'
 import json, os, pathlib, re, subprocess, sys
 
 raw = os.environ.get("SIMPLICIO_MCP_ROUTE_INPUT", "")
+runtime_bin = os.environ.get("SIMPLICIO_BIN") or str(pathlib.Path.home() / ".simplicio" / "bin" / "simplicio")
 try:
     hook = json.loads(raw)
 except Exception:
@@ -28,16 +32,10 @@ context = ("Simplicio MCP is mandatory. Use simplicio_map first, then simplicio_
            "and simplicio_memory for recall; use simplicio_file_read or simplicio_read, simplicio_search, "
            "simplicio_edit, simplicio_run/simplicio_exec, and simplicio_validate. There is no host-tool escape hatch.")
 
-def which(name):
-    for directory in os.environ.get("PATH", "").split(os.pathsep):
-        candidate = pathlib.Path(directory) / name
-        if candidate.is_file() and os.access(candidate, os.X_OK): return str(candidate)
-    return None
-
 def warm(root):
     root = pathlib.Path(root).expanduser()
-    binary = which("simplicio")
-    if not root.is_dir() or not binary: return
+    binary = pathlib.Path(runtime_bin)
+    if not root.is_dir() or not binary.is_file() or not os.access(binary, os.X_OK): return
     state = root / ".simplicio" / "hook-context"
     try:
         state.mkdir(parents=True, exist_ok=True)
@@ -66,7 +64,7 @@ def warm(root):
             "  try: marker.unlink()\n"
             "  except OSError: pass\n"
         )
-        subprocess.Popen([sys.executable,"-c",worker,str(root),binary], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        subprocess.Popen([sys.executable,"-c",worker,str(root),str(binary)], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
     except (OSError, ValueError): pass
 
 def packet(root):

@@ -34,6 +34,7 @@ GITHUB="https://github.com/$REPO"
 ED25519_PUBLIC_KEY="2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok="
 ED25519_HELPER_URL="https://raw.githubusercontent.com/$REPO/master/scripts/verify_ed25519.py"
 ED25519_HELPER_SHA256="f03a0719dd557ddea27dc4cf1456d6f06a47b9056505e4d4b8453090697600d0"
+CODEX_ROUTE_HOOK_URL="https://raw.githubusercontent.com/$REPO/master/codex/mcp-route.sh"
 BIN_NAME="simplicio"
 
 GREEN='\033[0;32m'
@@ -109,6 +110,23 @@ verify_ed25519_signature() {
     --public-key "$public_key" \
     --signature "$signature" \
     --sha256 "$expected_sha256" >/dev/null 2>&1
+}
+
+install_codex_route_hook() {
+  hook_dir="$HOME/.simplicio/hooks"
+  hook_path="$hook_dir/mcp-route.sh"
+  hook_tmp="$(mktemp)"
+  mkdir -p "$hook_dir"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$CODEX_ROUTE_HOOK_URL" -o "$hook_tmp" || { rm -f "$hook_tmp"; return 1; }
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q "$CODEX_ROUTE_HOOK_URL" -O "$hook_tmp" || { rm -f "$hook_tmp"; return 1; }
+  else
+    rm -f "$hook_tmp"
+    return 1
+  fi
+  chmod +x "$hook_tmp"
+  mv -f "$hook_tmp" "$hook_path"
 }
 
 verify_runtime_contract() {
@@ -470,6 +488,12 @@ if SIMPLICIO_MCP_URL="$SIMPLICIO_MCP_URL" "$DEST_PATH" mcp register >/dev/null 2
 else
   warn "não foi possível registrar o MCP automaticamente; rode: $DEST_PATH mcp register"
 fi
+if install_codex_route_hook; then
+  ok "hook MCP local atualizado para usar $DEST_PATH diretamente"
+else
+  warn "não foi possível atualizar o hook MCP local; o registro MCP do Runtime permanece instalado"
+fi
+ok "MCP direto: $DEST_PATH serve --mcp --stdio; SIMPLICIO_MCP_URL=${SIMPLICIO_MCP_URL}"
 
 # PATH is optional for MCP because host configs point at $DEST_PATH directly.
 case ":$PATH:" in

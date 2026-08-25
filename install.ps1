@@ -38,6 +38,7 @@ $Asset = "simplicio-windows-x64.exe"
 $Ed25519PublicKey = "2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok="
 $Ed25519HelperUrl = "https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/scripts/verify_ed25519.py"
 $Ed25519HelperSha256 = "f03a0719dd557ddea27dc4cf1456d6f06a47b9056505e4d4b8453090697600d0"
+$CodexRouteHookUrl = "https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/codex/mcp-route.ps1"
 $PinnedPublicKey = ([string]$Ed25519PublicKey).Trim()
 $SimplicioMcpUrl = if ($env:SIMPLICIO_MCP_URL) { $env:SIMPLICIO_MCP_URL } else { "http://127.0.0.1:8787/mcp" }
 
@@ -143,6 +144,13 @@ function Report-LoginState {
     return
   }
   Write-Warning "Google login missing or entitlement inactive; run: `"$DestPath`" auth login"
+}
+
+function Install-CodexRouteHook {
+  $hookDir = Join-Path $env:USERPROFILE ".simplicio\hooks"
+  $hookPath = Join-Path $hookDir "mcp-route.ps1"
+  New-Item -ItemType Directory -Force -Path $hookDir | Out-Null
+  Invoke-WebRequest -Uri $CodexRouteHookUrl -OutFile $hookPath -UseBasicParsing -ErrorAction Stop
 }
 
 # ─── -Doctor: idempotent, read-only health check ───────────────────────────
@@ -386,6 +394,13 @@ try {
 } catch {
   Write-Warning "could not register MCP automatically; run: `"$DestPath`" mcp register"
 }
+try {
+  Install-CodexRouteHook
+  Write-Host "  ✓ local MCP hook updated to use $DestPath directly"
+} catch {
+  Write-Warning "could not update the local MCP hook; Runtime MCP registration remains installed"
+}
+Write-Host "  ✓ Direct MCP: $DestPath serve --mcp --stdio; SIMPLICIO_MCP_URL=$SimplicioMcpUrl"
 
 $BundleDir = if ($env:SIMPLICIO_BUNDLE_DIR) { $env:SIMPLICIO_BUNDLE_DIR } else { Join-Path $env:USERPROFILE ".simplicio" }
 New-Item -ItemType Directory -Force -Path $BundleDir | Out-Null

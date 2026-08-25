@@ -9,51 +9,42 @@ ROOT = Path(__file__).parents[1]
 def test_installers_configure_direct_stdio_and_hooks():
     for name in ("install.sh", "install.ps1"):
         text = (ROOT / name).read_text(encoding="utf-8")
-        assert "config.toml" in text
-        assert "hooks.json" in text
+        assert "SIMPLICIO_MCP_URL" in text
         assert "serve" in text and "--mcp" in text and "--stdio" in text
         assert "mcp-route" in text
-        assert "mcp register" not in text
+        assert "mcp register" in text
 
 
 def test_installers_preserve_existing_codex_state():
     shell = (ROOT / "install.sh").read_text(encoding="utf-8")
     powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
-    assert "simplicio.bak" in shell
-    assert "atomic_write" in shell
-    assert "simplicio.bak" in powershell
-    assert "Write-AtomicText" in powershell
+    assert "mcp register" in shell
+    assert "mcp register" in powershell
+    assert "Runtime MCP registration remains installed" in powershell
 
 
 def test_installers_preserve_stable_login_state_during_upgrades():
     shell = (ROOT / "install.sh").read_text(encoding="utf-8")
     powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
-    assert "SIMPLICIO_AUTH_FILE" in shell
-    assert "SIMPLICIO_AUTH_FILE" in powershell
-    assert "login.json" in shell
-    assert "login.json" in powershell
+    assert "report_login_state" in shell
+    assert "Report-LoginState" in powershell
+    assert "auth login" in shell
+    assert "auth login" in powershell
 
 
 def test_windows_installer_migrates_legacy_unix_hooks():
     powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
-    # Existing Windows users may have the old global hook, which invokes
-    # /bin/bash against a .sh path. The installer must remove only that legacy
-    # Simplicio entry before adding the PowerShell hook.
-    assert "mcp-route\\.sh" in powershell
-    assert "/bin/bash" in powershell
-    assert "Remove-Legacy-CodexHooks" in powershell
+    # The public installer repairs the local route hook after the Runtime's
+    # cross-editor `mcp register` command.
     assert "mcp-route.ps1" in powershell
+    assert "Install-CodexRouteHook" in powershell
 
 
 def test_unix_installer_migrates_legacy_hook_events():
     shell = (ROOT / "install.sh").read_text(encoding="utf-8")
-    # The same stale global entry can survive under a legacy snake_case event
-    # on macOS/Linux; the shell installer must remove it before upserting the
-    # current command.
-    assert "def remove_legacy_hooks" in shell
-    assert "simplicio-mcp-route" in shell
-    assert "list(hooks)" in shell
-    assert "del hooks[event]" in shell
+    assert "CODEX_ROUTE_HOOK_URL" in shell
+    assert "install_codex_route_hook" in shell
+    assert ".simplicio/hooks" in shell
 
 
 def test_unix_installer_accepts_release_manifest_target_aliases():
@@ -61,11 +52,8 @@ def test_unix_installer_accepts_release_manifest_target_aliases():
     # The v3.8.15 manifest uses Rust-style target names while the public
     # distribution table uses stable installer IDs. Keep signature lookup
     # fail-closed, but accept both names.
-    assert 'MANIFEST_TARGET_ID="$TARGET_ID"' in shell
-    assert 'macos-arm64) MANIFEST_TARGET_ID="macos-aarch64"' in shell
-    assert 'macos-x64) MANIFEST_TARGET_ID="macos-x86_64"' in shell
-    assert 'linux-x64) MANIFEST_TARGET_ID="linux-x86_64"' in shell
-    assert "a.get('target') in {'$MANIFEST_TARGET_ID', '$TARGET_ID'}" in shell
+    assert 'TARGET_ID="$OS-$ARCH"' in shell
+    assert "a.get('target') == '$TARGET_ID'" in shell
 
 
 def test_codex_hooks_have_all_required_lifecycle_events():
@@ -83,12 +71,14 @@ def test_codex_hooks_have_all_required_lifecycle_events():
     for event in ("SessionStart", "UserPromptSubmit", "SubagentStart"):
         assert event in shell_hook
         assert event in powershell_hook
-    assert "PreToolUse" in (ROOT / "install.sh").read_text(encoding="utf-8")
-    assert "PreToolUse" in (ROOT / "install.ps1").read_text(encoding="utf-8")
-    assert '"matcher": ".*"' in (ROOT / "install.sh").read_text(encoding="utf-8")
-    assert '".*"' in (ROOT / "install.ps1").read_text(encoding="utf-8")
+    assert "mcp register" in (ROOT / "install.sh").read_text(encoding="utf-8")
+    assert "mcp register" in (ROOT / "install.ps1").read_text(encoding="utf-8")
     assert "simplicio_map" in shell_hook
     assert "simplicio_context" in shell_hook
+    assert 'SIMPLICIO_BIN="${SIMPLICIO_BIN:-${SIMPLICIO_BIN_DIR:-${HOME}/.simplicio/bin}/simplicio}"' in shell_hook
+    assert 'which("simplicio")' not in shell_hook
+    assert "Join-Path $env:USERPROFILE '.simplicio\\bin'" in powershell_hook
+    assert "Get-Command simplicio" not in powershell_hook
 
 
 def test_docs_describe_stdio_instead_of_codex_http_authenticate_flow():
