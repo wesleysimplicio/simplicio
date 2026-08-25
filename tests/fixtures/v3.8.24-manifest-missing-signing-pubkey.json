@@ -1,0 +1,19 @@
+{
+  "evidence": {
+    "release_url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.24/simplicio-update-manifest.json",
+    "observed_command": "powershell -c \"irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex\"",
+    "observed_error": "Refusing to install: manifest Ed25519 public key does not match the pinned installer key.",
+    "expected_powershell_error": "Refusing to install: manifest requires Ed25519 signatures but signing_pubkey is missing.",
+    "expected_shell_error": "manifest signing_pubkey is missing"
+  },
+  "manifest": {
+    "schema": "simplicio.update-manifest/v1",
+    "version": "3.8.24",
+    "channel": "stable",
+    "release_tag": "v3.8.24",
+    "repository": "wesleysimplicio/simplicio",
+    "security": {
+      "signature_required": true
+    }
+  }
+}
