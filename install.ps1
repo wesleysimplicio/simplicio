@@ -40,6 +40,7 @@ $Ed25519HelperUrl = "https://raw.githubusercontent.com/wesleysimplicio/simplicio
 $Ed25519HelperSha256 = "f03a0719dd557ddea27dc4cf1456d6f06a47b9056505e4d4b8453090697600d0"
 $CodexRouteHookUrl = "https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/codex/mcp-route.ps1"
 $PinnedPublicKey = ([string]$Ed25519PublicKey).Trim()
+$script:Ed25519VerifyError = ""
 $SimplicioMcpUrl = if ($env:SIMPLICIO_MCP_URL) { $env:SIMPLICIO_MCP_URL } else { "http://127.0.0.1:8787/mcp" }
 
 if ($env:SIMPLICIO_BIN_DIR) {
@@ -82,15 +83,36 @@ function Test-Ed25519Signature([string]$BinaryPath, [string]$Signature, [string]
         break
       }
     }
-    if (-not $python) { return $false }
-    Invoke-WebRequest -Uri $Ed25519HelperUrl -OutFile $helperPath -UseBasicParsing -ErrorAction Stop
+    if (-not $python) {
+      $script:Ed25519VerifyError = "Python 3 is required for Ed25519 verification; install Python 3 or ensure py, python3, or python points to Python 3."
+      return $false
+    }
+    try {
+      Invoke-WebRequest -Uri $Ed25519HelperUrl -OutFile $helperPath -UseBasicParsing -ErrorAction Stop
+    } catch {
+      $script:Ed25519VerifyError = "could not download Ed25519 verification helper: $($_.Exception.Message)"
+      return $false
+    }
     $helperHash = (Get-FileHash -Path $helperPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($helperHash -ne $Ed25519HelperSha256.ToLowerInvariant()) { return $false }
+    if ($helperHash -ne $Ed25519HelperSha256.ToLowerInvariant()) {
+      $script:Ed25519VerifyError = "Ed25519 verification helper SHA256 mismatch: expected $Ed25519HelperSha256, got $helperHash"
+      return $false
+    }
     $normalizedSignature = ([string]$Signature).Trim()
     $normalizedPublicKey = ([string]$PublicKey).Trim()
     $normalizedDigest = ([string]$Digest).Trim().ToLowerInvariant()
-    & $python @pythonArgs $helperPath --public-key $normalizedPublicKey --signature $normalizedSignature --sha256 $normalizedDigest 2>$null
-    return ($LASTEXITCODE -eq 0)
+    $verifyOutput = & $python @pythonArgs $helperPath --public-key $normalizedPublicKey --signature $normalizedSignature --sha256 $normalizedDigest 2>&1 | Out-String
+    if ($LASTEXITCODE -ne 0) {
+      $detail = $verifyOutput.Trim()
+      if ([string]::IsNullOrWhiteSpace($detail)) {
+        $detail = "verification helper exited with code $LASTEXITCODE"
+      } else {
+        $detail = "verification helper exited with code $LASTEXITCODE: $detail"
+      }
+      $script:Ed25519VerifyError = $detail
+      return $false
+    }
+    return $true
   } catch {
     return $false
   } finally {
@@ -339,7 +361,11 @@ if ($ExpectedSha256) {
 if ($ExpectedSigned) {
   if (-not (Test-Ed25519Signature $StagingPath $ExpectedSignature $PinnedPublicKey $ExpectedSha256)) {
     Remove-Item -Force $StagingPath -ErrorAction SilentlyContinue
-    Write-Error "Ed25519 signature verification failed; refusing to install."
+    if ([string]::IsNullOrWhiteSpace($script:Ed25519VerifyError)) {
+      Write-Error "Ed25519 signature verification failed; refusing to install."
+    } else {
+      Write-Error "Ed25519 signature verification failed: $script:Ed25519VerifyError; refusing to install."
+    }
     exit 1
   }
   Write-Host "  ✓ Ed25519 signature verified over SHA256 digest"
