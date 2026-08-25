@@ -1,16 +1,16 @@
 {
   "schema": "simplicio.update-manifest/v1",
-  "version": "3.8.24",
+  "version": "3.8.25",
   "channel": "stable",
-  "release_tag": "v3.8.24",
+  "release_tag": "v3.8.25",
   "repository": "wesleysimplicio/simplicio",
-  "commit": "5e87e6f8f3cd8142b1609b964bb6495dc9b9b89f",
+  "commit": "268db4f0a5e838fd7c59a2c61f263e06b3e7ab67",
   "signing_pubkey": "2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok=",
-  "generated_at": "2026-08-24T21:33:17.513843Z",
+  "generated_at": "2026-08-25T04:27:45.529092Z",
   "source": {
     "version": "Cargo.toml",
-    "tag": "v3.8.24",
-    "commit": "5e87e6f8f3cd8142b1609b964bb6495dc9b9b89f"
+    "tag": "v3.8.25",
+    "commit": "268db4f0a5e838fd7c59a2c61f263e06b3e7ab67"
   },
   "security": {
     "checksum_algorithm": "SHA256",
@@ -18,18 +18,17 @@
     "signature_required": true,
     "refuse_unsigned": true,
     "sbom_required": true,
-    "provenance_required": true,
-    "platform_signing_note": "Apple code signing/notarization and Windows Authenticode were not available on the manual macOS host; Ed25519 integrity signatures are verified."
+    "provenance_required": true
   },
   "artifacts": [
     {
       "target": "macos-arm64",
       "artifact": "simplicio-macos-arm64",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.24/simplicio-macos-arm64",
-      "size": 43195200,
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.25/simplicio-macos-arm64",
+      "size": 42962176,
       "checksum_file": "SHA256SUMS",
-      "sha256": "e4d79e462c2dca20569d0e7943d6e1e53f1422c089b3551b9c3ea9750d5ec1a0",
-      "signature": "ed25519:6y2OoHgANdgj7EVjqH67d0hmnK+5km6EDj3Wd+pdydqHm21tm6cboTtPjlNhVhxa+RtIsFydpvUcnW1YDrBABw==",
+      "sha256": "998c4c889a4a906a331fea5724990ba95526ce9849942cbb64a74178e706ade3",
+      "signature": "ed25519:pX5Hm/2HMAIv777ipoxM0kO8qRl877CJyX1+hnaiyKWCskxuJ1s7wrHB1GvEiaPzmuSjoYnNHYo9dCX2HOWsAw==",
       "signature_file": "simplicio-macos-arm64.sig",
       "signature_algorithm": "ed25519",
       "sbom": {
@@ -41,19 +40,20 @@
         "format": "simplicio.provenance/v1"
       },
       "platform_signing": {
-        "kind": "codesign-notarization",
-        "status": "not_available",
-        "required": false
+        "kind": "ad-hoc-codesign",
+        "status": "verified-ad-hoc",
+        "required": false,
+        "note": "local manual release fallback; no Developer ID/notarization identity available"
       }
     },
     {
       "target": "macos-x64",
       "artifact": "simplicio-macos-x64",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.24/simplicio-macos-x64",
-      "size": 48481044,
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.25/simplicio-macos-x64",
+      "size": 48448272,
       "checksum_file": "SHA256SUMS",
-      "sha256": "9f0e61337fa6602d85dd78e6867a91f0f8c76277514882095ea8b5bdf3485a69",
-      "signature": "ed25519:rPmZagsLeGzUvZpAXn7/uujKZuphJy9nW2LCvbkfTg0QoS9ljyjtJ63W5xd0K4U8sMQ6O3q2DUDJ7FTkQbzvCQ==",
+      "sha256": "c2684f5603d2edb717f74fab9f672dcc27bd2bfbf938271514a1afb47ee52c1f",
+      "signature": "ed25519:zdBhq+LJ2oHqwHaBw0OkZ5geewj/cryHZ44OBh0ACjxHg0aiV9VmxSZ6m3ZV11ruX4GDHPMdh2UENasMoKLtDg==",
       "signature_file": "simplicio-macos-x64.sig",
       "signature_algorithm": "ed25519",
       "sbom": {
@@ -65,19 +65,20 @@
         "format": "simplicio.provenance/v1"
       },
       "platform_signing": {
-        "kind": "codesign-notarization",
-        "status": "not_available",
-        "required": false
+        "kind": "ad-hoc-codesign",
+        "status": "verified-ad-hoc",
+        "required": false,
+        "note": "local manual release fallback; no Developer ID/notarization identity available"
       }
     },
     {
       "target": "linux-x64",
       "artifact": "simplicio-linux-x64",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.24/simplicio-linux-x64",
-      "size": 56168800,
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.25/simplicio-linux-x64",
+      "size": 55552512,
       "checksum_file": "SHA256SUMS",
-      "sha256": "80fbcd60fd16e09782854b42fd91f3ab2fc4eaf54d0b3de8ca607239a2a6497d",
-      "signature": "ed25519:dpwe0p6lwdugAEEeM5V7jEJGmdlEctVTS1JnJqw9HUCG3x165StFmB9z/4tMFKCvW4ew2/CMkgR2QFC532xhCA==",
+      "sha256": "62edf52c18313df8d50e45d4a99a938b57e01c187359186bc644463aa299d265",
+      "signature": "ed25519:bKI2TEJh31gKLW7mzDMEjLBWaR9ztRm1sFcVHyX1IO6a3Uk5vjt5Gi/chj+mlROcABsPMEYJCNvJYIzhc+CUBQ==",
       "signature_file": "simplicio-linux-x64.sig",
       "signature_algorithm": "ed25519",
       "sbom": {
@@ -90,18 +91,18 @@
       },
       "platform_signing": {
         "kind": "none",
-        "status": "not_available",
+        "status": "not-applicable",
         "required": false
       }
     },
     {
       "target": "windows-x64",
       "artifact": "simplicio-windows-x64.exe",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.24/simplicio-windows-x64.exe",
-      "size": 50629632,
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.25/simplicio-windows-x64.exe",
+      "size": 64417280,
       "checksum_file": "SHA256SUMS",
-      "sha256": "12681adb6fa49bc2a5d39f8feca42baabe5d97b61cfdf40a5d452d890a8be83a",
-      "signature": "ed25519:/Tt+wpY4VedOmsOJRPAaAz470OfD4QprLGnTed7QGkkWgyqLoeg2U/dr6PD3EWl4rvHLiok2UWALeDBvG9KmCQ==",
+      "sha256": "0b9e5777f3d5c0c29345a83b237ab17fcf1115f18f25746929370a2765f7a470",
+      "signature": "ed25519:6/r0EsOUT3SSmtNTipTyF/7RUhIfejKLXCeoqb7DF6kBcnUTLABATYrGuZaiNnRwWRANu0FCtlNF0zSkfKxSCw==",
       "signature_file": "simplicio-windows-x64.exe.sig",
       "signature_algorithm": "ed25519",
       "sbom": {
@@ -114,8 +115,9 @@
       },
       "platform_signing": {
         "kind": "authenticode",
-        "status": "not_available",
-        "required": false
+        "status": "unavailable",
+        "required": false,
+        "note": "local manual release fallback; no Authenticode signer available"
       }
     }
   ]

@@ -7,7 +7,7 @@ Simplicio exposes a local [Model Context Protocol](https://modelcontextprotocol.
 Product commands and MCP require an active Simplicio session, including during the public beta:
 
 ```bash
-simplicio login google
+simplicio auth login
 simplicio auth status --json
 ```
 
@@ -26,14 +26,19 @@ When enabled, Codex launches the installed binary directly:
 
 ~~~toml
 [mcp_servers.simplicio]
-command = "/path/to/simplicio"
+command = "~/.simplicio/bin/simplicio"
 args = ["serve", "--mcp", "--stdio"]
+
+[mcp_servers.simplicio.env]
+SIMPLICIO_MCP_URL = "http://127.0.0.1:8787/mcp"
 ~~~
 
-STDIO is local and avoids a local HTTP daemon, but the Runtime still validates
-Google login and entitlement on every MCP session. Existing user hooks remain
-preserved; review enabled Simplicio hooks in Settings → Hooks and run codex mcp
-list. Never paste tokens into either config file.
+STDIO is the primary local transport and launches the managed binary directly.
+`SIMPLICIO_MCP_URL` keeps the loopback HTTP endpoint discoverable for HTTP-only
+or manual clients, but Codex should not use the URL as its primary registration.
+The Runtime still validates Google login and entitlement on every MCP session.
+Existing user hooks remain preserved; review enabled Simplicio hooks in Settings
+→ Hooks and run codex mcp list. Never paste tokens into either config file.
 
 To verify the registration:
 
@@ -96,7 +101,7 @@ Always discover the live schemas at startup instead of hard-coding arguments:
 
 ```bash
 printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
-  | simplicio serve --mcp --stdio
+  | ~/.simplicio/bin/simplicio serve --mcp --stdio
 ```
 
 A successful response contains the tool definitions. A `login required` error means the account session is not active; authenticate instead of bypassing the gate.

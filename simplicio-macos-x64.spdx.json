@@ -2,10 +2,10 @@
   "spdxVersion": "SPDX-2.3",
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
-  "name": "simplicio-3.8.24-macos-x64",
-  "documentNamespace": "https://simplicio.dev/sbom/9f0e61337fa6602d85dd78e6867a91f0f8c76277514882095ea8b5bdf3485a69",
+  "name": "simplicio-3.8.25-macos-x64",
+  "documentNamespace": "https://simplicio.dev/sbom/c2684f5603d2edb717f74fab9f672dcc27bd2bfbf938271514a1afb47ee52c1f",
   "creationInfo": {
-    "created": "2026-08-24T21:33:04.915398Z",
+    "created": "2026-08-25T04:27:45.209836Z",
     "creators": [
       "Tool: simplicio-runtime release evidence"
     ]
@@ -14,7 +14,7 @@
     {
       "SPDXID": "SPDXRef-Package-simplicio-runtime",
       "name": "simplicio-macos-x64",
-      "versionInfo": "3.8.24",
+      "versionInfo": "3.8.25",
       "downloadLocation": "NOASSERTION",
       "filesAnalyzed": true
     }
@@ -26,7 +26,7 @@
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "9f0e61337fa6602d85dd78e6867a91f0f8c76277514882095ea8b5bdf3485a69"
+          "checksumValue": "c2684f5603d2edb717f74fab9f672dcc27bd2bfbf938271514a1afb47ee52c1f"
         }
       ]
     }

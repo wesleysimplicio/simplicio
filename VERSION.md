@@ -8,9 +8,9 @@ This is the **public distribution repo** for [Simplicio](https://github.com/wesl
 
 **Not the source code.** The Rust runtime source lives in the private [`simplicio-runtime`](https://github.com/wesleysimplicio/simplicio-runtime) repo.
 
-## Runtime snapshot: v3.8.24
+## Runtime snapshot: v3.8.25
 
-## Current Version: v3.8.24
+## Current Version: v3.8.25
 
 - **Source:** `simplicio-runtime` main at commit
   `5e87e6f8f3cd8142b1609b964bb6495dc9b9b89f` (merged Runtime v3.8.24 release metadata).

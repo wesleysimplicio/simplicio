@@ -58,9 +58,10 @@ optional, not required.**
 
 The official installers download one canonical asset from the latest
 Runtime release, verify its SHA256 checksum and Ed25519 signature, validate the
-Runtime release contract, and require an active Simplicio account. They do not
-clone sibling repositories, install the embedded Python projects with pip, or
-modify Codex configuration unless SIMPLICIO_INSTALL_CODEX=1 is explicitly set.
+Runtime release contract, and register MCP hosts to launch the installed binary
+directly. They do not clone sibling repositories or install the embedded Python
+projects with pip. Login can be completed after installation; MCP tool calls
+remain fail-closed until the account is active.
 
 ### macOS / Linux
 
@@ -74,8 +75,8 @@ curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/in
 powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex"
 ```
 
-The default install location is `~/.local/bin/simplicio` on macOS/Linux and
-`%USERPROFILE%\.local\bin\simplicio.exe` on Windows. Add that directory to
+The default install location is `~/.simplicio/bin/simplicio` on macOS/Linux and
+`%USERPROFILE%\.simplicio\bin\simplicio.exe` on Windows. Add that directory to
 your `PATH` if the installer prints a PATH warning, then open a new terminal.
 
 The installer intentionally does not pin a release. Every normal installation
@@ -83,7 +84,7 @@ and update resolves GitHub's `latest` release, verifies it, and keeps the
 existing user data. To use another install directory:
 
 ```bash
-SIMPLICIO_BIN_DIR="$HOME/.local/bin" \
+SIMPLICIO_BIN_DIR="$HOME/.simplicio/bin" \
   sh -c "$(curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh)"
 ```
 
@@ -162,7 +163,7 @@ On a compatible release, the installer starts the login flow when no active
 session exists. To start it manually:
 
 ```bash
-simplicio login google
+simplicio auth login
 ```
 
 The CLI prints a verification URL and a short device code, then waits. Open
@@ -174,7 +175,7 @@ terminal log, or public repository.
 For scripts that need machine-readable polling output:
 
 ```bash
-simplicio login google --json
+simplicio auth login --json
 ```
 
 The website flow is also available at
@@ -241,12 +242,16 @@ directly:
 
 ~~~toml
 [mcp_servers.simplicio]
-command = "/path/to/simplicio"
+command = "~/.simplicio/bin/simplicio"
 args = ["serve", "--mcp", "--stdio"]
+
+[mcp_servers.simplicio.env]
+SIMPLICIO_MCP_URL = "http://127.0.0.1:8787/mcp"
 ~~~
 
-This keeps MCP execution local and avoids the latency of the local HTTP daemon.
-The Runtime still enforces Google login and entitlement for every MCP session.
+This keeps MCP execution local while still exposing the loopback HTTP endpoint as
+`SIMPLICIO_MCP_URL` for HTTP-only/manual clients. The Runtime still enforces
+Google login and entitlement for every MCP session.
 The installer also merges Simplicio `SessionStart`, `UserPromptSubmit`,
 `SubagentStart`, and `PreToolUse` hooks into `~/.codex/hooks.json`; existing
 Codex hooks are preserved and the Simplicio entries are updated idempotently.
@@ -295,15 +300,15 @@ Typical configuration locations are:
 | Cline | `~/.config/cline/mcp_settings.json` |
 | Continue | `~/.continue/config.json` |
 
-Reload the client after saving its configuration. STDIO is local and does not
-need a manually copied bearer token, but the Runtime still requires an active
-Simplicio login.
+Reload the client after saving its configuration. STDIO is local, points at the
+installed `~/.simplicio/bin/simplicio` binary, and does not need a manually
+copied bearer token. The Runtime still requires an active Simplicio login.
 
 Smoke-test the local server:
 
 ```bash
 printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \\
-  | simplicio serve --mcp --stdio
+  | ~/.simplicio/bin/simplicio serve --mcp --stdio
 ```
 
 The response should contain the ten tool definitions. If the command says
@@ -545,7 +550,7 @@ Common failures:
 
 | Symptom | Resolution |
 |---|---|
-| `login required` | Run `simplicio login google`; confirm `active: true`. |
+| `login required` | Run `simplicio auth login`; confirm `active: true`. |
 | Codex does not show Simplicio tools | Restart Codex, inspect **Settings → Hooks**, and verify `codex mcp list` points to `serve --mcp --stdio`. |
 | `tools/list` is empty or stale | Restart/reload the MCP host and verify its command resolves to the intended `simplicio` binary. |
 | Runtime release contract fails | Wait for a release with embedded sources, enabled Google login, and a configured public update key; do not bypass the gate. |

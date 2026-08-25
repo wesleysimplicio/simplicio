@@ -37,9 +37,10 @@ the single source of truth used by the release workflow, both installers and
 
 Verify the SHA256 checksum against the `sha256` field for your target in
 `simplicio-update-manifest.json` (published alongside each release) before
-running the binary. Then place it somewhere on your `PATH` (e.g.
-`/usr/local/bin` or `~/.local/bin`), naming it `simplicio` (or `simplicio.exe`
-on Windows).
+running the binary. The installer places it under `~/.simplicio/bin/simplicio`
+on macOS/Linux or `%USERPROFILE%\.simplicio\bin\simplicio.exe` on Windows.
+Manual installs can use another PATH directory, naming the file `simplicio` (or
+`simplicio.exe` on Windows).
 
 The installer does not pin a version. It resolves the current `latest` release,
 selects the canonical asset for the host, verifies its SHA256 and signature, and
@@ -185,14 +186,15 @@ A política do produto exige que o binário carregue as árvores de fontes Pytho
 reais de Mapper, Dev CLI, Loop, Fast, Prompt e Sprint. Esses projetos não devem
 ser reescritos como Rust, instalados via `pip` ou baixados como `simplicio-*`.
 O instalador valida o release `latest` antes de concluir. Se o contrato indicar
-`source_code_distributed=false`, login inativo ou chave pública ausente, ele
-recusa o binário em vez de instalar um snapshot incompleto.
+`source_code_distributed=false` ou chave pública ausente, ele recusa o binário
+em vez de instalar um snapshot incompleto. Uma sessão Google ativa pode ser
+concluída depois da instalação; as chamadas MCP continuam bloqueadas até lá.
 
 Quando uma release compatível estiver publicada, a sessão do Google será
 obrigatória, inclusive durante o beta:
 
 ```bash
-simplicio login google
+simplicio auth login
 simplicio auth status --json
 ```
 
@@ -213,20 +215,21 @@ normal e não podem substituir o Runtime verificado pelo instalador.
 O login Google é obrigatório, inclusive durante o beta:
 
 ```bash
-simplicio login google
+simplicio auth login
 simplicio auth status --json
 ```
 
-Codex integration is opt-in; the base installer does not modify another
-product's configuration. To enable versioned MCP registration and managed hooks:
+The installer registers MCP hosts to launch the managed binary directly. To
+refresh versioned MCP registration and managed hooks explicitly:
 
 ~~~bash
 SIMPLICIO_INSTALL_CODEX=1 sh install.sh
 ~~~
 
-The registration points to `simplicio serve --mcp --stdio`. The Runtime still
-requires Google login and active entitlement for every local MCP session; never
-copy tokens into config files. The managed Codex hooks cover all tool events,
+The registration points to the installed binary with `serve --mcp --stdio` and
+sets `SIMPLICIO_MCP_URL=http://127.0.0.1:8787/mcp` for HTTP/manual clients. The
+Runtime still requires Google login and active entitlement for every local MCP
+session; never copy tokens into config files. The managed Codex hooks cover all tool events,
 are versioned with the release, preserve existing user hooks, and are updated
 idempotently. The route is mandatory and has no environment-variable escape:
 native reads, edits, shell commands, and directory exploration are denied; use

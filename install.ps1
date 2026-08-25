@@ -11,11 +11,11 @@
 #
 # Environment variables:
 #   SIMPLICIO_VERSION           - pin a specific version (default: latest)
-#   SIMPLICIO_BIN_DIR           - custom install directory
+#   SIMPLICIO_BIN_DIR           - custom MCP binary directory (default: ~/.simplicio/bin)
+#   SIMPLICIO_MCP_URL           - local HTTP MCP URL exposed to stdio servers
 #   SIMPLICIO_ALLOW_UNVERIFIED  - "1" to proceed even if no checksum is
 #                                 published for this target (default: refuse)
 #   SIMPLICIO_BUNDLE_DIR       - Runtime report directory (default: ~/.simplicio)
-#   SIMPLICIO_AUTH_FILE        - optional stable login state path
 #
 # Asset naming follows distribution/targets.json (the canonical target
 # triplet table for the whole ecosystem) — target "windows-x64", asset
@@ -26,9 +26,7 @@
 param(
   [string]$Version = "",
   [switch]$Doctor,
-  [switch]$Uninstall,
-  [switch]$KeepData,
-  [switch]$Purge
+  [switch]$Uninstall
 )
 
 $ErrorActionPreference = "Stop"
@@ -38,38 +36,17 @@ $BinName = "simplicio.exe"
 $Target = "windows-x64"
 $Asset = "simplicio-windows-x64.exe"
 $Ed25519PublicKey = "2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok="
-$Ed25519HelperUrl = "https://raw.githubusercontent.com/$Repo/master/scripts/verify_ed25519.py"
+$Ed25519HelperUrl = "https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/scripts/verify_ed25519.py"
 $Ed25519HelperSha256 = "f03a0719dd557ddea27dc4cf1456d6f06a47b9056505e4d4b8453090697600d0"
 $PinnedPublicKey = ([string]$Ed25519PublicKey).Trim()
+$SimplicioMcpUrl = if ($env:SIMPLICIO_MCP_URL) { $env:SIMPLICIO_MCP_URL } else { "http://127.0.0.1:8787/mcp" }
+
 if ($env:SIMPLICIO_BIN_DIR) {
   $InstallDir = $env:SIMPLICIO_BIN_DIR
 } else {
-  $InstallDir = "$env:USERPROFILE\.local\bin"
+  $InstallDir = "$env:USERPROFILE\.simplicio\bin"
 }
 $DestPath = Join-Path $InstallDir $BinName
-$PreviousPath = "$DestPath.simplicio.previous"
-$AuthFile = if ($env:SIMPLICIO_AUTH_FILE) { $env:SIMPLICIO_AUTH_FILE } else { Join-Path $env:USERPROFILE ".simplicio\login.json" }
-$AuthFileWasPresent = Test-Path -LiteralPath $AuthFile
-$InstallTransactionActive = $false
-
-function Invoke-Rollback {
-  if (-not $InstallTransactionActive) { return }
-  if (Test-Path $PreviousPath) {
-    Move-Item -Force -Path $PreviousPath -Destination $DestPath
-    Write-Warning "rollback complete: restored previous Runtime at $DestPath"
-  } elseif (Test-Path $DestPath) {
-    Remove-Item -Force $DestPath
-    Write-Warning "rollback complete: removed new Runtime; no previous version existed"
-  }
-  if ($StagingPath -and (Test-Path $StagingPath)) { Remove-Item -Force $StagingPath -ErrorAction SilentlyContinue }
-  $script:InstallTransactionActive = $false
-}
-
-function Confirm-Purge {
-  if ($env:SIMPLICIO_CONFIRM_PURGE -eq "1") { return }
-  $answer = Read-Host "Type PURGE to delete user data under $BundleDir"
-  if ($answer -ne "PURGE") { throw "purge cancelled; confirmation must be PURGE" }
-}
 
 function Test-InPath([string]$dir) {
   return ($env:Path -split ";") -contains $dir
@@ -82,6 +59,41 @@ function Get-RuntimeVersionJson([string]$BinaryPath) {
     return ($raw | ConvertFrom-Json)
   } catch {
     return $null
+  }
+}
+
+
+function Test-Ed25519Signature([string]$BinaryPath, [string]$Signature, [string]$PublicKey, [string]$Digest) {
+  $helperPath = Join-Path ([IO.Path]::GetTempPath()) ("simplicio-verify-$([guid]::NewGuid().ToString('N')).py")
+  try {
+    $python = $null
+    $pythonArgs = @()
+    foreach ($candidate in @(
+      @{ Name = "py"; Args = @('-3') },
+      @{ Name = "python3"; Args = @() },
+      @{ Name = "python"; Args = @() }
+    )) {
+      if (-not (Get-Command $candidate.Name -ErrorAction SilentlyContinue)) { continue }
+      & $candidate.Name @($candidate.Args) -c "import sys; raise SystemExit(0 if sys.version_info[0] == 3 else 1)" 2>$null
+      if ($LASTEXITCODE -eq 0) {
+        $python = $candidate.Name
+        $pythonArgs = @($candidate.Args)
+        break
+      }
+    }
+    if (-not $python) { return $false }
+    Invoke-WebRequest -Uri $Ed25519HelperUrl -OutFile $helperPath -UseBasicParsing -ErrorAction Stop
+    $helperHash = (Get-FileHash -Path $helperPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($helperHash -ne $Ed25519HelperSha256.ToLowerInvariant()) { return $false }
+    $normalizedSignature = ([string]$Signature).Trim()
+    $normalizedPublicKey = ([string]$PublicKey).Trim()
+    $normalizedDigest = ([string]$Digest).Trim().ToLowerInvariant()
+    & $python @pythonArgs $helperPath --public-key $normalizedPublicKey --signature $normalizedSignature --sha256 $normalizedDigest 2>$null
+    return ($LASTEXITCODE -eq 0)
+  } catch {
+    return $false
+  } finally {
+    if (Test-Path $helperPath) { Remove-Item -Force $helperPath -ErrorAction SilentlyContinue }
   }
 }
 
@@ -102,80 +114,6 @@ function Test-RuntimeReleaseContract([string]$BinaryPath) {
   )
 }
 
-function Test-Ed25519Signature([string]$BinaryPath, [string]$Signature, [string]$PublicKey, [string]$Digest) {
-  $helperPath = Join-Path ([IO.Path]::GetTempPath()) ("simplicio-verify-$([guid]::NewGuid().ToString('N')).py")
-  try {
-    $python = $null
-    $pythonArgs = @()
-    # Windows commonly exposes Python as `py` or `python`, while `python3`
-    # may resolve to the Microsoft Store alias. Probe the interpreter before
-    # trusting its command name, then fail closed if no Python 3 is usable.
-    foreach ($candidate in @(
-      @{ Name = "py"; Args = @('-3') },
-      @{ Name = "python3"; Args = @() },
-      @{ Name = "python"; Args = @() }
-    )) {
-      if (-not (Get-Command $candidate.Name -ErrorAction SilentlyContinue)) { continue }
-      & $candidate.Name @($candidate.Args) -c "import sys; raise SystemExit(0 if sys.version_info[0] == 3 else 1)" 2>$null
-      if ($LASTEXITCODE -eq 0) {
-        $python = $candidate.Name
-        $pythonArgs = @($candidate.Args)
-        break
-      }
-    }
-    if (-not $python) {
-      Write-Host "  ! Ed25519 verification requires Python 3 (tried py -3, python3, python)"
-      return $false
-    }
-    Invoke-WebRequest -Uri $Ed25519HelperUrl -OutFile $helperPath -UseBasicParsing -ErrorAction Stop
-    $helperHash = (Get-FileHash -Path $helperPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($helperHash -ne $Ed25519HelperSha256.ToLowerInvariant()) { return $false }
-    $normalizedSignature = ([string]$Signature).Trim()
-    $normalizedPublicKey = ([string]$PublicKey).Trim()
-    $normalizedDigest = ([string]$Digest).Trim().ToLowerInvariant()
-    & $python @pythonArgs $helperPath --public-key $normalizedPublicKey --signature $normalizedSignature --sha256 $normalizedDigest
-    return ($LASTEXITCODE -eq 0)
-  } catch {
-    return $false
-  } finally {
-    Remove-Item -Force $helperPath -ErrorAction SilentlyContinue
-  }
-}
-function Test-McpToolSurface([string]$BinaryPath) {
-  if (-not (Test-Path $BinaryPath)) { return $false }
-  $required = @(
-    "simplicio_map", "simplicio_memory", "simplicio_edit", "simplicio_gate",
-    "simplicio_validate", "simplicio_run", "simplicio_symbol", "simplicio_search",
-    "simplicio_read", "simplicio_exec"
-  )
-  $payload = @(
-    '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}',
-    '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
-  ) -join [Environment]::NewLine
-  try {
-    $raw = $payload | & $BinaryPath serve --mcp --stdio --json 2>$null | Out-String
-    if ($LASTEXITCODE -ne 0) { return $false }
-    $response = $null
-    foreach ($line in ($raw -split "\r?\n")) {
-      if ([string]::IsNullOrWhiteSpace($line)) { continue }
-      try {
-        $candidate = $line | ConvertFrom-Json
-        if ($candidate.id -eq 2) { $response = $candidate }
-      } catch { continue }
-    }
-    if ($null -eq $response -or $null -eq $response.result) { return $false }
-    $names = @($response.result.tools | ForEach-Object { [string]$_.name })
-    $missing = @($required | Where-Object { $_ -notin $names })
-    if ($missing.Count -gt 0) {
-      Write-Host "  [FAIL] MCP tool surface incomplete; missing: $($missing -join ', ')"
-      return $false
-    }
-    return $true
-  } catch {
-    return $false
-  }
-}
-
 function Test-ActiveLogin {
   if (-not (Test-Path $DestPath)) { return $false }
   try {
@@ -184,15 +122,11 @@ function Test-ActiveLogin {
     $status = $raw | ConvertFrom-Json
     $identity = $status.identity
     if ($null -eq $identity) { return $false }
-    $identityEmail = [string]$identity.email
-    if ([string]::IsNullOrWhiteSpace($identityEmail)) {
-      $identityEmail = [string]$status.user.email
-    }
     $active = (
       $identity.enabled -eq $true -and
       $identity.login_enabled -eq $true -and
       $identity.status -notin @("disabled", "logged_out", "revoked") -and
-      -not [string]::IsNullOrWhiteSpace($identityEmail)
+      -not [string]::IsNullOrWhiteSpace([string]$identity.email)
     )
     if ($null -ne $status.entitlement -and $null -ne $status.entitlement.updates_allowed) {
       $active = $active -and ($status.entitlement.updates_allowed -eq $true)
@@ -203,160 +137,14 @@ function Test-ActiveLogin {
   }
 }
 
-function Require-ActiveLogin {
-  if (Test-ActiveLogin) { return }
-  Write-Host "==> Google login is required to activate Simplicio Runtime"
-  & $DestPath login google
-  if ($LASTEXITCODE -ne 0 -or -not (Test-ActiveLogin)) {
-    throw "Login ausente, expirado, revogado ou sem entitlement ativo; instalação bloqueada"
+function Report-LoginState {
+  if (Test-ActiveLogin) {
+    Write-Host "  ✓ active Google session and entitlement verified"
+    return
   }
+  Write-Warning "Google login missing or entitlement inactive; run: `"$DestPath`" auth login"
 }
 
-function Backup-Once([string]$Path) {
-  if ((Test-Path -LiteralPath $Path) -and -not (Test-Path -LiteralPath "$Path.simplicio.bak")) {
-    Copy-Item -LiteralPath $Path -Destination "$Path.simplicio.bak" -Force
-  }
-}
-
-function Write-AtomicText([string]$Path, [string]$Content) {
-  $parent = Split-Path -Parent $Path
-  New-Item -ItemType Directory -Force -Path $parent | Out-Null
-  $temp = "$Path.simplicio.tmp"
-  Set-Content -LiteralPath $temp -Value $Content -Encoding UTF8
-  Move-Item -Force -LiteralPath $temp -Destination $Path
-}
-
-function Remove-Legacy-CodexHooks([object]$Root) {
-  if ($null -eq $Root -or -not $Root.PSObject.Properties["hooks"]) { return }
-  $hooks = $Root.hooks
-  if ($null -eq $hooks -or -not $hooks.PSObject) { return }
-  $eventNames = @($hooks.PSObject.Properties | ForEach-Object { $_.Name })
-  foreach ($eventName in $eventNames) {
-    $eventProperty = $hooks.PSObject.Properties[$eventName]
-    if ($null -eq $eventProperty) { continue }
-    $items = @($eventProperty.Value)
-    $keptItems = @()
-    foreach ($item in $items) {
-      if ($null -eq $item -or -not $item.PSObject.Properties["hooks"]) {
-        $keptItems += $item
-        continue
-      }
-      $keptHooks = @()
-      foreach ($legacyHook in @($item.hooks)) {
-        $command = [string]$legacyHook.command
-        $isLegacySimplicio = (
-          $command -match '(?i)mcp-route\.sh|simplicio-mcp-route' -or
-          (($command -match '(?i)/bin/bash') -and ($command -match '(?i)simplicio'))
-        )
-        if (-not $isLegacySimplicio) { $keptHooks += $legacyHook }
-      }
-      if ($keptHooks.Count -gt 0) {
-        $item.hooks = $keptHooks
-        $keptItems += $item
-      }
-    }
-    if ($keptItems.Count -gt 0) {
-      $hooks | Add-Member -MemberType NoteProperty -Name $eventName -Value $keptItems -Force
-    } else {
-      $hooks.PSObject.Properties.Remove($eventName)
-    }
-  }
-}
-
-
-function Install-CodexIntegration {
-  $codexDir = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE ".codex" }
-  $codexConfig = Join-Path $codexDir "config.toml"
-  $codexHooks = Join-Path $codexDir "hooks.json"
-  $hookDir = Join-Path $env:USERPROFILE ".simplicio\hooks"
-  $hookPath = Join-Path $hookDir "mcp-route.ps1"
-  $hookTemp = "$hookPath.download-$([guid]::NewGuid().ToString('N')).tmp"
-  New-Item -ItemType Directory -Force -Path $codexDir, $hookDir | Out-Null
-
-  Write-Host "==> configuring Codex STDIO MCP and hooks"
-  $installedVersion = (& $DestPath --version 2>$null | Select-Object -First 1).Split(' ')[1].TrimStart('v')
-  $hookRef = if ($env:SIMPLICIO_CODEX_HOOK_REF) { $env:SIMPLICIO_CODEX_HOOK_REF } else { "v$installedVersion" }
-  if ([string]::IsNullOrWhiteSpace($installedVersion)) { throw "could not derive a versioned Codex hook ref" }
-  $hookUrl = "https://raw.githubusercontent.com/$Repo/$hookRef/codex/mcp-route.ps1"
-  try {
-    Invoke-WebRequest -Uri $hookUrl -OutFile $hookTemp -UseBasicParsing -ErrorAction Stop
-    Move-Item -Force -LiteralPath $hookTemp -Destination $hookPath
-  } catch {
-    if (Test-Path -LiteralPath $hookTemp) { Remove-Item -Force -LiteralPath $hookTemp -ErrorAction SilentlyContinue }
-    throw "could not download the Codex hook: $($_.Exception.Message)"
-  }
-
-  Backup-Once $codexConfig
-  $config = if (Test-Path -LiteralPath $codexConfig) { Get-Content -Raw -LiteralPath $codexConfig } else { "" }
-  $escapedBinary = $DestPath.Replace('\', '\\').Replace('"', '\"')
-  $stdioBlock = '[mcp_servers.simplicio]' + [Environment]::NewLine +
-    'command = "' + $escapedBinary + '"' + [Environment]::NewLine +
-    'args = ["serve", "--mcp", "--stdio"]' + [Environment]::NewLine
-  $sectionRegex = '(?ms)^\[mcp_servers\.simplicio\]\r?\n.*?(?=^\[|\z)'
-  if ([regex]::IsMatch($config, $sectionRegex)) {
-    $config = [regex]::Replace($config, $sectionRegex, [System.Text.RegularExpressions.MatchEvaluator]{ param($match) $stdioBlock }, 1)
-  } else {
-    $separator = if ([string]::IsNullOrWhiteSpace($config)) { "" } else { [Environment]::NewLine + [Environment]::NewLine }
-    $config = $config.TrimEnd() + $separator + $stdioBlock
-  }
-  Write-AtomicText $codexConfig $config
-
-  Backup-Once $codexHooks
-  try {
-    $root = if (Test-Path -LiteralPath $codexHooks) {
-      (Get-Content -Raw -LiteralPath $codexHooks | ConvertFrom-Json)
-    } else {
-      [pscustomobject]@{}
-    }
-  } catch {
-    throw "hooks.json is invalid and was preserved: $($_.Exception.Message)"
-  }
-  if ($null -eq $root) { $root = [pscustomobject]@{} }
-  Remove-Legacy-CodexHooks $root
-  if (-not $root.PSObject.Properties["hooks"]) {
-    $root | Add-Member -MemberType NoteProperty -Name hooks -Value ([pscustomobject]@{})
-  }
-  $hooks = $root.hooks
-  if ($null -eq $hooks -or -not $hooks.PSObject) { throw "hooks.json has an invalid hooks object" }
-  $hookCommand = 'powershell -NoProfile -ExecutionPolicy Bypass -File "' + $hookPath + '"'
-
-  function Upsert-CodexHook([string]$Event, [string]$Matcher) {
-    $property = $hooks.PSObject.Properties[$Event]
-    $items = if ($property) { @($property.Value) } else { @() }
-    foreach ($item in $items) {
-      if ($null -eq $item -or -not $item.PSObject.Properties["hooks"]) { continue }
-      foreach ($existing in @($item.hooks)) {
-        if ($existing -and ([string]$existing.command).Contains("mcp-route.ps1")) {
-          $existing.command = $hookCommand
-          $existing.timeout = 8
-          $existing.type = "command"
-          $existing.statusMessage = "Routing through Simplicio MCP"
-          if ($Matcher) { $item.matcher = $Matcher }
-          $hooks | Add-Member -MemberType NoteProperty -Name $Event -Value $items -Force
-          return
-        }
-      }
-    }
-    $hook = [pscustomobject]@{
-      type = "command"
-      command = $hookCommand
-      timeout = 8
-      statusMessage = "Routing through Simplicio MCP"
-    }
-    $entry = [pscustomobject]@{ hooks = @($hook) }
-    if ($Matcher) { $entry | Add-Member -MemberType NoteProperty -Name matcher -Value $Matcher }
-    $items += $entry
-    $hooks | Add-Member -MemberType NoteProperty -Name $Event -Value $items -Force
-  }
-
-  Upsert-CodexHook "PreToolUse" ".*"
-  Upsert-CodexHook "SessionStart" "startup|resume|clear|compact"
-  Upsert-CodexHook "SubagentStart" ""
-  Upsert-CodexHook "UserPromptSubmit" ""
-  Write-AtomicText $codexHooks ($root | ConvertTo-Json -Depth 20)
-  Write-Host "  ✓ Codex configured for simplicio serve --mcp --stdio"
-  Write-Host "  ✓ Codex hooks installed at $hookPath"
-}
 # ─── -Doctor: idempotent, read-only health check ───────────────────────────
 if ($Doctor) {
   Write-Host "==> simplicio doctor"
@@ -398,13 +186,6 @@ if ($Doctor) {
       Write-Host "  [FAIL] missing, expired, revoked, or inactive Google session"
       $ok = $false
     }
-
-    if (Test-McpToolSurface $DestPath) {
-      Write-Host "  [OK] MCP exposes the 10 documented tools after authentication"
-    } else {
-      Write-Host "  [FAIL] MCP does not expose the complete documented tool surface after login"
-      $ok = $false
-    }
   }
 
   if ($ok) {
@@ -418,14 +199,8 @@ if ($Doctor) {
   }
 }
 
-# ─── -Uninstall: transactional removal with explicit data policy ────────────
+# ─── -Uninstall: idempotent removal, safe to run repeatedly ────────────────
 if ($Uninstall) {
-  if ($Purge -and $KeepData) { Write-Error "-KeepData and -Purge are mutually exclusive"; exit 1 }
-  $purgeData = $Purge.IsPresent
-  $bundleDir = if ($env:SIMPLICIO_BUNDLE_DIR) { $env:SIMPLICIO_BUNDLE_DIR } else { Join-Path $env:USERPROFILE ".simplicio" }
-  if ($purgeData) {
-    try { Confirm-Purge } catch { Write-Error $_.Exception.Message; exit 1 }
-  }
   Write-Host "==> simplicio uninstall"
   if (Test-Path $DestPath) {
     Remove-Item -Force $DestPath
@@ -433,23 +208,13 @@ if ($Uninstall) {
   } else {
     Write-Host "  ✓ already removed (nothing at $DestPath)"
   }
-  if (Test-Path $PreviousPath) { Remove-Item -Force $PreviousPath }
-  if ($purgeData) {
-    if ([string]::IsNullOrWhiteSpace($bundleDir) -or $bundleDir -eq $env:USERPROFILE -or $bundleDir -eq "\") { Write-Error "refusing to purge a broad directory: $bundleDir"; exit 1 }
-    if (Test-Path $bundleDir) {
-      # Provider credentials may live in ~/.simplicio/.env. Purge only
-      # Simplicio-managed state and keep that user-owned secret file intact.
-      Get-ChildItem -LiteralPath $bundleDir -Force |
-        Where-Object { $_.Name -ne ".env" } |
-        Remove-Item -Recurse -Force
-      Write-Host "  ✓ Simplicio data removed from $bundleDir (.env and login state removed by explicit purge)"
-    } else {
-      Write-Host "  ✓ no Simplicio data found at $bundleDir (.env absent)"
-    }
-  } else {
-    Write-Host "  ✓ user data under $env:USERPROFILE\.simplicio was preserved (-KeepData)"
-  }
-  Write-Host "  Note: this script never edits your PATH profile."
+  # Data/config is intentionally preserved (idempotent, non-destructive
+  # uninstall) — user data under ~/.simplicio is never touched here.
+  Write-Host "  ✓ user data under `$env:USERPROFILE\.simplicio was preserved"
+  Write-Host ""
+  Write-Host "  Note: if you added $InstallDir to your PowerShell profile's"
+  Write-Host "  `$env:Path, remove that line manually — this script never"
+  Write-Host "  edits your profile."
   exit 0
 }
 
@@ -571,37 +336,27 @@ if ($ExpectedSigned) {
   }
   Write-Host "  ✓ Ed25519 signature verified over SHA256 digest"
 }
-# A clean HOME has no authenticated session yet. Validate only the offline
-# Runtime release contract before the swap; MCP initialize/tools/list runs
-# after Require-ActiveLogin below.
+
+# Validate the staged executable before the atomic swap. A release that lacks
+# embedded sources, Google login activation, or the signed-update key must not
+# replace a working installation and then fail its post-install checks.
 if (-not (Test-RuntimeReleaseContract $StagingPath)) {
   Remove-Item -Force $StagingPath -ErrorAction SilentlyContinue
   Write-Error "Runtime release does not meet the distribution contract (embedded sources, Google login, and signed-update key); installation aborted."
   exit 1
 }
 
-# Journal the previous executable before the atomic swap. Any later
-# fail-closed path restores it through Invoke-Rollback.
-if (Test-Path $DestPath) {
-  Copy-Item -Force -Path $DestPath -Destination $PreviousPath
-} elseif (Test-Path $PreviousPath) {
-  Remove-Item -Force $PreviousPath
-}
-$InstallTransactionActive = $true
+# Atomic swap: rename into place on the same volume so there is never a
+# window where $DestPath is a half-written file, and re-running this script
+# (idempotent update) never leaves stale .tmp files behind on success.
 try {
   Move-Item -Force -Path $StagingPath -Destination $DestPath
 } catch {
-  Invoke-Rollback
   Remove-Item -Force $StagingPath -ErrorAction SilentlyContinue
   Write-Error "Could not move verified binary into place: $($_.Exception.Message)"
   exit 1
 }
 Write-Host "  ✓ installed: $DestPath"
-if ($AuthFileWasPresent -and -not (Test-Path -LiteralPath $AuthFile)) {
-  Invoke-Rollback
-  Write-Error "Login state disappeared during the upgrade: $AuthFile. Previous Runtime restored."
-  exit 1
-}
 
 # ─── Verify the downloaded Runtime ──────────────────────────────────────────
 try {
@@ -613,46 +368,23 @@ try {
 }
 
 if (-not (Test-RuntimeReleaseContract $DestPath)) {
-  Invoke-Rollback
   Write-Error "This Runtime does not meet the distribution contract; refusing to finish installation. Install a compatible Runtime release."
   exit 1
 }
 Write-Host "  ✓ Runtime release contract verified"
-# MCP initialize/tools/list is authenticated and is intentionally deferred until
-# after Require-ActiveLogin below for clean-HOME bootstrap.
 
-# ─── Active login precedes the authenticated MCP handshake ──────────────────
+# ─── Login state: do not block fresh machines from installing ───────────────
+Report-LoginState
+
+# All supported local hosts, including Codex, are registered by direct stdio
+# command first. The HTTP MCP endpoint remains available as SIMPLICIO_MCP_URL.
 try {
-  Require-ActiveLogin
+  $env:SIMPLICIO_MCP_URL = $SimplicioMcpUrl
+  & $DestPath mcp register | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "mcp register returned $LASTEXITCODE" }
+  Write-Host "  ✓ MCP registered by direct command: $DestPath"
 } catch {
-  Invoke-Rollback
-  Write-Error $_.Exception.Message
-  exit 1
-}
-Write-Host "  ✓ active Google session and entitlement verified"
-if ($AuthFileWasPresent -and -not (Test-Path -LiteralPath $AuthFile)) {
-  Invoke-Rollback
-  Write-Error "Login state disappeared during the upgrade: $AuthFile. Previous Runtime restored."
-  exit 1
-}
-
-if (-not (Test-McpToolSurface $DestPath)) {
-  Invoke-Rollback
-  Write-Error "This Runtime does not expose the complete MCP tool surface after login; refusing to finish installation."
-  exit 1
-}
-# Codex integration is opt-in. MCP registration and routing hooks remain
-# separate, and the hook reference is versioned/pinned inside the function.
-if ($env:SIMPLICIO_INSTALL_CODEX -eq "1") {
-  try {
-    Install-CodexIntegration
-  } catch {
-    Invoke-Rollback
-    Write-Error $_.Exception.Message
-    exit 1
-  }
-} else {
-  Write-Host "==> Codex integration not installed automatically; set SIMPLICIO_INSTALL_CODEX=1 to enable"
+  Write-Warning "could not register MCP automatically; run: `"$DestPath`" mcp register"
 }
 
 $BundleDir = if ($env:SIMPLICIO_BUNDLE_DIR) { $env:SIMPLICIO_BUNDLE_DIR } else { Join-Path $env:USERPROFILE ".simplicio" }
@@ -665,16 +397,11 @@ try {
   Write-Host "  ✓ Runtime release report: $RuntimeReport"
 } catch {
   if (Test-Path $RuntimeReport) { Remove-Item -Force $RuntimeReport -ErrorAction SilentlyContinue }
-  Invoke-Rollback
   Write-Error "Could not persist the Runtime release report: $($_.Exception.Message)"
   exit 1
 }
-if ($InstallTransactionActive) {
-  if (Test-Path $PreviousPath) { Remove-Item -Force $PreviousPath }
-  $InstallTransactionActive = $false
-}
 
-# PATH hint
+# PATH is optional for MCP because host configs point at $DestPath directly.
 if (-not (Test-InPath $InstallDir)) {
   Write-Host ""
   Write-Host "  ! $InstallDir is not in PATH"
@@ -686,9 +413,10 @@ if (-not (Test-InPath $InstallDir)) {
 Write-Host ""
 Write-Host "  ✓ simplicio Runtime $Version (windows-x64) installed successfully"
 Write-Host "  ✓ Runtime release contract is active"
-Write-Host "  ✓ login state preserved outside the binary: $AuthFile"
 Write-Host "  ✓ no pip packages or sibling checkouts were installed"
-Write-Host "  ✓ active Google login is required for product commands"
+Write-Host "  ✓ active Google login is verified after auth login"
+Write-Host "  ✓ MCP command points at $DestPath"
+Write-Host "  ✓ SIMPLICIO_MCP_URL=$SimplicioMcpUrl"
 Write-Host ""
 Write-Host "  Run:     simplicio chat 'hello' --repo ."
 Write-Host "  REPL:    simplicio chat --repl --repo ."
