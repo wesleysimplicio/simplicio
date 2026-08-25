@@ -20,7 +20,9 @@ For each release `vX.Y.Z`, publish:
 - SHA-256 and signing/notarization status for each Desktop artifact.
 
 The manifest must use the immutable `vX.Y.Z` download URLs, require Ed25519,
-refuse unsigned artifacts, and match the checksums and sidecars byte-for-byte.
+refuse unsigned artifacts, match the checksums and sidecars byte-for-byte, and
+publish the root `signing_pubkey` exactly as
+`2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok=`.
 Do not publish a new release from a checkout where `version.txt` and the
 manifest disagree.
 
@@ -54,8 +56,10 @@ The `.sig` sidecar and the manifest `signature` field must contain the same
 `ed25519:<base64>` value. The bootstrap verifier used by both `install.ps1`
 and `install.sh` validates this domain-separated payload and is pinned by its
 SHA-256 in the installers. A raw 32-byte SHA-256 digest is not a valid release
-signature payload. The publication gate also verifies every signature before a
-release can be staged; never bypass it with `SIMPLICIO_ALLOW_UNVERIFIED=1`.
+signature payload. Missing or divergent `signing_pubkey` values are fatal. The
+publication gate also verifies every signature before a release can be staged;
+`SIMPLICIO_ALLOW_UNVERIFIED=1` never bypasses a stable release failure and is
+only permitted for an explicitly selected unofficial channel.
 
 ## Manual publication order
 
