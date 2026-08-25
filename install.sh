@@ -612,20 +612,21 @@ if [ "$SKIP_EXISTING" != "true" ]; then
   MANIFEST_TMP="$(mktemp)"
   trap 'rm -f "$MANIFEST_TMP"' EXIT
   if fetch_url "$MANIFEST_URL" "$MANIFEST_TMP" 2>/dev/null; then
-    if command -v python3 >/dev/null 2>&1; then
-      EXPECTED_SHA256="$(python3 -c "
-import json,sys
+    if ! command -v python3 >/dev/null 2>&1; then
+      err "cannot verify signed release manifest: Python 3 is required"
+    fi
+    EXPECTED_SHA256="$(python3 -c "
+import json
 try:
     m = json.load(open('$MANIFEST_TMP'))
     for a in m.get('artifacts', []):
         if a.get('target') in {'$MANIFEST_TARGET_ID', '$TARGET_ID'}:
             print(a.get('sha256') or '')
-            print('true' if a.get('signed') or str(a.get('signature') or '').startswith('ed25519:') else 'false')
             break
 except Exception:
     pass
-" 2>/dev/null | sed -n '1p')"
-      SIGNED="$(python3 -c "
+" 2>/dev/null)"
+    SIGNED="$(python3 -c "
 import json
 try:
     m = json.load(open('$MANIFEST_TMP'))
@@ -636,7 +637,7 @@ try:
 except Exception:
     pass
 " 2>/dev/null)"
-      SIGNATURE="$(python3 -c "
+    SIGNATURE="$(python3 -c "
 import json
 try:
     m = json.load(open('$MANIFEST_TMP'))
@@ -647,18 +648,15 @@ try:
 except Exception:
     pass
 " 2>/dev/null)"
-      SIGNING_PUBKEY="$(python3 -c "
+    SIGNING_PUBKEY="$(python3 -c "
 import json
 try:
     m = json.load(open('$MANIFEST_TMP'))
-    print(m.get('signing_pubkey') or '')
+    print(str(m.get('signing_pubkey') or '').strip())
 except Exception:
     pass
 " 2>/dev/null)"
-      if [ -z "$SIGNING_PUBKEY" ]; then
-        SIGNING_PUBKEY="$ED25519_PUBLIC_KEY"
-      fi
-      SIGNATURE_REQUIRED="$(python3 -c "
+    SIGNATURE_REQUIRED="$(python3 -c "
 import json
 try:
     m = json.load(open('$MANIFEST_TMP'))
@@ -666,20 +664,24 @@ try:
 except Exception:
     pass
 " 2>/dev/null)"
+  fi
+  if [ "$SIGNATURE_REQUIRED" = "true" ] || [ "$SIGNED" = "true" ]; then
+    if [ -z "$SIGNING_PUBKEY" ]; then
+      err "manifest signing_pubkey is missing"
+    fi
+    if [ "$SIGNATURE_REQUIRED" = "true" ] && [ "$SIGNING_PUBKEY" != "$ED25519_PUBLIC_KEY" ]; then
+      err "manifest signing_pubkey does not match the pinned installer key"
     fi
   fi
-
   if [ "$SIGNATURE_REQUIRED" = "true" ] && { [ "$SIGNED" != "true" ] || [ -z "$SIGNATURE" ]; }; then
     err "recusando instalar: o manifest exige assinatura Ed25519, mas o artefato '$TARGET_ID' não tem uma assinatura publicada"
-  elif [ "$SIGNATURE_REQUIRED" = "true" ] && [ "$SIGNING_PUBKEY" != "$ED25519_PUBLIC_KEY" ]; then
-    err "recusando instalar: a chave pública Ed25519 do manifest não corresponde à chave pinada"
   elif [ -z "$EXPECTED_SHA256" ]; then
     if [ "$SIGNED" = "true" ]; then
       err "recusando instalar: assinatura Ed25519 publicada sem digest SHA256 verificável"
-    elif [ "${SIMPLICIO_ALLOW_UNVERIFIED:-}" = "1" ]; then
-      warn "sem checksum publicado para o alvo '$TARGET_ID' — prosseguindo SEM VERIFICAÇÃO (SIMPLICIO_ALLOW_UNVERIFIED=1)"
+    elif [ "${SIMPLICIO_ALLOW_UNVERIFIED:-}" = "1" ] && [ "${SIMPLICIO_CHANNEL:-}" = "unofficial" ]; then
+      warn "sem checksum publicado para o alvo '$TARGET_ID' — prosseguindo SEM VERIFICAÇÃO (SIMPLICIO_ALLOW_UNVERIFIED=1, unofficial channel)"
     else
-      err "recusando instalar: nenhum SHA256 publicado no manifest para o alvo '$TARGET_ID'. Defina SIMPLICIO_ALLOW_UNVERIFIED=1 para prosseguir por sua conta e risco."
+      err "recusando instalar: nenhum SHA256 publicado no manifest para o alvo '$TARGET_ID'."
     fi
   elif [ "$SIGNED" != "true" ]; then
     warn "checksum será verificado, mas este artefato ainda não exige assinatura Ed25519 neste canal"

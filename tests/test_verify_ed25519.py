@@ -6,9 +6,9 @@ import unittest
 from scripts import verify_ed25519
 
 
-PUBLIC_KEY = "A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg="
-SIGNATURE = "ed25519:UKIyIZkSH3nmk+E1LybN3bjQlPpiumLoLIu+bdQUC/j4/6nQkNX3MBhU7kZv+OZ6S9iLYVGwwzPZD5n//MGGAQ=="
-DIGEST = "3ba84e1d362618f0e9f45064634a1594485bca3298b8182b5a7eaa3fded4688f"
+PUBLIC_KEY = "2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok="
+SIGNATURE = "ed25519:/Tt+wpY4VedOmsOJRPAaAz470OfD4QprLGnTed7QGkkWgyqLoeg2U/dr6PD3EWl4rvHLiok2UWALeDBvG9KmCQ=="
+DIGEST = "12681adb6fa49bc2a5d39f8feca42baabe5d97b61cfdf40a5d452d890a8be83a"
 
 
 class Ed25519ReleaseContractTests(unittest.TestCase):

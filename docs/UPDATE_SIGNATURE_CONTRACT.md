@@ -14,9 +14,9 @@ simplicio-release-v1:D
 ```
 
 The signature is published as `ed25519:<base64-signature>` in both the artifact
-sidecar (`<artifact>.sig`) and the corresponding manifest entry. The manifest
-public key must match the key compiled into the Runtime and pinned by the
-installers.
+sidecar (`<artifact>.sig`) and the corresponding manifest entry. The manifest must publish the root `signing_pubkey` field. Stable releases accept exactly
+`2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok=`, which is the key compiled into the
+Runtime and pinned by both installers.
 
 ## Verification order
 
@@ -28,9 +28,10 @@ Every installer must:
 4. verify the Runtime distribution contract;
 5. only then replace the installed binary.
 
-An invalid or missing signature is a hard failure. `SIMPLICIO_ALLOW_UNVERIFIED=1`
-is only an explicit checksum-only emergency override and must not be used for
-official releases.
+A missing, empty, whitespace-only, or divergent `signing_pubkey` is a hard failure,
+as are missing/invalid signatures and checksum mismatches. `SIMPLICIO_ALLOW_UNVERIFIED=1`
+may be used only with an explicit `SIMPLICIO_CHANNEL=unofficial` channel and never
+bypasses any cryptographic failure on a stable signed release.
 
 ## Regression protection
 
@@ -46,3 +47,7 @@ The fixture covers the real Runtime domain-separated payload and deliberately
 rejects a raw digest signature. The release provenance gate also verifies the
 cryptographic signature for every staged artifact whenever the manifest marks
 signatures as required.
+
+## Key rotation
+
+The private Ed25519 signing key never belongs in this repository. Key rotation is a separate documented transition: update the schema and installers before accepting a new key, publish a new patch release, and never rewrite the bytes or assets of an immutable release.

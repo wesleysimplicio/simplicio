@@ -1,0 +1,261 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://simplicio.dev/schemas/update-manifest.schema.json",
+  "title": "Simplicio Update Manifest",
+  "oneOf": [
+    {
+      "title": "Generated release manifest",
+      "type": "object",
+      "required": [
+        "schema",
+        "version",
+        "channel",
+        "release_tag",
+        "repository",
+        "commit",
+        "signing_pubkey",
+        "generated_at",
+        "source",
+        "security",
+        "artifacts"
+      ],
+      "properties": {
+        "schema": {
+          "const": "simplicio.update-manifest/v1"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "channel": {
+          "enum": [
+            "stable",
+            "beta",
+            "nightly"
+          ]
+        },
+        "release_tag": {
+          "type": "string",
+          "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "signing_pubkey": {
+          "type": "string",
+          "const": "2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok="
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "source": {
+          "type": "object",
+          "required": [
+            "version",
+            "tag",
+            "commit"
+          ],
+          "properties": {
+            "version": {
+              "const": "Cargo.toml"
+            },
+            "tag": {
+              "type": "string",
+              "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+            },
+            "commit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "security": {
+          "type": "object",
+          "required": [
+            "checksum_algorithm",
+            "signature_algorithm",
+            "signature_required",
+            "refuse_unsigned",
+            "sbom_required",
+            "provenance_required"
+          ],
+          "properties": {
+            "checksum_algorithm": {
+              "const": "SHA256"
+            },
+            "signature_algorithm": {
+              "const": "ed25519"
+            },
+            "signature_required": {
+              "const": true
+            },
+            "refuse_unsigned": {
+              "const": true
+            },
+            "sbom_required": {
+              "const": true
+            },
+            "provenance_required": {
+              "const": true
+            }
+          },
+          "additionalProperties": false
+        },
+        "artifacts": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "type": "object",
+            "required": [
+              "target",
+              "artifact",
+              "url",
+              "size",
+              "checksum_file",
+              "sha256",
+              "signature",
+              "signature_file",
+              "signature_algorithm",
+              "sbom",
+              "provenance",
+              "platform_signing"
+            ],
+            "properties": {
+              "target": {
+                "enum": [
+                  "windows-x64",
+                  "macos-arm64",
+                  "macos-x64",
+                  "linux-x64"
+                ]
+              },
+              "artifact": {
+                "type": "string",
+                "minLength": 1
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "size": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "checksum_file": {
+                "const": "SHA256SUMS"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[A-Fa-f0-9]{64}$"
+              },
+              "signature": {
+                "type": "string",
+                "pattern": "^ed25519:[A-Za-z0-9+/=]+$"
+              },
+              "signature_file": {
+                "type": "string",
+                "minLength": 1
+              },
+              "signature_algorithm": {
+                "const": "ed25519"
+              },
+              "sbom": {
+                "type": "object",
+                "required": [
+                  "file",
+                  "format"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "format": {
+                    "const": "SPDX-2.3"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "provenance": {
+                "type": "object",
+                "required": [
+                  "file",
+                  "format"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "format": {
+                    "const": "simplicio.provenance/v1"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "platform_signing": {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "status",
+                  "required"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "authenticode",
+                      "codesign-notarization",
+                      "none"
+                    ]
+                  },
+                  "status": {
+                    "const": "verified"
+                  },
+                  "required": {
+                    "const": true
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    {
+      "title": "Release manifest template",
+      "type": "object",
+      "required": [
+        "schema",
+        "template",
+        "source_of_truth",
+        "artifacts"
+      ],
+      "properties": {
+        "schema": {
+          "const": "simplicio.update-manifest/v1"
+        },
+        "template": {
+          "const": true
+        },
+        "source_of_truth": {
+          "const": "scripts/generate-release-manifest.py"
+        },
+        "artifacts": {
+          "type": "array",
+          "maxItems": 0
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

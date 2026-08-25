@@ -5,6 +5,7 @@
   "release_tag": "v3.8.24",
   "repository": "wesleysimplicio/simplicio",
   "commit": "5e87e6f8f3cd8142b1609b964bb6495dc9b9b89f",
+  "signing_pubkey": "2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok=",
   "generated_at": "2026-08-24T21:33:17.513843Z",
   "source": {
     "version": "Cargo.toml",

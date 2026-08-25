@@ -40,6 +40,7 @@ $Asset = "simplicio-windows-x64.exe"
 $Ed25519PublicKey = "2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok="
 $Ed25519HelperUrl = "https://raw.githubusercontent.com/$Repo/master/scripts/verify_ed25519.py"
 $Ed25519HelperSha256 = "f03a0719dd557ddea27dc4cf1456d6f06a47b9056505e4d4b8453090697600d0"
+$PinnedPublicKey = ([string]$Ed25519PublicKey).Trim()
 if ($env:SIMPLICIO_BIN_DIR) {
   $InstallDir = $env:SIMPLICIO_BIN_DIR
 } else {
@@ -493,33 +494,40 @@ try {
 $ExpectedSha256 = $null
 $ExpectedSigned = $false
 $ExpectedSignature = $null
-$ExpectedPublicKey = $null
+$ExpectedPublicKey = ""
 $SignatureRequired = $false
 if ($Manifest) {
   $artifact = $Manifest.artifacts | Where-Object { $_.target -eq $Target } | Select-Object -First 1
   if ($artifact) {
-    $ExpectedSha256 = $artifact.sha256
+    $ExpectedSha256 = [string]$artifact.sha256
     $ExpectedSigned = [bool]$artifact.signed -or ([string]$artifact.signature).StartsWith("ed25519:")
-    $ExpectedSignature = $artifact.signature
+    $ExpectedSignature = [string]$artifact.signature
   }
-  $ExpectedPublicKey = [string]$Manifest.signing_pubkey
+  $ExpectedPublicKey = ([string]$Manifest.signing_pubkey).Trim()
   $SignatureRequired = [bool]$Manifest.security.signature_required
 }
 
-if ($SignatureRequired -and (-not $ExpectedSigned -or [string]::IsNullOrWhiteSpace([string]$ExpectedSignature))) {
+if ($SignatureRequired -or $ExpectedSigned) {
+  if ([string]::IsNullOrWhiteSpace($ExpectedPublicKey)) {
+    Write-Error "Refusing to install: manifest requires Ed25519 signatures but signing_pubkey is missing."
+    exit 1
+  }
+  if ($SignatureRequired -and $ExpectedPublicKey -cne $PinnedPublicKey) {
+    Write-Error "Refusing to install: manifest Ed25519 public key does not match the pinned installer key."
+    exit 1
+  }
+}
+if ($SignatureRequired -and (-not $ExpectedSigned -or [string]::IsNullOrWhiteSpace($ExpectedSignature))) {
   Write-Error "Refusing to install: the manifest requires an Ed25519 signature, but target '$Target' has no published signature."
-  exit 1
-} elseif ($SignatureRequired -and $ExpectedPublicKey -ne $Ed25519PublicKey) {
-  Write-Error "Refusing to install: manifest Ed25519 public key does not match the pinned installer key."
   exit 1
 } elseif (-not $ExpectedSha256) {
   if ($ExpectedSigned) {
     Write-Error "Refusing to install: published Ed25519 signature has no verifiable SHA256 digest."
     exit 1
-  } elseif ($env:SIMPLICIO_ALLOW_UNVERIFIED -eq "1") {
-    Write-Host "  ! no published checksum for target '$Target' — proceeding UNVERIFIED (SIMPLICIO_ALLOW_UNVERIFIED=1)"
+  } elseif ($env:SIMPLICIO_ALLOW_UNVERIFIED -eq "1" -and $env:SIMPLICIO_CHANNEL -eq "unofficial") {
+    Write-Host "  ! no published checksum for target '$Target' — proceeding UNVERIFIED (SIMPLICIO_ALLOW_UNVERIFIED=1, unofficial channel)"
   } else {
-    Write-Error "Refusing to install: no published SHA256 checksum for target '$Target' in the update manifest. Set SIMPLICIO_ALLOW_UNVERIFIED=1 to override at your own risk."
+    Write-Error "Refusing to install: no published SHA256 checksum for target '$Target' in the update manifest."
     exit 1
   }
 } elseif (-not $ExpectedSigned) {
@@ -556,7 +564,7 @@ if ($ExpectedSha256) {
 }
 
 if ($ExpectedSigned) {
-  if ($ExpectedPublicKey -ne $Ed25519PublicKey -or -not (Test-Ed25519Signature $StagingPath ([string]$ExpectedSignature) $Ed25519PublicKey ([string]$ExpectedSha256))) {
+  if (-not (Test-Ed25519Signature $StagingPath $ExpectedSignature $PinnedPublicKey $ExpectedSha256)) {
     Remove-Item -Force $StagingPath -ErrorAction SilentlyContinue
     Write-Error "Ed25519 signature verification failed; refusing to install."
     exit 1
