@@ -73,8 +73,8 @@ class PublicManifestSigningKeyTests(unittest.TestCase):
         self.assertIn("SIMPLICIO_ALLOW_UNVERIFIED", shell)
         self.assertIn("SIMPLICIO_CHANNEL", powershell)
         self.assertIn("SIMPLICIO_CHANNEL", shell)
-        self.assertLess(powershell.index("Get-FileHash"), powershell.index("Move-Item -Force"))
-        self.assertLess(shell.index("sha256_of"), shell.index('mv -f "$STAGING_PATH" "$DEST_PATH"'))
+        self.assertLess(powershell.index("if ($ExpectedSha256)"), powershell.rindex("Move-Item -Force"))
+        self.assertLess(shell.index('if [ -n "$EXPECTED_SHA256" ]'), shell.rindex('mv -f "$STAGING_PATH" "$DEST_PATH"'))
 
 
 if __name__ == "__main__":
