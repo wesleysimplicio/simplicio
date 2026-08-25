@@ -60,6 +60,23 @@ class PublicManifestSigningKeyTests(unittest.TestCase):
             hashlib.sha256(b"tampered").hexdigest(),
         )
 
+
+    def test_v3_8_24_incident_fixture_keeps_missing_key_fatal(self):
+        fixture = json.loads(
+            (ROOT / "tests/fixtures/v3.8.24-manifest-missing-signing-pubkey.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        manifest = fixture["manifest"]
+        evidence = fixture["evidence"]
+        self.assertNotIn("signing_pubkey", manifest)
+        self.assertTrue(manifest["security"]["signature_required"])
+        self.assertIn("does not match the pinned installer key", evidence["observed_error"])
+        powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
+        shell = (ROOT / "install.sh").read_text(encoding="utf-8")
+        self.assertIn(evidence["expected_powershell_error"], powershell)
+        self.assertIn(evidence["expected_shell_error"], shell)
+
     def test_both_installers_keep_key_errors_distinct_and_fail_closed(self):
         powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
         shell = (ROOT / "install.sh").read_text(encoding="utf-8")
