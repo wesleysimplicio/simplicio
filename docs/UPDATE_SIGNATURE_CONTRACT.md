@@ -51,3 +51,8 @@ signatures as required.
 ## Key rotation
 
 The private Ed25519 signing key never belongs in this repository. Key rotation is a separate documented transition: update the schema and installers before accepting a new key, publish a new patch release, and never rewrite the bytes or assets of an immutable release.
+
+
+## Incident evidence: v3.8.24
+
+The public `v3.8.24` manifest had `security.signature_required=true` but no root `signing_pubkey`. The installer consequently reported a key mismatch instead of the specific missing-field error. The incident is preserved in `tests/fixtures/v3.8.24-manifest-missing-signing-pubkey.json`, and the regression test requires the missing-key path to remain fatal. Never rewrite the immutable `v3.8.24` assets; the correction belongs in a new patch release.
