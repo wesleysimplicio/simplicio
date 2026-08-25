@@ -76,6 +76,41 @@ sha256_of() {
   fi
 }
 
+verify_ed25519_signature() {
+  binary_path="$1"
+  signature="$2"
+  public_key="$3"
+  expected_sha256="$4"
+  helper_path="$5"
+
+  if [ -z "$signature" ] || [ -z "$public_key" ] || [ -z "$expected_sha256" ]; then
+    return 1
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    return 1
+  fi
+  if [ "$(sha256_of "$binary_path")" != "$expected_sha256" ]; then
+    return 1
+  fi
+
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$ED25519_HELPER_URL" -o "$helper_path" || return 1
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q "$ED25519_HELPER_URL" -O "$helper_path" || return 1
+  else
+    return 1
+  fi
+
+  if [ "$(sha256_of "$helper_path")" != "$ED25519_HELPER_SHA256" ]; then
+    return 1
+  fi
+
+  python3 "$helper_path" \
+    --public-key "$public_key" \
+    --signature "$signature" \
+    --sha256 "$expected_sha256" >/dev/null 2>&1
+}
+
 verify_runtime_contract() {
   binary_path="$1"
   if [ ! -x "$binary_path" ] || ! command -v python3 >/dev/null 2>&1; then

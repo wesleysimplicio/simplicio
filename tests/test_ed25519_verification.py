@@ -30,6 +30,11 @@ def test_tampered_signature_is_rejected():
 def test_installers_pin_and_invoke_crypto_verification():
     shell = (ROOT / 'install.sh').read_text(encoding='utf-8')
     powershell = (ROOT / 'install.ps1').read_text(encoding='utf-8')
-    assert 'ED25519_PUBLIC_KEY' in shell and 'verify_ed25519_signature' in shell
+    assert 'ED25519_PUBLIC_KEY' in shell
+    assert 'verify_ed25519_signature() {' in shell
+    assert shell.index('verify_ed25519_signature() {') < shell.index(
+        'verify_ed25519_signature "$STAGING_PATH"'
+    )
+    assert 'python3 "$helper_path"' in shell
     assert '$Ed25519PublicKey' in powershell and 'Test-Ed25519Signature' in powershell
     assert 'SIMPLICIO_ALLOW_UNVERIFIED' in shell and 'SIMPLICIO_ALLOW_UNVERIFIED' in powershell
