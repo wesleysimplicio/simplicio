@@ -93,6 +93,20 @@ py -m pip install --upgrade simplicio-installer
 simplicio install
 ```
 
+### Instalacja bezpośrednia (bez PyPI)
+
+macOS / Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
+```
+
+Windows PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex
+```
+
 Gotowe. Jedno polecenie. Żaden menedżer pakietów, żadna konfiguracja modelu.
 
 ---
