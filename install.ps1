@@ -331,7 +331,8 @@ if (-not $Version) {
 if ($Version -eq "latest") {
   $ReleaseBase = "https://github.com/$Repo/releases/latest/download"
 } else {
-  $ReleaseBase = "https://github.com/$Repo/releases/download/$Version"
+  $ReleaseTag = if ($Version.StartsWith("v")) { $Version } else { "v$Version" }
+  $ReleaseBase = "https://github.com/$Repo/releases/download/$ReleaseTag"
 }
 
 # ─── Fetch update manifest for checksum verification ───────────────────────

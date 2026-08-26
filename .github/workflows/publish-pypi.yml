@@ -31,6 +31,36 @@ jobs:
           name: simplicio-installer-dist
           path: pypi/simplicio/dist/
 
+  release-install-smoke:
+    if: inputs.publish == true
+    needs: publish
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-latest, target: linux-x64}
+          - {os: windows-latest, target: windows-x64}
+          - {os: macos-13, target: macos-x64}
+          - {os: macos-14, target: macos-arm64}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test terminal and PyPI installers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/release_install_smoke.py --version "$(python -c 'import json; print(json.load(open("simplicio-update-manifest.json"))["version"])')" --json | tee release-install-${{ matrix.target }}.json
+      - name: Upload release install evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-install-smoke-${{ matrix.target }}
+          path: release-install-${{ matrix.target }}.json
+          retention-days: 30
+
   publish:
     if: inputs.publish == true
     needs: build

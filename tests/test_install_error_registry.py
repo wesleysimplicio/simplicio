@@ -82,6 +82,9 @@ def test_validation_sentinels_are_recorded_as_fixed():
         "MACOS-X64-009",
         "BENCH-010",
         "PYPI-MANIFEST-011",
+        "RELEASE-TAG-012",
+        "SWAP-ACTIVATION-013",
+        "PYPI-PUBLIC-014",
     }
     assert expected <= entries.keys()
     assert all(entries[key]["status"] == "fixed" for key in expected)

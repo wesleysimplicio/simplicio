@@ -20,3 +20,15 @@ def test_workflow_has_four_platform_matrix_entries():
     for value in ('ubuntu-latest', 'windows-latest', 'macos-13', 'macos-14'):
         assert value in workflow
     assert '--download --json' in workflow
+
+
+def test_release_install_smoke_covers_terminal_and_pypi_paths():
+    script = (ROOT / 'scripts/release_install_smoke.py').read_text(encoding='utf-8')
+    workflow = (ROOT / '.github/workflows/publish-pypi.yml').read_text(encoding='utf-8')
+    assert 'install.sh' in script
+    assert 'install.ps1' in script
+    assert 'simplicio-installer==' in script
+    assert '"-m",' in script
+    assert '"venv",' in script
+    assert 'release_install_smoke.py' in workflow
+    assert 'needs: publish' in workflow

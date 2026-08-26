@@ -19,6 +19,12 @@ def test_shell_uninstall_policy_and_rollback_are_explicit():
     assert 'estado de login desapareceu' in text
 
 
+def test_shell_swap_has_one_activation_message_after_atomic_move():
+    text = (ROOT / 'install.sh').read_text(encoding='utf-8')
+    assert text.count('mv -f \"$STAGING_PATH\" \"$DEST_PATH\"') == 1
+    assert text.count('ok \"Simplicio Runtime instalado em $DEST_PATH\"') == 1
+
+
 def test_powershell_uninstall_policy_and_rollback_are_explicit():
     text = (ROOT / 'install.ps1').read_text(encoding='utf-8')
     assert '[switch]$KeepData' in text and '[switch]$Purge' in text

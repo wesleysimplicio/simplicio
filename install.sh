@@ -391,7 +391,8 @@ if [ "$SKIP_EXISTING" != "true" ]; then
   if [ "$VERSION" = "latest" ]; then
     RELEASE_BASE="$GITHUB/releases/latest/download"
   else
-    RELEASE_BASE="$GITHUB/releases/download/$VERSION"
+    RELEASE_TAG="v${VERSION#v}"
+    RELEASE_BASE="$GITHUB/releases/download/$RELEASE_TAG"
   fi
   DOWNLOAD_URL="$RELEASE_BASE/$ASSET"
   MANIFEST_URL="$RELEASE_BASE/simplicio-update-manifest.json"
@@ -547,7 +548,6 @@ except Exception:
   fi
   INSTALL_TRANSACTION_ACTIVE="false"
   rm -f "$PREVIOUS_PATH"
-  ok "Simplicio Runtime instalado em $DEST_PATH"  mv -f "$STAGING_PATH" "$DEST_PATH"
   ok "Simplicio Runtime instalado em $DEST_PATH"
 fi
 

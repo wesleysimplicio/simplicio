@@ -30,6 +30,9 @@ também os caminhos públicos, o fallback de autenticação e a limpeza de stagi
 | UNINSTALL-008 | Todas | fixed | Keep-data, purge confirmado e rollback estão explícitos nos instaladores. |
 | MACOS-X64-009 | macOS Intel | fixed | Teste e instalador usam o alvo canônico `macos-x64`. |
 | BENCH-010 | CI | fixed | Wrappers npm e manifesto estão alinhados em 3.8.25. |
+| RELEASE-TAG-012 | Todas | fixed | Pin `3.8.25` montava URL sem o prefixo `v` no GitHub Release. |
+| SWAP-ACTIVATION-013 | macOS/Linux | fixed | Linha duplicada podia impedir o binário staged de virar o ativo. |
+| PYPI-PUBLIC-014 | Todas | fixed | O smoke público detectou pacote ausente no PyPI e passou a bloquear releases sem publicação. |
 | PYPI-MANIFEST-011 | Packaging | fixed | Pin PyPI 3.8.25 confere com o manifest público. |
 
 ## Regras para novos incidentes

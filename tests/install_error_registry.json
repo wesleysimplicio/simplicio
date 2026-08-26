@@ -149,6 +149,49 @@
       "fixed_commit": "eef83c7a8abc2b96993928db4780777cab37c9e2"
     },
     {
+      "id": "RELEASE-TAG-012",
+      "platform": "windows-macos-linux",
+      "status": "fixed",
+      "severity": "high",
+      "source": "local-release-smoke",
+      "symptom": "A pinned version without a leading v requested a non-existent GitHub Release URL.",
+      "root_cause": "The terminal installers used the environment version verbatim instead of normalizing the immutable release tag.",
+      "guard": "Both installers normalize 3.8.25 and v3.8.25 to the same v3.8.25 download tag.",
+      "regression_tests": [
+        "tests/test_clean_install_bootstrap_contract.py::test_shell_defers_mcp_handshake_until_after_login",
+        "tests/test_clean_install_bootstrap_contract.py::test_powershell_defers_mcp_handshake_until_after_login"
+      ],
+      "fixed_commit": "pending"
+    },
+    {
+      "id": "SWAP-ACTIVATION-013",
+      "platform": "macos-linux",
+      "status": "fixed",
+      "severity": "blocker",
+      "source": "local-release-smoke",
+      "symptom": "The installer could download and verify a binary without activating the staged file.",
+      "root_cause": "A duplicated activation line caused the first command to be passed as extra arguments to the logging helper.",
+      "guard": "The atomic move and success message each occur exactly once and have a regression test.",
+      "regression_tests": [
+        "tests/test_install_transaction_contract.py::test_shell_swap_has_one_activation_message_after_atomic_move"
+      ],
+      "fixed_commit": "pending"
+    },
+    {
+      "id": "PYPI-PUBLIC-014",
+      "platform": "windows-macos-linux",
+      "status": "fixed",
+      "severity": "blocker",
+      "source": "local-release-smoke",
+      "symptom": "The public PyPI index did not contain the version referenced by the installer docs.",
+      "root_cause": "The package was built in the repository but had not been published before claiming PyPI installation support.",
+      "guard": "The PyPI publish workflow runs the terminal and public PyPI smoke on all four supported hosts after upload.",
+      "regression_tests": [
+        "tests/test_clean_install_e2e_contract.py::test_release_install_smoke_covers_terminal_and_pypi_paths"
+      ],
+      "fixed_commit": "pending"
+    },
+    {
       "id": "PYPI-MANIFEST-011",
       "platform": "packaging",
       "status": "fixed",

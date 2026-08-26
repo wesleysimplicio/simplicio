@@ -94,6 +94,21 @@ namespaces. Their approved aliases are maintained in
 `distribution/targets.json`; the smoke test accepts only those explicit
 aliases, never an arbitrary target string.
 
+## Installer smoke for every release
+
+Depois de publicar o GitHub Release e o pacote PyPI da mesma versão, execute o
+smoke multiplataforma. Ele cria `HOME` e virtualenvs temporários, instala pelo
+script de terminal e por `pip`, baixa a release assinada, e verifica o binário
+instalado sem reutilizar estado do mantenedor:
+
+```bash
+python3 scripts/release_install_smoke.py --version vX.Y.Z --json
+```
+
+O workflow `publish-pypi.yml` executa esse mesmo comando em Linux, Windows,
+macOS Intel e macOS Apple Silicon depois do job de publicação. Uma nova release
+não deve ser considerada pronta se qualquer um dos dois métodos falhar.
+
 ## Latest-only installation
 
 The PyPI bootstrap installs the launcher and then resolves the signed Runtime
