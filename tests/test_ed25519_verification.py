@@ -38,3 +38,9 @@ def test_installers_pin_and_invoke_crypto_verification():
     assert 'python3 "$helper_path"' in shell
     assert '$Ed25519PublicKey' in powershell and 'Test-Ed25519Signature' in powershell
     assert 'SIMPLICIO_ALLOW_UNVERIFIED' in shell and 'SIMPLICIO_ALLOW_UNVERIFIED' in powershell
+
+
+def test_powershell_verifier_braces_exit_code_before_colon():
+    script = (ROOT / 'install.ps1').read_text(encoding='utf-8')
+    assert '${LASTEXITCODE}: $detail' in script
+    assert '$LASTEXITCODE: $detail' not in script

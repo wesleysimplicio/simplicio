@@ -107,7 +107,7 @@ function Test-Ed25519Signature([string]$BinaryPath, [string]$Signature, [string]
       if ([string]::IsNullOrWhiteSpace($detail)) {
         $detail = "verification helper exited with code $LASTEXITCODE"
       } else {
-        $detail = "verification helper exited with code $LASTEXITCODE: $detail"
+        $detail = "verification helper exited with code ${LASTEXITCODE}: $detail"
       }
       $script:Ed25519VerifyError = $detail
       return $false
@@ -145,11 +145,12 @@ function Test-ActiveLogin {
     $status = $raw | ConvertFrom-Json
     $identity = $status.identity
     if ($null -eq $identity) { return $false }
+    $identityEmail = if ($null -ne $identity.email) { $identity.email } else { $status.user.email }
     $active = (
       $identity.enabled -eq $true -and
       $identity.login_enabled -eq $true -and
       $identity.status -notin @("disabled", "logged_out", "revoked") -and
-      -not [string]::IsNullOrWhiteSpace([string]$identity.email)
+      -not [string]::IsNullOrWhiteSpace([string]$identityEmail)
     )
     if ($null -ne $status.entitlement -and $null -ne $status.entitlement.updates_allowed) {
       $active = $active -and ($status.entitlement.updates_allowed -eq $true)
