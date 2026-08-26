@@ -104,6 +104,13 @@ def test_public_publisher_can_resume_after_an_external_partial_failure():
     assert "already_published_to_pypi" in source
 
 
+def test_public_runbook_requires_manual_publication_without_actions():
+    source = (ROOT / "docs/RELEASE_RUNBOOK.md").read_text(encoding="utf-8")
+    assert "publish-pypi.yml" not in source
+    assert "GitHub Actions" not in source
+    assert "publicador local/manual" in source
+
+
 def test_publication_cleanliness_ignores_only_protected_local_state():
     script = ROOT / "scripts/publish_release_local.py"
     spec = importlib.util.spec_from_file_location("publish_release_local", script)

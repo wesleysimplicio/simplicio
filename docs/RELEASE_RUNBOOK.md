@@ -105,9 +105,10 @@ instalado sem reutilizar estado do mantenedor:
 python3 scripts/release_install_smoke.py --version vX.Y.Z --json
 ```
 
-O workflow `publish-pypi.yml` executa esse mesmo comando em Linux, Windows,
-macOS Intel e macOS Apple Silicon depois do job de publicação. Uma nova release
-não deve ser considerada pronta se qualquer um dos dois métodos falhar.
+O publicador local/manual executa esse mesmo comando antes e depois dos uploads.
+Os recibos nativos de Linux, Windows, macOS Intel e macOS Apple Silicon são
+registrados por host, sem delegar build ou publicação a workflows remotos. Uma
+nova release não deve ser considerada pronta se qualquer um dos dois métodos falhar.
 
 ## Latest-only installation
 
