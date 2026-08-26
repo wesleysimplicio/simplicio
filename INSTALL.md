@@ -21,7 +21,21 @@ py -m pip install --upgrade simplicio-installer
 simplicio install
 ```
 
-The PyPI package is the official bootstrap: it installs the launcher, verifies
+### Direct terminal installer (without PyPI)
+
+macOS / Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex
+```
+
+The PyPI package is the recommended bootstrap: it installs the launcher, verifies
 the signed SHA256/Ed25519 Runtime release, and installs the platform binary.
 If the Python script directory is not already on `PATH`, add it before running
 `simplicio install`.
@@ -34,7 +48,7 @@ Known installer incidents and regression sentinels are tracked in
 Download the binary for your platform from the
 [releases](https://github.com/wesleysimplicio/simplicio/releases). Asset names
 are canonical — see [`distribution/targets.json`](distribution/targets.json),
-the single source of truth used by the release workflow, both installers and
+the single source of truth used by the local/manual publisher, both installers and
 `simplicio-update-manifest.json`:
 
 | Target id      | Platform               | Asset                       |

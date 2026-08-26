@@ -58,7 +58,8 @@ def test_install_docs_use_pypi_bootstrap():
         text = (ROOT / relative).read_text(encoding="utf-8")
         assert "python3 -m pip install --upgrade simplicio-installer" in text
         assert "simplicio install" in text
-        assert "raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh" not in text
+        assert "curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh" in text
+        assert "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex" in text
     for relative in ("README.md", "INSTALL.md"):
         text = (ROOT / relative).read_text(encoding="utf-8")
         assert "py -m pip install --upgrade simplicio-installer" in text
