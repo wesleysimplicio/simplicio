@@ -91,6 +91,9 @@ SIMPLICIO_BIN_DIR="$HOME/.simplicio/bin" \
   sh -c "$(curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh)"
 ```
 
+Known installer incidents and their regression sentinels are tracked in
+[docs/INSTALL_ERROR_REGISTRY.md](docs/INSTALL_ERROR_REGISTRY.md).
+
 PowerShell supports the equivalent `SIMPLICIO_BIN_DIR` setting. Keep checksum
 verification enabled. Only set
 `SIMPLICIO_ALLOW_UNVERIFIED=1` when you have deliberately accepted an

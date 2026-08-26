@@ -22,6 +22,9 @@ powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/m
 $env:Path = "$env:USERPROFILE\.simplicio\bin;$env:Path"
 ```
 
+Known installer incidents and regression sentinels are tracked in
+[docs/INSTALL_ERROR_REGISTRY.md](docs/INSTALL_ERROR_REGISTRY.md).
+
 ### Manual Download
 
 Download the binary for your platform from the

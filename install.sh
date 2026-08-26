@@ -430,7 +430,10 @@ except Exception:
 
   info "Baixando de $DOWNLOAD_URL ..."
   STAGING_PATH="$DEST_PATH.download-$$.tmp"
-  fetch "$DOWNLOAD_URL" "$STAGING_PATH"
+  if ! fetch "$DOWNLOAD_URL" "$STAGING_PATH"; then
+    rm -f "$STAGING_PATH"
+    err "download falhou ao buscar $DOWNLOAD_URL: verifique a release, a arquitetura e a conectividade"
+  fi
 
   if [ ! -s "$STAGING_PATH" ]; then
     rm -f "$STAGING_PATH"

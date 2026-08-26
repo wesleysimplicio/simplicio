@@ -1,0 +1,166 @@
+{
+  "schema": "simplicio.install-error-registry/v1",
+  "version": 1,
+  "scope": "public-installers",
+  "maintained_by": "tests/test_install_error_registry.py",
+  "entries": [
+    {
+      "id": "WIN-PS-PARSE-001",
+      "platform": "windows",
+      "status": "fixed",
+      "severity": "blocker",
+      "source": "customer-screenshot",
+      "symptom": "PowerShell aborts before the installer can fetch or report a failure.",
+      "root_cause": "A colon immediately followed the interpolated $LASTEXITCODE variable.",
+      "guard": "Brace LASTEXITCODE when it is followed by a colon.",
+      "regression_tests": [
+        "tests/test_ed25519_verification.py::test_powershell_verifier_braces_exit_code_before_colon"
+      ],
+      "fixed_commit": "7bc2667"
+    },
+    {
+      "id": "WIN-FETCH-002",
+      "platform": "windows",
+      "status": "guarded",
+      "severity": "high",
+      "source": "customer-report",
+      "symptom": "A helper or binary fetch can fail and leave an unexplained installer error.",
+      "root_cause": "Network failures must be converted into a diagnostic and the staging file must be removed.",
+      "guard": "Invoke-WebRequest uses ErrorAction Stop inside catch blocks; failed downloads clean staging files.",
+      "regression_tests": [
+        "tests/test_install_error_registry.py::test_windows_fetch_failures_are_caught_and_cleaned"
+      ],
+      "fixed_commit": "7bc2667"
+    },
+    {
+      "id": "UNIX-FETCH-003",
+      "platform": "macos-linux",
+      "status": "fixed",
+      "severity": "blocker",
+      "source": "customer-report",
+      "symptom": "macOS/Linux installer exits from the raw curl/wget fetch, without a useful error or cleanup.",
+      "root_cause": "The staged binary fetch was called directly while install.sh uses set -e.",
+      "guard": "The staged asset fetch is wrapped, reports the URL, and removes the temporary file before exit.",
+      "regression_tests": [
+        "tests/test_install_error_registry.py::test_unix_asset_fetch_failure_is_caught_and_cleaned"
+      ],
+      "fixed_commit": "this-patch"
+    },
+    {
+      "id": "AUTH-SHAPE-004",
+      "platform": "windows-macos-linux",
+      "status": "fixed",
+      "severity": "high",
+      "source": "customer-report",
+      "symptom": "A valid login is reported as inactive when the account email is returned under user.email.",
+      "root_cause": "Installers only inspected identity.email during a staged auth schema transition.",
+      "guard": "Both installers accept identity.email and the legacy user.email shape.",
+      "regression_tests": [
+        "tests/test_auth_install_contract.py::test_legacy_identity_shape_is_accepted_after_successful_login",
+        "tests/test_auth_install_contract.py::test_both_published_installers_include_legacy_email_fallback"
+      ],
+      "fixed_commit": "7bc2667"
+    },
+    {
+      "id": "DOC-INSTALL-005",
+      "platform": "windows-macos-linux",
+      "status": "fixed",
+      "severity": "high",
+      "source": "customer-report",
+      "symptom": "Customers copy an obsolete channel or cannot run the installed CLI in the current terminal.",
+      "root_cause": "Public docs mixed install channels and did not make the session-only PATH step explicit.",
+      "guard": "Docs use the canonical master installer URLs, explain current-session PATH, and point to the managed binary.",
+      "regression_tests": [
+        "tests/test_install_error_registry.py::test_install_docs_are_canonical_and_path_explicit"
+      ],
+      "fixed_commit": "ca83b82"
+    },
+    {
+      "id": "MCP-BOOT-006",
+      "platform": "windows-macos-linux",
+      "status": "open",
+      "severity": "high",
+      "source": "full-validation",
+      "symptom": "Bootstrap contract tests still expect the old require_active_login/verify_mcp_tools ordering.",
+      "root_cause": "Installer behavior moved to report_login_state plus direct MCP registration, but the old tests were not reconciled.",
+      "guard": "Keep the failing tests as a release sentinel until the intended login/MCP contract is decided and implemented.",
+      "regression_tests": [
+        "tests/test_clean_install_bootstrap_contract.py::test_shell_defers_mcp_handshake_until_after_login",
+        "tests/test_clean_install_bootstrap_contract.py::test_powershell_defers_mcp_handshake_until_after_login"
+      ],
+      "next_action": "Reconcile the test contract with the intended fail-closed MCP behavior."
+    },
+    {
+      "id": "CODEX-HOOK-007",
+      "platform": "windows-macos-linux",
+      "status": "open",
+      "severity": "medium",
+      "source": "full-validation",
+      "symptom": "Codex integration test rejects the current mutable-master hook reference policy.",
+      "root_cause": "The test and installer policy disagree on the allowed opt-in hook reference.",
+      "guard": "Keep the sentinel until the hook ref policy is made explicit and both code and test agree.",
+      "regression_tests": [
+        "tests/test_codex_integration_cli.py::test_installers_are_opt_in_and_do_not_use_mutable_master_hook_ref"
+      ],
+      "next_action": "Choose a version-pinned hook policy and update the contract."
+    },
+    {
+      "id": "UNINSTALL-008",
+      "platform": "windows-macos-linux",
+      "status": "open",
+      "severity": "medium",
+      "source": "full-validation",
+      "symptom": "Uninstall/rollback contract tests expect transaction markers and purge semantics absent from the current scripts.",
+      "root_cause": "The installer implementation and the transaction test contract have drifted.",
+      "guard": "Keep all three failing sentinels recorded; do not silently weaken purge or rollback expectations.",
+      "regression_tests": [
+        "tests/test_install_transaction_contract.py::test_shell_uninstall_policy_and_rollback_are_explicit",
+        "tests/test_install_transaction_contract.py::test_powershell_uninstall_policy_and_rollback_are_explicit",
+        "tests/test_install_transaction_contract.py::test_shell_purge_removes_simplicio_state_but_preserves_provider_env"
+      ],
+      "next_action": "Reconcile the desired uninstall contract before changing deletion behavior."
+    },
+    {
+      "id": "MACOS-X64-009",
+      "platform": "macos",
+      "status": "open",
+      "severity": "medium",
+      "source": "full-validation",
+      "symptom": "The macOS Intel contract test still demands the obsolete macos-x86_64 manifest alias.",
+      "root_cause": "The test expects a naming convention different from distribution/targets.json and the published manifest, which use macos-x64.",
+      "guard": "Keep the sentinel until the canonical target naming decision is recorded and the test is corrected.",
+      "regression_tests": [
+        "tests/test_macos_x64_contract.py::test_shell_installer_does_not_reject_macos_x64"
+      ],
+      "next_action": "Confirm whether macos-x64 is canonical; then update the stale test or the distribution table."
+    },
+    {
+      "id": "BENCH-010",
+      "platform": "ci",
+      "status": "open",
+      "severity": "low",
+      "source": "full-validation",
+      "symptom": "The benchmark audit timing/CLI report test is not deterministic in the current environment.",
+      "root_cause": "The test combines measured timing with a strict report assertion.",
+      "guard": "Keep the failure visible as a quality-gate sentinel rather than hiding it behind a skip.",
+      "regression_tests": [
+        "tests/test_quality_helpers.py::BenchmarkTests::test_audit_timing_and_cli_emit_reports"
+      ],
+      "next_action": "Separate timing tolerance from report-file correctness."
+    },
+    {
+      "id": "PYPI-MANIFEST-011",
+      "platform": "packaging",
+      "status": "open",
+      "severity": "medium",
+      "source": "full-validation",
+      "symptom": "The PyPI installer test finds a default manifest pin that does not match the versioned checkout.",
+      "root_cause": "The wrapper's default source/version pin drifted from the public release metadata.",
+      "guard": "Keep the packaging sentinel active until the wrapper and checkout provenance are aligned.",
+      "regression_tests": [
+        "tests/unit/test_pypi_installer.py::test_default_manifest_pin_matches_versioned_checkout"
+      ],
+      "next_action": "Align the PyPI default pin with the versioned public checkout and release manifest."
+    }
+  ]
+}
