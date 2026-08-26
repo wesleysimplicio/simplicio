@@ -136,6 +136,83 @@ def blocking_tracked_changes() -> list[str]:
     return sorted(path for path in changed if not is_ignored_local_state(path))
 
 
+def pypi_release_files(version: str) -> list[dict]:
+    try:
+        with urllib.request.urlopen("https://pypi.org/pypi/simplicio-installer/json", timeout=30) as response:
+            releases = json.load(response).get("releases", {})
+    except Exception as exc:
+        raise PublishError("could not verify current PyPI project state") from exc
+    files = releases.get(version, [])
+    if not isinstance(files, list):
+        raise PublishError("PyPI release metadata is malformed")
+    if files and (len(files) != 1 or files[0].get("packagetype") != "bdist_wheel"):
+        raise PublishError("PyPI release is not exactly one wheel")
+    return files
+
+
+def resume_public_preflight(tag: str, version: str, source_commit: str) -> dict:
+    if run(["git", "branch", "--show-current"]).stdout.strip() != "master":
+        raise PublishError("public repository must be on master")
+    if "wesleysimplicio/simplicio" not in run(["git", "remote", "get-url", "origin"]).stdout.strip():
+        raise PublishError("origin is not the public distribution repository")
+    blocking = blocking_tracked_changes()
+    if blocking:
+        raise PublishError(
+            "public tracked worktree has distribution changes: " + ", ".join(blocking)
+        )
+
+    run(["git", "fetch", "--quiet", "origin", "master", "--tags"], timeout=120)
+    remote_tag = run(
+        ["git", "ls-remote", "--tags", "origin", "refs/tags/" + tag]
+    ).stdout.strip()
+    if not remote_tag:
+        raise PublishError("cannot resume before the public tag exists: " + tag)
+    remote_tag_object = remote_tag.split()[0]
+    local_tag_object = run(["git", "rev-parse", "refs/tags/" + tag]).stdout.strip()
+    if remote_tag_object != local_tag_object:
+        raise PublishError("local and remote public tag identities differ")
+    public_commit = run(["git", "rev-list", "-n", "1", tag]).stdout.strip()
+    remote_master = run(["git", "ls-remote", "origin", "refs/heads/master"]).stdout.split()[0]
+    run(["git", "merge-base", "--is-ancestor", public_commit, remote_master])
+
+    manifest = json.loads((ROOT / "simplicio-update-manifest.json").read_text(encoding="utf-8"))
+    if (
+        manifest.get("version") != version
+        or manifest.get("release_tag") != tag
+        or manifest.get("commit") != source_commit
+    ):
+        raise PublishError("public checkout does not match the release identity being resumed")
+    if (ROOT / "version.txt").read_text(encoding="utf-8").strip() != version:
+        raise PublishError("public version.txt does not match the release being resumed")
+    if source_commit not in (ROOT / "VERSION.md").read_text(encoding="utf-8"):
+        raise PublishError("public VERSION.md does not name the Runtime source commit")
+
+    release = json.loads(run([
+        "gh", "release", "view", tag,
+        "--repo", PUBLIC_REPOSITORY,
+        "--json", "tagName,isDraft,isPrerelease,assets",
+    ]).stdout)
+    if (
+        release.get("tagName") != tag
+        or release.get("isDraft") is True
+        or release.get("isPrerelease") is True
+    ):
+        raise PublishError("existing GitHub release is not the expected final release")
+    release_assets = {
+        str(item.get("name"))
+        for item in release.get("assets", [])
+        if isinstance(item, dict) and item.get("name")
+    }
+    if release_assets != set(required_bundle_files()):
+        raise PublishError("existing GitHub release asset set is incomplete or unexpected")
+
+    existing_pypi = pypi_release_files(version)
+    return {
+        "public_commit": public_commit,
+        "already_published_to_pypi": bool(existing_pypi),
+    }
+
+
 def public_preflight(tag: str, version: str, *, require_clean: bool) -> None:
     if run(["git", "branch", "--show-current"]).stdout.strip() != "master":
         raise PublishError("public repository must be on master")
@@ -160,12 +237,7 @@ def public_preflight(tag: str, version: str, *, require_clean: bool) -> None:
     )
     if existing.returncode == 0:
         raise PublishError("public release already exists: " + tag)
-    try:
-        with urllib.request.urlopen("https://pypi.org/pypi/simplicio-installer/json", timeout=30) as response:
-            releases = json.load(response).get("releases", {})
-    except Exception as exc:
-        raise PublishError("could not verify current PyPI project state") from exc
-    if version in releases:
+    if pypi_release_files(version):
         raise PublishError("PyPI version already exists: " + version)
 
 
@@ -352,6 +424,68 @@ def publish(bundle: Path, tag: str, version: str, source_commit: str) -> dict:
     }
 
 
+def resume_publish(bundle: Path, tag: str, version: str, source_commit: str) -> dict:
+    resume_state = resume_public_preflight(tag, version, source_commit)
+    bundle_receipt = verify_bundle(bundle, tag, version, source_commit)
+
+    run([sys.executable, str(ROOT / "scripts/verify_distribution_consistency.py")])
+    run([
+        sys.executable, "-m", "pytest", "-q",
+        "tests/test_codex_integration_cli.py",
+        "tests/test_release_local_contract.py",
+    ])
+    run([str(bundle / "simplicio-macos-arm64"), "version", "--json"])
+    if (ROOT / "scripts/verify_mcp_tools.py").is_file():
+        run([
+            sys.executable,
+            str(ROOT / "scripts/verify_mcp_tools.py"),
+            str(bundle / "simplicio-macos-arm64"),
+        ])
+
+    with tempfile.TemporaryDirectory(prefix="simplicio-public-resume-wheel-") as raw:
+        wheel = build_wheel(Path(raw), version)
+        wheel_help_smoke(wheel)
+        terminal = run([
+            sys.executable,
+            str(ROOT / "scripts/release_install_smoke.py"),
+            "--version", version, "--terminal", "--json",
+        ], timeout=900)
+        if not resume_state["already_published_to_pypi"]:
+            run(
+                [sys.executable, "-m", "twine", "upload", "--non-interactive", str(wheel)],
+                timeout=900,
+            )
+        pypi = wait_for_pypi(version)
+        package = run([
+            sys.executable,
+            str(ROOT / "scripts/release_install_smoke.py"),
+            "--version", version, "--pypi", "--json",
+        ], timeout=1200)
+        remote = run([
+            sys.executable,
+            str(ROOT / "scripts/post_release_smoke.py"),
+            "--repo", PUBLIC_REPOSITORY,
+            "--version", tag,
+            "--execute", "--json",
+        ], timeout=1200)
+
+    return {
+        "schema": "simplicio.local-publication-resume/v1",
+        "status": "verified",
+        "resumed": True,
+        "version": version,
+        "tag": tag,
+        "source_commit": source_commit,
+        "public_commit": resume_state["public_commit"],
+        "already_published_to_pypi": resume_state["already_published_to_pypi"],
+        "bundle": bundle_receipt,
+        "terminal_install": json.loads(terminal.stdout),
+        "pypi": pypi,
+        "pypi_install": json.loads(package.stdout),
+        "remote_release": json.loads(remote.stdout),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--bundle", type=Path, required=True)
@@ -360,13 +494,16 @@ def main() -> int:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--check-only", action="store_true")
     mode.add_argument("--publish", action="store_true")
+    mode.add_argument("--resume", action="store_true")
     args = parser.parse_args()
 
     tag, version = normalize_version(args.version)
     if re.fullmatch(r"[0-9a-f]{40}", args.source_commit) is None:
         raise PublishError("source commit must be a full SHA-1")
-    public_preflight(tag, version, require_clean=True)
-    if args.check_only:
+    if args.resume:
+        receipt = resume_publish(args.bundle.resolve(), tag, version, args.source_commit)
+    elif args.check_only:
+        public_preflight(tag, version, require_clean=True)
         receipt = {
             "schema": "simplicio.local-publication-preflight/v1",
             "status": "ready",

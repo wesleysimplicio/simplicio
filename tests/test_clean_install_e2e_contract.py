@@ -37,7 +37,7 @@ def test_local_publisher_covers_terminal_pypi_and_post_release_smokes():
     assert 'simplicio-installer==' in script
     assert '"-m",' in script
     assert '"venv",' in script
-    assert publisher.count('scripts/release_install_smoke.py') == 2
+    assert publisher.count('scripts/release_install_smoke.py') >= 2
     assert '"--terminal"' in publisher
     assert '"--pypi"' in publisher
     assert '"twine", "upload"' in publisher
