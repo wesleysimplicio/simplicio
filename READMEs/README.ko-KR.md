@@ -81,13 +81,15 @@ bunx simplicio install
 ### macOS / Linux
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
+python3 -m pip install --upgrade simplicio-installer
+simplicio install
 ```
 
 ### Windows
 
 ```powershell
-powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex"
+py -m pip install --upgrade simplicio-installer
+simplicio install
 ```
 
 끝. 하나의 명령어입니다. 패키지 매니저도, 모델 설정도 필요 없습니다.

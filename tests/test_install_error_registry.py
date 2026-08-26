@@ -53,15 +53,15 @@ def test_windows_fetch_failures_are_caught_and_cleaned():
     assert "if (Test-Path $StagingPath) { Remove-Item -Force $StagingPath" in powershell
 
 
-def test_install_docs_are_canonical_and_path_explicit():
+def test_install_docs_use_pypi_bootstrap():
+    for relative in ("README.md", "INSTALL.md", "READMEs/README.pt-BR.md"):
+        text = (ROOT / relative).read_text(encoding="utf-8")
+        assert "python3 -m pip install --upgrade simplicio-installer" in text
+        assert "simplicio install" in text
+        assert "raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh" not in text
     for relative in ("README.md", "INSTALL.md"):
         text = (ROOT / relative).read_text(encoding="utf-8")
-        assert "raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh" in text
-        assert 'export PATH="$HOME/.simplicio/bin:$PATH"' in text
-        assert "raw.githubusercontent.com/wesleysimplicio/simplicio/main/install" not in text
-    portuguese = (ROOT / "READMEs/README.pt-BR.md").read_text(encoding="utf-8")
-    assert "raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh" in portuguese
-    assert 'export PATH="$HOME/.simplicio/bin:$PATH"' in portuguese
+        assert "py -m pip install --upgrade simplicio-installer" in text
 
 
 def test_supported_unix_manifest_targets_are_present():

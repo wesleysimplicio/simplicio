@@ -54,36 +54,31 @@ opcionais, não obrigatórios.**
 
 ## 🚀 Instalação
 
-Use os instaladores oficiais. Eles baixam a release pública mais recente, validam
-checksum e assinatura, instalam o binário gerenciado e não clonam repositórios
-irmãos nem dependem de npm, pip, Homebrew ou Bun.
+Use o pacote oficial do PyPI. Ele instala o launcher Python, valida a release
+assinada do Runtime e instala o binário correto para macOS, Linux ou Windows.
 
-### macOS / Linux
+### Todos os sistemas via PyPI
+
+macOS / Linux:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
-export PATH="$HOME/.simplicio/bin:$PATH"
+python3 -m pip install --upgrade simplicio-installer
+simplicio install
 simplicio version
 simplicio auth login
 simplicio auth status --json
 simplicio ecosystem verify --json
 ```
 
-### Windows (PowerShell)
+No Windows (PowerShell), use `py -m pip install --upgrade simplicio-installer`
+no lugar de `python3 -m pip ...`. O token do PyPI fica somente no ambiente de
+publicação; nunca é copiado para o repositório.
 
-```powershell
-irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex
-$env:Path = "$env:USERPROFILE\.simplicio\bin;$env:Path"
-simplicio.exe version
-simplicio.exe auth login
-simplicio.exe auth status --json
-simplicio.exe ecosystem verify --json
-```
-
-O instalador coloca o binário em `~/.simplicio/bin/simplicio` no macOS/Linux ou
-`%USERPROFILE%\.simplicio\bin\simplicio.exe` no Windows. Ele não altera
-o perfil do shell; as alterações de `PATH` acima valem apenas para o terminal
-atual. O login Google é necessário antes de usar o MCP ou comandos autenticados.
+O launcher instala o Runtime verificado em `~/.local/bin/simplicio` no
+macOS/Linux ou `%USERPROFILE%\.local\bin\simplicio.exe` no Windows. Garanta que
+o diretório de scripts do Python e esse diretório estejam no `PATH`; o launcher
+não altera o perfil do shell. O login Google é necessário antes de usar o MCP
+ou comandos autenticados.
 
 ---
 

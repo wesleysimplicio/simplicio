@@ -5,7 +5,7 @@ Save up to 96% on AI tokens. Single binary, runs on your machine.
 ## Install
 
 ```bash
-pip install simplicio
+python3 -m pip install --upgrade simplicio-installer
 simplicio install
 ```
 

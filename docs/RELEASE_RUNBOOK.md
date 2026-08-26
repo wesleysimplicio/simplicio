@@ -96,12 +96,12 @@ aliases, never an arbitrary target string.
 
 ## Latest-only installation
 
-Installers intentionally resolve the GitHub `latest` release instead of a
-hard-coded version:
+The PyPI bootstrap installs the launcher and then resolves the signed Runtime
+release required by that package version:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
-powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex"
+python3 -m pip install --upgrade simplicio-installer
+simplicio install
 ```
 
 After installation, login is mandatory:

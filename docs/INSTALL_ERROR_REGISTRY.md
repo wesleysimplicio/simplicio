@@ -24,7 +24,7 @@ também os caminhos públicos, o fallback de autenticação e a limpeza de stagi
 | WIN-FETCH-002 | Windows | guarded | Falha de helper/binário precisava de diagnóstico e limpeza. |
 | UNIX-FETCH-003 | macOS/Linux | fixed | Fetch do binário saía pelo `set -e` sem tratamento explícito. |
 | AUTH-SHAPE-004 | Todas | fixed | Login válido em `user.email` era rejeitado. |
-| DOC-INSTALL-005 | Todas | fixed | Docs misturavam canais e não deixavam o PATH da sessão explícito. |
+| DOC-INSTALL-005 | Todas | fixed | Docs apontavam para installers/canais inconsistentes em vez do bootstrap PyPI. |
 | MCP-BOOT-006 | Todas | open | Testes ainda esperam o contrato antigo de login/MCP. |
 | CODEX-HOOK-007 | Todas | open | Política do hook versionado diverge do teste. |
 | UNINSTALL-008 | Todas | open | Contrato de uninstall/rollback diverge dos scripts atuais. |
@@ -41,5 +41,5 @@ também os caminhos públicos, o fallback de autenticação e a limpeza de stagi
 4. Quando corrigido, atualizar o status e registrar o commit de resolução.
 5. Executar o teste específico e a validação progressiva antes de publicar.
 
-Última auditoria: commit público `fdde817`; o caso UNIX-FETCH-003 está coberto
-pelo mesmo patch.
+Última auditoria: o registro também cobre o contrato público do bootstrap PyPI.
+O caso UNIX-FETCH-003 permanece coberto pelo mesmo patch.

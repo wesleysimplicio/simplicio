@@ -108,14 +108,15 @@ A successful response contains the tool definitions. A `login required` error me
 
 ## Automatic setup
 
-The official installers verify the binary checksum, Ed25519 signature, and
-embedded-bundle contract, then require active login. Codex MCP registration and
-routing hooks are opt-in; enable them explicitly with SIMPLICIO_INSTALL_CODEX=1.
+The official PyPI bootstrap verifies the binary checksum, Ed25519 signature,
+and release-manifest contract, then requires active login. Codex MCP registration
+and routing hooks are opt-in; enable them explicitly after `simplicio install`.
 Other MCP clients can use the local STDIO entry above without copying tokens.
 
-A quick installer bootstrap is:
+A quick PyPI bootstrap is:
 ~~~bash
-curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
+python3 -m pip install --upgrade simplicio-installer
+simplicio install
 ~~~
 
 For the full installation, update, benchmark, and troubleshooting guide, see [`README.md`](README.md).

@@ -67,11 +67,11 @@
       "status": "fixed",
       "severity": "high",
       "source": "customer-report",
-      "symptom": "Customers copy an obsolete channel or cannot run the installed CLI in the current terminal.",
-      "root_cause": "Public docs mixed install channels and did not make the session-only PATH step explicit.",
-      "guard": "Docs use the canonical master installer URLs, explain current-session PATH, and point to the managed binary.",
+      "symptom": "Customers copy an obsolete channel instead of the PyPI bootstrap.",
+      "root_cause": "Public docs mixed install channels and the package README used the wrong PyPI name.",
+      "guard": "Primary docs use python3/py -m pip install --upgrade simplicio-installer followed by simplicio install.",
       "regression_tests": [
-        "tests/test_install_error_registry.py::test_install_docs_are_canonical_and_path_explicit"
+        "tests/test_install_error_registry.py::test_install_docs_use_pypi_bootstrap"
       ],
       "fixed_commit": "ca83b82"
     },

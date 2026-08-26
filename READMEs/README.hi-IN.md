@@ -82,13 +82,15 @@ bunx simplicio install
 ### macOS / Linux
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
+python3 -m pip install --upgrade simplicio-installer
+simplicio install
 ```
 
 ### Windows
 
 ```powershell
-powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex"
+py -m pip install --upgrade simplicio-installer
+simplicio install
 ```
 
 हो गया। एक कमांड। कोई पैकेज मैनेजर नहीं, कोई मॉडल कॉन्फ़िगरेशन नहीं।

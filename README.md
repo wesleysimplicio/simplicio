@@ -63,47 +63,43 @@ directly. They do not clone sibling repositories or install the embedded Python
 projects with pip. Login can be completed after installation; MCP tool calls
 remain fail-closed until the account is active.
 
-### macOS / Linux
+### All platforms via PyPI
+
+macOS / Linux:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
-export PATH="$HOME/.simplicio/bin:$PATH"
+python3 -m pip install --upgrade simplicio-installer
+simplicio install
 ```
 
-### Windows
+Windows (PowerShell):
 
 ```powershell
-powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex"
-$env:Path = "$env:USERPROFILE\.simplicio\bin;$env:Path"
+py -m pip install --upgrade simplicio-installer
+simplicio install
 ```
 
-The default install location is `~/.simplicio/bin/simplicio` on macOS/Linux and
-`%USERPROFILE%\.simplicio\bin\simplicio.exe` on Windows. The installer does not
-edit your shell profile; the `PATH` changes above apply only to the current
-terminal. Use the managed path directly if you prefer not to change `PATH`.
+The PyPI package is the official bootstrap. It installs the launcher from PyPI,
+verifies the signed SHA256/Ed25519 Runtime release, and then installs the
+platform binary. It does not place a secret or token in the repository.
 
-The installer intentionally does not pin a release. Every normal installation
-and update resolves GitHub's `latest` release, verifies it, and keeps the
-existing user data. To use another install directory:
+The PyPI launcher command is installed into Python's script directory. The
+verified Runtime is placed at `~/.local/bin/simplicio` on macOS/Linux or
+`%USERPROFILE%\.local\bin\simplicio.exe` on Windows. Ensure the Python script
+and managed Runtime directories are on `PATH`; the launcher does not edit shell
+profiles.
 
-```bash
-SIMPLICIO_BIN_DIR="$HOME/.simplicio/bin" \
-  sh -c "$(curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh)"
-```
+The launcher resolves the release required by its package version, verifies the
+signed manifest and asset checksum, and preserves existing user data.
 
 Known installer incidents and their regression sentinels are tracked in
 [docs/INSTALL_ERROR_REGISTRY.md](docs/INSTALL_ERROR_REGISTRY.md).
 
-PowerShell supports the equivalent `SIMPLICIO_BIN_DIR` setting. Keep checksum
-verification enabled. Only set
-`SIMPLICIO_ALLOW_UNVERIFIED=1` when you have deliberately accepted an
-unverified artifact and understand the supply-chain risk.
-
-The resolved latest release must contain the six Python projects in the binary,
-enable Google login, and ship the configured public key plus signed update
-artifacts. The installer refuses to finish when any of these requirements,
-checksums, or the release manifest is missing. A Runtime source build or a
-private candidate is not a substitute for a published, verifiable release.
+The PyPI launcher has no unverified-artifact bypass. The selected Runtime
+release must contain the signed manifest and a canonical asset for the host; the
+launcher aborts when either is missing or its checksum does not match. A Runtime
+source build or a private candidate is not a substitute for a published,
+verifiable release.
 
 Check the installation:
 
