@@ -27,6 +27,7 @@ ASSETS = (
     "simplicio-windows-x64.exe",
 )
 META_ASSETS = ("SHA256SUMS", "simplicio-update-manifest.json")
+LOCAL_STATE_PREFIXES = (".simplicio/", "pypi/simplicio/build/")
 
 
 class PublishError(RuntimeError):
@@ -120,6 +121,21 @@ def verify_bundle(bundle: Path, tag: str, version: str, source_commit: str) -> d
     return {"version": version, "source_commit": source_commit, "artifacts": verified}
 
 
+def is_ignored_local_state(path: str) -> bool:
+    normalized = path.replace("\\", "/")
+    return normalized.startswith(LOCAL_STATE_PREFIXES)
+
+
+def blocking_tracked_changes() -> list[str]:
+    changed: set[str] = set()
+    for command in (
+        ["git", "diff", "--name-only"],
+        ["git", "diff", "--cached", "--name-only"],
+    ):
+        changed.update(line.strip() for line in run(command).stdout.splitlines() if line.strip())
+    return sorted(path for path in changed if not is_ignored_local_state(path))
+
+
 def public_preflight(tag: str, version: str, *, require_clean: bool) -> None:
     if run(["git", "branch", "--show-current"]).stdout.strip() != "master":
         raise PublishError("public repository must be on master")
@@ -129,8 +145,12 @@ def public_preflight(tag: str, version: str, *, require_clean: bool) -> None:
         package = tomllib.load(handle)
     if package.get("project", {}).get("name") != "simplicio-installer":
         raise PublishError("public package identity mismatch")
-    if require_clean and run(["git", "status", "--porcelain", "--untracked-files=no"]).stdout.strip():
-        raise PublishError("public tracked worktree must be clean before publication")
+    if require_clean:
+        blocking = blocking_tracked_changes()
+        if blocking:
+            raise PublishError(
+                "public tracked worktree has distribution changes: " + ", ".join(blocking)
+            )
     if run(["git", "ls-remote", "--tags", "origin", "refs/tags/" + tag]).stdout.strip():
         raise PublishError("public tag already exists: " + tag)
     run(["gh", "auth", "status"], timeout=60)
@@ -345,7 +365,7 @@ def main() -> int:
     tag, version = normalize_version(args.version)
     if re.fullmatch(r"[0-9a-f]{40}", args.source_commit) is None:
         raise PublishError("source commit must be a full SHA-1")
-    public_preflight(tag, version, require_clean=args.publish)
+    public_preflight(tag, version, require_clean=True)
     if args.check_only:
         receipt = {
             "schema": "simplicio.local-publication-preflight/v1",

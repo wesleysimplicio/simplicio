@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import importlib.util
 import shutil
 import subprocess
 from pathlib import Path
@@ -74,3 +75,18 @@ def test_public_publisher_uses_post_release_smoke_cli_contract():
     assert '"--repo", PUBLIC_REPOSITORY' in publisher
     assert '"--repository"' not in publisher
     assert '"core.whitespace=cr-at-eol"' in publisher
+
+
+def test_publication_cleanliness_ignores_only_protected_local_state():
+    script = ROOT / "scripts/publish_release_local.py"
+    spec = importlib.util.spec_from_file_location("publish_release_local", script)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    assert module.is_ignored_local_state(".simplicio/runtime-resource-map.json")
+    assert module.is_ignored_local_state("pypi/simplicio/build/generated.whl")
+    assert module.is_ignored_local_state(r".simplicio\\ledger\\events.jsonl")
+    assert not module.is_ignored_local_state("README.md")
+    assert not module.is_ignored_local_state("pypi/simplicio/pyproject.toml")
+    source = script.read_text(encoding="utf-8")
+    assert "public_preflight(tag, version, require_clean=True)" in source
