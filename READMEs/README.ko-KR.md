@@ -92,6 +92,20 @@ py -m pip install --upgrade simplicio-installer
 simplicio install
 ```
 
+### 직접 설치(PyPI 없이)
+
+macOS / Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
+```
+
+Windows PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex
+```
+
 끝. 하나의 명령어입니다. 패키지 매니저도, 모델 설정도 필요 없습니다.
 
 ---

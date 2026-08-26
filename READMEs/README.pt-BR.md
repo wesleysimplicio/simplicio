@@ -74,6 +74,20 @@ No Windows (PowerShell), use `py -m pip install --upgrade simplicio-installer`
 no lugar de `python3 -m pip ...`. O token do PyPI fica somente no ambiente de
 publicação; nunca é copiado para o repositório.
 
+### Instalação direta (sem PyPI)
+
+macOS / Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
+```
+
+Windows PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex
+```
+
 O launcher instala o Runtime verificado em `~/.local/bin/simplicio` no
 macOS/Linux ou `%USERPROFILE%\.local\bin\simplicio.exe` no Windows. Garanta que
 o diretório de scripts do Python e esse diretório estejam no `PATH`; o launcher

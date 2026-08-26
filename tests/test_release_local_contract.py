@@ -39,6 +39,17 @@ def test_mcp_docs_use_copy_safe_absolute_paths_for_every_platform():
         assert not re.search(r'command\s*=\s*"[A-Za-z]:\\(?!\\)', source)
 
 
+def test_all_readmes_document_pypi_and_direct_installer_paths():
+    readmes = [ROOT / "README.md", *sorted((ROOT / "READMEs").glob("README.*.md"))]
+    assert len(readmes) == 15
+    for path in readmes:
+        source = path.read_text(encoding="utf-8")
+        assert "simplicio-installer" in source, path
+        assert "pip install" in source, path
+        assert "install.sh" in source, path
+        assert "install.ps1" in source, path
+
+
 def test_powershell_parser_accepts_the_public_installer():
     pwsh = shutil.which("pwsh")
     assert pwsh is not None, "pwsh is a required local release-test dependency"
