@@ -1,6 +1,6 @@
 """Simplicio — AI coding agent that saves up to 96% on tokens."""
 
-__version__ = "3.8.30"
+__version__ = "3.8.31"
 
 
 def main():

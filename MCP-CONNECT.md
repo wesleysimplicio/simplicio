@@ -19,7 +19,7 @@ Codex integration is opt-in. The base installer leaves Codex unchanged. Enable
 the versioned, reversible integration explicitly:
 
 ~~~bash
-SIMPLICIO_INSTALL_CODEX=1 SIMPLICIO_CODEX_HOOK_REF=v3.8.30 sh install.sh
+SIMPLICIO_INSTALL_CODEX=1 SIMPLICIO_CODEX_HOOK_REF=v3.8.31 sh install.sh
 ~~~
 
 When enabled, the installer writes the absolute managed-binary path
