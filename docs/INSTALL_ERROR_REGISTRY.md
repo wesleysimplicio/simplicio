@@ -41,5 +41,5 @@ também os caminhos públicos, o fallback de autenticação e a limpeza de stagi
 4. Quando corrigido, atualizar o status e registrar o commit de resolução.
 5. Executar o teste específico e a validação progressiva antes de publicar.
 
-Última auditoria: commit público `7bc2667`; o caso UNIX-FETCH-003 é a correção
-deste patch.
+Última auditoria: commit público `fdde817`; o caso UNIX-FETCH-003 está coberto
+pelo mesmo patch.

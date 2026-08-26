@@ -44,7 +44,7 @@
       "regression_tests": [
         "tests/test_install_error_registry.py::test_unix_asset_fetch_failure_is_caught_and_cleaned"
       ],
-      "fixed_commit": "this-patch"
+      "fixed_commit": "fdde817"
     },
     {
       "id": "AUTH-SHAPE-004",
