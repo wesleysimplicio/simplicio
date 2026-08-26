@@ -15,6 +15,7 @@ import time
 import tomllib
 import urllib.request
 import venv
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -270,6 +271,43 @@ def update_public_metadata(tag: str, version: str, source_commit: str) -> list[P
         )
         path.write_text(body, encoding="utf-8")
         changed.append(path)
+
+    for relative in (
+        "npm/simplicio/package.json",
+        "npm/simplicio-installer/package.json",
+        "npm/simplicio-unscoped/package.json",
+    ):
+        path = ROOT / relative
+        body = path.read_text(encoding="utf-8")
+        body, replacements = re.subn(
+            r'(?m)^  "version": "[0-9]+\.[0-9]+\.[0-9]+",$',
+            '  "version": "' + version + '",',
+            body,
+            count=1,
+        )
+        if replacements != 1:
+            raise PublishError("could not update wrapper version: " + relative)
+        path.write_text(body, encoding="utf-8")
+        changed.append(path)
+
+    ecosystem = ROOT / "SIMPLICIO_ECOSYSTEM.md"
+    body = ecosystem.read_text(encoding="utf-8")
+    body, current_replacements = re.subn(
+        r"(?m)^[0-9]+\.[0-9]+\.[0-9]+ \(release pública;",
+        version + " (release pública;",
+        body,
+        count=1,
+    )
+    body, manifest_replacements = re.subn(
+        r"(?m)^O manifest atualmente publicado neste repositório é o `[0-9]+\.[0-9]+\.[0-9]+`\.",
+        "O manifest atualmente publicado neste repositório é o `" + version + "`.",
+        body,
+        count=1,
+    )
+    if current_replacements != 1 or manifest_replacements != 1:
+        raise PublishError("could not update SIMPLICIO_ECOSYSTEM.md version")
+    ecosystem.write_text(body, encoding="utf-8")
+    changed.append(ecosystem)
     return changed
 
 
@@ -299,13 +337,45 @@ def prepare_package(version: str) -> list[Path]:
 
 def build_wheel(output: Path, version: str) -> Path:
     output.mkdir(parents=True, exist_ok=True)
-    run([sys.executable, "-m", "build", "--wheel", "--outdir", str(output), str(PACKAGE_ROOT)])
+    with tempfile.TemporaryDirectory(prefix="simplicio-wheel-source-") as raw:
+        clean_package = Path(raw) / "simplicio"
+        shutil.copytree(
+            PACKAGE_ROOT,
+            clean_package,
+            ignore=shutil.ignore_patterns(
+                "build",
+                "dist",
+                "*.egg-info",
+                "__pycache__",
+                "*.pyc",
+            ),
+        )
+        run([
+            sys.executable,
+            "-m",
+            "build",
+            "--wheel",
+            "--outdir",
+            str(output),
+            str(clean_package),
+        ])
     wheels = list(output.glob("*.whl"))
     if len(wheels) != 1:
         raise PublishError("expected exactly one wheel, found %d" % len(wheels))
     wheel = wheels[0]
     if version not in wheel.name:
         raise PublishError("wheel filename does not contain release version")
+    try:
+        with zipfile.ZipFile(wheel) as archive:
+            cached = [
+                name
+                for name in archive.namelist()
+                if "__pycache__" in name or name.endswith(".pyc")
+            ]
+    except (OSError, zipfile.BadZipFile) as exc:
+        raise PublishError("wheel is not a valid ZIP archive") from exc
+    if cached:
+        raise PublishError("wheel contains cached bytecode: " + ", ".join(cached))
     run([sys.executable, "-m", "twine", "check", str(wheel)])
     return wheel
 
