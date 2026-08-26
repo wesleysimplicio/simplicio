@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 import re
 import importlib.util
 import shutil
 import subprocess
+import zipfile
 from pathlib import Path
 
 
@@ -102,6 +104,99 @@ def test_public_publisher_can_resume_after_an_external_partial_failure():
     assert "def resume_public_preflight(" in source
     assert "def resume_publish(" in source
     assert "already_published_to_pypi" in source
+
+
+def test_public_publisher_builds_wheel_from_clean_source(tmp_path, monkeypatch):
+    script = ROOT / "scripts/publish_release_local.py"
+    spec = importlib.util.spec_from_file_location("publish_release_local_clean_wheel", script)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+
+    package = tmp_path / "package"
+    source = package / "simplicio"
+    source.mkdir(parents=True)
+    (source / "__init__.py").write_text("", encoding="utf-8")
+    cache = source / "__pycache__"
+    cache.mkdir()
+    (cache / "stale.pyc").write_bytes(b"stale")
+    build = package / "build"
+    build.mkdir()
+    (build / "stale.txt").write_text("stale", encoding="utf-8")
+    monkeypatch.setattr(module, "PACKAGE_ROOT", package)
+
+    def fake_run(command, **_kwargs):
+        if command[1:3] == ["-m", "build"]:
+            clean_source = Path(command[-1])
+            assert not (clean_source / "build").exists()
+            assert not any(
+                "__pycache__" in path.parts or path.suffix == ".pyc"
+                for path in clean_source.rglob("*")
+            )
+            output = Path(command[command.index("--outdir") + 1])
+            output.mkdir(parents=True, exist_ok=True)
+            wheel = output / "simplicio_installer-3.8.31-py3-none-any.whl"
+            with zipfile.ZipFile(wheel, "w") as archive:
+                archive.writestr("simplicio/__init__.py", "")
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(module, "run", fake_run)
+    wheel = module.build_wheel(tmp_path / "output", "3.8.31")
+    with zipfile.ZipFile(wheel) as archive:
+        assert archive.namelist() == ["simplicio/__init__.py"]
+
+
+def test_public_publisher_updates_all_release_version_consumers(tmp_path, monkeypatch):
+    script = ROOT / "scripts/publish_release_local.py"
+    spec = importlib.util.spec_from_file_location("publish_release_local_versions", script)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+
+    (tmp_path / "VERSION.md").write_text(
+        "## Runtime snapshot: v3.8.30\n"
+        "## Current Version: v3.8.30\n"
+        "  `bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb`\n",
+        encoding="utf-8",
+    )
+    for relative in ("README.md", "MCP-CONNECT.md"):
+        (tmp_path / relative).write_text(
+            "SIMPLICIO_CODEX_HOOK_REF=v3.8.30\n",
+            encoding="utf-8",
+        )
+    wrappers = (
+        "npm/simplicio/package.json",
+        "npm/simplicio-installer/package.json",
+        "npm/simplicio-unscoped/package.json",
+    )
+    for relative in wrappers:
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(
+                {"name": relative, "version": "3.8.30", "description": "fixture"},
+                indent=2,
+            ) + "\n",
+            encoding="utf-8",
+        )
+    (tmp_path / "SIMPLICIO_ECOSYSTEM.md").write_text(
+        "3.8.30 (release pública; quatro alvos)\n"
+        "O manifest atualmente publicado neste repositório é o `3.8.30`.\n",
+        encoding="utf-8",
+    )
+
+    changed = module.update_public_metadata(
+        "v3.8.31",
+        "3.8.31",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
+    assert (tmp_path / "version.txt").read_text(encoding="utf-8") == "3.8.31\n"
+    assert all(json.loads((tmp_path / path).read_text())["version"] == "3.8.31" for path in wrappers)
+    ecosystem = (tmp_path / "SIMPLICIO_ECOSYSTEM.md").read_text(encoding="utf-8")
+    assert "3.8.30" not in ecosystem
+    assert ecosystem.count("3.8.31") == 2
+    assert tmp_path / "SIMPLICIO_ECOSYSTEM.md" in changed
 
 
 def test_public_runbook_requires_manual_publication_without_actions():
