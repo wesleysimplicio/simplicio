@@ -79,7 +79,21 @@ py -m pip install --upgrade simplicio-installer
 simplicio install
 ```
 
-The PyPI package is the official bootstrap. It installs the launcher from PyPI,
+### Direct terminal installer (without PyPI)
+
+macOS / Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex
+```
+
+The PyPI package is the recommended bootstrap. It installs the launcher from PyPI,
 verifies the signed SHA256/Ed25519 Runtime release, and then installs the
 platform binary. It does not place a secret or token in the repository.
 
