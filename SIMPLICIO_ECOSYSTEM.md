@@ -8,7 +8,7 @@ Consumidores finais via release do Runtime e, opcionalmente, via `npx @wesleysim
 
 ## Versão atual
 
-3.8.25 (release pública; quatro alvos Runtime + Desktop macOS ARM64 DMG/ZIP)
+3.8.30 (release pública; quatro alvos Runtime para Windows, macOS e Linux)
 
 ## Regra de distribuição
 
@@ -43,7 +43,7 @@ release, não uma advertência ignorável.
 
 ## Estado do manifest público
 
-O manifest atualmente publicado neste repositório é o `3.8.25`. Esta release
+O manifest atualmente publicado neste repositório é o `3.8.30`. Esta release
 publica os quatro alvos Runtime canônicos (macOS Apple Silicon, macOS Intel, Linux x64
 e Windows x64), cada um com SHA256 e sidecar Ed25519, além dos assets Desktop
 macOS ARM64 DMG e ZIP registrados em `docs/RELEASE_RUNBOOK.md`. O binário informa

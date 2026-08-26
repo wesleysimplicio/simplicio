@@ -14,7 +14,7 @@ sys.path.insert(0, str(PACKAGE_ROOT))
 import simplicio  # noqa: E402
 from simplicio import __main__ as installer  # noqa: E402
 
-CURRENT_VERSION = "3.8.25"
+CURRENT_VERSION = (REPO_ROOT / "version.txt").read_text(encoding="utf-8").strip()
 TEST_TRUST = {CURRENT_VERSION: "fixture-digest"}
 
 
@@ -36,7 +36,7 @@ class FakeReleaseClient:
         trusted_digest(manifest)
         self.release_data = (
             {
-                "tag_name": "v3.8.25",
+                "tag_name": "v" + CURRENT_VERSION,
                 "assets": [
                     {"name": installer.MANIFEST_ASSET},
                     {"name": "simplicio-linux-x64"},
@@ -89,7 +89,9 @@ def json_bytes(value):
 def valid_runner(command, **kwargs):
     assert command[1:] == ["version", "--json"]
     assert kwargs["check"] and kwargs["capture_output"] and kwargs["text"]
-    return subprocess.CompletedProcess(command, 0, '{"runtime":{"version":"3.8.25"}}', "")
+    return subprocess.CompletedProcess(
+        command, 0, json.dumps({"runtime": {"version": CURRENT_VERSION}}), ""
+    )
 
 
 def test_install_verifies_then_atomically_replaces_binary(tmp_path, monkeypatch):
@@ -279,6 +281,7 @@ def test_release_client_rejects_non_github_asset_url():
 
 def test_default_manifest_pin_matches_versioned_checkout():
     payload = (REPO_ROOT / "simplicio-update-manifest.json").read_bytes()
+    assert simplicio.__version__ == CURRENT_VERSION
     assert installer.TRUSTED_MANIFEST_SHA256[CURRENT_VERSION] == hashlib.sha256(payload).hexdigest()
 
 
@@ -349,7 +352,9 @@ def test_windows_staging_uses_exe_suffix(tmp_path, monkeypatch):
 
     def runner(command, **kwargs):
         staged_paths.append(command[0])
-        return subprocess.CompletedProcess(command, 0, '{"runtime":{"version":"3.8.25"}}', "")
+        return subprocess.CompletedProcess(
+            command, 0, json.dumps({"runtime": {"version": CURRENT_VERSION}}), ""
+        )
 
     installer.do_install(client=client, install_dir=tmp_path, runner=runner)
     assert staged_paths[0].endswith(".exe")
