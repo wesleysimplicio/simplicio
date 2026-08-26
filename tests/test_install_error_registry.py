@@ -89,6 +89,8 @@ def test_validation_sentinels_are_recorded_as_fixed():
         "LOCAL-RELEASE-016",
         "POST-SMOKE-CLI-017",
         "AUTH-E2E-ENV-018",
+        "PYPI-TEST-VERSION-019",
+        "PUBLICATION-RESUME-020",
     }
     assert expected <= entries.keys()
     assert all(entries[key]["status"] == "fixed" for key in expected)

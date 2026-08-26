@@ -37,7 +37,10 @@ também os caminhos públicos, o fallback de autenticação e a limpeza de stagi
 | LOCAL-RELEASE-016 | Release | fixed | A publicação dependia de automação hospedada, embora a operação oficial seja local e manual. |
 | POST-SMOKE-CLI-017 | Release | fixed | O publicador chamava o smoke final com a opção inexistente `--repository`. |
 | AUTH-E2E-ENV-018 | Todas | fixed | Smokes usavam uma variável inexistente e não ativavam o gate opcional de login do Runtime. |
-| PYPI-MANIFEST-011 | Packaging | fixed | Pin PyPI 3.8.25 confere com o manifest público. |
+| PYPI-TEST-VERSION-019 | Packaging | fixed | Fixtures do pacote PyPI ficaram presas em 3.8.25 após a v3.8.30. |
+| PUBLICATION-RESUME-020 | Release | fixed | Uma falha externa após publicar GitHub Release não podia ser retomada com segurança. |
+| PYPI-AUTH-021 | Packaging | open | O índice PyPI rejeitou a credencial local com HTTP 403; falta renovar a credencial por canal seguro. |
+| PYPI-MANIFEST-011 | Packaging | fixed | Pin PyPI 3.8.30 confere com o manifest público. |
 
 ## Regras para novos incidentes
 
@@ -48,5 +51,5 @@ também os caminhos públicos, o fallback de autenticação e a limpeza de stagi
 4. Quando corrigido, atualizar o status e registrar o commit de resolução.
 5. Executar o teste específico e a validação progressiva antes de publicar.
 
-Última auditoria local: 196 testes Pytest + 30 subtestes, 69 testes do runner Python e 15 testes Node passaram antes da v3.8.30.
+Última auditoria local: 199 testes Pytest + 30 subtestes, 69 testes do runner Python e 15 testes Node passaram na validação da v3.8.30.
 O registro cobre os contratos públicos de bootstrap PyPI, MCP, Codex, uninstall, rollback, publicação local e alvos macOS.

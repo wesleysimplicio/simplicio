@@ -251,6 +251,47 @@
       "fixed_commit": "dfdeedbcfc8ad47f972bc1875252f07717dbf1a9"
     },
     {
+      "id": "PYPI-TEST-VERSION-019",
+      "platform": "packaging",
+      "status": "fixed",
+      "severity": "high",
+      "source": "post-release-validation-v3.8.30",
+      "symptom": "Os testes do pacote PyPI continuavam simulando e esperando a versão 3.8.25 depois da publicação da v3.8.30.",
+      "root_cause": "Fixtures e expectativas duplicavam uma versão literal em vez de usar version.txt como fonte canônica.",
+      "guard": "Fixtures, runners simulados e a asserção de __version__ derivam CURRENT_VERSION de version.txt.",
+      "regression_tests": [
+        "tests/unit/test_pypi_installer.py::test_default_manifest_pin_matches_versioned_checkout"
+      ],
+      "fixed_commit": "a9b70eededd5de95cf71302e1836981967023979"
+    },
+    {
+      "id": "PUBLICATION-RESUME-020",
+      "platform": "release",
+      "status": "fixed",
+      "severity": "blocker",
+      "source": "partial-publication-v3.8.30",
+      "symptom": "Depois de publicar tag, GitHub Release e binários, uma falha externa no PyPI obrigava o publicador a reiniciar um fluxo já parcialmente aplicado.",
+      "root_cause": "O publicador local não possuía uma rota idempotente para validar o estado remoto existente e continuar apenas as etapas pendentes.",
+      "guard": "A opção --resume exige tag e assets remotos exatos, pula versões PyPI já existentes e repete todos os smokes finais.",
+      "regression_tests": [
+        "tests/test_release_local_contract.py::test_public_publisher_can_resume_after_an_external_partial_failure"
+      ],
+      "fixed_commit": "74279315fb050042e24d5170a255978d30430e5a"
+    },
+    {
+      "id": "PYPI-AUTH-021",
+      "platform": "packaging",
+      "status": "open",
+      "severity": "blocker",
+      "source": "partial-publication-v3.8.30",
+      "symptom": "O upload de simplicio-installer 3.8.30 recebe HTTP 403 por autenticação PyPI inválida ou inexistente.",
+      "root_cause": "A credencial PyPI disponível localmente foi rejeitada pelo índice; nenhum segredo é registrado nos logs.",
+      "guard": "O publicador retomável preserva tag e assets já verificados e permite repetir somente a publicação pendente após renovar a credencial.",
+      "regression_tests": [
+        "tests/test_release_local_contract.py::test_public_publisher_can_resume_after_an_external_partial_failure"
+      ]
+    },
+    {
       "id": "PYPI-MANIFEST-011",
       "platform": "packaging",
       "status": "fixed",
