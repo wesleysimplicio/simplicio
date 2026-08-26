@@ -41,5 +41,5 @@ também os caminhos públicos, o fallback de autenticação e a limpeza de stagi
 4. Quando corrigido, atualizar o status e registrar o commit de resolução.
 5. Executar o teste específico e a validação progressiva antes de publicar.
 
-Última auditoria: o registro também cobre o contrato público do bootstrap PyPI.
-O caso UNIX-FETCH-003 permanece coberto pelo mesmo patch.
+Última auditoria: 177 testes passaram no commit eef83c7a8abc2b96993928db4780777cab37c9e2.
+O registro cobre os contratos públicos de bootstrap PyPI, MCP, Codex, uninstall, rollback e alvos macOS.

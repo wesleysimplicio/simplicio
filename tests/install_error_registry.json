@@ -88,7 +88,7 @@
         "tests/test_clean_install_bootstrap_contract.py::test_shell_defers_mcp_handshake_until_after_login",
         "tests/test_clean_install_bootstrap_contract.py::test_powershell_defers_mcp_handshake_until_after_login"
       ],
-      "fixed_commit": "pending"
+      "fixed_commit": "eef83c7a8abc2b96993928db4780777cab37c9e2"
     },
     {
       "id": "CODEX-HOOK-007",
@@ -102,7 +102,7 @@
       "regression_tests": [
         "tests/test_codex_integration_cli.py::test_installers_are_opt_in_and_do_not_use_mutable_master_hook_ref"
       ],
-      "fixed_commit": "pending"
+      "fixed_commit": "eef83c7a8abc2b96993928db4780777cab37c9e2"
     },
     {
       "id": "UNINSTALL-008",
@@ -118,7 +118,7 @@
         "tests/test_install_transaction_contract.py::test_powershell_uninstall_policy_and_rollback_are_explicit",
         "tests/test_install_transaction_contract.py::test_shell_purge_removes_simplicio_state_but_preserves_provider_env"
       ],
-      "fixed_commit": "pending"
+      "fixed_commit": "eef83c7a8abc2b96993928db4780777cab37c9e2"
     },
     {
       "id": "MACOS-X64-009",
@@ -132,7 +132,7 @@
       "regression_tests": [
         "tests/test_macos_x64_contract.py::test_shell_installer_does_not_reject_macos_x64"
       ],
-      "fixed_commit": "pending"
+      "fixed_commit": "eef83c7a8abc2b96993928db4780777cab37c9e2"
     },
     {
       "id": "BENCH-010",
@@ -146,7 +146,7 @@
       "regression_tests": [
         "tests/test_quality_helpers.py::BenchmarkTests::test_audit_timing_and_cli_emit_reports"
       ],
-      "fixed_commit": "pending"
+      "fixed_commit": "eef83c7a8abc2b96993928db4780777cab37c9e2"
     },
     {
       "id": "PYPI-MANIFEST-011",
