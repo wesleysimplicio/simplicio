@@ -204,7 +204,7 @@
         "tests/test_release_local_contract.py::test_mcp_docs_use_copy_safe_absolute_paths_for_every_platform",
         "tests/test_codex_integration_cli.py::test_windows_binary_path_is_toml_safe_and_uses_forward_slashes"
       ],
-      "fixed_commit": "pending-v3.8.30"
+      "fixed_commit": "c12d277f23a2f8e9cb6b3ceae5cb749d67cf3129"
     },
     {
       "id": "LOCAL-RELEASE-016",
@@ -220,7 +220,7 @@
         "tests/test_clean_install_e2e_contract.py::test_public_target_table_has_exactly_four_release_entries",
         "tests/test_clean_install_e2e_contract.py::test_local_publisher_covers_terminal_pypi_and_post_release_smokes"
       ],
-      "fixed_commit": "pending-v3.8.30"
+      "fixed_commit": "c12d277f23a2f8e9cb6b3ceae5cb749d67cf3129"
     },
     {
       "id": "POST-SMOKE-CLI-017",
@@ -234,7 +234,7 @@
       "regression_tests": [
         "tests/test_release_local_contract.py::test_public_publisher_uses_post_release_smoke_cli_contract"
       ],
-      "fixed_commit": "pending-v3.8.30"
+      "fixed_commit": "c12d277f23a2f8e9cb6b3ceae5cb749d67cf3129"
     },
     {
       "id": "PYPI-MANIFEST-011",
