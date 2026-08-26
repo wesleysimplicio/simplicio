@@ -3,8 +3,9 @@
 
 This is intentionally an end-to-end smoke: it uses the checked-out terminal
 installer and a clean virtual environment that installs simplicio-installer
-from PyPI. Both paths then download the same signed GitHub Release into an
-isolated HOME and verify the installed Runtime JSON envelope.
+from either the just-built wheel (pre-publication) or PyPI (post-publication).
+Both paths then download the same signed GitHub Release into an isolated HOME
+and verify the installed Runtime JSON envelope.
 """
 from __future__ import annotations
 
@@ -139,11 +140,13 @@ def venv_launcher(venv: Path) -> Path:
     return venv / "bin" / "simplicio"
 
 
-def pypi_install(version: str, root: Path, index_url: str) -> dict:
-    venv = root / "pypi-venv"
-    run_checked([sys.executable, "-m", "venv", str(venv)], dict(os.environ))
-    python = venv_python(venv)
-    install_command = [
+def package_install_command(
+    python: Path,
+    version: str,
+    index_url: str,
+    wheel: Path | None,
+) -> list[str]:
+    command = [
         str(python),
         "-m",
         "pip",
@@ -151,30 +154,57 @@ def pypi_install(version: str, root: Path, index_url: str) -> dict:
         "--disable-pip-version-check",
         "--no-cache-dir",
         "--no-deps",
-        "--index-url",
-        index_url,
-        "simplicio-installer==" + version,
     ]
+    if wheel is not None:
+        command.extend(["--no-index", str(wheel)])
+    else:
+        command.extend(["--index-url", index_url, "simplicio-installer==" + version])
+    return command
+
+
+def pypi_install(
+    version: str,
+    root: Path,
+    index_url: str,
+    wheel: Path | None = None,
+) -> dict:
+    if wheel is not None:
+        wheel = wheel.resolve()
+        if not wheel.is_file() or wheel.suffix != ".whl":
+            raise SmokeError("local wheel does not exist or is not a .whl: %s" % wheel)
+    source = "wheel" if wheel is not None else "pypi"
+    venv = root / (source + "-venv")
+    run_checked([sys.executable, "-m", "venv", str(venv)], dict(os.environ))
+    python = venv_python(venv)
+    install_command = package_install_command(python, version, index_url, wheel)
     last_error: SmokeError | None = None
-    for _attempt in range(3):
+    attempts = 1 if wheel is not None else 12
+    for attempt in range(attempts):
         try:
             run_checked(install_command, dict(os.environ), timeout=180)
             last_error = None
             break
         except SmokeError as exc:
             last_error = exc
-            time.sleep(5)
+            if attempt + 1 < attempts:
+                time.sleep(10)
     if last_error is not None:
         raise last_error
 
-    home = root / "pypi-home"
+    home = root / (source + "-home")
     bundle = home / ".simplicio"
     bin_dir = home / ".local" / "bin"
     home.mkdir(parents=True)
     env = isolated_env(home, bundle, bin_dir)
     result = run_checked([str(venv_launcher(venv)), "install"], env, timeout=300)
     evidence = verify_runtime(installed_binary(bin_dir), env, version)
-    evidence.update({"method": "pypi", "index_url": index_url, "stdout_tail": _tail(result.stdout)})
+    evidence.update(
+        {
+            "method": source,
+            "package_source": str(wheel) if wheel is not None else index_url,
+            "stdout_tail": _tail(result.stdout),
+        }
+    )
     return evidence
 
 
@@ -183,6 +213,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--version")
     parser.add_argument("--terminal", action="store_true")
     parser.add_argument("--pypi", action="store_true")
+    parser.add_argument(
+        "--wheel",
+        type=Path,
+        help="install this exact local wheel instead of reading the PyPI index",
+    )
     parser.add_argument("--pypi-index-url", default=os.environ.get("PYPI_INDEX_URL", DEFAULT_PYPI_INDEX))
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
@@ -196,7 +231,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.terminal:
             report["checks"].append(terminal_install(version, root))
         if args.pypi:
-            report["checks"].append(pypi_install(version, root, args.pypi_index_url))
+            report["checks"].append(
+                pypi_install(version, root, args.pypi_index_url, args.wheel)
+            )
     if args.json:
         print(json.dumps(report, sort_keys=True))
     else:

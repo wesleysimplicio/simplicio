@@ -31,4 +31,15 @@ def test_release_install_smoke_covers_terminal_and_pypi_paths():
     assert '"-m",' in script
     assert '"venv",' in script
     assert 'release_install_smoke.py' in workflow
+    assert 'prepublish-install-smoke:' in workflow
+    assert '--wheel' in workflow
+    assert 'release-install-smoke:' in workflow
     assert 'needs: publish' in workflow
+
+
+def test_shell_installer_uses_safe_printf_without_losing_ansi_rendering():
+    installer = (ROOT / 'install.sh').read_text(encoding='utf-8')
+    assert "printf '%b' \"${GREEN}\"" in installer
+    assert "printf '%b\\n' \"${GREEN}" in installer
+    assert 'printf "${GREEN}"' not in installer
+    assert "printf '%s' \"${GREEN}\"" not in installer

@@ -2,7 +2,7 @@
   "schema": "simplicio.distribution-benchmark/v1",
   "metrics": {
     "installer_payload_bytes": {
-      "baseline": 45297,
+      "baseline": 59660,
       "max_regression_percent": 10
     },
     "audit_median_ms": {

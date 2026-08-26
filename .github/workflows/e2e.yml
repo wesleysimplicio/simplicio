@@ -35,7 +35,7 @@ jobs:
         include:
           - {os: ubuntu-latest, target: linux-x64}
           - {os: windows-latest, target: windows-x64}
-          - {os: macos-13, target: macos-x64}
+          - {os: macos-15-intel, target: macos-x64}
           - {os: macos-14, target: macos-arm64}
     runs-on: ${{ matrix.os }}
     steps:

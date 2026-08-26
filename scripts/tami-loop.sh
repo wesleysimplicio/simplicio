@@ -31,9 +31,14 @@ FAILS=0
 
 # 5. Log interno da Tami
 CID=$(date +%s)
-echo "tami|$CID|isa=$ISA|helo=$HELO|levi=$LEVI|hbp=$HBP_L|fails=$FAILS" >> ~/.simplicio/tami-loop.log
+echo "tami|$CID|isa=$ISA|helo=$HELO|levi=$LEVI|hbp=$HBP_L|memory=$MEM_OK|fails=$FAILS" >> ~/.simplicio/tami-loop.log
 
 # 6. Atualiza memoria
 simplicio memory ingest --json >/dev/null 2>&1 || true
 
-echo "[$(date +%H:%M:%S)] Tami: $([ $FAILS -eq 0 ] && echo 'tudo bem, pode confiar' || echo '$FAILS coisinhas pra cuidar')"
+if [ "$FAILS" -eq 0 ]; then
+  TAMI_STATUS="tudo bem, pode confiar"
+else
+  TAMI_STATUS="$FAILS coisinhas pra cuidar"
+fi
+echo "[$(date +%H:%M:%S)] Tami: $TAMI_STATUS"

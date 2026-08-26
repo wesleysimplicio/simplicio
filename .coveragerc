@@ -3,6 +3,13 @@ branch = True
 source = scripts
 omit =
     scripts/run_python_tests.py
+    # These are exercised by dedicated integration/e2e jobs. The unit coverage
+    # gate measures modules whose behavior is owned by the Python unit suite.
+    scripts/codex_integration.py
+    scripts/e2e_clean_install.py
+    scripts/e2e_ecosystem.py
+    scripts/post_release_smoke.py
+    scripts/release_install_smoke.py
 
 [report]
 show_missing = True

@@ -350,14 +350,14 @@ case "${1:-}" in
     run_uninstall ;;
 esac
 
-printf "${GREEN}"
+printf '%b' "${GREEN}"
 cat << "EOF"
   ╔══════════════════════════════════════╗
   ║          Simplicio Runtime           ║
   ║    Seu assistente pessoal digital    ║
   ╚══════════════════════════════════════╝
 EOF
-printf "${NC}"
+printf '%b' "${NC}"
 echo ""
 
 # ─── 1. Detect platform ──────────────────────────────────────────────────────
@@ -603,16 +603,16 @@ fi
 
 # ─── 4. Mensagem final ───────────────────────────────────────────────────────
 echo ""
-printf "${GREEN}╔══════════════════════════════════════════════════════════╗${NC}\n"
-printf "${GREEN}║                                                          ║${NC}\n"
-printf "${GREEN}║   Simplicio Runtime instalado com sucesso!              ║${NC}\n"
-printf "${GREEN}║                                                          ║${NC}\n"
-printf "${GREEN}║   ✓ Contrato de release verificado                       ║${NC}\n"
-printf "${GREEN}║   ✓ Sem pip ou clones durante a instalação               ║${NC}\n"
-printf "${GREEN}║   ✓ Login Google verificável após auth login             ║${NC}\n"
-printf "${GREEN}║   ✓ MCP direto para o binário gerenciado                 ║${NC}\n"
-printf "${GREEN}║   🩺 Doctor: sh install.sh --doctor                     ║${NC}\n"
-printf "${GREEN}║                                                          ║${NC}\n"
-printf "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}\n"
+printf '%b\n' "${GREEN}╔══════════════════════════════════════════════════════════╗${NC}"
+printf '%b\n' "${GREEN}║                                                          ║${NC}"
+printf '%b\n' "${GREEN}║   Simplicio Runtime instalado com sucesso!              ║${NC}"
+printf '%b\n' "${GREEN}║                                                          ║${NC}"
+printf '%b\n' "${GREEN}║   ✓ Contrato de release verificado                       ║${NC}"
+printf '%b\n' "${GREEN}║   ✓ Sem pip ou clones durante a instalação               ║${NC}"
+printf '%b\n' "${GREEN}║   ✓ Login Google verificável após auth login             ║${NC}"
+printf '%b\n' "${GREEN}║   ✓ MCP direto para o binário gerenciado                 ║${NC}"
+printf '%b\n' "${GREEN}║   🩺 Doctor: sh install.sh --doctor                     ║${NC}"
+printf '%b\n' "${GREEN}║                                                          ║${NC}"
+printf '%b\n' "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 ok "Instalação Runtime concluída. SIMPLICIO_MCP_URL=${SIMPLICIO_MCP_URL}"

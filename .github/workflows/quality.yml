@@ -70,7 +70,7 @@ jobs:
         run: python -m pip install -r requirements-quality.txt
       - name: Python tests with JUnit and coverage
         run: |
-          coverage run --rcfile=.coveragerc scripts/run_python_tests.py --junit artifacts/unit/python-junit.xml
+          coverage run --rcfile=.coveragerc -m pytest -q --junitxml=artifacts/unit/python-junit.xml
           coverage report --fail-under=85
           coverage report --include=scripts/verify_distribution_consistency.py,scripts/verify_release_provenance.py --fail-under=90
           coverage xml
@@ -230,7 +230,7 @@ jobs:
         run: >-
           python scripts/flaky_check.py --attempts 3
           --junit artifacts/flaky/python-junit.xml --
-          python -m unittest discover -s tests -p test_*.py
+          python -m pytest -q
       - name: Repeat Node unit suite
         run: >-
           python scripts/flaky_check.py --attempts 3
