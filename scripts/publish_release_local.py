@@ -322,17 +322,46 @@ def wheel_help_smoke(wheel: Path) -> None:
 
 def commit_public(paths: list[Path], tag: str, source_commit: str) -> str:
     relative = sorted({str(path.relative_to(ROOT)) for path in paths})
+    branch = "release/" + tag
+    run(["git", "switch", "-c", branch])
     run(["git", "add", "--", *relative])
     run(["git", "-c", "core.whitespace=cr-at-eol", "diff", "--cached", "--check"])
     run([
         "git", "commit", "-m", "release(public): publish signed Runtime %s" % tag,
         "-m", "Source commit: " + source_commit,
     ])
-    commit = run(["git", "rev-parse", "HEAD"]).stdout.strip()
-    run(["git", "push", "origin", "master"])
-    run(["git", "tag", tag])
+    release_commit = run(["git", "rev-parse", "HEAD"]).stdout.strip()
+    run(["git", "push", "-u", "origin", branch])
+    run([
+        "gh", "pr", "create",
+        "--repo", PUBLIC_REPOSITORY,
+        "--base", "master",
+        "--head", branch,
+        "--title", "release(public): publish signed Runtime " + tag,
+        "--body", "Source Runtime commit: " + source_commit,
+    ])
+    pull_number = run([
+        "gh", "pr", "view", branch,
+        "--repo", PUBLIC_REPOSITORY,
+        "--json", "number",
+        "--jq", ".number",
+    ]).stdout.strip()
+    run([
+        "gh", "pr", "merge", pull_number,
+        "--repo", PUBLIC_REPOSITORY,
+        "--squash",
+        "--subject", "release(public): publish signed Runtime %s (#%s)" % (tag, pull_number),
+        "--body", "Source Runtime commit: " + source_commit,
+    ], timeout=600)
+
+    run(["git", "fetch", "--quiet", "origin", "master"])
+    run(["git", "switch", "master"])
+    run(["git", "merge", "--ff-only", "origin/master"])
+    public_commit = run(["git", "rev-parse", "HEAD"]).stdout.strip()
+    run(["git", "diff", "--exit-code", release_commit, public_commit, "--", *relative])
+    run(["git", "tag", tag, public_commit])
     run(["git", "push", "origin", "refs/tags/" + tag])
-    return commit
+    return public_commit
 
 
 def create_public_release(tag: str, bundle: Path) -> None:

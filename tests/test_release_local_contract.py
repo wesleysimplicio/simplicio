@@ -77,6 +77,14 @@ def test_public_publisher_uses_post_release_smoke_cli_contract():
     assert '"core.whitespace=cr-at-eol"' in publisher
 
 
+def test_public_publisher_requires_pr_merge_before_tagging():
+    publisher = (ROOT / "scripts/publish_release_local.py").read_text(encoding="utf-8")
+    assert '"gh", "pr", "create"' in publisher
+    assert '"gh", "pr", "merge"' in publisher
+    assert '["git", "push", "origin", "master"]' not in publisher
+    assert '["git", "merge", "--ff-only", "origin/master"]' in publisher
+
+
 def test_public_publisher_can_resume_after_an_external_partial_failure():
     source = (ROOT / "scripts/publish_release_local.py").read_text(encoding="utf-8")
     assert 'mode.add_argument("--resume"' in source
