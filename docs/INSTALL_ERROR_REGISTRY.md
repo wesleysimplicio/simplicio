@@ -36,6 +36,7 @@ também os caminhos públicos, o fallback de autenticação e a limpeza de stagi
 | MCP-TOML-PATH-015 | Todas | fixed | TOML do MCP usava barras invertidas do Windows ou `~`, gerando escape inválido/caminho não absoluto. |
 | LOCAL-RELEASE-016 | Release | fixed | A publicação dependia de automação hospedada, embora a operação oficial seja local e manual. |
 | POST-SMOKE-CLI-017 | Release | fixed | O publicador chamava o smoke final com a opção inexistente `--repository`. |
+| AUTH-E2E-ENV-018 | Todas | fixed | Smokes usavam uma variável inexistente e não ativavam o gate opcional de login do Runtime. |
 | PYPI-MANIFEST-011 | Packaging | fixed | Pin PyPI 3.8.25 confere com o manifest público. |
 
 ## Regras para novos incidentes

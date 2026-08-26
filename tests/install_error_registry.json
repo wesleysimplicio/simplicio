@@ -237,6 +237,20 @@
       "fixed_commit": "c12d277f23a2f8e9cb6b3ceae5cb749d67cf3129"
     },
     {
+      "id": "AUTH-E2E-ENV-018",
+      "platform": "windows-macos-linux",
+      "status": "fixed",
+      "severity": "blocker",
+      "source": "post-release-smoke-v3.8.30",
+      "symptom": "O smoke remoto validava os artefatos, mas falhava ao exigir o gate MCP de login opcional.",
+      "root_cause": "Os harnesses definiam SIMPLICIO_E2E_EXPECT_LOGIN_REQUIRED, enquanto o Runtime reconhece SIMPLICIO_LOGIN_REQUIRED.",
+      "guard": "Os dois smokes usam a variável canônica e um teste rejeita a antiga antes da publicação.",
+      "regression_tests": [
+        "tests/test_clean_install_e2e_contract.py::test_release_smokes_enable_the_canonical_optional_login_gate"
+      ],
+      "fixed_commit": "dfdeedbcfc8ad47f972bc1875252f07717dbf1a9"
+    },
+    {
       "id": "PYPI-MANIFEST-011",
       "platform": "packaging",
       "status": "fixed",
