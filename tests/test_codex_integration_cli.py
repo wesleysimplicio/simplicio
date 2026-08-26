@@ -2,6 +2,7 @@ import json
 import subprocess
 import sys
 import tempfile
+import tomllib
 from pathlib import Path
 
 
@@ -24,6 +25,29 @@ def test_cli_install_status_uninstall_is_reversible():
         removed = call(home, 'uninstall')
         assert removed.returncode == 0, removed.stderr
         assert json.loads(call(home, 'status').stdout)['status'] == 'absent'
+
+
+def test_windows_binary_path_is_toml_safe_and_uses_forward_slashes():
+    with tempfile.TemporaryDirectory() as raw:
+        home = Path(raw)
+        windows_binary = r"C:\Users\mathe\Downloads\simplicio-windows-x64.exe"
+        installed = call(
+            home,
+            "install",
+            "--platform",
+            "windows",
+            "--version",
+            "v3.8.30",
+            "--hook-ref",
+            "v3.8.30",
+            "--binary",
+            windows_binary,
+        )
+        assert installed.returncode == 0, installed.stderr
+        config = (home / ".codex/config.toml").read_text(encoding="utf-8")
+        expected = "C:/Users/mathe/Downloads/simplicio-windows-x64.exe"
+        assert f'command = "{expected}"' in config
+        assert tomllib.loads(config)["mcp_servers"]["simplicio"]["command"] == expected
 
 
 def test_installers_are_opt_in_and_do_not_use_mutable_master_hook_ref():

@@ -33,6 +33,9 @@ também os caminhos públicos, o fallback de autenticação e a limpeza de stagi
 | RELEASE-TAG-012 | Todas | fixed | Pin `3.8.25` montava URL sem o prefixo `v` no GitHub Release. |
 | SWAP-ACTIVATION-013 | macOS/Linux | fixed | Linha duplicada podia impedir o binário staged de virar o ativo. |
 | PYPI-PUBLIC-014 | Todas | fixed | O smoke público detectou pacote ausente no PyPI e passou a bloquear releases sem publicação. |
+| MCP-TOML-PATH-015 | Todas | fixed | TOML do MCP usava barras invertidas do Windows ou `~`, gerando escape inválido/caminho não absoluto. |
+| LOCAL-RELEASE-016 | Release | fixed | A publicação dependia de automação hospedada, embora a operação oficial seja local e manual. |
+| POST-SMOKE-CLI-017 | Release | fixed | O publicador chamava o smoke final com a opção inexistente `--repository`. |
 | PYPI-MANIFEST-011 | Packaging | fixed | Pin PyPI 3.8.25 confere com o manifest público. |
 
 ## Regras para novos incidentes

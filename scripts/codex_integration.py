@@ -61,6 +61,10 @@ def install(args: argparse.Namespace) -> dict:
         start = config.index(MARKER); end = config.index(END_MARKER, start) + len(END_MARKER)
         config = config[:start] + config[end:]
     binary = args.binary or 'simplicio'
+    if args.platform == 'windows':
+        # Forward slashes are accepted by Windows and remain literal inside a
+        # TOML basic string; an unescaped C:\\Users path would make \\U invalid.
+        binary = binary.replace('\\', '/')
     block = f'{MARKER}\n[mcp_servers.simplicio]\ncommand = {json.dumps(binary)}\nargs = ["serve", "--mcp", "--stdio"]\n{END_MARKER}\n'
     config = config.rstrip() + ('\n\n' if config.strip() else '') + block
     atomic_write(config_path, config)

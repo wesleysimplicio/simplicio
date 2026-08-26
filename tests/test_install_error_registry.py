@@ -85,6 +85,9 @@ def test_validation_sentinels_are_recorded_as_fixed():
         "RELEASE-TAG-012",
         "SWAP-ACTIVATION-013",
         "PYPI-PUBLIC-014",
+        "MCP-TOML-PATH-015",
+        "LOCAL-RELEASE-016",
+        "POST-SMOKE-CLI-017",
     }
     assert expected <= entries.keys()
     assert all(entries[key]["status"] == "fixed" for key in expected)

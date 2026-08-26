@@ -240,12 +240,46 @@ configuration or hooks. To enable the versioned, reversible integration:
 SIMPLICIO_INSTALL_CODEX=1 SIMPLICIO_CODEX_HOOK_REF=v3.8.25 sh install.sh
 ~~~
 
-When enabled, the installer configures Codex to launch the installed binary
-directly:
+When enabled, the installer writes the absolute managed-binary path
+automatically. If you inspect or repair `config.toml` manually, copy the block
+for your operating system. MCP clients launch `command` directly, so do not
+use `~` and do not expect shell expansion.
+
+#### Windows
+
+Use forward slashes in TOML. Windows accepts them, and they avoid invalid TOML
+escapes such as `\U` in `C:\Users\...`.
 
 ~~~toml
 [mcp_servers.simplicio]
-command = "~/.simplicio/bin/simplicio"
+command = "C:/Users/YourName/.simplicio/bin/simplicio.exe"
+args = ["serve", "--mcp", "--stdio"]
+
+[mcp_servers.simplicio.env]
+SIMPLICIO_MCP_URL = "http://127.0.0.1:8787/mcp"
+~~~
+
+If you are testing a downloaded asset before installation, the same rule is
+`C:/Users/YourName/Downloads/simplicio-windows-x64.exe`. Never paste
+a raw-backslash Windows path into a double-quoted TOML command; use forward
+slashes as shown above.
+
+#### macOS
+
+~~~toml
+[mcp_servers.simplicio]
+command = "/Users/your-name/.simplicio/bin/simplicio"
+args = ["serve", "--mcp", "--stdio"]
+
+[mcp_servers.simplicio.env]
+SIMPLICIO_MCP_URL = "http://127.0.0.1:8787/mcp"
+~~~
+
+#### Linux
+
+~~~toml
+[mcp_servers.simplicio]
+command = "/home/your-name/.simplicio/bin/simplicio"
 args = ["serve", "--mcp", "--stdio"]
 
 [mcp_servers.simplicio.env]

@@ -48,7 +48,7 @@ $SimplicioMcpUrl = if ($env:SIMPLICIO_MCP_URL) { $env:SIMPLICIO_MCP_URL } else {
 if ($env:SIMPLICIO_BIN_DIR) {
   $InstallDir = $env:SIMPLICIO_BIN_DIR
 } else {
-  $InstallDir = "$env:USERPROFILE\.simplicio\bin"
+  $InstallDir = Join-Path $env:USERPROFILE ".simplicio\bin"
 }
 $DestPath = Join-Path $InstallDir $BinName
 $InstallTransactionActive = $false

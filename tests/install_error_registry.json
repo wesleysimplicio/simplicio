@@ -187,9 +187,54 @@
       "root_cause": "The package was built in the repository but had not been published before claiming PyPI installation support.",
       "guard": "The PyPI publish workflow runs the terminal and public PyPI smoke on all four supported hosts after upload.",
       "regression_tests": [
-        "tests/test_clean_install_e2e_contract.py::test_release_install_smoke_covers_terminal_and_pypi_paths"
+        "tests/test_clean_install_e2e_contract.py::test_local_publisher_covers_terminal_pypi_and_post_release_smokes"
       ],
       "fixed_commit": "292cef8bbea11a35ef9d87ef3cf674f81d47dcc7"
+    },
+    {
+      "id": "MCP-TOML-PATH-015",
+      "platform": "windows-macos-linux",
+      "status": "fixed",
+      "severity": "blocker",
+      "source": "customer-screenshot",
+      "symptom": "A configuração TOML do MCP falha no Windows com escapes como \\U, ou aponta para um caminho não expandido no macOS/Linux.",
+      "root_cause": "Exemplos e geradores reutilizavam barras invertidas do Windows ou o atalho de shell ~ dentro de um valor TOML.",
+      "guard": "Windows usa C:/...; macOS usa /Users/...; Linux usa /home/...; o TOML gerado é analisado e o caminho faz round-trip.",
+      "regression_tests": [
+        "tests/test_release_local_contract.py::test_mcp_docs_use_copy_safe_absolute_paths_for_every_platform",
+        "tests/test_codex_integration_cli.py::test_windows_binary_path_is_toml_safe_and_uses_forward_slashes"
+      ],
+      "fixed_commit": "pending-v3.8.30"
+    },
+    {
+      "id": "LOCAL-RELEASE-016",
+      "platform": "release",
+      "status": "fixed",
+      "severity": "high",
+      "source": "release-process-review",
+      "symptom": "A publicação era orientada por automação hospedada, incompatível com o processo operacional local do projeto.",
+      "root_cause": "O contrato de release não declarava um único publicador local responsável pelos quatro binários, GitHub Release público e PyPI público.",
+      "guard": "O repositório público possui um publicador local testado, sem delegar a publicação a automação hospedada.",
+      "regression_tests": [
+        "tests/test_release_local_contract.py::test_public_repository_owns_local_pypi_and_release_publication",
+        "tests/test_clean_install_e2e_contract.py::test_public_target_table_has_exactly_four_release_entries",
+        "tests/test_clean_install_e2e_contract.py::test_local_publisher_covers_terminal_pypi_and_post_release_smokes"
+      ],
+      "fixed_commit": "pending-v3.8.30"
+    },
+    {
+      "id": "POST-SMOKE-CLI-017",
+      "platform": "release",
+      "status": "fixed",
+      "severity": "blocker",
+      "source": "release-preflight",
+      "symptom": "O publicador falharia depois do upload ao chamar post_release_smoke.py com uma opção desconhecida.",
+      "root_cause": "O chamador usava --repository, enquanto o contrato do smoke expõe --repo.",
+      "guard": "Um teste de contrato mantém o nome da opção do publicador alinhado ao parser do smoke final.",
+      "regression_tests": [
+        "tests/test_release_local_contract.py::test_public_publisher_uses_post_release_smoke_cli_contract"
+      ],
+      "fixed_commit": "pending-v3.8.30"
     },
     {
       "id": "PYPI-MANIFEST-011",

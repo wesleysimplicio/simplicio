@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 
 
@@ -15,26 +16,26 @@ def test_clean_install_harness_covers_all_release_targets():
         assert report['signature'] is True
 
 
-def test_workflow_has_four_platform_matrix_entries():
-    workflow = (ROOT / '.github/workflows/e2e.yml').read_text(encoding='utf-8')
-    for value in ('ubuntu-latest', 'windows-latest', 'macos-13', 'macos-14'):
-        assert value in workflow
-    assert '--download --json' in workflow
+def test_public_target_table_has_exactly_four_release_entries():
+    payload = json.loads((ROOT / 'distribution/targets.json').read_text(encoding='utf-8'))
+    target_ids = {item['id'] for item in payload['targets']}
+    assert target_ids == {'linux-x64', 'windows-x64', 'macos-x64', 'macos-arm64'}
 
 
-def test_release_install_smoke_covers_terminal_and_pypi_paths():
+def test_local_publisher_covers_terminal_pypi_and_post_release_smokes():
     script = (ROOT / 'scripts/release_install_smoke.py').read_text(encoding='utf-8')
-    workflow = (ROOT / '.github/workflows/publish-pypi.yml').read_text(encoding='utf-8')
+    publisher = (ROOT / 'scripts/publish_release_local.py').read_text(encoding='utf-8')
     assert 'install.sh' in script
     assert 'install.ps1' in script
     assert 'simplicio-installer==' in script
     assert '"-m",' in script
     assert '"venv",' in script
-    assert 'release_install_smoke.py' in workflow
-    assert 'prepublish-install-smoke:' in workflow
-    assert '--wheel' in workflow
-    assert 'release-install-smoke:' in workflow
-    assert 'needs: publish' in workflow
+    assert publisher.count('scripts/release_install_smoke.py') == 2
+    assert '"--terminal"' in publisher
+    assert '"--pypi"' in publisher
+    assert '"twine", "upload"' in publisher
+    assert 'scripts/post_release_smoke.py' in publisher
+    assert '"--repo", PUBLIC_REPOSITORY' in publisher
 
 
 def test_shell_installer_uses_safe_printf_without_losing_ansi_rendering():
