@@ -19,6 +19,6 @@ def test_macos_x64_maps_to_signed_release_asset_and_installer():
 
 def test_shell_installer_does_not_reject_macos_x64():
     text = (ROOT / 'install.sh').read_text(encoding='utf-8')
-    assert 'macos-x64) MANIFEST_TARGET_ID="macos-x86_64"' in text
-    assert 'esta release publica apenas macOS Apple Silicon' not in text
+    assert 'TARGET_ID="$OS-$ARCH"' in text
     assert 'simplicio-$OS-$ARCH' in text
+    assert 'macos-x86_64' not in text

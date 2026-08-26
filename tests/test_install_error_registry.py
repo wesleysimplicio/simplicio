@@ -21,7 +21,7 @@ def test_registry_is_versioned_and_covers_all_installers():
     platforms = {entry["platform"] for entry in entries}
     assert {"windows", "macos-linux", "windows-macos-linux"} <= platforms
     assert any(entry["platform"] == "macos" for entry in entries)
-    assert any(entry["status"] == "open" for entry in entries)
+    assert any(entry["status"] in {"fixed", "guarded"} for entry in entries)
 
 
 def test_every_registry_entry_links_to_existing_regression_tests():
@@ -73,7 +73,7 @@ def test_supported_unix_manifest_targets_are_present():
     assert {"macos-arm64", "macos-x64", "linux-x64"} <= target_ids
 
 
-def test_open_validation_sentinels_are_recorded():
+def test_validation_sentinels_are_recorded_as_fixed():
     entries = {entry["id"]: entry for entry in load_registry()["entries"]}
     expected = {
         "MCP-BOOT-006",
@@ -84,4 +84,4 @@ def test_open_validation_sentinels_are_recorded():
         "PYPI-MANIFEST-011",
     }
     assert expected <= entries.keys()
-    assert all(entries[key]["status"] == "open" for key in expected)
+    assert all(entries[key]["status"] == "fixed" for key in expected)

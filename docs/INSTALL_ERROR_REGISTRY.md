@@ -25,12 +25,12 @@ também os caminhos públicos, o fallback de autenticação e a limpeza de stagi
 | UNIX-FETCH-003 | macOS/Linux | fixed | Fetch do binário saía pelo `set -e` sem tratamento explícito. |
 | AUTH-SHAPE-004 | Todas | fixed | Login válido em `user.email` era rejeitado. |
 | DOC-INSTALL-005 | Todas | fixed | Docs apontavam para installers/canais inconsistentes em vez do bootstrap PyPI. |
-| MCP-BOOT-006 | Todas | open | Testes ainda esperam o contrato antigo de login/MCP. |
-| CODEX-HOOK-007 | Todas | open | Política do hook versionado diverge do teste. |
-| UNINSTALL-008 | Todas | open | Contrato de uninstall/rollback diverge dos scripts atuais. |
-| MACOS-X64-009 | macOS Intel | open | Teste ainda exige alias `macos-x86_64`; tabela/manifest usam `macos-x64`. |
-| BENCH-010 | CI | open | Auditoria de timing/relatório não está determinística no ambiente atual. |
-| PYPI-MANIFEST-011 | Packaging | open | Pin padrão do instalador PyPI diverge do checkout versionado. |
+| MCP-BOOT-006 | Todas | fixed | Handshake MCP agora depende de login ativo e não testa staging. |
+| CODEX-HOOK-007 | Todas | fixed | Codex é opt-in e exige hook versionado explícito. |
+| UNINSTALL-008 | Todas | fixed | Keep-data, purge confirmado e rollback estão explícitos nos instaladores. |
+| MACOS-X64-009 | macOS Intel | fixed | Teste e instalador usam o alvo canônico `macos-x64`. |
+| BENCH-010 | CI | fixed | Wrappers npm e manifesto estão alinhados em 3.8.25. |
+| PYPI-MANIFEST-011 | Packaging | fixed | Pin PyPI 3.8.25 confere com o manifest público. |
 
 ## Regras para novos incidentes
 

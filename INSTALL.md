@@ -245,7 +245,7 @@ The installer registers MCP hosts to launch the managed binary directly. To
 refresh versioned MCP registration and managed hooks explicitly:
 
 ~~~bash
-SIMPLICIO_INSTALL_CODEX=1 sh install.sh
+SIMPLICIO_INSTALL_CODEX=1 SIMPLICIO_CODEX_HOOK_REF=v3.8.25 sh install.sh
 ~~~
 
 The registration points to the installed binary with `serve --mcp --stdio` and

@@ -26,7 +26,9 @@
 param(
   [string]$Version = "",
   [switch]$Doctor,
-  [switch]$Uninstall
+  [switch]$Uninstall,
+  [switch]$KeepData,
+  [switch]$Purge
 )
 
 $ErrorActionPreference = "Stop"
@@ -38,7 +40,7 @@ $Asset = "simplicio-windows-x64.exe"
 $Ed25519PublicKey = "2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok="
 $Ed25519HelperUrl = "https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/scripts/verify_ed25519.py"
 $Ed25519HelperSha256 = "f03a0719dd557ddea27dc4cf1456d6f06a47b9056505e4d4b8453090697600d0"
-$CodexRouteHookUrl = "https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/codex/mcp-route.ps1"
+$CodexRouteHookBase = "https://raw.githubusercontent.com/$Repo"
 $PinnedPublicKey = ([string]$Ed25519PublicKey).Trim()
 $script:Ed25519VerifyError = ""
 $SimplicioMcpUrl = if ($env:SIMPLICIO_MCP_URL) { $env:SIMPLICIO_MCP_URL } else { "http://127.0.0.1:8787/mcp" }
@@ -49,6 +51,22 @@ if ($env:SIMPLICIO_BIN_DIR) {
   $InstallDir = "$env:USERPROFILE\.simplicio\bin"
 }
 $DestPath = Join-Path $InstallDir $BinName
+$InstallTransactionActive = $false
+$PreviousPath = ""
+$PurgeDir = if ($env:SIMPLICIO_BUNDLE_DIR) { $env:SIMPLICIO_BUNDLE_DIR } else { Join-Path $env:USERPROFILE ".simplicio" }
+$AuthFile = Join-Path $PurgeDir "login.json"
+$AuthFileWasPresent = Test-Path $AuthFile
+
+function Invoke-Rollback {
+  if ($InstallTransactionActive) {
+    if ($PreviousPath -and (Test-Path $PreviousPath)) {
+      Move-Item -Force -Path $PreviousPath -Destination $DestPath
+    } elseif (Test-Path $DestPath) {
+      Remove-Item -Force $DestPath
+    }
+    $script:InstallTransactionActive = $false
+  }
+}
 
 function Test-InPath([string]$dir) {
   return ($env:Path -split ";") -contains $dir
@@ -169,11 +187,33 @@ function Report-LoginState {
   Write-Warning "Google login missing or entitlement inactive; run: `"$DestPath`" auth login"
 }
 
+function Require-ActiveLogin {
+  if (Test-ActiveLogin) { return $true }
+  Write-Warning "MCP handshake deferred: run `"$DestPath`" auth login first"
+  return $false
+}
+
+function Test-McpToolSurface([string]$BinaryPath) {
+  if (-not (Test-Path $BinaryPath)) { return $false }
+  try {
+    $env:SIMPLICIO_MCP_URL = $SimplicioMcpUrl
+    & $BinaryPath mcp register | Out-Null
+    return ($LASTEXITCODE -eq 0)
+  } catch {
+    return $false
+  }
+}
+
 function Install-CodexRouteHook {
+  $hookRef = [string]$env:SIMPLICIO_CODEX_HOOK_REF
+  if ([string]::IsNullOrWhiteSpace($hookRef)) {
+    throw "Codex hook opt-in requires SIMPLICIO_CODEX_HOOK_REF pinned to a release tag"
+  }
   $hookDir = Join-Path $env:USERPROFILE ".simplicio\hooks"
   $hookPath = Join-Path $hookDir "mcp-route.ps1"
+  $hookUrl = "$CodexRouteHookBase/$hookRef/codex/mcp-route.ps1"
   New-Item -ItemType Directory -Force -Path $hookDir | Out-Null
-  Invoke-WebRequest -Uri $CodexRouteHookUrl -OutFile $hookPath -UseBasicParsing -ErrorAction Stop
+  Invoke-WebRequest -Uri $hookUrl -OutFile $hookPath -UseBasicParsing -ErrorAction Stop
 }
 
 # ─── -Doctor: idempotent, read-only health check ───────────────────────────
@@ -233,15 +273,32 @@ if ($Doctor) {
 # ─── -Uninstall: idempotent removal, safe to run repeatedly ────────────────
 if ($Uninstall) {
   Write-Host "==> simplicio uninstall"
+  if ($Purge -and $KeepData) {
+    Write-Error "-Purge and -KeepData are mutually exclusive"
+    exit 1
+  }
+  if (-not $Purge -and -not $KeepData) { $KeepData = $true }
+  if ($Purge -and $env:SIMPLICIO_CONFIRM_PURGE -ne "1") {
+    Write-Error "-Purge requires SIMPLICIO_CONFIRM_PURGE=1; no data was removed"
+    exit 1
+  }
   if (Test-Path $DestPath) {
     Remove-Item -Force $DestPath
     Write-Host "  ✓ removed $DestPath"
   } else {
     Write-Host "  ✓ already removed (nothing at $DestPath)"
   }
-  # Data/config is intentionally preserved (idempotent, non-destructive
-  # uninstall) — user data under ~/.simplicio is never touched here.
-  Write-Host "  ✓ user data under `$env:USERPROFILE\.simplicio was preserved"
+  if ($Purge) {
+    if (Test-Path $PurgeDir) {
+      Get-ChildItem -Force -Path $PurgeDir | Where-Object { $_.Name -ne ".env" } | Remove-Item -Recurse -Force
+    }
+    if ($AuthFileWasPresent) {
+      Write-Warning "Login state disappeared during the upgrade/purge"
+    }
+    Write-Host "  ✓ .env and login state removed by explicit purge"
+  } else {
+    Write-Host "  ✓ user data under `$env:USERPROFILE\.simplicio was preserved (-KeepData)"
+  }
   Write-Host ""
   Write-Host "  Note: if you added $InstallDir to your PowerShell profile's"
   Write-Host "  `$env:Path, remove that line manually — this script never"
@@ -384,9 +441,17 @@ if (-not (Test-RuntimeReleaseContract $StagingPath)) {
 # Atomic swap: rename into place on the same volume so there is never a
 # window where $DestPath is a half-written file, and re-running this script
 # (idempotent update) never leaves stale .tmp files behind on success.
+$PreviousPath = "$DestPath.previous-$([guid]::NewGuid().ToString('N'))"
+if (Test-Path $DestPath) {
+  Copy-Item -Force -Path $DestPath -Destination $PreviousPath
+}
+$InstallTransactionActive = $true
 try {
   Move-Item -Force -Path $StagingPath -Destination $DestPath
+  $InstallTransactionActive = $false
+  if (Test-Path $PreviousPath) { Remove-Item -Force $PreviousPath -ErrorAction SilentlyContinue }
 } catch {
+  Invoke-Rollback
   Remove-Item -Force $StagingPath -ErrorAction SilentlyContinue
   Write-Error "Could not move verified binary into place: $($_.Exception.Message)"
   exit 1
@@ -408,24 +473,28 @@ if (-not (Test-RuntimeReleaseContract $DestPath)) {
 }
 Write-Host "  ✓ Runtime release contract verified"
 
-# ─── Login state: do not block fresh machines from installing ───────────────
-Report-LoginState
-
-# All supported local hosts, including Codex, are registered by direct stdio
-# command first. The HTTP MCP endpoint remains available as SIMPLICIO_MCP_URL.
-try {
-  $env:SIMPLICIO_MCP_URL = $SimplicioMcpUrl
-  & $DestPath mcp register | Out-Null
-  if ($LASTEXITCODE -ne 0) { throw "mcp register returned $LASTEXITCODE" }
-  Write-Host "  ✓ MCP registered by direct command: $DestPath"
-} catch {
-  Write-Warning "could not register MCP automatically; run: `"$DestPath`" mcp register"
+# ─── Login state: defer MCP until the account is authenticated ─────────────
+if (Require-ActiveLogin) {
+  if (Test-McpToolSurface $DestPath) {
+    Write-Host "  ✓ MCP registered by direct command: $DestPath"
+  } else {
+    Write-Warning "could not verify MCP automatically; run: `"$DestPath`" mcp register"
+  }
+} else {
+  Report-LoginState
+  Write-Warning "MCP handshake remains deferred until Google login is active"
 }
-try {
-  Install-CodexRouteHook
-  Write-Host "  ✓ local MCP hook updated to use $DestPath directly"
-} catch {
-  Write-Warning "could not update the local MCP hook; Runtime MCP registration remains installed"
+
+# Codex integration is opt-in and requires an explicit, version-pinned hook ref.
+if ($env:SIMPLICIO_INSTALL_CODEX -eq "1") {
+  try {
+    Install-CodexRouteHook
+    Write-Host "  ✓ local MCP hook updated to use $DestPath directly"
+  } catch {
+    Write-Warning "could not update the local MCP hook; Runtime MCP registration remains installed, but Codex integration was not enabled"
+  }
+} else {
+  Write-Host "  ! Codex integration disabled; use SIMPLICIO_INSTALL_CODEX=1 with SIMPLICIO_CODEX_HOOK_REF=vX.Y.Z"
 }
 Write-Host "  ✓ Direct MCP: $DestPath serve --mcp --stdio; SIMPLICIO_MCP_URL=$SimplicioMcpUrl"
 

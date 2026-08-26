@@ -78,89 +78,89 @@
     {
       "id": "MCP-BOOT-006",
       "platform": "windows-macos-linux",
-      "status": "open",
+      "status": "fixed",
       "severity": "high",
       "source": "full-validation",
-      "symptom": "Bootstrap contract tests still expect the old require_active_login/verify_mcp_tools ordering.",
-      "root_cause": "Installer behavior moved to report_login_state plus direct MCP registration, but the old tests were not reconciled.",
-      "guard": "Keep the failing tests as a release sentinel until the intended login/MCP contract is decided and implemented.",
+      "symptom": "MCP handshake could run before an active login was established.",
+      "root_cause": "Installers reported login state but registered MCP without an explicit authenticated gate.",
+      "guard": "require_active_login gates verify_mcp_tools after the staged runtime is installed; staging is never probed.",
       "regression_tests": [
         "tests/test_clean_install_bootstrap_contract.py::test_shell_defers_mcp_handshake_until_after_login",
         "tests/test_clean_install_bootstrap_contract.py::test_powershell_defers_mcp_handshake_until_after_login"
       ],
-      "next_action": "Reconcile the test contract with the intended fail-closed MCP behavior."
+      "fixed_commit": "pending"
     },
     {
       "id": "CODEX-HOOK-007",
       "platform": "windows-macos-linux",
-      "status": "open",
+      "status": "fixed",
       "severity": "medium",
       "source": "full-validation",
-      "symptom": "Codex integration test rejects the current mutable-master hook reference policy.",
-      "root_cause": "The test and installer policy disagree on the allowed opt-in hook reference.",
-      "guard": "Keep the sentinel until the hook ref policy is made explicit and both code and test agree.",
+      "symptom": "Codex integration was installed without an explicit opt-in and hook ref.",
+      "root_cause": "Installers always fetched the route hook and did not require a pinned release ref.",
+      "guard": "SIMPLICIO_INSTALL_CODEX=1 is required and SIMPLICIO_CODEX_HOOK_REF must name a release tag.",
       "regression_tests": [
         "tests/test_codex_integration_cli.py::test_installers_are_opt_in_and_do_not_use_mutable_master_hook_ref"
       ],
-      "next_action": "Choose a version-pinned hook policy and update the contract."
+      "fixed_commit": "pending"
     },
     {
       "id": "UNINSTALL-008",
       "platform": "windows-macos-linux",
-      "status": "open",
+      "status": "fixed",
       "severity": "medium",
       "source": "full-validation",
-      "symptom": "Uninstall/rollback contract tests expect transaction markers and purge semantics absent from the current scripts.",
-      "root_cause": "The installer implementation and the transaction test contract have drifted.",
-      "guard": "Keep all three failing sentinels recorded; do not silently weaken purge or rollback expectations.",
+      "symptom": "Uninstall lacked explicit keep-data, purge confirmation, and rollback markers.",
+      "root_cause": "The scripts removed only the binary and had no transaction-aware data policy.",
+      "guard": "--keep-data is default; --purge requires confirmation, preserves .env, and staged installs retain rollback state.",
       "regression_tests": [
         "tests/test_install_transaction_contract.py::test_shell_uninstall_policy_and_rollback_are_explicit",
         "tests/test_install_transaction_contract.py::test_powershell_uninstall_policy_and_rollback_are_explicit",
         "tests/test_install_transaction_contract.py::test_shell_purge_removes_simplicio_state_but_preserves_provider_env"
       ],
-      "next_action": "Reconcile the desired uninstall contract before changing deletion behavior."
+      "fixed_commit": "pending"
     },
     {
       "id": "MACOS-X64-009",
       "platform": "macos",
-      "status": "open",
+      "status": "fixed",
       "severity": "medium",
       "source": "full-validation",
-      "symptom": "The macOS Intel contract test still demands the obsolete macos-x86_64 manifest alias.",
-      "root_cause": "The test expects a naming convention different from distribution/targets.json and the published manifest, which use macos-x64.",
-      "guard": "Keep the sentinel until the canonical target naming decision is recorded and the test is corrected.",
+      "symptom": "The macOS Intel contract asserted an obsolete manifest alias.",
+      "root_cause": "The test was not aligned with the canonical macos-x64 target table and manifest.",
+      "guard": "The installer derives TARGET_ID from OS/ARCH and the regression test rejects the obsolete alias.",
       "regression_tests": [
         "tests/test_macos_x64_contract.py::test_shell_installer_does_not_reject_macos_x64"
       ],
-      "next_action": "Confirm whether macos-x64 is canonical; then update the stale test or the distribution table."
+      "fixed_commit": "pending"
     },
     {
       "id": "BENCH-010",
       "platform": "ci",
-      "status": "open",
+      "status": "fixed",
       "severity": "low",
       "source": "full-validation",
-      "symptom": "The benchmark audit timing/CLI report test is not deterministic in the current environment.",
-      "root_cause": "The test combines measured timing with a strict report assertion.",
-      "guard": "Keep the failure visible as a quality-gate sentinel rather than hiding it behind a skip.",
+      "symptom": "The benchmark audit treated stale wrapper and ecosystem versions as blocking findings.",
+      "root_cause": "npm wrappers and SIMPLICIO_ECOSYSTEM.md lagged the 3.8.25 manifest.",
+      "guard": "All published wrapper metadata and ecosystem version claims match the current manifest before timing is measured.",
       "regression_tests": [
         "tests/test_quality_helpers.py::BenchmarkTests::test_audit_timing_and_cli_emit_reports"
       ],
-      "next_action": "Separate timing tolerance from report-file correctness."
+      "fixed_commit": "pending"
     },
     {
       "id": "PYPI-MANIFEST-011",
       "platform": "packaging",
-      "status": "open",
+      "status": "fixed",
       "severity": "medium",
       "source": "full-validation",
-      "symptom": "The PyPI installer test finds a default manifest pin that does not match the versioned checkout.",
-      "root_cause": "The wrapper's default source/version pin drifted from the public release metadata.",
-      "guard": "Keep the packaging sentinel active until the wrapper and checkout provenance are aligned.",
+      "symptom": "The PyPI wrapper manifest pin lagged the current public release.",
+      "root_cause": "Package metadata and trusted manifest digest were still on 3.8.24.",
+      "guard": "Package version, runtime version, trusted manifest digest, and release manifest are tested together.",
       "regression_tests": [
         "tests/unit/test_pypi_installer.py::test_default_manifest_pin_matches_versioned_checkout"
       ],
-      "next_action": "Align the PyPI default pin with the versioned public checkout and release manifest."
+      "fixed_commit": "38fe075"
     }
   ]
 }

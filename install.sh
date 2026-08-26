@@ -34,7 +34,7 @@ GITHUB="https://github.com/$REPO"
 ED25519_PUBLIC_KEY="2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok="
 ED25519_HELPER_URL="https://raw.githubusercontent.com/$REPO/master/scripts/verify_ed25519.py"
 ED25519_HELPER_SHA256="f03a0719dd557ddea27dc4cf1456d6f06a47b9056505e4d4b8453090697600d0"
-CODEX_ROUTE_HOOK_URL="https://raw.githubusercontent.com/$REPO/master/codex/mcp-route.sh"
+# Codex hooks are fetched from an explicit release ref only when opt-in is enabled.
 BIN_NAME="simplicio"
 
 GREEN='\033[0;32m'
@@ -51,6 +51,25 @@ err()   { printf "${RED}  ✗${NC} %s\n" "$*"; exit 1; }
 SIMPLICIO_MCP_URL="${SIMPLICIO_MCP_URL:-http://127.0.0.1:8787/mcp}"
 BIN_DIR="${SIMPLICIO_BIN_DIR:-$HOME/.simplicio/bin}"
 DEST_PATH="$BIN_DIR/$BIN_NAME"
+INSTALL_TRANSACTION_ACTIVE="false"
+PREVIOUS_PATH=""
+PURGE_DIR="${SIMPLICIO_BUNDLE_DIR:-$HOME/.simplicio}"
+AUTH_FILE="$PURGE_DIR/login.json"
+AUTH_FILE_WAS_PRESENT="false"
+if [ -e "$AUTH_FILE" ]; then
+  AUTH_FILE_WAS_PRESENT="true"
+fi
+
+rollback_install() {
+  if [ "$INSTALL_TRANSACTION_ACTIVE" = "true" ]; then
+    if [ -n "$PREVIOUS_PATH" ] && [ -e "$PREVIOUS_PATH" ]; then
+      mv -f "$PREVIOUS_PATH" "$DEST_PATH"
+    else
+      rm -f "$DEST_PATH"
+    fi
+    INSTALL_TRANSACTION_ACTIVE="false"
+  fi
+}
 
 # ─── Detect platform (canonical os/arch naming, matches distribution/targets.json) ──
 detect_platform() {
@@ -113,14 +132,21 @@ verify_ed25519_signature() {
 }
 
 install_codex_route_hook() {
+  hook_ref="${SIMPLICIO_CODEX_HOOK_REF:-}"
+  if [ -z "$hook_ref" ]; then
+    warn "Codex hook opt-in requires SIMPLICIO_CODEX_HOOK_REF pinned to a release tag"
+    return 1
+  fi
+  CODEX_ROUTE_HOOK_URL="https://raw.githubusercontent.com/$REPO/$hook_ref/codex/mcp-route.sh"
+  hook_url="$CODEX_ROUTE_HOOK_URL"
   hook_dir="$HOME/.simplicio/hooks"
   hook_path="$hook_dir/mcp-route.sh"
   hook_tmp="$(mktemp)"
   mkdir -p "$hook_dir"
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$CODEX_ROUTE_HOOK_URL" -o "$hook_tmp" || { rm -f "$hook_tmp"; return 1; }
+    curl -fsSL "$hook_url" -o "$hook_tmp" || { rm -f "$hook_tmp"; return 1; }
   elif command -v wget >/dev/null 2>&1; then
-    wget -q "$CODEX_ROUTE_HOOK_URL" -O "$hook_tmp" || { rm -f "$hook_tmp"; return 1; }
+    wget -q "$hook_url" -O "$hook_tmp" || { rm -f "$hook_tmp"; return 1; }
   else
     rm -f "$hook_tmp"
     return 1
@@ -217,6 +243,20 @@ report_login_state() {
   return 0
 }
 
+require_active_login() {
+  if verify_active_login; then
+    return 0
+  fi
+  warn "MCP handshake adiado: faça login com ${DEST_PATH} auth login"
+  return 1
+}
+
+verify_mcp_tools() {
+  binary_path="$1"
+  [ -x "$binary_path" ] || return 1
+  SIMPLICIO_MCP_URL="$SIMPLICIO_MCP_URL" "$binary_path" mcp register >/dev/null 2>&1
+}
+
 # ─── --doctor: idempotent, read-only health check ──────────────────────────
 run_doctor() {
   info "simplicio doctor"
@@ -275,16 +315,39 @@ run_uninstall() {
   else
     ok "já estava removido (nada em $DEST_PATH)"
   fi
-  # Dados do usuário são preservados intencionalmente (uninstall idempotente
-  # e não-destrutivo) — ~/.simplicio nunca é tocado aqui.
-  ok "dados do usuário em \$HOME/.simplicio foram preservados"
+
+  if [ "${UNINSTALL_MODE:-keep-data}" = "purge" ]; then
+    if [ "${SIMPLICIO_CONFIRM_PURGE:-}" != "1" ]; then
+      err "purge exige SIMPLICIO_CONFIRM_PURGE=1; dados não foram removidos"
+    fi
+    if [ -d "$PURGE_DIR" ]; then
+      for _entry in "$PURGE_DIR"/* "$PURGE_DIR"/.[!.]*; do
+        [ -e "$_entry" ] || continue
+        _name="$(basename "$_entry")"
+        [ "$_name" = ".env" ] && continue
+        rm -rf "$_entry"
+      done
+    fi
+    if [ "$AUTH_FILE_WAS_PRESENT" = "true" ]; then
+      warn "estado de login desapareceu durante o purge explícito"
+    fi
+    ok "dados do Simplicio removidos; .env do provedor foi preservado"
+  else
+    ok "dados do usuário em \$HOME/.simplicio foram preservados (--keep-data)"
+  fi
   warn "se você adicionou $BIN_DIR ao PATH no seu ~/.zshrc ou ~/.bashrc, remova a linha manualmente"
   exit 0
 }
 
 case "${1:-}" in
   --doctor) detect_platform; run_doctor ;;
-  --uninstall) run_uninstall ;;
+  --uninstall)
+    case "${2:-}" in
+      ""|--keep-data) UNINSTALL_MODE="keep-data" ;;
+      --purge) UNINSTALL_MODE="purge" ;;
+      *) err "opção de uninstall desconhecida: ${2}" ;;
+    esac
+    run_uninstall ;;
 esac
 
 printf "${GREEN}"
@@ -471,7 +534,20 @@ except Exception:
   # Swap atômico: mv no mesmo filesystem nunca deixa $DEST_PATH parcialmente
   # escrito, e reexecutar este script (update idempotente) não deixa .tmp
   # órfãos em caso de sucesso.
-  mv -f "$STAGING_PATH" "$DEST_PATH"
+  PREVIOUS_PATH="$DEST_PATH.previous-$$"
+  if [ -e "$DEST_PATH" ] && ! cp -p "$DEST_PATH" "$PREVIOUS_PATH"; then
+    rm -f "$PREVIOUS_PATH" "$STAGING_PATH"
+    err "não foi possível preparar rollback da instalação anterior"
+  fi
+  INSTALL_TRANSACTION_ACTIVE="true"
+  if ! mv -f "$STAGING_PATH" "$DEST_PATH"; then
+    rollback_install
+    rm -f "$STAGING_PATH" "$PREVIOUS_PATH"
+    err "não foi possível ativar o Runtime verificado"
+  fi
+  INSTALL_TRANSACTION_ACTIVE="false"
+  rm -f "$PREVIOUS_PATH"
+  ok "Simplicio Runtime instalado em $DEST_PATH"  mv -f "$STAGING_PATH" "$DEST_PATH"
   ok "Simplicio Runtime instalado em $DEST_PATH"
 fi
 
@@ -482,20 +558,27 @@ if ! verify_runtime_contract "$DEST_PATH"; then
 fi
 ok "contrato de release do Runtime verificado"
 
-# ─── 2.2 Login state: do not block fresh machines from installing ──────────
-report_login_state
-
-# All supported local hosts, including Codex, are registered by direct stdio
-# command first. The HTTP MCP endpoint remains available as SIMPLICIO_MCP_URL.
-if SIMPLICIO_MCP_URL="$SIMPLICIO_MCP_URL" "$DEST_PATH" mcp register >/dev/null 2>&1; then
-  ok "MCP registrado por comando direto para $DEST_PATH"
+# ─── 2.2 Login state: defer MCP until the account is authenticated ─────────
+if require_active_login; then
+  if verify_mcp_tools "$DEST_PATH"; then
+    ok "MCP registrado por comando direto para $DEST_PATH"
+  else
+    warn "não foi possível verificar o MCP automaticamente; rode: $DEST_PATH mcp register"
+  fi
 else
-  warn "não foi possível registrar o MCP automaticamente; rode: $DEST_PATH mcp register"
+  report_login_state
+  warn "MCP handshake permanece adiado até o login Google ficar ativo"
 fi
-if install_codex_route_hook; then
-  ok "hook MCP local atualizado para usar $DEST_PATH diretamente"
+
+# Codex integration is opt-in and requires an explicit, version-pinned hook ref.
+if [ "${SIMPLICIO_INSTALL_CODEX:-}" = "1" ]; then
+  if install_codex_route_hook; then
+    ok "hook MCP local atualizado para usar $DEST_PATH diretamente"
+  else
+    warn "não foi possível atualizar o hook MCP local; integração Codex não foi ativada"
+  fi
 else
-  warn "não foi possível atualizar o hook MCP local; o registro MCP do Runtime permanece instalado"
+  info "integração Codex não ativada; use SIMPLICIO_INSTALL_CODEX=1 com SIMPLICIO_CODEX_HOOK_REF=vX.Y.Z"
 fi
 ok "MCP direto: $DEST_PATH serve --mcp --stdio; SIMPLICIO_MCP_URL=${SIMPLICIO_MCP_URL}"
 
