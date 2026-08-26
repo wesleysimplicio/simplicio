@@ -44,5 +44,5 @@ também os caminhos públicos, o fallback de autenticação e a limpeza de stagi
 4. Quando corrigido, atualizar o status e registrar o commit de resolução.
 5. Executar o teste específico e a validação progressiva antes de publicar.
 
-Última auditoria: 177 testes passaram no commit eef83c7a8abc2b96993928db4780777cab37c9e2.
+Última auditoria: 179 testes passaram no commit 292cef8bbea11a35ef9d87ef3cf674f81d47dcc7.
 O registro cobre os contratos públicos de bootstrap PyPI, MCP, Codex, uninstall, rollback e alvos macOS.

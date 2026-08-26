@@ -161,7 +161,7 @@
         "tests/test_clean_install_bootstrap_contract.py::test_shell_defers_mcp_handshake_until_after_login",
         "tests/test_clean_install_bootstrap_contract.py::test_powershell_defers_mcp_handshake_until_after_login"
       ],
-      "fixed_commit": "pending"
+      "fixed_commit": "292cef8bbea11a35ef9d87ef3cf674f81d47dcc7"
     },
     {
       "id": "SWAP-ACTIVATION-013",
@@ -175,7 +175,7 @@
       "regression_tests": [
         "tests/test_install_transaction_contract.py::test_shell_swap_has_one_activation_message_after_atomic_move"
       ],
-      "fixed_commit": "pending"
+      "fixed_commit": "292cef8bbea11a35ef9d87ef3cf674f81d47dcc7"
     },
     {
       "id": "PYPI-PUBLIC-014",
@@ -189,7 +189,7 @@
       "regression_tests": [
         "tests/test_clean_install_e2e_contract.py::test_release_install_smoke_covers_terminal_and_pypi_paths"
       ],
-      "fixed_commit": "pending"
+      "fixed_commit": "292cef8bbea11a35ef9d87ef3cf674f81d47dcc7"
     },
     {
       "id": "PYPI-MANIFEST-011",
