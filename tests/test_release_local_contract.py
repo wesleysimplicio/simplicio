@@ -77,6 +77,14 @@ def test_public_publisher_uses_post_release_smoke_cli_contract():
     assert '"core.whitespace=cr-at-eol"' in publisher
 
 
+def test_public_publisher_can_resume_after_an_external_partial_failure():
+    source = (ROOT / "scripts/publish_release_local.py").read_text(encoding="utf-8")
+    assert 'mode.add_argument("--resume"' in source
+    assert "def resume_public_preflight(" in source
+    assert "def resume_publish(" in source
+    assert "already_published_to_pypi" in source
+
+
 def test_publication_cleanliness_ignores_only_protected_local_state():
     script = ROOT / "scripts/publish_release_local.py"
     spec = importlib.util.spec_from_file_location("publish_release_local", script)
