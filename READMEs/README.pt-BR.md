@@ -54,44 +54,36 @@ opcionais, não obrigatórios.**
 
 ## 🚀 Instalação
 
-### npm / npx (qualquer SO)
-
-```bash
-npx simplicio install
-```
-
-### pip / PyPI (qualquer SO)
-
-```bash
-pip install simplicio-installer
-simplicio install
-```
-
-### Homebrew (macOS)
-
-```bash
-brew install simplicio
-```
-
-### Bun
-
-```bash
-bunx simplicio install
-```
+Use os instaladores oficiais. Eles baixam a release pública mais recente, validam
+checksum e assinatura, instalam o binário gerenciado e não clonam repositórios
+irmãos nem dependem de npm, pip, Homebrew ou Bun.
 
 ### macOS / Linux
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
+export PATH="$HOME/.simplicio/bin:$PATH"
+simplicio version
+simplicio auth login
+simplicio auth status --json
+simplicio ecosystem verify --json
 ```
 
-### Windows
+### Windows (PowerShell)
 
 ```powershell
-powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex"
+irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex
+$env:Path = "$env:USERPROFILE\.simplicio\bin;$env:Path"
+simplicio.exe version
+simplicio.exe auth login
+simplicio.exe auth status --json
+simplicio.exe ecosystem verify --json
 ```
 
-Pronto. Um comando. Sem gerenciador de pacotes, sem configuração de modelo.
+O instalador coloca o binário em `~/.simplicio/bin/simplicio` no macOS/Linux ou
+`%USERPROFILE%\.simplicio\bin\simplicio.exe` no Windows. Ele não altera
+o perfil do shell; as alterações de `PATH` acima valem apenas para o terminal
+atual. O login Google é necessário antes de usar o MCP ou comandos autenticados.
 
 ---
 

@@ -12,12 +12,14 @@ for signed updates, and a valid signed manifest.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
+export PATH="$HOME/.simplicio/bin:$PATH"
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
 powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex"
+$env:Path = "$env:USERPROFILE\.simplicio\bin;$env:Path"
 ```
 
 ### Manual Download
@@ -75,10 +77,23 @@ SIMPLICIO_CONFIRM_PURGE=1 for a non-interactive purge.
 ## Verify Installation
 
 ```bash
-simplicio help
+# macOS / Linux
+simplicio version
+simplicio auth login
+simplicio auth status --json
+simplicio ecosystem verify --json
 ```
 
-Expected output starts with `simplicio <latest-runtime-version>`.
+```powershell
+# Windows (PowerShell)
+simplicio.exe version
+simplicio.exe auth login
+simplicio.exe auth status --json
+simplicio.exe ecosystem verify --json
+```
+
+The version command confirms the installed binary; `auth status` confirms the
+Google session required by the Runtime before MCP or authenticated commands.
 
 ## Configuration
 

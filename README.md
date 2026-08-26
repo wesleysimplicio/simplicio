@@ -67,17 +67,20 @@ remain fail-closed until the account is active.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh
+export PATH="$HOME/.simplicio/bin:$PATH"
 ```
 
 ### Windows
 
 ```powershell
 powershell -c "irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex"
+$env:Path = "$env:USERPROFILE\.simplicio\bin;$env:Path"
 ```
 
 The default install location is `~/.simplicio/bin/simplicio` on macOS/Linux and
-`%USERPROFILE%\.simplicio\bin\simplicio.exe` on Windows. Add that directory to
-your `PATH` if the installer prints a PATH warning, then open a new terminal.
+`%USERPROFILE%\.simplicio\bin\simplicio.exe` on Windows. The installer does not
+edit your shell profile; the `PATH` changes above apply only to the current
+terminal. Use the managed path directly if you prefer not to change `PATH`.
 
 The installer intentionally does not pin a release. Every normal installation
 and update resolves GitHub's `latest` release, verifies it, and keeps the
@@ -102,9 +105,10 @@ private candidate is not a substitute for a published, verifiable release.
 Check the installation:
 
 ```bash
-simplicio --version
-simplicio version --json
-simplicio ecosystem doctor --json
+simplicio version
+simplicio auth login
+simplicio auth status --json
+simplicio ecosystem verify --json
 sh install.sh --doctor                 # when running from a checkout
 ```
 
