@@ -310,7 +310,7 @@ def run_native_smoke(target: str, manifest: Mapping[str, object], binary: bytes)
                 "HOME": home,
                 "USERPROFILE": home,
                 "XDG_CONFIG_HOME": str(Path(home) / ".config"),
-                "SIMPLICIO_E2E_EXPECT_LOGIN_REQUIRED": "1",
+                "SIMPLICIO_LOGIN_REQUIRED": "1",
             })
             auth = subprocess.run(command + ["auth", "status", "--json"], env=clean_env, capture_output=True, text=True, timeout=90)
             auth_text = (auth.stdout + auth.stderr).lower()

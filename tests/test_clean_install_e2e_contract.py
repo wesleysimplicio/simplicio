@@ -22,6 +22,13 @@ def test_public_target_table_has_exactly_four_release_entries():
     assert target_ids == {'linux-x64', 'windows-x64', 'macos-x64', 'macos-arm64'}
 
 
+def test_release_smokes_enable_the_canonical_optional_login_gate():
+    for relative in ('scripts/e2e_clean_install.py', 'scripts/post_release_smoke.py'):
+        source = (ROOT / relative).read_text(encoding='utf-8')
+        assert 'SIMPLICIO_LOGIN_REQUIRED' in source
+        assert 'SIMPLICIO_E2E_EXPECT_LOGIN_REQUIRED' not in source
+
+
 def test_local_publisher_covers_terminal_pypi_and_post_release_smokes():
     script = (ROOT / 'scripts/release_install_smoke.py').read_text(encoding='utf-8')
     publisher = (ROOT / 'scripts/publish_release_local.py').read_text(encoding='utf-8')

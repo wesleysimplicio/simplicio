@@ -83,7 +83,7 @@ def runtime_check(target_id: str, target: dict, env: dict[str, str]) -> dict:
         raise SystemExit('Runtime does not advertise login_enabled')
     with tempfile.TemporaryDirectory(prefix='simplicio-clean-home-') as home:
         clean_env = dict(env)
-        clean_env.update({'HOME': home, 'USERPROFILE': home, 'XDG_CONFIG_HOME': str(Path(home) / '.config'), 'SIMPLICIO_E2E_EXPECT_LOGIN_REQUIRED': '1'})
+        clean_env.update({'HOME': home, 'USERPROFILE': home, 'XDG_CONFIG_HOME': str(Path(home) / '.config'), 'SIMPLICIO_LOGIN_REQUIRED': '1'})
         status = run_checked(command + ['auth', 'status', '--json'], clean_env)
         status_output = (status.stdout + status.stderr).lower()
         if status.returncode != 0 and 'login' not in status_output and 'authenticated' not in status_output:
