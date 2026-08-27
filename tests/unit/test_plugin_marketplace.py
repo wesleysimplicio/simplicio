@@ -36,6 +36,25 @@ def test_plugin_manifests_have_skill_sources() -> None:
             assert any(skill_dir.rglob("SKILL.md"))
 
 
+def test_codex_marketplace_packages_simplicio_plugin() -> None:
+    marketplace = _load_json(".agents/plugins/marketplace.json")
+    assert marketplace["name"] == "simplicio-codex"
+
+    entry = marketplace["plugins"][0]
+    assert entry["name"] == "simplicio"
+    source = ROOT / entry["source"]["path"]
+    manifest = json.loads(
+        (source / ".codex-plugin/plugin.json").read_text(encoding="utf-8")
+    )
+
+    assert manifest["name"] == entry["name"]
+    assert manifest["mcpServers"] == "./.mcp.json"
+    assert (source / "bin/simplicio-mcp-bootstrap.js").is_file()
+    assert (source / "assets/simplicio-logo.png").is_file()
+    assert (source / "LICENSE").is_file()
+    assert any((source / "skills").rglob("SKILL.md"))
+
+
 def test_published_adapters_point_to_their_canonical_commands() -> None:
     prompt = _load_json("plugins/simplicio-prompt/.claude-plugin/plugin.json")
     assert prompt["name"] == "simplicio-prompt"

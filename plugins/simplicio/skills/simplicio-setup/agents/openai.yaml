@@ -1,0 +1,3 @@
+interface:
+  display_name: "Simplicio Setup"
+  short_description: "Install, verify, authenticate, and repair Simplicio"

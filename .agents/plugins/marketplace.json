@@ -1,0 +1,20 @@
+{
+  "name": "simplicio-codex",
+  "interface": {
+    "displayName": "Simplicio Codex"
+  },
+  "plugins": [
+    {
+      "name": "simplicio",
+      "source": {
+        "source": "local",
+        "path": "./plugins/simplicio"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

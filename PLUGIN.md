@@ -1,11 +1,26 @@
-# Simplicio public plugin marketplace
+# Simplicio public plugin marketplaces
 
-This repository publishes the installable Claude Code marketplace for the
-Simplicio ecosystem. The compiled `simplicio` Runtime remains a separate
-platform-specific binary and provides the MCP server; the marketplace carries
-the host-side skills and adapters.
+This repository publishes installable Codex and Claude Code marketplaces for
+the Simplicio ecosystem.
 
-## Install
+## Install in Codex
+
+```bash
+codex plugin marketplace add wesleysimplicio/simplicio --ref master
+codex plugin add simplicio@simplicio-codex
+```
+
+Start a new Codex task after installation. The plugin's MCP bootstrap then
+reuses a compatible Simplicio Runtime or installs the pinned, verified Runtime
+release and starts its complete stdio MCP surface. `simplicio_exec` exposes
+every valid CLI subcommand, while the Runtime publishes its dedicated tools
+dynamically. Authentication remains explicit; installation never logs in on
+the user's behalf.
+
+The Codex package, including its official Simplicio logo, lives at
+[`plugins/simplicio`](plugins/simplicio).
+
+## Install in Claude Code
 
 In Claude Code:
 
@@ -16,7 +31,7 @@ In Claude Code:
 /plugin install simplicio-sprint@simplicio
 ```
 
-Install the Runtime MCP separately and restart the host:
+Install the Runtime MCP separately for Claude Code and restart the host:
 
 ```bash
 simplicio install --global --dry-run --json
@@ -29,6 +44,7 @@ The Runtime entrypoint is `simplicio serve --mcp --stdio`.
 
 | Plugin | Owns | Source |
 |---|---|---|
+| `simplicio` (Codex) | Verified Runtime bootstrap, complete live MCP surface, all CLI commands through `simplicio_exec`, setup and Runtime skills | This repository |
 | `simplicio-loop` | Loop, tasks alias, orient, review, compress, learn, autoresearch, Prism, Mapper, Fast, Dev CLI, Runtime skills and safety hooks | [`simplicio-loop`](https://github.com/wesleysimplicio/simplicio-loop) |
 | `simplicio-prompt` | Tuple-Space/Yool prompt contract, fan-out commands, and opt-in prompt adapter | [`simplicio-prompt`](https://github.com/wesleysimplicio/simplicio-prompt) |
 | `simplicio-sprint` | Sprint intake, mapping, evidence collection, and draft-PR delivery | [`simplicio-sprint`](https://github.com/wesleysimplicio/simplicio-sprint) |
@@ -46,5 +62,5 @@ simplicio self-test --json
 simplicio contracts smoke --json
 ```
 
-The bundle is local and MIT-licensed within its plugin directories. The root
+The plugin bundles are MIT-licensed within their plugin directories. The root
 Runtime distribution and its release artifacts retain their repository license.

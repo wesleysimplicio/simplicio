@@ -1,0 +1,48 @@
+{
+  "name": "simplicio",
+  "version": "0.2.0",
+  "description": "Install and connect the Simplicio Runtime for compact repository context, governed execution, every CLI subcommand, and evidence-backed validation.",
+  "author": {
+    "name": "Wesley Simplicio",
+    "url": "https://github.com/wesleysimplicio"
+  },
+  "homepage": "https://simpleti.com.br/simplicio/",
+  "repository": "https://github.com/wesleysimplicio/simplicio",
+  "license": "MIT",
+  "keywords": [
+    "simplicio",
+    "codex",
+    "mcp",
+    "local-first",
+    "repository-context",
+    "validation"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Simplicio",
+    "shortDescription": "Governed local-first coding with Simplicio.",
+    "longDescription": "Bootstrap the verified Simplicio Runtime on first activation, expose its complete live MCP surface, and connect Codex workflows to compact repository mapping, project-memory recall, governed execution, deterministic edits, and receipt-backed validation.",
+    "developerName": "Wesley Simplicio",
+    "category": "Productivity",
+    "capabilities": [
+      "Automatic Runtime bootstrap",
+      "Complete live MCP tool surface",
+      "Every CLI command through simplicio_exec",
+      "Repository mapping",
+      "Project memory",
+      "Governed execution",
+      "Deterministic edits",
+      "Evidence-backed validation"
+    ],
+    "websiteURL": "https://simpleti.com.br/simplicio/",
+    "defaultPrompt": [
+      "Install or verify Simplicio, then show its Runtime and authentication status.",
+      "Map this repository with Simplicio before making changes.",
+      "Recall relevant project memory, then implement and validate this task."
+    ],
+    "brandColor": "#FFC93C",
+    "composerIcon": "./assets/icon.svg",
+    "logo": "./assets/simplicio-logo.png"
+  }
+}

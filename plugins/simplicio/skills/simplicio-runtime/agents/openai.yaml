@@ -1,0 +1,3 @@
+interface:
+  display_name: "Simplicio Runtime"
+  short_description: "Map, execute, edit, and validate with Simplicio"
