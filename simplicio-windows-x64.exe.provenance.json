@@ -2,13 +2,13 @@
   "schema": "simplicio.provenance/v1",
   "subject": {
     "name": "simplicio-windows-x64.exe",
-    "sha256": "be9aa72ee630d91a8c3249a9436048a381c02460ca8c433084b1a4b1e5d2be58",
-    "size": 64833536
+    "sha256": "42657fb3a8a35a1a8f3ab1faa2121e38342fcd4e798a68d5c93226ea8fa8cf10",
+    "size": 64899584
   },
   "build": {
-    "version": "3.8.34",
+    "version": "3.8.35",
     "target": "windows-x64",
-    "source_commit": "7b3c3d7e6689283fae58fcfc82ea9c82b0ead2cb",
+    "source_commit": "ef29775dbbc884bffc507fbb35cdce0837a83781",
     "builder": "local manual release"
   },
   "optimization_profile": {
@@ -17,5 +17,5 @@
       "optimization_profile_receipt_not_supplied"
     ]
   },
-  "generated_at": "2026-08-27T12:58:23.037413Z"
+  "generated_at": "2026-08-27T19:56:41.172006Z"
 }

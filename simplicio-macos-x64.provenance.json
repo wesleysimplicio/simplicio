@@ -2,13 +2,13 @@
   "schema": "simplicio.provenance/v1",
   "subject": {
     "name": "simplicio-macos-x64",
-    "sha256": "6d05fed964e29f642880a95fd7418a52814b1daefef229417147b3b2ffcd8a1b",
-    "size": 49453456
+    "sha256": "d5596a1b4423fd2c2dba136dfd6b00bce324522f6c4af75c25e8736c6e2f7231",
+    "size": 49478368
   },
   "build": {
-    "version": "3.8.34",
+    "version": "3.8.35",
     "target": "macos-x64",
-    "source_commit": "7b3c3d7e6689283fae58fcfc82ea9c82b0ead2cb",
+    "source_commit": "ef29775dbbc884bffc507fbb35cdce0837a83781",
     "builder": "local manual release"
   },
   "optimization_profile": {
@@ -17,5 +17,5 @@
       "optimization_profile_receipt_not_supplied"
     ]
   },
-  "generated_at": "2026-08-27T12:58:22.874971Z"
+  "generated_at": "2026-08-27T19:56:40.991626Z"
 }
