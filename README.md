@@ -251,7 +251,7 @@ Codex integration is opt-in. A normal installation does not modify Codex
 configuration or hooks. To enable the versioned, reversible integration:
 
 ~~~bash
-SIMPLICIO_INSTALL_CODEX=1 SIMPLICIO_CODEX_HOOK_REF=v3.8.31 sh install.sh
+SIMPLICIO_INSTALL_CODEX=1 SIMPLICIO_CODEX_HOOK_REF=v3.8.32 sh install.sh
 ~~~
 
 When enabled, the installer writes the absolute managed-binary path
