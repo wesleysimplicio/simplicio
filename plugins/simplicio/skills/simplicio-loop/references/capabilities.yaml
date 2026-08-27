@@ -1,0 +1,60 @@
+schema_version: 1
+owner: simplicio-loop
+role: orchestration
+capabilities:
+  - id: loop.plan
+    intent: [plan, dag, decompose, issues]
+    inputs: [goal, tasks, constraints]
+    outputs: [plan, dependencies, completion_oracle]
+    effects: none
+    requires: [mapper.project-survey]
+    verifies: [acyclic-or-explicit-cycle]
+  - id: loop.slot-dispatch
+    intent: [slot, agent, assign, dispatch]
+    inputs: [plan, slot_budget, agent_policy]
+    outputs: [slot_ids, assignments]
+    effects: worktree-or-task-allocation
+    requires: [loop.plan]
+    verifies: [one-task-per-slot, isolation]
+  - id: loop.stage
+    intent: [stage, workflow, execute-step]
+    inputs: [slot_id, capability_id, inputs]
+    outputs: [event, status, artifacts]
+    effects: declared-by-child
+    requires: [loop.slot-dispatch]
+    verifies: [event-recorded]
+  - id: loop.fanout
+    intent: [parallel, fan-out, batch]
+    inputs: [tasks, concurrency_limit]
+    outputs: [per-task-events, fan-in-summary]
+    effects: child-effects
+    requires: [loop.slot-dispatch]
+    verifies: [bounded-concurrency, per-task-status]
+  - id: loop.retry
+    intent: [retry, transient, rerun]
+    inputs: [failed_stage, retry_policy]
+    outputs: [attempts, final_status]
+    effects: child-effects
+    requires: [loop.stage]
+    verifies: [retry-budget, causal-chain]
+  - id: loop.recovery
+    intent: [recover, resume, checkpoint]
+    inputs: [run_id, events, checkpoint]
+    outputs: [resume_plan, unresolved]
+    effects: task-state
+    requires: [loop.stage]
+    verifies: [checkpoint-integrity]
+  - id: loop.review
+    intent: [review, reviewer, inspect]
+    inputs: [artifacts, completion_oracle]
+    outputs: [findings, verdict]
+    effects: none
+    requires: [loop.stage]
+    verifies: [independent-check]
+  - id: loop.complete
+    intent: [complete, converge, finish]
+    inputs: [events, oracle, findings]
+    outputs: [completion_verdict]
+    effects: none
+    requires: [loop.review]
+    verifies: [oracle-proven]

@@ -53,9 +53,27 @@ separate plugin definitions.
 Included skills:
 
 - `simplicio-runtime`: map, recall, edit, execute, and validate through live MCP
-  schemas.
+  schemas, with the Runtime capability and interface contracts bundled locally.
 - `simplicio-setup`: verify bootstrap, authentication, repair, and explicit
   global host registration.
+- `simplicio-mapper`: survey repositories and produce bounded, revision-aware
+  context before implementation.
+- `simplicio-fast`: accelerate indexed, cache-aware, read-only retrieval while
+  preserving Mapper provenance and freshness checks.
+- `simplicio-dev-cli`: perform deterministic edits, tests, diagnostics, and
+  evidence-backed validation through the Dev CLI contract.
+- `simplicio-loop`: orchestrate multi-step work with bounded stages, retries,
+  fan-out, recovery, and convergence.
+- `simplicio-prism`: route mixed work across Mapper, Fast, Dev CLI, Loop, and
+  Runtime using the bundled capability inventory and recipes.
+- `rtk-cli` and `simplicio-cli`: optional local tooling for compact shell output
+  and the Simplicio six-layer task-to-code verification workflow.
+
+The five component skills include their upstream `references/`, `agents/`,
+`assets/`, and Prism helper files so Codex can use the same system contracts
+without importing Runtime source code. The plugin intentionally bundles only
+Simplicio first-party system skills, not the Runtime's unrelated external skill
+catalog.
 
 Source and official artwork:
 <https://github.com/wesleysimplicio/simplicio> and the Simplicio Runtime source

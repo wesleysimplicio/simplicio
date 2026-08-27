@@ -1,0 +1,7 @@
+interface:
+  display_name: Simplicio Dev CLI
+  short_description: Apply and validate deterministic code changes
+  default_prompt: Use @simplicio-dev-cli to edit, validate, test, and diagnose changes
+    through the deterministic CLI contract.
+  icon_small: assets/icon.svg
+  icon_large: assets/icon.svg

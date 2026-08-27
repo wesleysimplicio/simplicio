@@ -1,0 +1,7 @@
+interface:
+  display_name: Simplicio Mapper
+  short_description: Map codebases and select reliable context
+  default_prompt: Use @simplicio-mapper to survey a codebase, build a snapshot, and
+    select the smallest reliable context.
+  icon_small: assets/icon.svg
+  icon_large: assets/icon.svg

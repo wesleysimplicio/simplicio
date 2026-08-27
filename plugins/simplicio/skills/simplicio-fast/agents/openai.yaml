@@ -1,0 +1,7 @@
+interface:
+  display_name: Simplicio Fast
+  short_description: Accelerate indexed retrieval and ranking
+  default_prompt: Use @simplicio-fast to retrieve and rank indexed project context
+    with low latency.
+  icon_small: assets/icon.svg
+  icon_large: assets/icon.svg

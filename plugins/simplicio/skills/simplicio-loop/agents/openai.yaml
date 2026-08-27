@@ -1,0 +1,7 @@
+interface:
+  display_name: Simplicio Loop
+  short_description: Orchestrate iterative agent workflows
+  default_prompt: Use @simplicio-loop to orchestrate multi-step, parallel, retryable
+    work and converge on verified results.
+  icon_small: assets/icon.svg
+  icon_large: assets/icon.svg
