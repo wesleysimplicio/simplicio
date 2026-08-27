@@ -1,7 +1,7 @@
 {
   "name": "simplicio",
-  "version": "0.2.0",
-  "description": "Install and connect the Simplicio Runtime for compact repository context, governed execution, every CLI subcommand, and evidence-backed validation.",
+  "version": "0.2.1",
+  "description": "Up to 96% token savings. Install and connect the Simplicio Runtime for compact repository context, governed execution, every CLI subcommand, and evidence-backed validation.",
   "author": {
     "name": "Wesley Simplicio",
     "url": "https://github.com/wesleysimplicio"
@@ -21,8 +21,8 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Simplicio",
-    "shortDescription": "Governed local-first coding with Simplicio.",
-    "longDescription": "Bootstrap the verified Simplicio Runtime on first activation, expose its complete live MCP surface, and connect Codex workflows to compact repository mapping, project-memory recall, governed execution, deterministic edits, and receipt-backed validation.",
+    "shortDescription": "Up to 96% token savings. Governed local-first coding with Simplicio.",
+    "longDescription": "Up to 96% token savings. Bootstrap the verified Simplicio Runtime on first activation, expose its complete live MCP surface, and connect Codex workflows to compact repository mapping, project-memory recall, governed execution, deterministic edits, and receipt-backed validation.",
     "developerName": "Wesley Simplicio",
     "category": "Productivity",
     "capabilities": [
