@@ -50,6 +50,15 @@
 
 ## 🚀 インストール
 
+### Codex プラグインからインストール
+
+Codex を使う場合は、Simplicio をプラグインとしてインストールできます。公開 Marketplace を追加してプラグインをインストールし、新しい Codex セッションを開始してください。プラグインが Simplicio Runtime をインストールして起動し、skills と MCP ツールを利用できるようにします。
+
+```bash
+codex plugin marketplace add wesleysimplicio/simplicio --ref master
+codex plugin add simplicio@simplicio-codex
+```
+
 ### npm / npx（全OS対応）
 
 ```bash

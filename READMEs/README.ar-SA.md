@@ -54,6 +54,15 @@
 
 ## 🚀 التثبيت
 
+### التثبيت عبر إضافة Codex
+
+إذا كنت تستخدم Codex، يمكنك تثبيت Simplicio كإضافة. أضف Marketplace العام، وثبّت الإضافة، ثم ابدأ جلسة Codex جديدة؛ ستثبّت الإضافة Simplicio Runtime وتُشغّله وتوفّر مهاراته وأدوات MCP.
+
+```bash
+codex plugin marketplace add wesleysimplicio/simplicio --ref master
+codex plugin add simplicio@simplicio-codex
+```
+
 ### npm / npx (أي نظام تشغيل)
 
 ```bash

@@ -54,6 +54,15 @@
 
 ## 🚀 Установка
 
+### Установка через плагин Codex
+
+Если вы используете Codex, Simplicio можно установить как плагин. Добавьте публичный Marketplace, установите плагин и запустите новый сеанс Codex; плагин установит и запустит Simplicio Runtime и предоставит его skills и инструменты MCP.
+
+```bash
+codex plugin marketplace add wesleysimplicio/simplicio --ref master
+codex plugin add simplicio@simplicio-codex
+```
+
 ### npm / npx (любая ОС)
 
 ```bash

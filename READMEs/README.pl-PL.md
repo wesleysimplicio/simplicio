@@ -54,6 +54,15 @@ opcjonalne, nie wymagane.**
 
 ## 🚀 Instalacja
 
+### Instalacja przez wtyczkę Codex
+
+Jeśli używasz Codex, możesz zainstalować Simplicio jako wtyczkę. Dodaj publiczny Marketplace, zainstaluj wtyczkę i uruchom nową sesję Codex; wtyczka zainstaluje i uruchomi Simplicio Runtime oraz udostępni jego skills i narzędzia MCP.
+
+```bash
+codex plugin marketplace add wesleysimplicio/simplicio --ref master
+codex plugin add simplicio@simplicio-codex
+```
+
 ### npm / npx (dowolny system)
 
 ```bash

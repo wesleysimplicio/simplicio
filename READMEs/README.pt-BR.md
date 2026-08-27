@@ -54,6 +54,15 @@ opcionais, não obrigatórios.**
 
 ## 🚀 Instalação
 
+### Instalar pelo plugin do Codex
+
+Se você usa o Codex, pode instalar o Simplicio como um plugin. Adicione o Marketplace público, instale o plugin e inicie uma nova sessão do Codex; o plugin instala e inicializa o Runtime do Simplicio e disponibiliza suas skills e ferramentas MCP.
+
+```bash
+codex plugin marketplace add wesleysimplicio/simplicio --ref master
+codex plugin add simplicio@simplicio-codex
+```
+
 Use o pacote oficial do PyPI. Ele instala o launcher Python, valida a release
 assinada do Runtime e instala o binário correto para macOS, Linux ou Windows.
 

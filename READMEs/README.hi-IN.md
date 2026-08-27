@@ -54,6 +54,15 @@ AI-सहायित विकास कार्यप्रवाह को �
 
 ## 🚀 इंस्टॉलेशन
 
+### Codex प्लगइन से इंस्टॉल करें
+
+यदि आप Codex का उपयोग करते हैं, तो Simplicio को प्लगइन के रूप में इंस्टॉल कर सकते हैं। सार्वजनिक Marketplace जोड़ें, प्लगइन इंस्टॉल करें और नया Codex सत्र शुरू करें; प्लगइन Simplicio Runtime को इंस्टॉल और बूटस्ट्रैप करता है तथा उसकी skills और MCP टूल उपलब्ध कराता है।
+
+```bash
+codex plugin marketplace add wesleysimplicio/simplicio --ref master
+codex plugin add simplicio@simplicio-codex
+```
+
 ### npm / npx (किसी भी OS पर)
 
 ```bash

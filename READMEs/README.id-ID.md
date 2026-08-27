@@ -54,6 +54,15 @@ bersifat opsional, tidak wajib.**
 
 ## 🚀 Instalasi
 
+### Instal melalui plugin Codex
+
+Jika Anda menggunakan Codex, Anda dapat menginstal Simplicio sebagai plugin. Tambahkan Marketplace publik, instal plugin, lalu mulai sesi Codex baru; plugin akan menginstal dan melakukan bootstrap Simplicio Runtime serta menyediakan skills dan alat MCP.
+
+```bash
+codex plugin marketplace add wesleysimplicio/simplicio --ref master
+codex plugin add simplicio@simplicio-codex
+```
+
 ### npm / npx (OS apa saja)
 
 ```bash

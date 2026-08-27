@@ -54,6 +54,15 @@
 
 ## 🚀 安装
 
+### 通过 Codex 插件安装
+
+如果你使用 Codex，可以将 Simplicio 作为插件安装。添加公共 Marketplace、安装插件，然后启动新的 Codex 会话；插件会安装并引导启动 Simplicio Runtime，并提供其 skills 和 MCP 工具。
+
+```bash
+codex plugin marketplace add wesleysimplicio/simplicio --ref master
+codex plugin add simplicio@simplicio-codex
+```
+
 ### npm / npx（支持所有操作系统）
 
 ```bash
