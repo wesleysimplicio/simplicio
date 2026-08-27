@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "simplicio-installer"
-version = "3.8.31"
+version = "3.8.32"
 description = "Simplicio — AI coding agent that saves up to 96% on tokens"
 readme = "README.md"
 requires-python = ">=3.7"

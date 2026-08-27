@@ -1,6 +1,6 @@
 {
   "name": "simplicio",
-  "version": "3.8.31",
+  "version": "3.8.32",
   "description": "Simplicio \u2014 up to 96% token savings on any LLM. One-command install.",
   "bin": {
     "simplicio": "./install.js"
