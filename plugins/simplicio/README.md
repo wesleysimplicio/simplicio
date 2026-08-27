@@ -66,8 +66,8 @@ Included skills:
   fan-out, recovery, and convergence.
 - `simplicio-prism`: route mixed work across Mapper, Fast, Dev CLI, Loop, and
   Runtime using the bundled capability inventory and recipes.
-- `rtk-cli` and `simplicio-cli`: optional local tooling for compact shell output
-  and the Simplicio six-layer task-to-code verification workflow.
+- `simplicio-cli`: optional local tooling for the Simplicio six-layer
+  task-to-code verification workflow.
 
 The five component skills include their upstream `references/`, `agents/`,
 `assets/`, and Prism helper files so Codex can use the same system contracts
