@@ -1,16 +1,16 @@
 {
   "schema": "simplicio.update-manifest/v1",
-  "version": "3.8.32",
+  "version": "3.8.34",
   "channel": "stable",
-  "release_tag": "v3.8.32",
+  "release_tag": "v3.8.34",
   "repository": "wesleysimplicio/simplicio",
-  "commit": "39c041020abcd2395c18925758b8cf238e969e03",
+  "commit": "7b3c3d7e6689283fae58fcfc82ea9c82b0ead2cb",
   "signing_pubkey": "2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok=",
-  "generated_at": "2026-08-27T02:14:20.688212Z",
+  "generated_at": "2026-08-27T12:58:23.198447Z",
   "source": {
     "version": "Cargo.toml",
-    "tag": "v3.8.32",
-    "commit": "39c041020abcd2395c18925758b8cf238e969e03"
+    "tag": "v3.8.34",
+    "commit": "7b3c3d7e6689283fae58fcfc82ea9c82b0ead2cb"
   },
   "security": {
     "checksum_algorithm": "SHA256",
@@ -24,11 +24,11 @@
     {
       "target": "macos-arm64",
       "artifact": "simplicio-macos-arm64",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.32/simplicio-macos-arm64",
-      "size": 43699200,
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.34/simplicio-macos-arm64",
+      "size": 43715696,
       "checksum_file": "SHA256SUMS",
-      "sha256": "2b0aff6c139b610c4422e78b668cb6ccb3b6a52fb265d4144e136bcdf48b4600",
-      "signature": "ed25519:4DPLaYgB6vOh788xuFVvthy8j992PUXNEp7eLXXjtJdF4m8PwWRppVo7dOdn1RRKPI3ue0gLkNbO3H7GzbarCQ==",
+      "sha256": "b62efb2dc22f85aff2a98ce8bcd027e5e97f40bb9b3d1215ae0ef44b50d96e37",
+      "signature": "ed25519:L4abfZ1xMES8vCgRH9wRmwi/0YqGSl0iPFAvsYIpFEtOwXBJ/OGExkQiGxYkn1CkobMXSN7/77Rivkl62g+4Dg==",
       "signature_file": "simplicio-macos-arm64.sig",
       "signature_algorithm": "ed25519",
       "sbom": {
@@ -48,11 +48,11 @@
     {
       "target": "macos-x64",
       "artifact": "simplicio-macos-x64",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.32/simplicio-macos-x64",
-      "size": 49408000,
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.34/simplicio-macos-x64",
+      "size": 49453456,
       "checksum_file": "SHA256SUMS",
-      "sha256": "946beeeabb8247cec3db8f12d89d453223cc530871c1e9232fe04394193f2826",
-      "signature": "ed25519:OSJalRCS4+xP7MxPEIs7p72z1qmvIqOfYT17mHwqzm18eBDg5ATWWQE1nQqH+vmYIy/aVEmzwZyVVMhcn1+PDg==",
+      "sha256": "6d05fed964e29f642880a95fd7418a52814b1daefef229417147b3b2ffcd8a1b",
+      "signature": "ed25519:JIkr1juEQoXi3JZ/JuzWitLB+LMH4Z+4xbeFJ68gJFSGHsmNwzNm8tnMesZEhgnTFw04dD2Rv20voVt8HBOLDw==",
       "signature_file": "simplicio-macos-x64.sig",
       "signature_algorithm": "ed25519",
       "sbom": {
@@ -72,11 +72,11 @@
     {
       "target": "linux-x64",
       "artifact": "simplicio-linux-x64",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.32/simplicio-linux-x64",
-      "size": 56562304,
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.34/simplicio-linux-x64",
+      "size": 56619216,
       "checksum_file": "SHA256SUMS",
-      "sha256": "c0de1c0e2968f3196eabc8c06a281f70e2150a2b4fc66271241f67cf0c9bf078",
-      "signature": "ed25519:CKJxziqk3TETu2Yf9SDYZxCxvspRMVC6CDJu0PxGJN3LIoz8QxT1Exso07y+84I5syIH+oxEFDbspif5pfEGDg==",
+      "sha256": "443f6ee9b457ad2f2a79ee90882d66284d55188f267bbc0879903b27117fbd3f",
+      "signature": "ed25519:YPrFY+mbPsydiHwkZLTkAO4ARWrI2c7oG/jmXQMD6KNCuCINh61qaKy4teIhACV2sJUwOj7Q9MeogEiqUJaICA==",
       "signature_file": "simplicio-linux-x64.sig",
       "signature_algorithm": "ed25519",
       "sbom": {
@@ -96,11 +96,11 @@
     {
       "target": "windows-x64",
       "artifact": "simplicio-windows-x64.exe",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.32/simplicio-windows-x64.exe",
-      "size": 67611136,
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.34/simplicio-windows-x64.exe",
+      "size": 64833536,
       "checksum_file": "SHA256SUMS",
-      "sha256": "0afedd29041af99e75553e2c9f5ff6bf0a139d86df045ce923fb210a1818ebc1",
-      "signature": "ed25519:aCaOuAiJTQbP/KZoNsg7tToOKA8lbyAPq7znbYwNDDx4dqnDJRCVZ4ZycH0exU31esTgLasK7EscI3lGLc0BDw==",
+      "sha256": "be9aa72ee630d91a8c3249a9436048a381c02460ca8c433084b1a4b1e5d2be58",
+      "signature": "ed25519:l5EBRBP4XjUZFLbhN3Icx+EBwlJIaWRzYz/0QJSH2kaT+D8fqiFOcTu083wd771cPwUqDIu7BOZ3ZINZR2bVBQ==",
       "signature_file": "simplicio-windows-x64.exe.sig",
       "signature_algorithm": "ed25519",
       "sbom": {
