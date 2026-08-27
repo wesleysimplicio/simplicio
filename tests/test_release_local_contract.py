@@ -90,6 +90,55 @@ def test_public_publisher_uses_post_release_smoke_cli_contract():
     assert '"core.whitespace=cr-at-eol"' in publisher
 
 
+def test_public_publisher_stages_versioned_codex_hooks(tmp_path, monkeypatch):
+    script = ROOT / "scripts/publish_release_local.py"
+    spec = importlib.util.spec_from_file_location("publish_release_local_hooks", script)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+
+    bundle = tmp_path / "bundle"
+    public = tmp_path / "public"
+    for relative in module.CODEX_HOOK_FILES:
+        source = bundle / relative
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("fixture " + relative + "\n", encoding="utf-8")
+    (bundle / "codex/mcp-route.sh").chmod(0o755)
+
+    monkeypatch.setattr(module, "ROOT", public)
+    changed = module.stage_codex_hooks(bundle)
+
+    assert {path.relative_to(public).as_posix() for path in changed} == set(
+        module.CODEX_HOOK_FILES
+    )
+    for relative in module.CODEX_HOOK_FILES:
+        assert (public / relative).read_bytes() == (bundle / relative).read_bytes()
+    assert (public / "codex/mcp-route.sh").stat().st_mode & 0o111
+
+
+def test_publication_paths_gate_the_executable_codex_hook_contract():
+    publisher = (ROOT / "scripts/publish_release_local.py").read_text(encoding="utf-8")
+    assert 'shutil.which("pwsh")' in publisher
+    assert 'run(["bash", str(ROOT / "tests/test_codex_hooks.sh")], timeout=60)' in publisher
+    assert publisher.count("verify_codex_hook_contract()") == 3
+
+
+def test_publication_fails_closed_when_powershell_is_unavailable(monkeypatch):
+    script = ROOT / "scripts/publish_release_local.py"
+    spec = importlib.util.spec_from_file_location("publish_release_local_pwsh", script)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    monkeypatch.setattr(module.shutil, "which", lambda _name: None)
+
+    try:
+        module.verify_codex_hook_contract()
+    except module.PublishError as exc:
+        assert "PowerShell is required" in str(exc)
+    else:
+        raise AssertionError("publication accepted a skipped Windows hook contract")
+
+
 def test_public_publisher_requires_pr_merge_before_tagging():
     publisher = (ROOT / "scripts/publish_release_local.py").read_text(encoding="utf-8")
     assert '"gh", "pr", "create"' in publisher

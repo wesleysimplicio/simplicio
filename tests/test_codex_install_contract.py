@@ -1,9 +1,32 @@
 """Static contract checks for the public Codex integration."""
 
+import json
+import os
 from pathlib import Path
+import subprocess
 
 
 ROOT = Path(__file__).parents[1]
+
+
+def test_pretooluse_allow_unchanged_emits_no_permission_decision():
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "simplicio__simplicio_read",
+        "tool_input": {"path": "src/main.rs"},
+        "cwd": "/tmp",
+    }
+    completed = subprocess.run(
+        ["bash", str(ROOT / "codex" / "mcp-route.sh")],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+        env={**os.environ, "SIMPLICIO_BIN": "/nonexistent"},
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout == ""
 
 
 def test_installers_configure_direct_stdio_and_hooks():
@@ -59,15 +82,20 @@ def test_unix_installer_accepts_release_manifest_target_aliases():
 def test_codex_hooks_have_all_required_lifecycle_events():
     shell_hook = (ROOT / "codex/mcp-route.sh").read_text(encoding="utf-8")
     powershell_hook = (ROOT / "codex/mcp-route.ps1").read_text(encoding="utf-8")
-    # Claude's current PreToolUse protocol rejects the legacy top-level
-    # {decision: allow|deny} response. Both platform hooks must emit the
-    # event-specific permissionDecision envelope.
-    assert "permissionDecision" in shell_hook
-    assert "permissionDecision" in powershell_hook
+    # Codex rejects a bare PreToolUse permissionDecision=allow. Allowing an
+    # unchanged call is represented by successful empty stdout on both hosts.
+    assert "permissionDecision" not in shell_hook
+    assert "permissionDecision" not in powershell_hook
     assert "hookEventName" in shell_hook
     assert "hookEventName" in powershell_hook
-    assert "Use simplicio_file_read / simplicio_read / simplicio_search instead of" in shell_hook
-    assert "Use simplicio_file_read / simplicio_read / simplicio_search instead of" in powershell_hook
+    assert "simplicio-hook-version: 3240-v6" in shell_hook
+    assert "simplicio-hook-version: 3240-v6" in powershell_hook
+    assert "Empty stdout is the portable allow-unchanged contract" in shell_hook
+    assert "No decision means allow unchanged" in shell_hook
+    assert "Allow-Unchanged" in powershell_hook
+    assert "rejects an explicit PreToolUse allow without updatedInput" in powershell_hook
+    assert "Simplicio MCP is mandatory" not in shell_hook
+    assert "Simplicio MCP is mandatory" not in powershell_hook
     for event in ("SessionStart", "UserPromptSubmit", "SubagentStart"):
         assert event in shell_hook
         assert event in powershell_hook
@@ -77,7 +105,7 @@ def test_codex_hooks_have_all_required_lifecycle_events():
     assert "simplicio_context" in shell_hook
     assert 'SIMPLICIO_BIN="${SIMPLICIO_BIN:-${SIMPLICIO_BIN_DIR:-${HOME}/.simplicio/bin}/simplicio}"' in shell_hook
     assert 'which("simplicio")' not in shell_hook
-    assert "Join-Path $env:USERPROFILE '.simplicio\\bin'" in powershell_hook
+    assert "Join-Path (Join-Path $UserHome '.simplicio\\bin') 'simplicio.exe'" in powershell_hook
     assert "Get-Command simplicio" not in powershell_hook
 
 
