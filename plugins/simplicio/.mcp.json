@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "simplicio-runtime": {
+      "command": "node",
+      "args": [
+        "./bin/simplicio-mcp-bootstrap.js"
+      ],
+      "cwd": ".",
+      "env_vars": [
+        "HOME",
+        "USERPROFILE",
+        "LOCALAPPDATA",
+        "PATH",
+        "SIMPLICIO_MCP_URL"
+      ],
+      "startup_timeout_sec": 600,
+      "tool_timeout_sec": 3600
+    }
+  }
+}
