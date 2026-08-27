@@ -34,3 +34,23 @@ Use `simplicio_exec` for every valid Simplicio CLI subcommand that does not have
 - Distinguish source inspection, installed binary, running MCP server, authentication, and validated task results; evidence in one lane does not prove the others.
 - Report token savings only when a receipt supplies a baseline, actual usage, and proof kind. Qualify the public "up to 96%" figure as a controlled-workload maximum, never an unconditional result.
 - Mark unavailable or ambiguous evidence plainly instead of inventing a successful result.
+
+## Bundled Runtime system contract
+
+The plugin also carries the first-party Runtime system contract in
+`references/capabilities.yaml` and `references/interfaces.md`. Consult those
+files before relying on an unfamiliar Runtime or native capability. Preserve
+the following boundaries:
+
+- Runtime governs native execution, MCP, gates, checkpoints, durable receipts,
+  backpressure, pools, memory, and governed subagents; it does not replace
+  Mapper's survey or Dev CLI's mutation contract.
+- Loop remains operational without Runtime for ordinary orchestration. Use
+  Runtime only when native execution, MCP, governance, receipts, checkpoints,
+  backpressure, or governed subagents are required.
+- Require explicit capability, repository, scope, and effect policy before
+  side effects. Reconcile only from durable evidence; never synthesize a
+  receipt or delete an unknown-effect lock.
+- Keep the deterministic route: one to three tasks use direct parallelism and
+  more than three tasks activate Prism. Physical resource, lease,
+  backpressure, and effect-authority limits still govern admission.
