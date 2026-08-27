@@ -54,6 +54,15 @@
 
 ## 🚀 התקנה
 
+### התקנה דרך התוסף של Codex
+
+אם אתם משתמשים ב-Codex, תוכלו להתקין את Simplicio כתוסף. הוסיפו את ה-Marketplace הציבורי, התקינו את התוסף והתחילו סשן Codex חדש; התוסף יתקין ויאותחל את Simplicio Runtime ויעמיד לרשותכם את ה-skills וכלי ה-MCP שלו.
+
+```bash
+codex plugin marketplace add wesleysimplicio/simplicio --ref master
+codex plugin add simplicio@simplicio-codex
+```
+
 ### npm / npx (כל מערכת הפעלה)
 
 ```bash

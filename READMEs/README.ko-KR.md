@@ -53,6 +53,15 @@
 
 ## 🚀 설치
 
+### Codex 플러그인으로 설치
+
+Codex를 사용한다면 Simplicio를 플러그인으로 설치할 수 있습니다. 공개 Marketplace를 추가하고 플러그인을 설치한 뒤 새 Codex 세션을 시작하세요. 플러그인이 Simplicio Runtime을 설치하고 부트스트랩하며 skills와 MCP 도구를 제공합니다.
+
+```bash
+codex plugin marketplace add wesleysimplicio/simplicio --ref master
+codex plugin add simplicio@simplicio-codex
+```
+
 ### npm / npx (모든 OS)
 
 ```bash

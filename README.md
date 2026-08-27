@@ -56,6 +56,15 @@ optional, not required.**
 
 ## 🚀 Installation
 
+### Install via the Codex plugin
+
+If you use Codex, you can install Simplicio as a plugin. Add the public marketplace, install the plugin, and start a new Codex session; the plugin installs and bootstraps the Simplicio Runtime and exposes its skills and MCP tools.
+
+```bash
+codex plugin marketplace add wesleysimplicio/simplicio --ref master
+codex plugin add simplicio@simplicio-codex
+```
+
 The official installers download one canonical asset from the latest
 Runtime release, verify its SHA256 checksum and Ed25519 signature, validate the
 Runtime release contract, and register MCP hosts to launch the installed binary

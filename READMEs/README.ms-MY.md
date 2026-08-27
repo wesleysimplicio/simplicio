@@ -54,6 +54,15 @@ jarak jauh adalah pilihan, bukan keperluan.**
 
 ## 🚀 Pemasangan
 
+### Pasang melalui pemalam Codex
+
+Jika anda menggunakan Codex, anda boleh memasang Simplicio sebagai pemalam. Tambahkan Marketplace awam, pasang pemalam dan mulakan sesi Codex baharu; pemalam memasang serta memulakan Simplicio Runtime dan menyediakan skills serta alat MCP.
+
+```bash
+codex plugin marketplace add wesleysimplicio/simplicio --ref master
+codex plugin add simplicio@simplicio-codex
+```
+
 ### npm / npx (sebarang OS)
 
 ```bash
