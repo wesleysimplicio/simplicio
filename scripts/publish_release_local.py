@@ -28,6 +28,10 @@ ASSETS = (
     "simplicio-windows-x64.exe",
 )
 META_ASSETS = ("SHA256SUMS", "simplicio-update-manifest.json")
+CODEX_HOOK_FILES = (
+    "codex/mcp-route.sh",
+    "codex/mcp-route.ps1",
+)
 LOCAL_STATE_PREFIXES = (".simplicio/", "pypi/simplicio/build/")
 
 
@@ -65,7 +69,7 @@ def normalize_version(value: str) -> tuple[str, str]:
     return tag, tag[1:]
 
 
-def required_bundle_files() -> list[str]:
+def required_release_assets() -> list[str]:
     files = list(META_ASSETS)
     for asset in ASSETS:
         files.extend((asset, asset + ".sig", asset + ".spdx.json", asset + ".provenance.json"))
@@ -75,7 +79,8 @@ def required_bundle_files() -> list[str]:
 def verify_bundle(bundle: Path, tag: str, version: str, source_commit: str) -> dict:
     if not bundle.is_dir():
         raise PublishError("release bundle does not exist: %s" % bundle)
-    missing = [name for name in required_bundle_files() if not (bundle / name).is_file()]
+    required_public_files = (*required_release_assets(), *CODEX_HOOK_FILES)
+    missing = [name for name in required_public_files if not (bundle / name).is_file()]
     if missing:
         raise PublishError("release bundle is missing: " + ", ".join(missing))
 
@@ -119,7 +124,16 @@ def verify_bundle(bundle: Path, tag: str, version: str, source_commit: str) -> d
         for suffix in (".spdx.json", ".provenance.json"):
             json.loads((bundle / (asset + suffix)).read_text(encoding="utf-8"))
         verified.append({"asset": asset, "sha256": digest, "size": path.stat().st_size})
-    return {"version": version, "source_commit": source_commit, "artifacts": verified}
+    hooks = [
+        {"path": relative, "sha256": sha256(bundle / relative)}
+        for relative in CODEX_HOOK_FILES
+    ]
+    return {
+        "version": version,
+        "source_commit": source_commit,
+        "artifacts": verified,
+        "codex_hooks": hooks,
+    }
 
 
 def is_ignored_local_state(path: str) -> bool:
@@ -204,7 +218,7 @@ def resume_public_preflight(tag: str, version: str, source_commit: str) -> dict:
         for item in release.get("assets", [])
         if isinstance(item, dict) and item.get("name")
     }
-    if release_assets != set(required_bundle_files()):
+    if release_assets != set(required_release_assets()):
         raise PublishError("existing GitHub release asset set is incomplete or unexpected")
 
     existing_pypi = pypi_release_files(version)
@@ -313,11 +327,39 @@ def update_public_metadata(tag: str, version: str, source_commit: str) -> list[P
 
 def stage_bundle(bundle: Path) -> list[Path]:
     staged = []
-    for name in required_bundle_files():
+    for name in required_release_assets():
         destination = ROOT / name
         shutil.copy2(bundle / name, destination)
         staged.append(destination)
     return staged
+
+
+def stage_codex_hooks(bundle: Path) -> list[Path]:
+    staged = []
+    for relative in CODEX_HOOK_FILES:
+        source = bundle / relative
+        destination = ROOT / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+        staged.append(destination)
+    return staged
+
+
+def verify_public_codex_hooks(bundle: Path) -> None:
+    mismatched = [
+        relative
+        for relative in CODEX_HOOK_FILES
+        if not (ROOT / relative).is_file()
+        or sha256(ROOT / relative) != sha256(bundle / relative)
+    ]
+    if mismatched:
+        raise PublishError("public Codex hooks differ from release bundle: " + ", ".join(mismatched))
+
+
+def verify_codex_hook_contract() -> None:
+    if shutil.which("pwsh") is None:
+        raise PublishError("PowerShell is required to validate the Windows Codex hook")
+    run(["bash", str(ROOT / "tests/test_codex_hooks.sh")], timeout=60)
 
 
 def prepare_package(version: str) -> list[Path]:
@@ -437,7 +479,7 @@ def commit_public(paths: list[Path], tag: str, source_commit: str) -> str:
 def create_public_release(tag: str, bundle: Path) -> None:
     run([
         "gh", "release", "create", tag,
-        *[str(bundle / name) for name in required_bundle_files()],
+        *[str(bundle / name) for name in required_release_assets()],
         "--repo", PUBLIC_REPOSITORY,
         "--verify-tag",
         "--title", "Simplicio Runtime " + tag,
@@ -465,9 +507,11 @@ def publish(bundle: Path, tag: str, version: str, source_commit: str) -> dict:
     public_preflight(tag, version, require_clean=True)
     bundle_receipt = verify_bundle(bundle, tag, version, source_commit)
     changed = stage_bundle(bundle)
+    changed.extend(stage_codex_hooks(bundle))
     changed.extend(update_public_metadata(tag, version, source_commit))
     changed.extend(prepare_package(version))
 
+    verify_codex_hook_contract()
     run([sys.executable, str(ROOT / "scripts/verify_distribution_consistency.py")])
     run([
         sys.executable, "-m", "pytest", "-q",
@@ -526,7 +570,9 @@ def publish(bundle: Path, tag: str, version: str, source_commit: str) -> dict:
 def resume_publish(bundle: Path, tag: str, version: str, source_commit: str) -> dict:
     resume_state = resume_public_preflight(tag, version, source_commit)
     bundle_receipt = verify_bundle(bundle, tag, version, source_commit)
+    verify_public_codex_hooks(bundle)
 
+    verify_codex_hook_contract()
     run([sys.executable, str(ROOT / "scripts/verify_distribution_consistency.py")])
     run([
         sys.executable, "-m", "pytest", "-q",

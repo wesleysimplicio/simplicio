@@ -16,6 +16,8 @@ For each release `vX.Y.Z`, publish:
 - `SHA256SUMS`;
 - `simplicio-update-manifest.json`;
 - matching `version.txt` and `VERSION.md`;
+- `codex/mcp-route.sh` and `codex/mcp-route.ps1`, copied from the same Runtime
+  source commit and committed in the immutable tag;
 - `Simplicio-X.Y.Z-arm64.dmg` and `.zip` when the Desktop build is published;
 - SHA-256 and signing/notarization status for each Desktop artifact.
 
@@ -25,6 +27,11 @@ publish the root `signing_pubkey` exactly as
 `2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok=`.
 Do not publish a new release from a checkout where `version.txt` and the
 manifest disagree.
+
+The Codex hooks are versioned tag files rather than GitHub Release assets.
+Before tagging, execute `bash tests/test_codex_hooks.sh` and require every
+allow-unchanged case to exit zero with empty stdout. A bare
+`permissionDecision: "allow"` without `updatedInput` is release-blocking.
 
 ## Desktop release assets
 

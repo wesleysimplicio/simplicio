@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Replace the stale mandatory Codex hook with the canonical advisory route:
+  unchanged native, Simplicio, and third-party tool calls now return empty
+  stdout instead of unsupported `permissionDecision: "allow"`.
+- Require local publication to stage both versioned Codex hooks from the
+  Runtime release bundle so future tags cannot retain an older hook protocol.
+- Keep Windows warming failures advisory for read-only repositories and remove
+  obsolete decision-emission paths from the versioned hooks.
+- Gate both fresh and resumed local publication on the executable hook suite.
+
 ### Changed
 
 - Public installers now configure Codex to launch the installed Simplicio
