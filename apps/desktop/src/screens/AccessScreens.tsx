@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { AccessState } from "../contracts";
 import { Brand, Glyph } from "../components/Brand";
 
@@ -113,6 +114,7 @@ export function AccessGate({
   onSubscribe?: () => void;
 }) {
   const content = accessContent[state];
+  const [showDiagnostic, setShowDiagnostic] = useState(false);
   return (
     <div className="locked-layout">
       <div className="locked-glow" aria-hidden="true" />
@@ -143,8 +145,19 @@ export function AccessGate({
               {content.secondary}
             </button>
           )}
+          {state === "unknown" && (
+            <button className="button button-secondary" type="button" onClick={() => setShowDiagnostic((current) => !current)}>
+              {showDiagnostic ? "Fechar diagnóstico" : content.secondary}
+            </button>
+          )}
         </div>
         {error && <p className="action-error" role="alert">{error}</p>}
+        {showDiagnostic && state === "unknown" && (
+          <div className="access-diagnostic" aria-live="polite">
+            <strong>Estado de acesso desconhecido</strong>
+            <p>A comunicação com o Runtime ou com o serviço de entitlement falhou. Tente novamente; nenhuma cobrança ou assinatura foi alterada.</p>
+          </div>
+        )}
         <div className="locked-safe-actions">
           <span><Glyph name="shield" size={17} /> Sempre disponíveis</span>
           <strong>Conta · cobrança · diagnóstico</strong>

@@ -378,14 +378,20 @@ def write_summary(path: Path, summary: Mapping[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, raw_path = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
     temporary = Path(raw_path)
+    replaced = False
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             json.dump(summary, handle, indent=2, sort_keys=True)
             handle.write("\n")
         temporary.chmod(0o600)
         os.replace(str(temporary), str(path))
+        replaced = True
     finally:
-        temporary.unlink(missing_ok=True)
+        if not replaced:
+            try:
+                temporary.unlink()
+            except FileNotFoundError:
+                pass
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

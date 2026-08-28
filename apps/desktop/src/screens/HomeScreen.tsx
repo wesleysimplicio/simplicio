@@ -8,11 +8,15 @@ export function HomeScreen({
   snapshot,
   busy,
   onProviders,
+  onActivity,
+  onDiagnostics,
   onRefresh,
 }: {
   snapshot: DesktopSnapshot;
   busy: boolean;
   onProviders: () => void;
+  onActivity: () => void;
+  onDiagnostics: () => void;
   onRefresh: () => void;
 }) {
   const connected = snapshot.providers.filter((provider) => provider.state === "connected");
@@ -97,7 +101,7 @@ export function HomeScreen({
               <span className="eyebrow">Recente</span>
               <h2>Atividade</h2>
             </div>
-            <button className="text-button" type="button">Ver relatório <Glyph name="arrow" size={16} /></button>
+            <button className="text-button" type="button" onClick={onActivity}>Ver relatório <Glyph name="arrow" size={16} /></button>
           </div>
           <div className="activity-list">
             {snapshot.activity.length === 0 && <div className="empty-state">Sem atividade verificada.</div>}
@@ -140,7 +144,7 @@ export function HomeScreen({
             <div><dt>Último recibo</dt><dd>{snapshot.runtime.lastReceiptAt ?? "—"}</dd></div>
             <div><dt>Mapa local</dt><dd>{snapshot.savings.mapCache.status}</dd></div>
           </dl>
-          <button className="button button-secondary button-wide" type="button">Abrir diagnóstico</button>
+          <button className="button button-secondary button-wide" type="button" onClick={onDiagnostics}>Abrir diagnóstico</button>
         </aside>
       </section>
     </div>

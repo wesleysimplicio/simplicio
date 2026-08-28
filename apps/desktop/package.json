@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json && vite build",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "preview": "vite preview",
     "tauri": "tauri"
   },
@@ -16,6 +17,7 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.1",
     "@tauri-apps/cli": "2.11.4",
     "@types/node": "26.4.0",
     "@types/react": "19.2.18",

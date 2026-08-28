@@ -40,16 +40,24 @@ def run_checked(command: list[str], env: dict[str, str], *, input_text: str | No
 def static_contract(target_id: str) -> dict:
     target, artifact, manifest = load_target(target_id)
     asset = ROOT / str(target['asset'])
-    if not asset.is_file() or asset.stat().st_size == 0:
-        raise SystemExit(f'asset missing or empty: {asset.name}')
-    if sha256(asset).lower() != str(artifact.get('sha256', '')).lower():
-        raise SystemExit(f'asset checksum mismatch: {asset.name}')
+    local_asset = asset.is_file()
+    if local_asset:
+        if asset.stat().st_size == 0:
+            raise SystemExit(f'asset is empty: {asset.name}')
+        if sha256(asset).lower() != str(artifact.get('sha256', '')).lower():
+            raise SystemExit(f'asset checksum mismatch: {asset.name}')
+    else:
+        url = str(artifact.get('url') or '')
+        if not url.startswith('https://github.com/wesleysimplicio/simplicio/releases/download/'):
+            raise SystemExit(f'manifest has no trusted release URL: {target_id}')
+        if not url.endswith('/' + asset.name):
+            raise SystemExit(f'manifest URL asset mismatch: {target_id}')
     if not str(artifact.get('signature', '')).startswith('ed25519:'):
         raise SystemExit(f'asset has no Ed25519 signature metadata: {target_id}')
     installer = ROOT / str(target['installer'])
     if not installer.is_file():
         raise SystemExit(f'installer missing: {installer}')
-    return {'target': target_id, 'asset': target['asset'], 'version': manifest.get('version'), 'checksum': artifact.get('sha256'), 'signature': True}
+    return {'target': target_id, 'asset': target['asset'], 'version': manifest.get('version'), 'checksum': artifact.get('sha256'), 'signature': True, 'local_asset': local_asset}
 
 def download_check(target_id: str, artifact: dict, manifest: dict) -> dict:
     url = str(artifact.get('url') or '')

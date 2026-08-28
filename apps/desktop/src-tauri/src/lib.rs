@@ -4,14 +4,21 @@ use std::path::PathBuf;
 use std::process::{Command, Output};
 
 mod supervisor;
+mod legacy_snapshot;
 
 const SNAPSHOT_SCHEMA: &str = "simplicio.desktop-snapshot/v1";
 const MAX_SNAPSHOT_BYTES: usize = 65_536;
 const SNAPSHOT_ARGS: &[&str] = &["desktop", "snapshot", "--json"];
-const LOGIN_ARGS: &[&str] = &["desktop", "login"];
+const LOGIN_ARGS: &[&str] = &["login", "google", "--json"];
 const LOGOUT_ARGS: &[&str] = &["logout", "--json"];
 const SUBSCRIPTION_ARGS: &[&str] = &["desktop", "subscribe", "--json"];
 const STATUS_ARGS: &[&str] = &["desktop", "status", "--json"];
+const LEGACY_AUTH_ARGS: &[&str] = &["auth", "status", "--json"];
+const LEGACY_STATUS_ARGS: &[&str] = &["status", "--json"];
+const LEGACY_SAVINGS_ARGS: &[&str] = &["savings", "report", "--json"];
+const LEGACY_INSTALL_ARGS: &[&str] = &["install", "--global", "--dry-run", "--json"];
+const REGISTER_ARGS_PREFIX: &[&str] = &["mcp", "register", "--binary"];
+const SUBSCRIPTION_URL: &str = "https://simpleti.com.br/simplicio";
 
 fn runtime_candidates_with(
     override_binary: Option<OsString>,
@@ -85,6 +92,56 @@ fn run_runtime_action(args: &[&str]) -> Result<(), String> {
     successful_output(args).map(|_| ())
 }
 
+fn repair_provider_integrations() -> Result<(), String> {
+    for binary in runtime_candidates() {
+        let result = Command::new(&binary)
+            .args(REGISTER_ARGS_PREFIX)
+            .arg(&binary)
+            .arg("--json")
+            .env("SIMPLICIO_DESKTOP_BRIDGE", "1")
+            .output();
+        match result {
+            Ok(output) if output.status.success() => return Ok(()),
+            Ok(_) => return Err("O Runtime não conseguiu reparar as integrações".to_string()),
+            Err(_) => continue,
+        }
+    }
+    Err("Simplicio Runtime não encontrado".to_string())
+}
+
+fn open_subscription_url() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    let mut command = {
+        let mut command = Command::new("open");
+        command.arg(SUBSCRIPTION_URL);
+        command
+    };
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        let mut command = Command::new("cmd");
+        command.args(["/C", "start", "", SUBSCRIPTION_URL]);
+        command
+    };
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut command = {
+        let mut command = Command::new("xdg-open");
+        command.arg(SUBSCRIPTION_URL);
+        command
+    };
+
+    command
+        .status()
+        .map_err(|_| "Não foi possível abrir os planos no navegador".to_string())
+        .and_then(|status| {
+            if status.success() {
+                Ok(())
+            } else {
+                Err("Não foi possível abrir os planos no navegador".to_string())
+            }
+        })
+}
+
+
 fn validate_snapshot(value: Value) -> Result<Value, String> {
     let encoded = serde_json::to_vec(&value)
         .map_err(|_| "Contrato de snapshot do Runtime incompatível".to_string())?;
@@ -148,7 +205,28 @@ fn validate_snapshot(value: Value) -> Result<Value, String> {
 }
 
 fn snapshot_from_runtime() -> Result<Value, String> {
-    validate_snapshot(run_runtime_json(SNAPSHOT_ARGS)?)
+    let output = run_runtime_output(SNAPSHOT_ARGS)?;
+    if output.status.success() {
+        let value = serde_json::from_slice(&output.stdout)
+            .map_err(|_| "Simplicio Runtime devolveu JSON inválido".to_string())?;
+        return validate_snapshot(value);
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if !stderr.contains("unknown desktop sub: snapshot") {
+        return Err(format!(
+            "Simplicio Runtime encerrou com código {}",
+            output.status.code().unwrap_or(-1)
+        ));
+    }
+
+    let auth = run_runtime_json(LEGACY_AUTH_ARGS)?;
+    let status = run_runtime_json(LEGACY_STATUS_ARGS)?;
+    let savings = run_runtime_json(LEGACY_SAVINGS_ARGS)?;
+    let install = run_runtime_json(LEGACY_INSTALL_ARGS)?;
+    validate_snapshot(legacy_snapshot::build_legacy_snapshot(
+        &auth, &status, &savings, &install,
+    )?)
 }
 
 #[tauri::command]
@@ -184,10 +262,22 @@ async fn desktop_logout() -> Result<Value, String> {
 }
 
 #[tauri::command]
+async fn desktop_repair_providers() -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        repair_provider_integrations()?;
+        snapshot_from_runtime()
+    })
+    .await
+    .map_err(|_| "Falha interna durante o reparo das integrações".to_string())?
+}
+
+#[tauri::command]
 async fn desktop_open_subscription() -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(|| run_runtime_action(SUBSCRIPTION_ARGS))
-        .await
-        .map_err(|_| "Falha interna ao abrir os planos".to_string())?
+    tauri::async_runtime::spawn_blocking(|| {
+        run_runtime_action(SUBSCRIPTION_ARGS).or_else(|_| open_subscription_url())
+    })
+    .await
+    .map_err(|_| "Falha interna ao abrir os planos".to_string())?
 }
 
 #[tauri::command]
@@ -205,6 +295,7 @@ pub fn run() {
             refresh_desktop_snapshot,
             desktop_login,
             desktop_logout,
+            desktop_repair_providers,
             desktop_open_subscription,
             runtime_status
         ])
@@ -262,10 +353,19 @@ mod tests {
     #[test]
     fn bridge_exposes_only_fixed_runtime_arguments() {
         assert_eq!(SNAPSHOT_ARGS, ["desktop", "snapshot", "--json"]);
-        assert_eq!(LOGIN_ARGS, ["desktop", "login"]);
+        assert_eq!(LOGIN_ARGS, ["login", "google", "--json"]);
         assert_eq!(LOGOUT_ARGS, ["logout", "--json"]);
         assert_eq!(SUBSCRIPTION_ARGS, ["desktop", "subscribe", "--json"]);
         assert_eq!(STATUS_ARGS, ["desktop", "status", "--json"]);
+        assert_eq!(LEGACY_AUTH_ARGS, ["auth", "status", "--json"]);
+        assert_eq!(LEGACY_STATUS_ARGS, ["status", "--json"]);
+        assert_eq!(LEGACY_SAVINGS_ARGS, ["savings", "report", "--json"]);
+        assert_eq!(
+            LEGACY_INSTALL_ARGS,
+            ["install", "--global", "--dry-run", "--json"]
+        );
+        assert_eq!(REGISTER_ARGS_PREFIX, ["mcp", "register", "--binary"]);
+        assert_eq!(SUBSCRIPTION_URL, "https://simpleti.com.br/simplicio");
     }
 
     #[test]

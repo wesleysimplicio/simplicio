@@ -12,15 +12,7 @@ const stateCopy: Record<ProviderState, string> = {
   not_installed: t("provider.not_installed"),
 };
 
-const actionCopy: Record<ProviderState, string> = {
-  connected: "Ver detalhes",
-  registered: "Verificar",
-  detected: "Conectar",
-  needs_attention: "Corrigir conexão",
-  not_installed: "Como instalar",
-};
-
-function ProviderCard({ provider }: { provider: ProviderConnection }) {
+function ProviderCard({ provider, onSelect }: { provider: ProviderConnection; onSelect: () => void }) {
   return (
     <article className={`provider-card state-${provider.state}`}>
       <div className="provider-card-top">
@@ -35,9 +27,9 @@ function ProviderCard({ provider }: { provider: ProviderConnection }) {
         <span>{provider.protocol}</span>
         <span>{provider.kind === "agent" ? "Agente" : "Editor"}</span>
       </div>
-      <span className="provider-action provider-action-static">
-        {actionCopy[provider.state]} <Glyph name="arrow" size={16} />
-      </span>
+      <button className="provider-action" type="button" onClick={onSelect}>
+        Ver detalhes <Glyph name="arrow" size={16} />
+      </button>
     </article>
   );
 }
@@ -45,13 +37,19 @@ function ProviderCard({ provider }: { provider: ProviderConnection }) {
 export function ProvidersScreen({
   snapshot,
   busy,
+  repairing,
   onRefresh,
+  onRepair,
 }: {
   snapshot: DesktopSnapshot;
   busy: boolean;
+  repairing: boolean;
   onRefresh: () => void;
+  onRepair: () => void;
 }) {
   const [filter, setFilter] = useState<"all" | "ready" | "available">("all");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showStateGuide, setShowStateGuide] = useState(false);
   const ordered = useMemo(() => {
     return providerRegistry(snapshot.providers)
       .filter((provider) => {
@@ -65,6 +63,8 @@ export function ProvidersScreen({
   const connected = canonical.filter((provider) => provider.state === "connected").length;
   const detected = canonical.filter((provider) => provider.state === "detected" || provider.state === "registered").length;
   const attention = canonical.filter((provider) => provider.state === "needs_attention").length;
+  const selected = canonical.find((provider) => provider.id === selectedId) ?? null;
+  const repairAvailable = canonical.some((provider) => provider.availableActions.includes("repair") || provider.availableActions.includes("register"));
 
   return (
     <div className="page providers-page">
@@ -74,9 +74,16 @@ export function ProvidersScreen({
           <h1>Providers</h1>
           <p>{connected} conectados · {detected} detectados</p>
         </div>
-        <button className="button button-primary" type="button" onClick={onRefresh} disabled={busy}>
-          <Glyph name="refresh" size={17} /> {busy ? "Verificando…" : "Verificar"}
-        </button>
+        <div className="provider-heading-actions">
+          {repairAvailable && (
+            <button className="button button-secondary" type="button" onClick={onRepair} disabled={busy}>
+              <Glyph name="settings" size={17} /> {repairing ? "Reparando…" : "Reparar integrações"}
+            </button>
+          )}
+          <button className="button button-primary" type="button" onClick={onRefresh} disabled={busy}>
+            <Glyph name="refresh" size={17} /> {busy && !repairing ? "Verificando…" : "Verificar"}
+          </button>
+        </div>
       </section>
 
       <section className="provider-summary" aria-label="Resumo das conexões">
@@ -96,8 +103,27 @@ export function ProvidersScreen({
       </div>
 
       <section className="provider-grid" aria-label="Lista de providers">
-        {ordered.map((provider) => <ProviderCard provider={provider} key={provider.id} />)}
+        {ordered.map((provider) => (
+          <ProviderCard provider={provider} key={provider.id} onSelect={() => setSelectedId(provider.id)} />
+        ))}
       </section>
+
+      {selected && (
+        <section className="panel provider-detail" aria-live="polite">
+          <div>
+            <span className="eyebrow">{stateCopy[selected.state]}</span>
+            <h2>{selected.name}</h2>
+            <p>{selected.detail}</p>
+          </div>
+          <dl>
+            <div><dt>Instalação</dt><dd>{selected.installState}</dd></div>
+            <div><dt>Registro</dt><dd>{selected.registrationState}</dd></div>
+            <div><dt>Handshake</dt><dd>{selected.handshakeState}</dd></div>
+            <div><dt>Frescor</dt><dd>{selected.freshness}</dd></div>
+          </dl>
+          <button className="text-button" type="button" onClick={() => setSelectedId(null)}>Fechar detalhes</button>
+        </section>
+      )}
 
       <section className="provider-principle">
         <div className="principle-icon"><Glyph name="spark" size={24} /></div>
@@ -106,8 +132,20 @@ export function ProvidersScreen({
           <h2>Detectado ≠ conectado</h2>
           <p>O verde exige handshake válido.</p>
         </div>
-        <button className="text-button" type="button">Entender os estados <Glyph name="arrow" size={16} /></button>
+        <button className="text-button" type="button" aria-expanded={showStateGuide} onClick={() => setShowStateGuide((current) => !current)}>
+          {showStateGuide ? "Ocultar estados" : "Entender os estados"} <Glyph name="arrow" size={16} />
+        </button>
       </section>
+
+      {showStateGuide && (
+        <section className="panel provider-state-guide" aria-live="polite">
+          <strong>Conectado</strong><span>handshake atual e registro válido</span>
+          <strong>Registrado</strong><span>configuração presente, handshake ainda não confirmado</span>
+          <strong>Detectado</strong><span>aplicativo encontrado, aguardando registro</span>
+          <strong>Requer atenção</strong><span>configuração antiga, falha ou incompatibilidade detectada</span>
+          <strong>Não instalado</strong><span>nenhuma instalação verificável encontrada</span>
+        </section>
+      )}
     </div>
   );
 }

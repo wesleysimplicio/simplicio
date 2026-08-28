@@ -1,0 +1,14 @@
+{
+  "name": "simplicio-hermes",
+  "version": "0.1.0",
+  "description": "Hermes middleware adapter for deterministic Simplicio Runtime preparation and redacted provider receipts.",
+  "author": "Wesley Simplicio",
+  "license": "MIT",
+  "homepage": "https://github.com/wesleysimplicio/simplicio/tree/master/plugins/simplicio-hermes",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wesleysimplicio/simplicio"
+  },
+  "keywords": ["hermes", "middleware", "runtime", "receipts"],
+  "skills": ["./skills/simplicio-hermes"]
+}

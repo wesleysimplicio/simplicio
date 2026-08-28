@@ -94,7 +94,12 @@ export function Shell({ children, snapshot, view, onViewChange }: ShellProps) {
               <span className="status-dot online" />
               Runtime ativo
             </span>
-            <button className="profile-button" type="button" aria-label="Abrir menu da conta">
+            <button
+              className="profile-button"
+              type="button"
+              aria-label="Abrir configurações da conta"
+              onClick={() => onViewChange("settings")}
+            >
               {snapshot.access.displayName?.slice(0, 1).toUpperCase() ?? "S"}
             </button>
           </div>
