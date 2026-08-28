@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from simplicio.host_adapters import install_detected_hosts
+from simplicio.host_adapters import install_detected_hosts, portable_cli_plan
 from simplicio.host_integrations import HOSTS, HostSpec
 
 
@@ -276,3 +276,15 @@ def test_pi_and_oh_my_pi_use_separate_exact_executables_and_configs(tmp_path: Pa
     assert (home / ".omp/mcp.json").is_file()
     assert json.loads((home / ".pi/agent/mcp.json").read_text())["mcpServers"]["simplicio"]
     assert json.loads((home / ".omp/mcp.json").read_text())["mcpServers"]["simplicio"]
+
+
+def test_orca_portable_contract_is_verification_only() -> None:
+    spec = next(item for item in HOSTS if item.host_id == "orca")
+    plan = portable_cli_plan(spec, "/usr/local/bin/orca")
+    assert plan == {
+        "host_id": "orca",
+        "argv": ["/usr/local/bin/orca", "status", "--json"],
+        "verification_only": True,
+        "mutates_worktree": False,
+        "reads_credentials": False,
+    }

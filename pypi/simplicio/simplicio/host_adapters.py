@@ -56,6 +56,26 @@ def _entry(binary: str) -> dict[str, Any]:
     }
 
 
+def portable_cli_plan(spec: HostSpec, executable: str) -> dict[str, Any]:
+    """Return a verification-only plan for hosts without an MCP writer.
+
+    Portable hosts are intentionally never configured by this module.  The
+    plan is safe to show in a receipt or UI and leaves worktrees, credentials,
+    and host state untouched.
+    """
+
+    if spec.capability != "portable-cli" or not spec.verification_command:
+        raise ValueError("host does not expose a portable CLI contract")
+    command = tuple(spec.verification_command)
+    return {
+        "host_id": spec.host_id,
+        "argv": [executable, *command[1:]],
+        "verification_only": True,
+        "mutates_worktree": False,
+        "reads_credentials": False,
+    }
+
+
 def _digest(value: bytes) -> str:
     return "sha256:" + hashlib.sha256(value).hexdigest()
 
