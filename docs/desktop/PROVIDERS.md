@@ -1,0 +1,25 @@
+# Desktop provider registry
+
+The Desktop separates host evidence from model-provider credentials. A provider
+card is derived from the registry, not from a host name or a successful config
+file write.
+
+## Canonical states
+
+| State | Required evidence | Meaning |
+| --- | --- | --- |
+| `connected` | installed + registered + current live handshake | The Simplicio server identity and protocol were observed within the TTL. |
+| `registered` | installed + registration read back | The config is present, but no current handshake was proven. |
+| `detected` | installed host only | The host/CLI exists, but registration is not proven. |
+| `needs_attention` | stale handshake/freshness or drift/incompatibility | Repair or verification is required. |
+| `not_installed` | host/CLI absent | Installation instructions are the only safe action. |
+
+`redactedProviderScan` is the dry-run/diagnostic surface. It is bounded by the
+Runtime snapshot limit and contains evidence fields and action IDs only; it
+never includes config files, credentials, prompts, or provider payloads.
+
+Registration writes must remain atomic, create a recoverable backup, and read
+back the resulting document before reporting `registered`. Connect, verify,
+repair, and instruction actions must be idempotent. The registry intentionally
+does not mark `hermes-agent` as supported until its clean-profile installer and
+provider-path E2E contract is available.
