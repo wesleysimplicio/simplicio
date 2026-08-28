@@ -1,0 +1,23 @@
+name: Repository quality
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  source-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Reject generated files, binaries, secrets, and personal paths
+        run: python scripts/repository_policy.py
+      - name: Check patch whitespace
+        run: git diff --check
