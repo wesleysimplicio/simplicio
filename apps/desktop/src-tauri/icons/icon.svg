@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Simplicio">
+  <rect width="512" height="512" rx="112" fill="#07110e"/>
+  <path d="M256 54 430 153v206L256 458 82 359V153Z" fill="#0d211a" stroke="#54f5b3" stroke-width="12"/>
+  <path transform="translate(36 36) scale(10)" fill="#54f5b3" d="m29.8 13.6-7.9-4.4-8.2 4.6v8.5l8.2 4.6 4.1-2.3v3.7l-4.1 2.3-8.2-4.6-4.5 2.6 12.7 7.1 12.6-7.1v-8.8l-8.1-4.5-4.5 2.5 4.5 2.5 3.4-1.9v3.8l-7.9 4.4-3.7-2.1v-7.7l3.7-2.1 3.5 1.9Z"/>
+</svg>

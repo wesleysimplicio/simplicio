@@ -1,0 +1,85 @@
+name: Desktop
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/desktop.yml"
+      - "apps/desktop/**"
+      - "docs/desktop/**"
+      - "distribution/bootstrap-profiles.json"
+      - "tests/test_bootstrap_profiles.py"
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/desktop.yml"
+      - "apps/desktop/**"
+      - "docs/desktop/**"
+      - "distribution/bootstrap-profiles.json"
+      - "tests/test_bootstrap_profiles.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Frontend, bridge and bootstrap
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      - name: Install frontend dependencies
+        working-directory: apps/desktop
+        run: npm ci
+
+      - name: Test frontend
+        working-directory: apps/desktop
+        run: npm test -- --run
+
+      - name: Build frontend
+        working-directory: apps/desktop
+        run: npm run build
+
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check
+
+      - name: Test Rust bridge
+        run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
+
+      - name: Build integrated Tauri binary
+        working-directory: apps/desktop
+        run: npm run tauri -- build --debug --no-bundle
+
+      - name: Test public bootstrap contract
+        run: |
+          python -m pip install pytest
+          python -m pytest tests/test_bootstrap_profiles.py
