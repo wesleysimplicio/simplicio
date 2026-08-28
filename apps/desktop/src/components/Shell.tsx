@@ -1,15 +1,16 @@
 import type { ReactNode } from "react";
 import type { DesktopSnapshot } from "../contracts";
 import { Brand, Glyph, type GlyphName } from "./Brand";
+import { t } from "../i18n";
 
 export type View = "home" | "providers" | "activity" | "memory" | "settings";
 
 const navigation: Array<{ id: View; label: string; icon: GlyphName }> = [
-  { id: "home", label: "Início", icon: "home" },
-  { id: "providers", label: "Providers", icon: "providers" },
-  { id: "activity", label: "Atividade", icon: "activity" },
-  { id: "memory", label: "Memória", icon: "memory" },
-  { id: "settings", label: "Configurações", icon: "settings" },
+  { id: "home", label: t("nav.home"), icon: "home" },
+  { id: "providers", label: t("nav.providers"), icon: "providers" },
+  { id: "activity", label: t("nav.activity"), icon: "activity" },
+  { id: "memory", label: t("nav.memory"), icon: "memory" },
+  { id: "settings", label: t("nav.settings"), icon: "settings" },
 ];
 
 interface ShellProps {
@@ -35,6 +36,7 @@ export function Shell({ children, snapshot, view, onViewChange }: ShellProps) {
               onClick={() => onViewChange(item.id)}
               type="button"
               aria-label={item.label}
+              aria-current={view === item.id ? "page" : undefined}
             >
               <Glyph name={item.icon} />
               <span>{item.label}</span>
@@ -53,6 +55,7 @@ export function Shell({ children, snapshot, view, onViewChange }: ShellProps) {
               onClick={() => onViewChange(item.id)}
               type="button"
               aria-label={item.label}
+              aria-current={view === item.id ? "page" : undefined}
             >
               <Glyph name={item.icon} />
               <span>{item.label}</span>
