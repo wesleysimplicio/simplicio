@@ -99,6 +99,14 @@ def test_vscode_declares_all_supported_configuration_scopes() -> None:
     assert vscode.verification_command[-1] == "--json"
 
 
+def test_antigravity_is_fail_closed_until_public_contract_is_verified() -> None:
+    antigravity = next(spec for spec in HOSTS if spec.host_id == "antigravity")
+    assert antigravity.executable_names == ()
+    assert antigravity.capability == "unsupported"
+    assert antigravity.contract == "unverified"
+    assert antigravity.verification_command == ()
+
+
 def test_skip_controls_are_explicit_and_do_not_touch_host_files(tmp_path: Path) -> None:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()

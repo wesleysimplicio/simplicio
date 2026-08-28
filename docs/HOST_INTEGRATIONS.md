@@ -57,6 +57,12 @@ executable. Its registry entry declares user (`~/.vscode/mcp.json`), workspace
 (`.vscode/mcp.json`), and remote scopes, with user scope as the default. The
 Runtime owns the JSON merge and returns the verification receipt.
 
+Google Antigravity remains fail-closed until its official executable and
+extension/MCP contract are publicly confirmed. The registry keeps its
+documentation pointer but intentionally supplies no executable probe or
+verification command, so an unrelated binary cannot be reported as a working
+integration.
+
 ## Opt-out and scope
 
 Skip every host with a comma-separated list or one host with an environment
