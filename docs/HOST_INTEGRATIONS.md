@@ -73,6 +73,11 @@ commands, `pi` and `omp`, respectively. Their Runtime registration metadata is
 kept distinct so installing one cannot be used as evidence that the other is
 present; both use the Runtime receipt for verification.
 
+OrcaDev / Orca ADE is represented as a `portable-cli` entry. The exact probe is
+`orca`, and verification is the non-mutating `orca status --json` command.
+Installer work stays outside project worktrees; host-specific skills and MCP
+behavior remain owned by Orca's documented CLI contract.
+
 ## Opt-out and scope
 
 Skip every host with a comma-separated list or one host with an environment
