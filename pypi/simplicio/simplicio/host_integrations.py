@@ -33,6 +33,8 @@ class HostSpec:
     config_paths: Tuple[str, ...] = ()
     capability: str = "unsupported"
     contract: str = "unknown"
+    minimum_version: str = "unknown"
+    verification_command: Tuple[str, ...] = ()
     documentation: str = ""
     reason: str = ""
 
@@ -43,6 +45,7 @@ def _runtime_mcp(
     executable_names: Sequence[str],
     config_paths: Sequence[str],
     documentation: str,
+    minimum_version: str = "not-pinned",
 ) -> HostSpec:
     return HostSpec(
         host_id=host_id,
@@ -51,6 +54,15 @@ def _runtime_mcp(
         config_paths=tuple(config_paths),
         capability="runtime-mcp",
         contract="delegated-to-runtime",
+        minimum_version=minimum_version,
+        verification_command=(
+            "simplicio",
+            "mcp",
+            "register",
+            "--binary",
+            "<absolute-path>",
+            "--json",
+        ),
         documentation=documentation,
         reason="The Runtime owns the atomic MCP/native-hook registration.",
     )
@@ -65,6 +77,7 @@ def _unverified(host_id: str, name: str, documentation: str, reason: str) -> Hos
         name=name,
         capability="unsupported",
         contract="unverified",
+        verification_command=(),
         documentation=documentation,
         reason=reason,
     )
@@ -138,6 +151,8 @@ HOSTS: Tuple[HostSpec, ...] = (
         executable_names=("orca",),
         capability="portable-cli",
         contract="documented-cli",
+        minimum_version="not-pinned",
+        verification_command=("orca", "status", "--json"),
         documentation="https://www.onorca.dev/docs/cli/overview",
         reason="Use the documented Orca skills/MCP path; do not alter worktrees.",
     ),
@@ -251,6 +266,8 @@ def detect_hosts(
                 "status": status,
                 "capability": spec.capability,
                 "contract": spec.contract,
+                "minimum_version": spec.minimum_version,
+                "verification": list(spec.verification_command),
                 "executable": executable_paths[0] if executable_paths else None,
                 "app": app_paths[0] if app_paths else None,
                 "config": config_paths[0] if config_paths else None,

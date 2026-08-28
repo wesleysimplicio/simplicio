@@ -28,6 +28,13 @@ CLI path. DeepSeek Harness, Antigravity, Command Code, and the remaining
 compatibility-matrix entries remain explicit `unsupported`/`unverified` until
 their canonical upstream contract is confirmed.
 
+Claude Code is detected only through the exact `claude` executable. Its
+supported configuration locations are `~/.claude/settings.json` and
+`~/.claude/.mcp.json`; the public installer does not copy Codex-only hooks into
+those files. Verification is the Runtime registration receipt produced by
+`simplicio mcp register --binary <absolute-path> --json`, and the Runtime is
+responsible for the atomic merge and rollback of the host configuration.
+
 ## Opt-out and scope
 
 Skip every host with a comma-separated list or one host with an environment
@@ -46,9 +53,10 @@ idempotent reconciliation to the Runtime.
 
 The receipt uses `simplicio.host-integration/v1` and contains the Runtime
 registration status, one row for every matrix entry, exact detected evidence,
-the capability (`runtime-mcp`, `portable-cli`, or `unsupported`), and the
-primary documentation URL. It contains no tokens or provider credentials and
-is written atomically with mode `0600`.
+the capability (`runtime-mcp`, `portable-cli`, or `unsupported`), a
+minimum-version field, a verification command (when known), and the primary
+documentation URL. It contains no tokens or provider credentials and is
+written atomically with mode `0600`.
 
 The receipt is evidence of what the installer observed; a host is marked
 `registered` only when the Runtime JSON result names it as registered. File
