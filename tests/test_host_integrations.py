@@ -9,6 +9,7 @@ PACKAGE_ROOT = Path(__file__).parents[1] / "pypi" / "simplicio"
 sys.path.insert(0, str(PACKAGE_ROOT))
 
 from simplicio.host_integrations import (
+    COMPATIBILITY_MATRIX_HOST_IDS,
     HOSTS,
     build_summary,
     detect_hosts,
@@ -132,6 +133,17 @@ def test_orca_uses_portable_cli_verification_without_worktree_mutation() -> None
     assert orca.contract == "documented-cli"
     assert orca.verification_command == ("orca", "status", "--json")
     assert "worktrees" in orca.reason
+
+
+def test_compatibility_matrix_covers_every_requested_remaining_host() -> None:
+    by_id = {spec.host_id: spec for spec in HOSTS}
+    assert COMPATIBILITY_MATRIX_HOST_IDS <= set(by_id)
+    assert len(COMPATIBILITY_MATRIX_HOST_IDS) == 22
+    for host_id in COMPATIBILITY_MATRIX_HOST_IDS - {"oh-my-pi"}:
+        spec = by_id[host_id]
+        assert spec.contract == "unverified"
+        assert spec.capability == "unsupported"
+        assert spec.executable_names == ()
 
 
 def test_skip_controls_are_explicit_and_do_not_touch_host_files(tmp_path: Path) -> None:

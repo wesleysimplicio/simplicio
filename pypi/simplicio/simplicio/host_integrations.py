@@ -198,6 +198,36 @@ REMAINING_HOSTS: Tuple[Tuple[str, str, str], ...] = (
     ("rovo-dev", "Rovo Dev", "https://www.atlassian.com/software/rovo"),
 )
 
+# Names requested by the compatibility-matrix issue.  Entries that already
+# have a dedicated adapter (currently oh-my-pi) remain represented by that
+# adapter; every other row is explicit and fail-closed until verified.
+COMPATIBILITY_MATRIX_HOST_IDS = frozenset(
+    {
+        "grok",
+        "github-copilot",
+        "mimo-code",
+        "amp",
+        "openclaude",
+        "oh-my-pi",
+        "hermes-agent",
+        "devin",
+        "goose",
+        "auggie",
+        "autohand-code",
+        "charm-crush",
+        "cline",
+        "codebuff",
+        "command-code",
+        "continue",
+        "droid",
+        "kilocode",
+        "kimi",
+        "mistral-vibe",
+        "qwen-code",
+        "rovo-dev",
+    }
+)
+
 HOSTS = HOSTS + tuple(
     _unverified(host_id, name, docs, "The public contract is not verified; automatic detection is disabled.")
     for host_id, name, docs in REMAINING_HOSTS
