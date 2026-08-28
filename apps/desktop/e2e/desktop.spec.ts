@@ -21,6 +21,9 @@ test("login and conservative access states remain actionable", async ({ page }) 
 test("all navigation, provider, receipt, and account controls work", async ({ page }) => {
   await page.goto("/?state=active");
   await expect(page.getByRole("heading", { name: "Hoje você economizou." })).toBeVisible();
+  const brandMark = page.locator(".brand-mark").first();
+  await expect(brandMark).toBeVisible();
+  await expect.poll(() => brandMark.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth >= 1024)).toBe(true);
 
   await page.getByRole("button", { name: "Ver relatório" }).click();
   await expect(page.getByRole("heading", { name: "Atividade" })).toBeVisible();

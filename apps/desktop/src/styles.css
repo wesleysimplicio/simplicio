@@ -86,16 +86,9 @@ p { margin-top: 0; }
 .brand-mark {
   width: 30px;
   height: 30px;
-  overflow: visible;
+  border-radius: 8px;
+  object-fit: cover;
 }
-
-.brand-mark-shell {
-  fill: #edf3e3;
-  stroke: #86b293;
-  stroke-width: 1.2;
-}
-
-.brand-mark-path { fill: var(--green-dark); }
 
 .brand-copy {
   min-width: 0;
