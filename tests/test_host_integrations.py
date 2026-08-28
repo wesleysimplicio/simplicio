@@ -12,6 +12,7 @@ from simplicio.host_integrations import (
     COMPATIBILITY_MATRIX_HOST_IDS,
     HOSTS,
     build_summary,
+    compatibility_matrix,
     detect_hosts,
     write_summary,
 )
@@ -144,6 +145,21 @@ def test_compatibility_matrix_covers_every_requested_remaining_host() -> None:
         assert spec.contract == "unverified"
         assert spec.capability == "unsupported"
         assert spec.executable_names == ()
+
+
+def test_compatibility_matrix_is_complete_and_redacted() -> None:
+    matrix = compatibility_matrix()
+    assert len(matrix) == len(HOSTS)
+    assert {row["id"] for row in matrix} == {spec.host_id for spec in HOSTS}
+    for row in matrix:
+        assert set(row) == {
+            "id", "name", "capability", "contract", "executable_names",
+            "scopes", "verification", "documentation",
+        }
+        assert "token" not in json.dumps(row).lower()
+        if row["contract"] == "unverified":
+            assert row["capability"] == "unsupported"
+            assert row["executable_names"] == []
 
 
 def test_command_code_is_fail_closed_until_official_contract_is_confirmed() -> None:
