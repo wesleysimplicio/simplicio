@@ -81,6 +81,15 @@ def test_deepseek_harness_is_fail_closed_until_contract_is_verified() -> None:
     assert deepseek.verification_command == ()
 
 
+def test_opencode_has_runtime_registration_contract() -> None:
+    opencode = next(spec for spec in HOSTS if spec.host_id == "opencode")
+    assert opencode.executable_names == ("opencode",)
+    assert opencode.config_paths == ("~/.config/opencode/opencode.json", "opencode.json")
+    assert opencode.capability == "runtime-mcp"
+    assert opencode.verification_command[:3] == ("simplicio", "mcp", "register")
+    assert opencode.default_scope == "user"
+
+
 def test_skip_controls_are_explicit_and_do_not_touch_host_files(tmp_path: Path) -> None:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()

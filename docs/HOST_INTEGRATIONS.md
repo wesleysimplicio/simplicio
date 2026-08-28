@@ -47,6 +47,11 @@ contract is confirmed. It therefore appears as `unsupported`/`unverified`
 instead of treating a similarly named binary or arbitrary configuration file
 as proof of compatibility.
 
+OpenCode uses the exact `opencode` executable probe and its documented user or
+workspace configuration locations (`~/.config/opencode/opencode.json` and
+`opencode.json`). Registration and verification remain delegated to the
+Runtime; the installer does not parse or rewrite OpenCode configuration.
+
 ## Opt-out and scope
 
 Skip every host with a comma-separated list or one host with an environment
