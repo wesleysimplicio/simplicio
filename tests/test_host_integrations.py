@@ -115,6 +115,16 @@ def test_kiro_has_runtime_registration_contract() -> None:
     assert kiro.verification_command[:3] == ("simplicio", "mcp", "register")
 
 
+def test_pi_and_oh_my_pi_use_separate_exact_host_entries() -> None:
+    pi = next(spec for spec in HOSTS if spec.host_id == "pi")
+    omp = next(spec for spec in HOSTS if spec.host_id == "oh-my-pi")
+    assert pi.executable_names == ("pi",)
+    assert omp.executable_names == ("omp",)
+    assert pi.host_id != omp.host_id
+    assert pi.capability == omp.capability == "runtime-mcp"
+    assert pi.verification_command == omp.verification_command
+
+
 def test_skip_controls_are_explicit_and_do_not_touch_host_files(tmp_path: Path) -> None:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
