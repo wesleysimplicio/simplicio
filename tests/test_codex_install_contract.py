@@ -34,8 +34,23 @@ def test_installers_configure_direct_stdio_and_hooks():
         text = (ROOT / name).read_text(encoding="utf-8")
         assert "SIMPLICIO_MCP_URL" in text
         assert "serve" in text and "--mcp" in text and "--stdio" in text
-        assert "mcp-route" in text
         assert "mcp register" in text
+        assert "--binary" in text
+        assert "--json" in text
+
+def test_plain_install_registers_all_detected_hosts_without_codex_opt_in():
+    shell = (ROOT / "install.sh").read_text(encoding="utf-8")
+    powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
+
+    assert "SIMPLICIO_INSTALL_CODEX" not in shell
+    assert "SIMPLICIO_CODEX_HOOK_REF" not in shell
+    assert "if require_active_login; then" not in shell
+    assert 'mcp register --binary "$binary_path" --json' in shell
+
+    assert "SIMPLICIO_INSTALL_CODEX" not in powershell
+    assert "SIMPLICIO_CODEX_HOOK_REF" not in powershell
+    assert "if (Require-ActiveLogin)" not in powershell
+    assert "mcp register --binary $BinaryPath --json" in powershell
 
 
 def test_installers_preserve_existing_codex_state():
@@ -43,7 +58,7 @@ def test_installers_preserve_existing_codex_state():
     powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
     assert "mcp register" in shell
     assert "mcp register" in powershell
-    assert "Runtime MCP registration remains installed" in powershell
+    assert "automatic MCP/hooks registration failed" in powershell
 
 
 def test_installers_preserve_stable_login_state_during_upgrades():
@@ -57,18 +72,16 @@ def test_installers_preserve_stable_login_state_during_upgrades():
 
 def test_windows_installer_migrates_legacy_unix_hooks():
     powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
-    # The public installer repairs the local route hook after the Runtime's
-    # cross-editor `mcp register` command.
-    assert "mcp-route.ps1" in powershell
-    assert "Install-CodexRouteHook" in powershell
-
+    assert "Install-CodexRouteHook" not in powershell
+    assert "SIMPLICIO_CODEX_HOOK_REF" not in powershell
+    assert "mcp register --binary $BinaryPath --json" in powershell
 
 def test_unix_installer_migrates_legacy_hook_events():
     shell = (ROOT / "install.sh").read_text(encoding="utf-8")
-    assert "CODEX_ROUTE_HOOK_URL" in shell
-    assert "install_codex_route_hook" in shell
-    assert ".simplicio/hooks" in shell
-
+    assert "CODEX_ROUTE_HOOK_URL" not in shell
+    assert "install_codex_route_hook" not in shell
+    assert "SIMPLICIO_CODEX_HOOK_REF" not in shell
+    assert 'mcp register --binary "$binary_path" --json' in shell
 
 def test_unix_installer_accepts_release_manifest_target_aliases():
     shell = (ROOT / "install.sh").read_text(encoding="utf-8")
@@ -84,16 +97,17 @@ def test_codex_hooks_have_all_required_lifecycle_events():
     powershell_hook = (ROOT / "codex/mcp-route.ps1").read_text(encoding="utf-8")
     # Codex rejects a bare PreToolUse permissionDecision=allow. Allowing an
     # unchanged call is represented by successful empty stdout on both hosts.
-    assert "permissionDecision" not in shell_hook
-    assert "permissionDecision" not in powershell_hook
+    assert '"permissionDecision": "allow"' not in shell_hook
+    assert "permissionDecision = 'allow'" not in powershell_hook
+    assert '"permissionDecision": "deny"' in shell_hook
+    assert "permissionDecision = 'deny'" in powershell_hook
     assert "hookEventName" in shell_hook
     assert "hookEventName" in powershell_hook
-    assert "simplicio-hook-version: 3240-v6" in shell_hook
-    assert "simplicio-hook-version: 3240-v6" in powershell_hook
+    assert "simplicio-hook-version: 3240-v8" in shell_hook
+    assert "simplicio-hook-version: 3240-v8" in powershell_hook
     assert "Empty stdout is the portable allow-unchanged contract" in shell_hook
-    assert "No decision means allow unchanged" in shell_hook
+    assert "No decision means allow unchanged" in powershell_hook
     assert "Allow-Unchanged" in powershell_hook
-    assert "rejects an explicit PreToolUse allow without updatedInput" in powershell_hook
     assert "Simplicio MCP is mandatory" not in shell_hook
     assert "Simplicio MCP is mandatory" not in powershell_hook
     for event in ("SessionStart", "UserPromptSubmit", "SubagentStart"):
@@ -101,7 +115,7 @@ def test_codex_hooks_have_all_required_lifecycle_events():
         assert event in powershell_hook
     assert "mcp register" in (ROOT / "install.sh").read_text(encoding="utf-8")
     assert "mcp register" in (ROOT / "install.ps1").read_text(encoding="utf-8")
-    assert "simplicio_map" in shell_hook
+    assert "result=subprocess.run([binary,'map','--repo'" in shell_hook
     assert "simplicio_context" in shell_hook
     assert 'SIMPLICIO_BIN="${SIMPLICIO_BIN:-${SIMPLICIO_BIN_DIR:-${HOME}/.simplicio/bin}/simplicio}"' in shell_hook
     assert 'which("simplicio")' not in shell_hook

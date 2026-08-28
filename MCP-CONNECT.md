@@ -15,22 +15,21 @@ Continue only when the status reports `active: true`. Never copy a password, dev
 
 ## Codex: local STDIO MCP and hooks
 
-Codex integration is opt-in. The base installer leaves Codex unchanged. Enable
-the versioned, reversible integration explicitly:
+The installer automatically invokes the installed Runtime's host registrar.
+There is no Codex opt-in flag and no separately downloaded hook. The Runtime
+detects supported clients, records the absolute managed-binary path, preserves
+existing user configuration, and installs native hooks only where a verified
+native hook API is available.
 
-~~~bash
-SIMPLICIO_INSTALL_CODEX=1 SIMPLICIO_CODEX_HOOK_REF=v3.8.35 sh install.sh
-~~~
+Registration runs before login reporting, so a fresh installation is configured
+even when the user has not authenticated yet. Protected MCP operations still
+validate Google login and entitlement when they are used. Restart every open
+client after installation so it reloads the MCP and hook files.
 
-When enabled, the installer writes the absolute managed-binary path
-automatically. If you inspect or repair `config.toml` manually, copy the block
-for your operating system. MCP clients launch `command` directly, so do not
-use `~` and do not expect shell expansion.
+MCP clients launch `command` directly, so do not use `~` and do not expect
+shell expansion.
 
 #### Windows
-
-Use forward slashes in TOML. Windows accepts them, and they avoid invalid TOML
-escapes such as `\U` in `C:\Users\...`.
 
 ~~~toml
 [mcp_servers.simplicio]
@@ -41,10 +40,7 @@ args = ["serve", "--mcp", "--stdio"]
 SIMPLICIO_MCP_URL = "http://127.0.0.1:8787/mcp"
 ~~~
 
-If you are testing a downloaded asset before installation, the same rule is
-`C:/Users/YourName/Downloads/simplicio-windows-x64.exe`. Never paste
-a raw-backslash Windows path into a double-quoted TOML command; use forward
-slashes as shown above.
+Use forward slashes in Windows TOML paths.
 
 #### macOS
 
@@ -68,25 +64,19 @@ args = ["serve", "--mcp", "--stdio"]
 SIMPLICIO_MCP_URL = "http://127.0.0.1:8787/mcp"
 ~~~
 
-STDIO is the primary local transport and launches the managed binary directly.
-`SIMPLICIO_MCP_URL` keeps the loopback HTTP endpoint discoverable for HTTP-only
-or manual clients, but Codex should not use the URL as its primary registration.
-The Runtime still validates Google login and entitlement on every MCP session.
-Existing user hooks remain preserved; review enabled Simplicio hooks in Settings
-→ Hooks and run codex mcp list. Never paste tokens into either config file.
+STDIO is the primary local transport. The Runtime's JSON registration report
+lists every client it detected and whether the MCP configuration or native hook
+was written. A failed write makes installation fail rather than silently
+continuing.
 
-To verify the registration:
+To inspect or repair the detected integrations:
 
-```bash
-codex mcp list
-```
+~~~bash
+simplicio mcp register --binary "$(command -v simplicio)" --json
+~~~
 
-The hook route is mandatory and has no environment-variable escape hatch.
-Native reads, edits, shell commands, and directory exploration are denied; use
-the Simplicio MCP tools. Rerunning the installer repairs the integration
-idempotently. To repair the managed integration, rerun with
-`SIMPLICIO_INSTALL_CODEX=1`. The integration helper keeps user data separate
-and leaves `.simplicio.bak` copies of the original Codex files.
+Restart Codex and other open clients after registration. Never paste tokens into
+client configuration files.
 
 ## Other clients: local STDIO
 

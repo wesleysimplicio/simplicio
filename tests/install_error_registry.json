@@ -81,14 +81,14 @@
       "status": "fixed",
       "severity": "high",
       "source": "full-validation",
-      "symptom": "MCP handshake could run before an active login was established.",
-      "root_cause": "Installers reported login state but registered MCP without an explicit authenticated gate.",
-      "guard": "require_active_login gates verify_mcp_tools after the staged runtime is installed; staging is never probed.",
+      "symptom": "Fresh installations could skip MCP and hook registration until after login.",
+      "root_cause": "The installers coupled local host configuration writes to active authentication.",
+      "guard": "install.sh and install.ps1 register every detected supported host with the installed binary before reporting login state; registration failure is fatal.",
       "regression_tests": [
         "tests/test_clean_install_bootstrap_contract.py::test_shell_defers_mcp_handshake_until_after_login",
         "tests/test_clean_install_bootstrap_contract.py::test_powershell_defers_mcp_handshake_until_after_login"
       ],
-      "fixed_commit": "eef83c7a8abc2b96993928db4780777cab37c9e2"
+      "fixed_commit": "7abc0f0428d65718cda709b57c51bcabb28b92ae"
     },
     {
       "id": "CODEX-HOOK-007",
@@ -96,13 +96,13 @@
       "status": "fixed",
       "severity": "medium",
       "source": "full-validation",
-      "symptom": "Codex integration was installed without an explicit opt-in and hook ref.",
-      "root_cause": "Installers always fetched the route hook and did not require a pinned release ref.",
-      "guard": "SIMPLICIO_INSTALL_CODEX=1 is required and SIMPLICIO_CODEX_HOOK_REF must name a release tag.",
+      "symptom": "Codex integration could remain disabled after a normal installation.",
+      "root_cause": "The public installers required an opt-in environment variable and downloaded a second hook artifact.",
+      "guard": "Every installer delegates automatic host and Runtime-owned hook registration to `simplicio mcp register --binary <installed> --json`; no Codex opt-in remains.",
       "regression_tests": [
         "tests/test_codex_integration_cli.py::test_installers_are_opt_in_and_do_not_use_mutable_master_hook_ref"
       ],
-      "fixed_commit": "eef83c7a8abc2b96993928db4780777cab37c9e2"
+      "fixed_commit": "7abc0f0428d65718cda709b57c51bcabb28b92ae"
     },
     {
       "id": "UNINSTALL-008",
@@ -304,6 +304,21 @@
         "tests/unit/test_pypi_installer.py::test_default_manifest_pin_matches_versioned_checkout"
       ],
       "fixed_commit": "38fe075"
+    },
+    {
+      "id": "AUTO-HOST-021",
+      "platform": "windows-macos-linux",
+      "status": "fixed",
+      "severity": "high",
+      "source": "customer-report",
+      "symptom": "SH and PS1 could defer registration, while the PyPI installer never registered detected clients.",
+      "root_cause": "Host registration was split across installer-specific paths instead of the installed Runtime.",
+      "guard": "SH, PS1, and PyPI all invoke the installed Runtime registrar and fail clearly when its JSON status is not passed.",
+      "regression_tests": [
+        "tests/test_codex_install_contract.py::test_plain_install_registers_all_detected_hosts_without_codex_opt_in",
+        "tests/unit/test_pypi_installer.py::test_install_registers_detected_hosts_with_installed_binary"
+      ],
+      "fixed_commit": "7abc0f0428d65718cda709b57c51bcabb28b92ae"
     }
   ]
 }

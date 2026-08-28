@@ -8,11 +8,12 @@ def read(name):
     return (ROOT / name).read_text(encoding='utf-8')
 
 
-def test_install_docs_match_opt_in_transactional_contract():
+def test_install_docs_match_automatic_transactional_contract():
     readme = read('README.md')
     install = read('INSTALL.md')
-    assert 'SIMPLICIO_INSTALL_CODEX=1' in readme
-    assert 'SIMPLICIO_INSTALL_CODEX=1' in install
+    assert 'SIMPLICIO_INSTALL_CODEX' not in readme
+    assert 'SIMPLICIO_INSTALL_CODEX' not in install
+    assert 'automatically' in readme
     assert '--uninstall --keep-data' in readme
     assert '--uninstall --purge' in install
     assert 'SIMPLICIO_CONFIRM_PURGE=1' in readme
@@ -23,7 +24,8 @@ def test_mcp_docs_match_local_authentication_contract():
     mcp = read('MCP-CONNECT.md')
     assert 'local STDIO' in mcp
     assert 'Google login' in mcp
-    assert 'SIMPLICIO_INSTALL_CODEX=1' in mcp
+    assert 'SIMPLICIO_INSTALL_CODEX' not in mcp
+    assert 'automatically' in mcp
     assert 'Ed25519' in mcp
 
 

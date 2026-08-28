@@ -256,22 +256,24 @@ the table above is a quick orientation, not a substitute for live schemas.
 
 ### Codex: local STDIO MCP and hooks
 
-Codex integration is opt-in. A normal installation does not modify Codex
-configuration or hooks. To enable the versioned, reversible integration:
+A normal installation now invokes the installed Runtime's host registrar
+automatically. No opt-in environment variable or separately downloaded hook is
+required. The Runtime detects supported clients, writes the absolute managed
+binary path, preserves existing user configuration, and installs native hooks
+only on clients whose hook surface is implemented and verified.
 
-~~~bash
-SIMPLICIO_INSTALL_CODEX=1 SIMPLICIO_CODEX_HOOK_REF=v3.8.35 sh install.sh
-~~~
+Registration does not require an active Google session. Authentication is still
+validated when an MCP session uses protected Runtime capabilities. Restart each
+open client after installation so it reloads its MCP server and hook files.
 
-When enabled, the installer writes the absolute managed-binary path
-automatically. If you inspect or repair `config.toml` manually, copy the block
-for your operating system. MCP clients launch `command` directly, so do not
-use `~` and do not expect shell expansion.
+MCP clients launch `command` directly, so do not use `~` and do not expect
+shell expansion. The generated registration uses the following local STDIO MCP
+shape for the current operating system.
 
 #### Windows
 
 Use forward slashes in TOML. Windows accepts them, and they avoid invalid TOML
-escapes such as `\U` in `C:\Users\...`.
+escapes such as `\\U` in `C:\\Users\\...`.
 
 ~~~toml
 [mcp_servers.simplicio]
@@ -281,11 +283,6 @@ args = ["serve", "--mcp", "--stdio"]
 [mcp_servers.simplicio.env]
 SIMPLICIO_MCP_URL = "http://127.0.0.1:8787/mcp"
 ~~~
-
-If you are testing a downloaded asset before installation, the same rule is
-`C:/Users/YourName/Downloads/simplicio-windows-x64.exe`. Never paste
-a raw-backslash Windows path into a double-quoted TOML command; use forward
-slashes as shown above.
 
 #### macOS
 
@@ -309,30 +306,21 @@ args = ["serve", "--mcp", "--stdio"]
 SIMPLICIO_MCP_URL = "http://127.0.0.1:8787/mcp"
 ~~~
 
-This keeps MCP execution local while still exposing the loopback HTTP endpoint as
-`SIMPLICIO_MCP_URL` for HTTP-only/manual clients. The Runtime still enforces
-Google login and entitlement for every MCP session.
-The installer also merges Simplicio `SessionStart`, `UserPromptSubmit`,
-`SubagentStart`, and `PreToolUse` hooks into `~/.codex/hooks.json`; existing
-Codex hooks are preserved and the Simplicio entries are updated idempotently.
-The `PreToolUse` route is mandatory: native host reads, edits, shell commands,
-and directory exploration are denied; use Simplicio MCP. Lifecycle events also
-start a bounded `map -> fast` context warm-up in the background.
-The managed hooks are versioned with the release, and repeated setup is
-idempotent. Review the result in Settings → Hooks and verify the MCP command
-with:
+The Runtime currently registers supported configurations for Codex, Claude
+Code/Desktop, Hermes, Cursor, Windsurf/Next, Kiro, Gemini, Trae, Antigravity,
+Junie, Cline, VS Code, Zed, and OpenCode. Existing files are merged
+idempotently. Codex and Claude receive their verified Runtime-owned native hook
+routes; other clients receive the supported MCP/rules integration.
+
+To inspect or repair every detected integration manually, run:
 
 ~~~bash
-codex mcp list
+simplicio mcp register --binary "$(command -v simplicio)" --json
 ~~~
 
-To repair the integration, rerun the installer with
-`SIMPLICIO_INSTALL_CODEX=1`. The managed integration has a separate
-status/install/uninstall/repair helper in `scripts/codex_integration.py`; user
-data remains separate from the integration. Original `config.toml` and
-`hooks.json` files are kept in `.simplicio.bak` copies on the first managed
-write. There is no environment-variable escape hatch; rerun the installer to
-repair a missing or stale route.
+A failed automatic registration makes the installer fail clearly instead of
+claiming success. Clients not reported by the JSON result are not silently
+treated as configured.
 
 ### Other MCP clients: local STDIO
 

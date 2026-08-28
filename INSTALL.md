@@ -255,24 +255,15 @@ simplicio auth login
 simplicio auth status --json
 ```
 
-The installer registers MCP hosts to launch the managed binary directly. To
-refresh versioned MCP registration and managed hooks explicitly:
+The installer automatically asks the installed Runtime to detect and register
+every supported MCP host. Registration uses the installed binary with
+`serve --mcp --stdio`, writes native hooks only for verified host hook APIs,
+preserves existing configuration, and does not depend on Google login.
 
-~~~bash
-SIMPLICIO_INSTALL_CODEX=1 SIMPLICIO_CODEX_HOOK_REF=v3.8.30 sh install.sh
-~~~
-
-The registration points to the installed binary with `serve --mcp --stdio` and
-sets `SIMPLICIO_MCP_URL=http://127.0.0.1:8787/mcp` for HTTP/manual clients. The
-Runtime still requires Google login and active entitlement for every local MCP
-session; never copy tokens into config files. The managed Codex hooks cover all tool events,
-are versioned with the release, preserve existing user hooks, and are updated
-idempotently. The route is mandatory and has no environment-variable escape:
-native reads, edits, shell commands, and directory exploration are denied; use
-the Simplicio MCP tools. Review enabled hooks in Settings → Hooks and verify
-the MCP command with `codex mcp list`. To repair, rerun with
-`SIMPLICIO_INSTALL_CODEX=1`; the integration helper keeps user data separate
-and `.simplicio.bak` copies are created for managed Codex files.
+Protected MCP operations still require an active Google session and entitlement.
+Restart open clients after installation. To inspect or repair the registration,
+run `simplicio mcp register --binary "$(command -v simplicio)" --json`. A
+registration failure terminates the installer instead of reporting success.
 
 ## Building from Source
 

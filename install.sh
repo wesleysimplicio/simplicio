@@ -34,7 +34,6 @@ GITHUB="https://github.com/$REPO"
 ED25519_PUBLIC_KEY="2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok="
 ED25519_HELPER_URL="https://raw.githubusercontent.com/$REPO/master/scripts/verify_ed25519.py"
 ED25519_HELPER_SHA256="f03a0719dd557ddea27dc4cf1456d6f06a47b9056505e4d4b8453090697600d0"
-# Codex hooks are fetched from an explicit release ref only when opt-in is enabled.
 BIN_NAME="simplicio"
 
 GREEN='\033[0;32m'
@@ -131,30 +130,6 @@ verify_ed25519_signature() {
     --sha256 "$expected_sha256" >/dev/null 2>&1
 }
 
-install_codex_route_hook() {
-  hook_ref="${SIMPLICIO_CODEX_HOOK_REF:-}"
-  if [ -z "$hook_ref" ]; then
-    warn "Codex hook opt-in requires SIMPLICIO_CODEX_HOOK_REF pinned to a release tag"
-    return 1
-  fi
-  CODEX_ROUTE_HOOK_URL="https://raw.githubusercontent.com/$REPO/$hook_ref/codex/mcp-route.sh"
-  hook_url="$CODEX_ROUTE_HOOK_URL"
-  hook_dir="$HOME/.simplicio/hooks"
-  hook_path="$hook_dir/mcp-route.sh"
-  hook_tmp="$(mktemp)"
-  mkdir -p "$hook_dir"
-  if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$hook_url" -o "$hook_tmp" || { rm -f "$hook_tmp"; return 1; }
-  elif command -v wget >/dev/null 2>&1; then
-    wget -q "$hook_url" -O "$hook_tmp" || { rm -f "$hook_tmp"; return 1; }
-  else
-    rm -f "$hook_tmp"
-    return 1
-  fi
-  chmod +x "$hook_tmp"
-  mv -f "$hook_tmp" "$hook_path"
-}
-
 verify_runtime_contract() {
   binary_path="$1"
   if [ ! -x "$binary_path" ] || ! command -v python3 >/dev/null 2>&1; then
@@ -243,18 +218,10 @@ report_login_state() {
   return 0
 }
 
-require_active_login() {
-  if verify_active_login; then
-    return 0
-  fi
-  warn "MCP handshake adiado: faça login com ${DEST_PATH} auth login"
-  return 1
-}
-
 verify_mcp_tools() {
   binary_path="$1"
   [ -x "$binary_path" ] || return 1
-  SIMPLICIO_MCP_URL="$SIMPLICIO_MCP_URL" "$binary_path" mcp register >/dev/null 2>&1
+  SIMPLICIO_MCP_URL="$SIMPLICIO_MCP_URL" "$binary_path" mcp register --binary "$binary_path" --json >/dev/null 2>&1
 }
 
 # ─── --doctor: idempotent, read-only health check ──────────────────────────
@@ -558,28 +525,13 @@ if ! verify_runtime_contract "$DEST_PATH"; then
 fi
 ok "contrato de release do Runtime verificado"
 
-# ─── 2.2 Login state: defer MCP until the account is authenticated ─────────
-if require_active_login; then
-  if verify_mcp_tools "$DEST_PATH"; then
-    ok "MCP registrado por comando direto para $DEST_PATH"
-  else
-    warn "não foi possível verificar o MCP automaticamente; rode: $DEST_PATH mcp register"
-  fi
+# ─── 2.2 Register MCP and native hooks for every detected client ───────────
+if verify_mcp_tools "$DEST_PATH"; then
+  ok "MCP e hooks registrados automaticamente para os clientes detectados"
 else
-  report_login_state
-  warn "MCP handshake permanece adiado até o login Google ficar ativo"
+  err "o Runtime foi instalado, mas o registro automático de MCP/hooks falhou: $DEST_PATH mcp register --binary $DEST_PATH --json"
 fi
-
-# Codex integration is opt-in and requires an explicit, version-pinned hook ref.
-if [ "${SIMPLICIO_INSTALL_CODEX:-}" = "1" ]; then
-  if install_codex_route_hook; then
-    ok "hook MCP local atualizado para usar $DEST_PATH diretamente"
-  else
-    warn "não foi possível atualizar o hook MCP local; integração Codex não foi ativada"
-  fi
-else
-  info "integração Codex não ativada; use SIMPLICIO_INSTALL_CODEX=1 com SIMPLICIO_CODEX_HOOK_REF=vX.Y.Z"
-fi
+report_login_state
 ok "MCP direto: $DEST_PATH serve --mcp --stdio; SIMPLICIO_MCP_URL=${SIMPLICIO_MCP_URL}"
 
 # PATH is optional for MCP because host configs point at $DEST_PATH directly.
