@@ -56,6 +56,20 @@ optional, not required.**
 
 ## 🚀 Installation
 
+### Desktop source (public foundation)
+
+The native Simplicio Desktop is being built publicly in
+[`apps/desktop`](apps/desktop). It uses Tauri 2 as a thin, capability-scoped
+shell around the separately supervised Simplicio Runtime. The first public
+Desktop download will replace the existing Desktop channel only after signed
+macOS and Windows artifacts pass the clean-machine, entitlement, provider,
+update and rollback gates. Until that cutover, the current download entrypoint
+remains unchanged.
+
+See the [Desktop architecture decision](docs/desktop/ADR-0001-public-tauri-shell.md),
+[product states](docs/desktop/PRODUCT-STATES.md), and
+[provider contract](docs/desktop/PROVIDER-CONTRACT.md).
+
 ### Install via the Codex plugin
 
 If you use Codex, you can install Simplicio as a plugin. Add the public marketplace, install the plugin, and start a new Codex session; the plugin installs and bootstraps the Simplicio Runtime and exposes its skills and MCP tools.
