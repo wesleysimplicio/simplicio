@@ -13,7 +13,22 @@ apps/desktop/vite.config.js
 apps/desktop/vite.config.d.ts
 apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/gen/
-.simplicio/cold-path/
-.simplicio/ledger/failure-events.jsonl
-**/.simplicio/cold-path/
-**/.simplicio/ledger/failure-events.jsonl
+# Simplicio runtime state and local indexes are never distribution sources.
+.simplicio/
+**/.simplicio/
+
+# Build products, dependency trees, logs, databases, models, and executables.
+target/
+**/target/
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+*.log
+*.sqlite
+*.sqlite3
+*.db
+*.gguf
+simplicio
+simplicio-*
+*.exe
