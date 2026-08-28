@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from simplicio.host_adapters import install_detected_hosts
-from simplicio.host_integrations import HostSpec
+from simplicio.host_integrations import HOSTS, HostSpec
 
 
 def _command(path: Path) -> None:
@@ -91,3 +91,28 @@ def test_malformed_config_isolated_as_failure(tmp_path: Path) -> None:
     )
     assert result["failed_hosts"] == ["fixture"]
     assert config.read_text(encoding="utf-8") == "not json"
+
+
+def test_claude_code_contract_uses_exact_probe_and_user_scope(tmp_path: Path) -> None:
+    spec = next(item for item in HOSTS if item.host_id == "claude-code")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    _command(bin_dir / "claude")
+    home = tmp_path / "home"
+    config = home / ".claude" / "settings.json"
+    config.parent.mkdir(parents=True)
+    config.write_text(json.dumps({"model": "sonnet"}) + "\n", encoding="utf-8")
+
+    result = install_detected_hosts(
+        "/opt/simplicio/bin/simplicio",
+        home=home,
+        cwd=tmp_path,
+        env={"PATH": str(bin_dir)},
+        specs=(spec,),
+    )
+
+    assert result["failed_hosts"] == []
+    assert result["results"][0]["status"] == "registered"
+    document = json.loads(config.read_text(encoding="utf-8"))
+    assert document["mcpServers"]["simplicio"]["command"] == "/opt/simplicio/bin/simplicio"
+    assert not (home / ".claude" / "settings.json.simplicio.bak").is_symlink()
