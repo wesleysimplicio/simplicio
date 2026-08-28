@@ -322,6 +322,11 @@ A failed automatic registration makes the installer fail clearly instead of
 claiming success. Clients not reported by the JSON result are not silently
 treated as configured.
 
+The installer also writes the redacted multi-host detection/registration
+receipt to `simplicio-host-integrations.json` beside the managed binary. See
+[`docs/HOST_INTEGRATIONS.md`](docs/HOST_INTEGRATIONS.md) for the supported
+matrix, exact-probe policy, opt-outs, and receipt schema.
+
 ### Other MCP clients: local STDIO
 
 For Claude Code, Cursor, VS Code, Cline, Continue, and similar clients, add a
