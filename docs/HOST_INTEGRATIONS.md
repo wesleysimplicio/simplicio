@@ -52,6 +52,11 @@ workspace configuration locations (`~/.config/opencode/opencode.json` and
 `opencode.json`). Registration and verification remain delegated to the
 Runtime; the installer does not parse or rewrite OpenCode configuration.
 
+Visual Studio Code is probed through the exact `code` or `code-insiders`
+executable. Its registry entry declares user (`~/.vscode/mcp.json`), workspace
+(`.vscode/mcp.json`), and remote scopes, with user scope as the default. The
+Runtime owns the JSON merge and returns the verification receipt.
+
 ## Opt-out and scope
 
 Skip every host with a comma-separated list or one host with an environment
