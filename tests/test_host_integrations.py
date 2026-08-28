@@ -73,6 +73,14 @@ def test_cursor_declares_user_and_workspace_scopes() -> None:
     assert cursor.config_paths == ("~/.cursor/mcp.json", ".cursor/mcp.json")
 
 
+def test_deepseek_harness_is_fail_closed_until_contract_is_verified() -> None:
+    deepseek = next(spec for spec in HOSTS if spec.host_id == "deepseek-harness")
+    assert deepseek.executable_names == ()
+    assert deepseek.capability == "unsupported"
+    assert deepseek.contract == "unverified"
+    assert deepseek.verification_command == ()
+
+
 def test_skip_controls_are_explicit_and_do_not_touch_host_files(tmp_path: Path) -> None:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
