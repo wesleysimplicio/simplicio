@@ -212,3 +212,17 @@ def test_vscode_contract_supports_user_workspace_and_remote_scopes(tmp_path: Pat
 
     assert json.loads((home / ".vscode/mcp.json").read_text())["mcpServers"]["simplicio"]
     assert json.loads((workspace / ".vscode/mcp.json").read_text())["mcpServers"]["simplicio"]
+
+
+def test_unverified_antigravity_is_reported_without_guessing_a_binary(tmp_path: Path) -> None:
+    spec = next(item for item in HOSTS if item.host_id == "antigravity")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    _command(bin_dir / "antigravity")
+    result = install_detected_hosts(
+        "/opt/simplicio/bin/simplicio", home=tmp_path / "home", cwd=tmp_path,
+        env={"PATH": str(bin_dir)}, specs=(spec,)
+    )
+
+    assert result["results"][0]["status"] == "unsupported"
+    assert result["results"][0]["reason_code"] == "unsupported"
