@@ -65,6 +65,14 @@ def test_claude_code_has_runtime_verification_contract() -> None:
     assert "<absolute-path>" in claude.verification_command
 
 
+def test_cursor_declares_user_and_workspace_scopes() -> None:
+    cursor = next(spec for spec in HOSTS if spec.host_id == "cursor")
+    assert cursor.executable_names == ("cursor",)
+    assert cursor.scopes == ("user", "workspace")
+    assert cursor.default_scope == "user"
+    assert cursor.config_paths == ("~/.cursor/mcp.json", ".cursor/mcp.json")
+
+
 def test_skip_controls_are_explicit_and_do_not_touch_host_files(tmp_path: Path) -> None:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()

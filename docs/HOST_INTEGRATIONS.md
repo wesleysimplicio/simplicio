@@ -35,6 +35,12 @@ those files. Verification is the Runtime registration receipt produced by
 `simplicio mcp register --binary <absolute-path> --json`, and the Runtime is
 responsible for the atomic merge and rollback of the host configuration.
 
+Cursor is detected only through the exact `cursor` executable. The registry
+declares both user (`~/.cursor/mcp.json`) and workspace (`.cursor/mcp.json`)
+scopes, with user scope as the default. The Runtime receives the selected
+scope and must preserve every unrelated provider, rule, extension, and MCP
+entry when reconciling the managed server.
+
 ## Opt-out and scope
 
 Skip every host with a comma-separated list or one host with an environment

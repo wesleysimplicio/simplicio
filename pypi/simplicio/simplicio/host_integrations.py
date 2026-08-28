@@ -35,6 +35,8 @@ class HostSpec:
     contract: str = "unknown"
     minimum_version: str = "unknown"
     verification_command: Tuple[str, ...] = ()
+    scopes: Tuple[str, ...] = ("user",)
+    default_scope: str = "user"
     documentation: str = ""
     reason: str = ""
 
@@ -46,6 +48,8 @@ def _runtime_mcp(
     config_paths: Sequence[str],
     documentation: str,
     minimum_version: str = "not-pinned",
+    scopes: Sequence[str] = ("user",),
+    default_scope: str = "user",
 ) -> HostSpec:
     return HostSpec(
         host_id=host_id,
@@ -63,6 +67,8 @@ def _runtime_mcp(
             "<absolute-path>",
             "--json",
         ),
+        scopes=tuple(scopes),
+        default_scope=default_scope,
         documentation=documentation,
         reason="The Runtime owns the atomic MCP/native-hook registration.",
     )
@@ -97,6 +103,8 @@ HOSTS: Tuple[HostSpec, ...] = (
         ("cursor",),
         ("~/.cursor/mcp.json", ".cursor/mcp.json"),
         "https://cursor.com/cli",
+        scopes=("user", "workspace"),
+        default_scope="user",
     ),
     _unverified(
         "deepseek-harness",
@@ -117,6 +125,8 @@ HOSTS: Tuple[HostSpec, ...] = (
         ("code", "code-insiders"),
         ("~/.vscode/mcp.json", ".vscode/mcp.json"),
         "https://code.visualstudio.com/docs/copilot/chat/mcp-servers",
+        scopes=("user", "workspace", "remote"),
+        default_scope="user",
     ),
     _unverified(
         "antigravity",
@@ -268,6 +278,8 @@ def detect_hosts(
                 "contract": spec.contract,
                 "minimum_version": spec.minimum_version,
                 "verification": list(spec.verification_command),
+                "scopes": list(spec.scopes),
+                "default_scope": spec.default_scope,
                 "executable": executable_paths[0] if executable_paths else None,
                 "app": app_paths[0] if app_paths else None,
                 "config": config_paths[0] if config_paths else None,
