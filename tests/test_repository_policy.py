@@ -15,7 +15,7 @@ def test_policy_rejects_generated_binaries_secrets_and_personal_paths(tmp_path: 
     (tmp_path / ".simplicio/cache").mkdir(parents=True)
     (tmp_path / ".simplicio/cache/map.json").write_text("{}", encoding="utf-8")
     (tmp_path / "simplicio.exe").write_bytes(b"binary")
-    (tmp_path / "config.txt").write_bytes(b"token=ghp_123456789012345678901234567890")
+    (tmp_path / "config.txt").write_bytes(b"token=" + b"ghp_" + b"123456789012345678901234567890")
     (tmp_path / "source.py").write_bytes(b"path=/home/alice/private")
     paths = [
         tmp_path / ".simplicio/cache/map.json",
