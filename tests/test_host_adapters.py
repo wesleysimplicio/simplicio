@@ -141,3 +141,32 @@ def test_cursor_contract_selects_requested_user_or_workspace_scope(tmp_path: Pat
     assert workspace_result["failed_hosts"] == []
     assert json.loads((home / ".cursor/mcp.json").read_text())["mcpServers"]["simplicio"]
     assert json.loads((workspace / ".cursor/mcp.json").read_text())["mcpServers"]["simplicio"]
+
+
+def test_unverified_deepseek_harness_fails_closed_without_mutation(tmp_path: Path) -> None:
+    spec = next(item for item in HOSTS if item.host_id == "deepseek-harness")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    _command(bin_dir / "deepseek")
+    home = tmp_path / "home"
+    result = install_detected_hosts(
+        "/opt/simplicio/bin/simplicio",
+        home=home,
+        cwd=tmp_path,
+        env={"PATH": str(bin_dir)},
+        specs=(spec,),
+    )
+
+    assert result["failed_hosts"] == []
+    assert result["results"] == [{
+        "host_id": "deepseek-harness",
+        "status": "unsupported",
+        "scope": "user",
+        "config": None,
+        "capability": "unsupported",
+        "verification": "none",
+        "reason_code": "unsupported",
+        "changed": False,
+        "backup": None,
+    }]
+    assert not home.exists()
