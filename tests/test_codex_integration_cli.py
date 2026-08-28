@@ -51,8 +51,11 @@ def test_windows_binary_path_is_toml_safe_and_uses_forward_slashes():
 
 
 def test_installers_are_opt_in_and_do_not_use_mutable_master_hook_ref():
-    shell = (ROOT / 'install.sh').read_text(encoding='utf-8')
-    powershell = (ROOT / 'install.ps1').read_text(encoding='utf-8')
-    assert 'SIMPLICIO_INSTALL_CODEX' in shell and 'SIMPLICIO_INSTALL_CODEX' in powershell
-    assert 'hook_ref="${SIMPLICIO_CODEX_HOOK_REF:-master}"' not in shell
-    assert 'else { "master" }' not in powershell
+    shell = (ROOT / "install.sh").read_text(encoding="utf-8")
+    powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
+    assert "SIMPLICIO_INSTALL_CODEX" not in shell
+    assert "SIMPLICIO_INSTALL_CODEX" not in powershell
+    assert "SIMPLICIO_CODEX_HOOK_REF" not in shell
+    assert "SIMPLICIO_CODEX_HOOK_REF" not in powershell
+    assert 'mcp register --binary "$binary_path" --json' in shell
+    assert "mcp register --binary $BinaryPath --json" in powershell

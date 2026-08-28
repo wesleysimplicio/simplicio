@@ -192,6 +192,34 @@ def _validate_runtime(path: Path, expected_version: str, runner=subprocess.run) 
         )
 
 
+def _register_detected_hosts(path: Path, runner=subprocess.run) -> None:
+    """Register MCP and Runtime-owned hooks for every detected supported client."""
+    try:
+        result = runner(
+            [
+                str(path),
+                "mcp",
+                "register",
+                "--binary",
+                str(path),
+                "--json",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        report = json.loads(result.stdout)
+    except (OSError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
+        raise InstallError(
+            "Runtime installed, but automatic MCP/hooks registration failed."
+        ) from exc
+    if not isinstance(report, dict) or report.get("status") != "passed":
+        failed = report.get("failed", []) if isinstance(report, dict) else []
+        detail = ": " + ", ".join(str(item) for item in failed) if failed else ""
+        raise InstallError(
+            "Runtime installed, but automatic MCP/hooks registration failed" + detail + "."
+        )
+
 def do_install(
     client=None,
     install_dir=None,
@@ -239,6 +267,7 @@ def do_install(
         staged_path.chmod(0o755)
         _validate_runtime(staged_path, expected_version, runner)
         os.replace(str(staged_path), str(destination))
+        _register_detected_hosts(destination, runner)
     except InstallError:
         raise
     except OSError as exc:

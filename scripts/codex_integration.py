@@ -106,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--source-root', type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument('--binary', default='simplicio')
     parser.add_argument('--version', default=os.environ.get('SIMPLICIO_VERSION', 'unknown'))
-    parser.add_argument('--hook-ref', default=os.environ.get('SIMPLICIO_CODEX_HOOK_REF', ''))
+    parser.add_argument('--hook-ref', default='')
     parser.add_argument('--platform', choices=('unix', 'windows'), default='windows' if os.name == 'nt' else 'unix')
     args = parser.parse_args(argv)
     if args.command == 'status': result = status(args)

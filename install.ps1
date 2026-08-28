@@ -40,7 +40,6 @@ $Asset = "simplicio-windows-x64.exe"
 $Ed25519PublicKey = "2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok="
 $Ed25519HelperUrl = "https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/scripts/verify_ed25519.py"
 $Ed25519HelperSha256 = "f03a0719dd557ddea27dc4cf1456d6f06a47b9056505e4d4b8453090697600d0"
-$CodexRouteHookBase = "https://raw.githubusercontent.com/$Repo"
 $PinnedPublicKey = ([string]$Ed25519PublicKey).Trim()
 $script:Ed25519VerifyError = ""
 $SimplicioMcpUrl = if ($env:SIMPLICIO_MCP_URL) { $env:SIMPLICIO_MCP_URL } else { "http://127.0.0.1:8787/mcp" }
@@ -187,33 +186,15 @@ function Report-LoginState {
   Write-Warning "Google login missing or entitlement inactive; run: `"$DestPath`" auth login"
 }
 
-function Require-ActiveLogin {
-  if (Test-ActiveLogin) { return $true }
-  Write-Warning "MCP handshake deferred: run `"$DestPath`" auth login first"
-  return $false
-}
-
 function Test-McpToolSurface([string]$BinaryPath) {
   if (-not (Test-Path $BinaryPath)) { return $false }
   try {
     $env:SIMPLICIO_MCP_URL = $SimplicioMcpUrl
-    & $BinaryPath mcp register | Out-Null
+    & $BinaryPath mcp register --binary $BinaryPath --json | Out-Null
     return ($LASTEXITCODE -eq 0)
   } catch {
     return $false
   }
-}
-
-function Install-CodexRouteHook {
-  $hookRef = [string]$env:SIMPLICIO_CODEX_HOOK_REF
-  if ([string]::IsNullOrWhiteSpace($hookRef)) {
-    throw "Codex hook opt-in requires SIMPLICIO_CODEX_HOOK_REF pinned to a release tag"
-  }
-  $hookDir = Join-Path $env:USERPROFILE ".simplicio\hooks"
-  $hookPath = Join-Path $hookDir "mcp-route.ps1"
-  $hookUrl = "$CodexRouteHookBase/$hookRef/codex/mcp-route.ps1"
-  New-Item -ItemType Directory -Force -Path $hookDir | Out-Null
-  Invoke-WebRequest -Uri $hookUrl -OutFile $hookPath -UseBasicParsing -ErrorAction Stop
 }
 
 # ─── -Doctor: idempotent, read-only health check ───────────────────────────
@@ -474,29 +455,14 @@ if (-not (Test-RuntimeReleaseContract $DestPath)) {
 }
 Write-Host "  ✓ Runtime release contract verified"
 
-# ─── Login state: defer MCP until the account is authenticated ─────────────
-if (Require-ActiveLogin) {
-  if (Test-McpToolSurface $DestPath) {
-    Write-Host "  ✓ MCP registered by direct command: $DestPath"
-  } else {
-    Write-Warning "could not verify MCP automatically; run: `"$DestPath`" mcp register"
-  }
+# ─── Register MCP and native hooks for every detected client ──────────────
+if (Test-McpToolSurface $DestPath) {
+  Write-Host "  ✓ MCP and hooks registered automatically for detected clients"
 } else {
-  Report-LoginState
-  Write-Warning "MCP handshake remains deferred until Google login is active"
+  Write-Error "Runtime installed, but automatic MCP/hooks registration failed: $DestPath mcp register --binary $DestPath --json"
+  exit 1
 }
-
-# Codex integration is opt-in and requires an explicit, version-pinned hook ref.
-if ($env:SIMPLICIO_INSTALL_CODEX -eq "1") {
-  try {
-    Install-CodexRouteHook
-    Write-Host "  ✓ local MCP hook updated to use $DestPath directly"
-  } catch {
-    Write-Warning "could not update the local MCP hook; Runtime MCP registration remains installed, but Codex integration was not enabled"
-  }
-} else {
-  Write-Host "  ! Codex integration disabled; use SIMPLICIO_INSTALL_CODEX=1 with SIMPLICIO_CODEX_HOOK_REF=vX.Y.Z"
-}
+Report-LoginState
 Write-Host "  ✓ Direct MCP: $DestPath serve --mcp --stdio; SIMPLICIO_MCP_URL=$SimplicioMcpUrl"
 
 $BundleDir = if ($env:SIMPLICIO_BUNDLE_DIR) { $env:SIMPLICIO_BUNDLE_DIR } else { Join-Path $env:USERPROFILE ".simplicio" }

@@ -87,11 +87,15 @@ def json_bytes(value):
 
 
 def valid_runner(command, **kwargs):
-    assert command[1:] == ["version", "--json"]
     assert kwargs["check"] and kwargs["capture_output"] and kwargs["text"]
-    return subprocess.CompletedProcess(
-        command, 0, json.dumps({"runtime": {"version": CURRENT_VERSION}}), ""
-    )
+    if command[1:] == ["version", "--json"]:
+        return subprocess.CompletedProcess(
+            command, 0, json.dumps({"runtime": {"version": CURRENT_VERSION}}), ""
+        )
+    assert command[1:4] == ["mcp", "register", "--binary"]
+    assert command[4] == command[0]
+    assert command[5:] == ["--json"]
+    return subprocess.CompletedProcess(command, 0, '{"status":"passed"}', "")
 
 
 def test_install_verifies_then_atomically_replaces_binary(tmp_path, monkeypatch):
@@ -111,6 +115,36 @@ def test_install_verifies_then_atomically_replaces_binary(tmp_path, monkeypatch)
     assert destination.read_bytes() == payload
     assert client.downloaded == [installer.MANIFEST_ASSET, "simplicio-linux-x64"]
     assert not list(tmp_path.glob(".simplicio-*"))
+
+
+def test_install_registers_detected_hosts_with_installed_binary(tmp_path, monkeypatch):
+    payload = b"verified runtime"
+    client = FakeReleaseClient(manifest_for(payload), payload)
+    monkeypatch.setattr(installer, "_target", lambda: ("linux-x64", "simplicio-linux-x64"))
+    calls = []
+
+    def runner(command, **kwargs):
+        calls.append(list(command))
+        return valid_runner(command, **kwargs)
+
+    installer.do_install(
+        client=client,
+        install_dir=tmp_path,
+        runner=runner,
+        trusted_manifest_sha256=trusted_digest(client.manifest),
+    )
+
+    destination = tmp_path / "simplicio"
+    assert len(calls) == 2
+    assert calls[0][1:] == ["version", "--json"]
+    assert calls[1] == [
+        str(destination),
+        "mcp",
+        "register",
+        "--binary",
+        str(destination),
+        "--json",
+    ]
 
 
 def test_install_rejects_missing_target_without_downloading(tmp_path, monkeypatch):
@@ -351,10 +385,9 @@ def test_windows_staging_uses_exe_suffix(tmp_path, monkeypatch):
     staged_paths = []
 
     def runner(command, **kwargs):
-        staged_paths.append(command[0])
-        return subprocess.CompletedProcess(
-            command, 0, json.dumps({"runtime": {"version": CURRENT_VERSION}}), ""
-        )
+        if command[1:] == ["version", "--json"]:
+            staged_paths.append(command[0])
+        return valid_runner(command, **kwargs)
 
     installer.do_install(client=client, install_dir=tmp_path, runner=runner)
     assert staged_paths[0].endswith(".exe")

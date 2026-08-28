@@ -275,17 +275,6 @@ def update_public_metadata(tag: str, version: str, source_commit: str) -> list[P
     version_doc.write_text(text, encoding="utf-8")
     changed.append(version_doc)
 
-    for relative in ("README.md", "MCP-CONNECT.md"):
-        path = ROOT / relative
-        body = path.read_text(encoding="utf-8")
-        body = re.sub(
-            r"SIMPLICIO_CODEX_HOOK_REF=v[0-9]+\.[0-9]+\.[0-9]+",
-            "SIMPLICIO_CODEX_HOOK_REF=" + tag,
-            body,
-        )
-        path.write_text(body, encoding="utf-8")
-        changed.append(path)
-
     for relative in (
         "npm/simplicio/package.json",
         "npm/simplicio-installer/package.json",

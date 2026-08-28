@@ -7,8 +7,9 @@
 > histórico e roadmap Host-8/Asolaria. Para instalar o produto atual, prevalecem
 > INSTALL.md, MCP-CONNECT.md, distribution/targets.json e
 > simplicio-update-manifest.json. A release pública é um binário único por
-> target; o instalador verifica SHA256 + Ed25519, exige login Google para MCP,
-> e só configura Codex quando SIMPLICIO_INSTALL_CODEX=1.
+> target; o instalador verifica SHA256 + Ed25519 e registra automaticamente os
+> clientes MCP detectados. O login Google continua obrigatório ao usar recursos
+> protegidos do Runtime, mas não bloqueia a configuração inicial.
 
 ---
 
