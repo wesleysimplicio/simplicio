@@ -2,6 +2,7 @@ export type AccessState = "signed_out" | "inactive" | "active" | "unknown";
 
 export type ProviderState =
   | "connected"
+  | "registered"
   | "detected"
   | "needs_attention"
   | "not_installed";
