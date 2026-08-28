@@ -11,6 +11,7 @@ import { AccessGate, LoadingScreen, SignInScreen } from "./screens/AccessScreens
 import { HomeScreen } from "./screens/HomeScreen";
 import { ProvidersScreen } from "./screens/ProvidersScreen";
 import { SecondaryScreen } from "./screens/SecondaryScreen";
+import { MemoryScreen } from "./screens/MemoryScreen";
 
 function initialView(): View {
   if (typeof window === "undefined") return "home";
@@ -122,7 +123,8 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       {view === "providers" && (
         <ProvidersScreen snapshot={snapshot} busy={action === "refresh"} onRefresh={refresh} />
       )}
-      {view !== "home" && view !== "providers" && <SecondaryScreen view={view} snapshot={snapshot} />}
+      {view === "memory" && <MemoryScreen snapshot={snapshot} />}
+      {view !== "home" && view !== "providers" && view !== "memory" && <SecondaryScreen view={view} snapshot={snapshot} />}
     </Shell>
   );
 }
