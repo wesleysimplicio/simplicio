@@ -170,3 +170,24 @@ def test_unverified_deepseek_harness_fails_closed_without_mutation(tmp_path: Pat
         "backup": None,
     }]
     assert not home.exists()
+
+
+def test_opencode_contract_registers_documented_user_config(tmp_path: Path) -> None:
+    spec = next(item for item in HOSTS if item.host_id == "opencode")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    _command(bin_dir / "opencode")
+    home = tmp_path / "home"
+    config = home / ".config/opencode/opencode.json"
+    config.parent.mkdir(parents=True)
+    config.write_text(json.dumps({"provider": "local"}) + "\n", encoding="utf-8")
+
+    result = install_detected_hosts(
+        "/opt/simplicio/bin/simplicio", home=home, cwd=tmp_path,
+        env={"PATH": str(bin_dir)}, specs=(spec,)
+    )
+
+    assert result["failed_hosts"] == []
+    document = json.loads(config.read_text(encoding="utf-8"))
+    assert document["provider"] == "local"
+    assert document["mcpServers"]["simplicio"]["args"] == ["serve", "--mcp", "--stdio"]
