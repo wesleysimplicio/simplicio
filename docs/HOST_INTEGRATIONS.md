@@ -68,6 +68,11 @@ locations (`~/.kiro/settings/mcp.json` and `.kiro/settings/mcp.json`). The
 Runtime performs the idempotent registration and provides the JSON receipt;
 the public installer does not edit Kiro files directly.
 
+Pi and oh-my-pi are separate registry entries and are probed by their exact
+commands, `pi` and `omp`, respectively. Their Runtime registration metadata is
+kept distinct so installing one cannot be used as evidence that the other is
+present; both use the Runtime receipt for verification.
+
 ## Opt-out and scope
 
 Skip every host with a comma-separated list or one host with an environment
