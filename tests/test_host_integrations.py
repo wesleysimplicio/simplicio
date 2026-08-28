@@ -24,6 +24,7 @@ def _command(path: Path) -> None:
 def test_matrix_has_unique_ids_and_all_parent_children() -> None:
     ids = [spec.host_id for spec in HOSTS]
     assert len(ids) == len(set(ids))
+    assert all(spec.minimum_version for spec in HOSTS)
     for expected in {
         "claude-code",
         "cursor",
@@ -53,6 +54,15 @@ def test_detection_uses_exact_executable_and_app_evidence(tmp_path: Path) -> Non
     assert by_id["claude-code"]["executable"].endswith("/claude")
     assert by_id["cursor"]["status"] == "absent"
     assert by_id["deepseek-harness"]["status"] == "unsupported"
+
+
+def test_claude_code_has_runtime_verification_contract() -> None:
+    claude = next(spec for spec in HOSTS if spec.host_id == "claude-code")
+    assert claude.executable_names == ("claude",)
+    assert claude.config_paths == ("~/.claude/settings.json", "~/.claude/.mcp.json")
+    assert claude.capability == "runtime-mcp"
+    assert claude.verification_command[-1] == "--json"
+    assert "<absolute-path>" in claude.verification_command
 
 
 def test_skip_controls_are_explicit_and_do_not_touch_host_files(tmp_path: Path) -> None:
