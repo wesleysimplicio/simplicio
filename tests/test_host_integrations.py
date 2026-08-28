@@ -125,6 +125,15 @@ def test_pi_and_oh_my_pi_use_separate_exact_host_entries() -> None:
     assert pi.verification_command == omp.verification_command
 
 
+def test_orca_uses_portable_cli_verification_without_worktree_mutation() -> None:
+    orca = next(spec for spec in HOSTS if spec.host_id == "orca")
+    assert orca.executable_names == ("orca",)
+    assert orca.capability == "portable-cli"
+    assert orca.contract == "documented-cli"
+    assert orca.verification_command == ("orca", "status", "--json")
+    assert "worktrees" in orca.reason
+
+
 def test_skip_controls_are_explicit_and_do_not_touch_host_files(tmp_path: Path) -> None:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
