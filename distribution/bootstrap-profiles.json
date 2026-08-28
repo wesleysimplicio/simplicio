@@ -1,0 +1,59 @@
+{
+  "schema": "simplicio.bootstrap-profiles/v1",
+  "download_options": [
+    {
+      "id": "recommended-desktop",
+      "label": "Desktop",
+      "recommended": true,
+      "channel": "desktop",
+      "entrypoint": "https://github.com/wesleysimplicio/simplicio-agent/releases/latest",
+      "bootstrap_command": "simplicio bootstrap apply --profile recommended-desktop --auto",
+      "shared_state_profile": "recommended",
+      "component_lock": "shared",
+      "includes": [
+        "runtime",
+        "cli",
+        "daemon-or-sidecar",
+        "neural-database",
+        "skills-index",
+        "managed-integrations",
+        "updater",
+        "rollback-metadata",
+        "uninstall-ledger",
+        "savings-validation-receipts"
+      ],
+      "excludes": []
+    },
+    {
+      "id": "recommended-cli",
+      "label": "CLI only",
+      "recommended": false,
+      "channel": "cli",
+      "entrypoint": "https://pypi.org/project/simplicio/",
+      "bootstrap_command": "simplicio bootstrap apply --profile recommended-cli --auto",
+      "shared_state_profile": "recommended",
+      "component_lock": "shared",
+      "includes": [
+        "runtime",
+        "cli",
+        "neural-database",
+        "skills-index",
+        "managed-integrations",
+        "updater",
+        "rollback-metadata",
+        "uninstall-ledger",
+        "savings-validation-receipts"
+      ],
+      "excludes": ["desktop-shell"]
+    }
+  ],
+  "invariants": {
+    "exactly_two_download_options": true,
+    "desktop_includes_cli": true,
+    "shared_transaction_contract": "simplicio.bootstrap/v1",
+    "shared_component_lock": true,
+    "login_is_the_only_happy_path_consent": true,
+    "no_unverified_download_execution": true,
+    "per_user_by_default": true
+  }
+}
