@@ -28,6 +28,14 @@ CLI path. DeepSeek Harness, Antigravity, Command Code, and the remaining
 compatibility-matrix entries remain explicit `unsupported`/`unverified` until
 their canonical upstream contract is confirmed.
 
+The compatibility matrix contains all 22 remaining names requested by the
+registry issue: Grok, GitHub Copilot, MiMo Code, Amp, OpenClaude, oh-my-pi,
+Hermes Agent, Devin, Goose, Auggie, Autohand Code, Charm/Crush, Cline,
+Codebuff, Command Code, Continue, Droid, Kilocode, Kimi, Mistral Vibe, Qwen
+Code, and Rovo Dev. The existing oh-my-pi adapter is the only row in this set
+with a verified Runtime contract; every other row is explicit
+`unsupported`/`unverified` and has no guessed executable probe.
+
 Claude Code is detected only through the exact `claude` executable. Its
 supported configuration locations are `~/.claude/settings.json` and
 `~/.claude/.mcp.json`; the public installer does not copy Codex-only hooks into
