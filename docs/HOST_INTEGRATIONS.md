@@ -63,6 +63,11 @@ documentation pointer but intentionally supplies no executable probe or
 verification command, so an unrelated binary cannot be reported as a working
 integration.
 
+Kiro uses the exact `kiro-cli` probe and the documented user/workspace MCP
+locations (`~/.kiro/settings/mcp.json` and `.kiro/settings/mcp.json`). The
+Runtime performs the idempotent registration and provides the JSON receipt;
+the public installer does not edit Kiro files directly.
+
 ## Opt-out and scope
 
 Skip every host with a comma-separated list or one host with an environment

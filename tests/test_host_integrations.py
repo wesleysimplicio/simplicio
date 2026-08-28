@@ -107,6 +107,14 @@ def test_antigravity_is_fail_closed_until_public_contract_is_verified() -> None:
     assert antigravity.verification_command == ()
 
 
+def test_kiro_has_runtime_registration_contract() -> None:
+    kiro = next(spec for spec in HOSTS if spec.host_id == "kiro")
+    assert kiro.executable_names == ("kiro-cli",)
+    assert kiro.config_paths == ("~/.kiro/settings/mcp.json", ".kiro/settings/mcp.json")
+    assert kiro.capability == "runtime-mcp"
+    assert kiro.verification_command[:3] == ("simplicio", "mcp", "register")
+
+
 def test_skip_controls_are_explicit_and_do_not_touch_host_files(tmp_path: Path) -> None:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
