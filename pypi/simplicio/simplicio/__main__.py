@@ -21,6 +21,7 @@ from pathlib import Path
 from urllib.request import urlopen
 
 from . import __version__
+from .host_integrations import build_summary, write_summary
 
 INSTALL_DIR = os.path.expanduser("~/.local/bin")
 BINARY_NAME = "simplicio" + (".exe" if platform.system() == "Windows" else "")
@@ -192,7 +193,7 @@ def _validate_runtime(path: Path, expected_version: str, runner=subprocess.run) 
         )
 
 
-def _register_detected_hosts(path: Path, runner=subprocess.run) -> None:
+def _register_detected_hosts(path: Path, runner=subprocess.run) -> dict:
     """Register MCP and Runtime-owned hooks for every detected supported client."""
     try:
         result = runner(
@@ -219,6 +220,20 @@ def _register_detected_hosts(path: Path, runner=subprocess.run) -> None:
         raise InstallError(
             "Runtime installed, but automatic MCP/hooks registration failed" + detail + "."
         )
+    return report
+
+
+def _write_host_integration_summary(binary_path: Path, runtime_report: dict) -> Path:
+    """Persist the redacted multi-host receipt next to the managed binary."""
+    configured = os.environ.get("SIMPLICIO_HOST_SUMMARY")
+    summary_path = Path(configured) if configured else binary_path.parent / "simplicio-host-integrations.json"
+    try:
+        write_summary(summary_path, build_summary(runtime_report=runtime_report))
+    except OSError as exc:
+        raise InstallError(
+            "Runtime registered successfully, but the host integration receipt could not be written."
+        ) from exc
+    return summary_path
 
 def do_install(
     client=None,
@@ -267,7 +282,8 @@ def do_install(
         staged_path.chmod(0o755)
         _validate_runtime(staged_path, expected_version, runner)
         os.replace(str(staged_path), str(destination))
-        _register_detected_hosts(destination, runner)
+        registration = _register_detected_hosts(destination, runner)
+        _write_host_integration_summary(destination, registration)
     except InstallError:
         raise
     except OSError as exc:

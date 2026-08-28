@@ -1,0 +1,55 @@
+# Host integration registry
+
+The public installer distributes one verified Simplicio Runtime. It does not
+copy credentials, download arbitrary editor plugins, or maintain a second MCP
+writer for every host. After the binary is staged and its release contract is
+verified, the installer invokes:
+
+```text
+simplicio mcp register --binary <absolute-path> --json
+```
+
+The Runtime owns the transactional host edits and native hook decisions. The
+launcher records the redacted result in
+`<binary-directory>/simplicio-host-integrations.json`.
+
+## Detection policy
+
+Detection is non-invasive. It checks an exact executable name or a documented
+application path and never starts a host session. A configuration file by
+itself is not enough to mark a host as installed because stale files are common.
+Unknown products have no automatic executable probe until their official
+contract is verified; they are reported as `unsupported` instead of producing
+a false positive.
+
+The current Runtime-delegated entries are Claude Code, Cursor, OpenCode, VS
+Code, Kiro, Pi, and oh-my-pi. Orca is reported through the documented portable
+CLI path. DeepSeek Harness, Antigravity, Command Code, and the remaining
+compatibility-matrix entries remain explicit `unsupported`/`unverified` until
+their canonical upstream contract is confirmed.
+
+## Opt-out and scope
+
+Skip every host with a comma-separated list or one host with an environment
+variable:
+
+```text
+SIMPLICIO_SKIP_HOSTS=cursor,kiro
+SIMPLICIO_SKIP_CURSOR=1
+```
+
+These controls affect detection/registration reporting only; they never remove
+existing user configuration. Re-running the installer is safe and delegates
+idempotent reconciliation to the Runtime.
+
+## Receipt shape
+
+The receipt uses `simplicio.host-integration/v1` and contains the Runtime
+registration status, one row for every matrix entry, exact detected evidence,
+the capability (`runtime-mcp`, `portable-cli`, or `unsupported`), and the
+primary documentation URL. It contains no tokens or provider credentials and
+is written atomically with mode `0600`.
+
+The receipt is evidence of what the installer observed; a host is marked
+`registered` only when the Runtime JSON result names it as registered. File
+presence alone is never promoted to a successful integration.
