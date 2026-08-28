@@ -80,7 +80,10 @@ def _scope_path(spec: HostSpec, *, scope: str, home: Path, cwd: Path) -> Path | 
 def _load_json(path: Path) -> tuple[dict[str, Any], bytes, str | None]:
     if not path.exists():
         return {}, b"", None
-    raw = path.read_bytes()
+    try:
+        raw = path.read_bytes()
+    except OSError:
+        return {}, b"", "unreadable_config"
     try:
         value = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -92,7 +95,12 @@ def _load_json(path: Path) -> tuple[dict[str, Any], bytes, str | None]:
 
 def _merge_mcp(document: dict[str, Any], binary: str) -> tuple[dict[str, Any], str]:
     result = json.loads(json.dumps(document, ensure_ascii=False))
-    key = "mcpServers" if isinstance(result.get("mcpServers"), dict) else "servers"
+    if isinstance(result.get("mcpServers"), dict):
+        key = "mcpServers"
+    elif isinstance(result.get("servers"), dict):
+        key = "servers"
+    else:
+        key = "mcpServers"
     servers = result.setdefault(key, {})
     if not isinstance(servers, dict):
         raise ValueError("MCP server collection must be an object")
