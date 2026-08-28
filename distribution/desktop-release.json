@@ -1,0 +1,21 @@
+{
+  "schema": "simplicio.desktop-release/v1",
+  "artifact_policy": {
+    "signed": true,
+    "checksum": "SHA256",
+    "provenance": "required",
+    "sbom": "required"
+  },
+  "update_policy": {
+    "verify_before_install": true,
+    "stage_before_swap": true,
+    "rollback_on_start_failure": true,
+    "retain_previous": 1
+  },
+  "e2e_requirements": [
+    "manifest signature verifies",
+    "component lock matches staged files",
+    "fresh sidecar starts",
+    "failed start restores previous sidecar"
+  ]
+}
