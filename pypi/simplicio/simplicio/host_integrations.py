@@ -145,14 +145,14 @@ HOSTS: Tuple[HostSpec, ...] = (
         "pi",
         "Pi",
         ("pi",),
-        ("~/.pi/agent",),
+        ("~/.pi/agent/mcp.json",),
         "https://pi.dev/",
     ),
     _runtime_mcp(
         "oh-my-pi",
         "oh-my-pi",
         ("omp",),
-        ("~/.omp",),
+        ("~/.omp/mcp.json",),
         "https://omp.sh/",
     ),
     HostSpec(

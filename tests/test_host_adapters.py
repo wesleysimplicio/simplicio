@@ -250,3 +250,29 @@ def test_kiro_contract_is_atomic_and_idempotent(tmp_path: Path) -> None:
     assert first["failed_hosts"] == []
     assert second["results"][0]["reason_code"] == "already_registered"
     assert json.loads(config.read_text())["enabled"] is True
+
+
+def test_pi_and_oh_my_pi_use_separate_exact_executables_and_configs(tmp_path: Path) -> None:
+    pi = next(item for item in HOSTS if item.host_id == "pi")
+    omp = next(item for item in HOSTS if item.host_id == "oh-my-pi")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    _command(bin_dir / "pi")
+    _command(bin_dir / "omp")
+    home = tmp_path / "home"
+
+    pi_result = install_detected_hosts(
+        "/opt/simplicio/bin/simplicio", home=home, cwd=tmp_path,
+        env={"PATH": str(bin_dir)}, specs=(pi,)
+    )
+    omp_result = install_detected_hosts(
+        "/opt/simplicio/bin/simplicio", home=home, cwd=tmp_path,
+        env={"PATH": str(bin_dir)}, specs=(omp,)
+    )
+
+    assert pi_result["failed_hosts"] == []
+    assert omp_result["failed_hosts"] == []
+    assert (home / ".pi/agent/mcp.json").is_file()
+    assert (home / ".omp/mcp.json").is_file()
+    assert json.loads((home / ".pi/agent/mcp.json").read_text())["mcpServers"]["simplicio"]
+    assert json.loads((home / ".omp/mcp.json").read_text())["mcpServers"]["simplicio"]
