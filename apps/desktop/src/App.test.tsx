@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { DesktopApp } from "./App";
 import { createDemoSnapshot } from "./demo";
+import { MemoryScreen } from "./screens/MemoryScreen";
 
 describe("Simplicio Desktop product states", () => {
   it("offers browser login when there is no identity", () => {
@@ -59,5 +60,13 @@ describe("Simplicio Desktop product states", () => {
     const html = renderToStaticMarkup(<DesktopApp snapshot={snapshot} />);
     expect(html).toContain("sem telemetria");
     expect(html).not.toContain("0% telemetria do provider");
+  });
+
+  it("renders bounded memory metadata without exposing the map", () => {
+    const html = renderToStaticMarkup(<MemoryScreen snapshot={createDemoSnapshot("active")} />);
+    expect(html).toContain("Pronto para reutilizar");
+    expect(html).toContain("preview-20260828");
+    expect(html).toContain("Entrega protegida por recibo");
+    expect(html).not.toContain("repo_map");
   });
 });
