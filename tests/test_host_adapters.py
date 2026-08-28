@@ -288,3 +288,18 @@ def test_orca_portable_contract_is_verification_only() -> None:
         "mutates_worktree": False,
         "reads_credentials": False,
     }
+
+
+def test_command_code_contract_requires_an_official_contract(tmp_path: Path) -> None:
+    spec = next(item for item in HOSTS if item.host_id == "command-code")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    _command(bin_dir / "command-code")
+    home = tmp_path / "home"
+    result = install_detected_hosts(
+        "/opt/simplicio/bin/simplicio", home=home, cwd=tmp_path,
+        env={"PATH": str(bin_dir)}, specs=(spec,)
+    )
+    assert result["results"][0]["status"] == "unsupported"
+    assert result["results"][0]["reason_code"] == "unsupported"
+    assert not home.exists()
