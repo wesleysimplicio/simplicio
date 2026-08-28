@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import type { DesktopSnapshot } from "./contracts";
-import { loadDesktopSnapshot } from "./bridge";
+import {
+  beginDesktopLogin,
+  loadDesktopSnapshot,
+  openDesktopSubscription,
+  refreshDesktopSnapshot,
+} from "./bridge";
 import { Shell, type View } from "./components/Shell";
 import { AccessGate, LoadingScreen, SignInScreen } from "./screens/AccessScreens";
 import { HomeScreen } from "./screens/HomeScreen";
@@ -25,6 +30,8 @@ function initialView(): View {
 export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSnapshot }) {
   const [snapshot, setSnapshot] = useState<DesktopSnapshot | undefined>(initialSnapshot);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [action, setAction] = useState<"login" | "refresh" | "subscribe" | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [view, setView] = useState<View>(initialView);
 
   useEffect(() => {
@@ -42,21 +49,79 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
     };
   }, [initialSnapshot]);
 
+  async function refresh() {
+    setAction("refresh");
+    setActionError(null);
+    try {
+      setSnapshot(await refreshDesktopSnapshot());
+      setLoadFailed(false);
+    } catch {
+      setActionError("Não foi possível atualizar o Runtime.");
+    } finally {
+      setAction(null);
+    }
+  }
+
+  async function login() {
+    setAction("login");
+    setActionError(null);
+    try {
+      setSnapshot(await beginDesktopLogin());
+      setLoadFailed(false);
+    } catch {
+      setActionError("O login não foi concluído.");
+    } finally {
+      setAction(null);
+    }
+  }
+
+  async function subscribe() {
+    setAction("subscribe");
+    setActionError(null);
+    try {
+      await openDesktopSubscription();
+    } catch {
+      setActionError("Não foi possível abrir os planos.");
+    } finally {
+      setAction(null);
+    }
+  }
+
   if (!snapshot && !loadFailed) return <LoadingScreen />;
 
   if (loadFailed) {
-    return <AccessGate state="unknown" />;
+    return <AccessGate state="unknown" busy={action !== null} error={actionError} onRefresh={refresh} />;
   }
 
-  if (!snapshot || snapshot.access.state === "signed_out") return <SignInScreen />;
+  if (!snapshot || snapshot.access.state === "signed_out") {
+    return <SignInScreen busy={action === "login"} error={actionError} onLogin={login} />;
+  }
   if (snapshot.access.state === "inactive" || snapshot.access.state === "unknown") {
-    return <AccessGate state={snapshot.access.state} email={snapshot.access.email} />;
+    return (
+      <AccessGate
+        state={snapshot.access.state}
+        email={snapshot.access.email}
+        busy={action !== null}
+        error={actionError}
+        onRefresh={refresh}
+        onSubscribe={subscribe}
+      />
+    );
   }
 
   return (
     <Shell snapshot={snapshot} view={view} onViewChange={setView}>
-      {view === "home" && <HomeScreen snapshot={snapshot} onProviders={() => setView("providers")} />}
-      {view === "providers" && <ProvidersScreen snapshot={snapshot} />}
+      {view === "home" && (
+        <HomeScreen
+          snapshot={snapshot}
+          busy={action === "refresh"}
+          onProviders={() => setView("providers")}
+          onRefresh={refresh}
+        />
+      )}
+      {view === "providers" && (
+        <ProvidersScreen snapshot={snapshot} busy={action === "refresh"} onRefresh={refresh} />
+      )}
       {view !== "home" && view !== "providers" && <SecondaryScreen view={view} snapshot={snapshot} />}
     </Shell>
   );

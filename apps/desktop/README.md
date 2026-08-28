@@ -25,6 +25,9 @@ is always labelled in the UI and is never used by the packaged app.
 
 ## Validation
 
+Validation is intentionally local; this repository does not depend on GitHub
+Actions for the Desktop build or its Runtime contract.
+
 ```bash
 npm test
 npm run build
