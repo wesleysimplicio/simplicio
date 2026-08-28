@@ -29,7 +29,12 @@ export async function loadDesktopSnapshot(): Promise<DesktopSnapshot> {
 
 export async function beginDesktopLogin(): Promise<DesktopSnapshot> {
   if (!isTauri()) return createDemoSnapshot("active");
-  return invoke<DesktopSnapshot>("desktop_login");
+  return withTimeout(invoke<DesktopSnapshot>("desktop_login"), 120_000, "Tempo limite do login excedido.");
+}
+
+export async function logoutDesktop(): Promise<DesktopSnapshot> {
+  if (!isTauri()) return createDemoSnapshot("signed_out");
+  return invoke<DesktopSnapshot>("desktop_logout");
 }
 
 export async function refreshDesktopSnapshot(): Promise<DesktopSnapshot> {
@@ -43,4 +48,20 @@ export async function openDesktopSubscription(): Promise<void> {
     return;
   }
   await invoke("desktop_open_subscription");
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }

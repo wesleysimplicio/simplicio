@@ -9,6 +9,7 @@ const SNAPSHOT_SCHEMA: &str = "simplicio.desktop-snapshot/v1";
 const MAX_SNAPSHOT_BYTES: usize = 65_536;
 const SNAPSHOT_ARGS: &[&str] = &["desktop", "snapshot", "--json"];
 const LOGIN_ARGS: &[&str] = &["desktop", "login"];
+const LOGOUT_ARGS: &[&str] = &["logout", "--json"];
 const SUBSCRIPTION_ARGS: &[&str] = &["desktop", "subscribe", "--json"];
 const STATUS_ARGS: &[&str] = &["desktop", "status", "--json"];
 
@@ -173,6 +174,16 @@ async fn desktop_login() -> Result<Value, String> {
 }
 
 #[tauri::command]
+async fn desktop_logout() -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        run_runtime_action(LOGOUT_ARGS)?;
+        snapshot_from_runtime()
+    })
+    .await
+    .map_err(|_| "Falha interna durante o logout".to_string())?
+}
+
+#[tauri::command]
 async fn desktop_open_subscription() -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(|| run_runtime_action(SUBSCRIPTION_ARGS))
         .await
@@ -193,6 +204,7 @@ pub fn run() {
             desktop_snapshot,
             refresh_desktop_snapshot,
             desktop_login,
+            desktop_logout,
             desktop_open_subscription,
             runtime_status
         ])
@@ -251,6 +263,7 @@ mod tests {
     fn bridge_exposes_only_fixed_runtime_arguments() {
         assert_eq!(SNAPSHOT_ARGS, ["desktop", "snapshot", "--json"]);
         assert_eq!(LOGIN_ARGS, ["desktop", "login"]);
+        assert_eq!(LOGOUT_ARGS, ["logout", "--json"]);
         assert_eq!(SUBSCRIPTION_ARGS, ["desktop", "subscribe", "--json"]);
         assert_eq!(STATUS_ARGS, ["desktop", "status", "--json"]);
     }

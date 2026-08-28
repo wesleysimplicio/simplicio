@@ -3,6 +3,7 @@ import type { DesktopSnapshot } from "./contracts";
 import {
   beginDesktopLogin,
   loadDesktopSnapshot,
+  logoutDesktop,
   openDesktopSubscription,
   refreshDesktopSnapshot,
 } from "./bridge";
@@ -33,7 +34,7 @@ function initialView(): View {
 export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSnapshot }) {
   const [snapshot, setSnapshot] = useState<DesktopSnapshot | undefined>(initialSnapshot);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [action, setAction] = useState<"login" | "refresh" | "subscribe" | null>(null);
+  const [action, setAction] = useState<"login" | "logout" | "refresh" | "subscribe" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [view, setView] = useState<View>(initialView);
 
@@ -90,6 +91,19 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
     }
   }
 
+  async function logout() {
+    setAction("logout");
+    setActionError(null);
+    try {
+      setSnapshot(await logoutDesktop());
+      setView("home");
+    } catch {
+      setActionError("Não foi possível sair com segurança.");
+    } finally {
+      setAction(null);
+    }
+  }
+
   if (!snapshot && !loadFailed) return <LoadingScreen />;
 
   if (loadFailed) {
@@ -127,7 +141,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       )}
       {view === "memory" && <MemoryScreen snapshot={snapshot} />}
       {view === "settings" && (
-        <SettingsScreen snapshot={snapshot} busy={action === "refresh"} onRefresh={refresh} onSubscribe={subscribe} />
+        <SettingsScreen snapshot={snapshot} busy={action === "refresh"} onRefresh={refresh} onSubscribe={subscribe} onLogout={logout} logoutBusy={action === "logout"} />
       )}
       {view === "activity" && <ActivityScreen snapshot={snapshot} />}
       {view !== "home" && view !== "providers" && view !== "memory" && view !== "settings" && view !== "activity" && <SecondaryScreen view={view} snapshot={snapshot} />}

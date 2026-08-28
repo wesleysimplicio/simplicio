@@ -74,11 +74,12 @@ describe("Simplicio Desktop product states", () => {
 
   it("offers account diagnostics and a redacted export", () => {
     const snapshot = createDemoSnapshot("active");
-    const html = renderToStaticMarkup(<SettingsScreen snapshot={snapshot} busy={false} onRefresh={() => undefined} onSubscribe={() => undefined} />);
+    const html = renderToStaticMarkup(<SettingsScreen snapshot={snapshot} busy={false} onRefresh={() => undefined} onSubscribe={() => undefined} onLogout={() => undefined} logoutBusy={false} />);
     const diagnostic = redactedDiagnostic(snapshot);
     expect(html).toContain("Gerenciar plano");
     expect(html).toContain("Exportar diagnóstico");
     expect(html).toContain("Atualizar estado");
+    expect(html).toContain("Sair da conta");
     expect(JSON.stringify(diagnostic)).not.toContain("voce@example.com");
     expect(JSON.stringify(diagnostic)).not.toContain("sonnet");
   });
