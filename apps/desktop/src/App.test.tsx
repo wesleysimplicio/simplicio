@@ -38,4 +38,14 @@ describe("Simplicio Desktop product states", () => {
     expect(html).toContain("Providers");
     expect(html).toContain("Demonstração");
   });
+
+  it("does not invent cost or cache metrics without evidence", () => {
+    const snapshot = createDemoSnapshot("active");
+    snapshot.savings.estimatedUsd = null;
+    snapshot.savings.providerCache.hitPercent = null;
+    snapshot.savings.providerCache.proofKind = "unavailable";
+    const html = renderToStaticMarkup(<DesktopApp snapshot={snapshot} />);
+    expect(html).toContain("sem telemetria");
+    expect(html).not.toContain("0% telemetria do provider");
+  });
 });

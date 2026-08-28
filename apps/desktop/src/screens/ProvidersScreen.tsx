@@ -30,17 +30,23 @@ function ProviderCard({ provider }: { provider: ProviderConnection }) {
       <div className="provider-tags">
         <span>{provider.protocol}</span>
         <span>{provider.kind === "agent" ? "Agente" : "Editor"}</span>
-        {provider.version && <span>v{provider.version}</span>}
       </div>
-      {provider.account && <p className="provider-account">{provider.account}</p>}
-      <button className="provider-action" type="button">
+      <span className="provider-action provider-action-static">
         {actionCopy[provider.state]} <Glyph name="arrow" size={16} />
-      </button>
+      </span>
     </article>
   );
 }
 
-export function ProvidersScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
+export function ProvidersScreen({
+  snapshot,
+  busy,
+  onRefresh,
+}: {
+  snapshot: DesktopSnapshot;
+  busy: boolean;
+  onRefresh: () => void;
+}) {
   const [filter, setFilter] = useState<"all" | "ready" | "available">("all");
   const ordered = useMemo(() => {
     const rank: Record<ProviderState, number> = { connected: 0, needs_attention: 1, detected: 2, not_installed: 3 };
@@ -65,7 +71,9 @@ export function ProvidersScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
           <h1>Providers</h1>
           <p>{connected} conectados · {detected} detectados</p>
         </div>
-        <button className="button button-primary" type="button"><Glyph name="refresh" size={17} /> Verificar</button>
+        <button className="button button-primary" type="button" onClick={onRefresh} disabled={busy}>
+          <Glyph name="refresh" size={17} /> {busy ? "Verificando…" : "Verificar"}
+        </button>
       </section>
 
       <section className="provider-summary" aria-label="Resumo das conexões">

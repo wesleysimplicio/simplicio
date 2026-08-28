@@ -4,8 +4,33 @@ import { Glyph } from "../components/Brand";
 const number = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "USD" });
 
-export function HomeScreen({ snapshot, onProviders }: { snapshot: DesktopSnapshot; onProviders: () => void }) {
+export function HomeScreen({
+  snapshot,
+  busy,
+  onProviders,
+  onRefresh,
+}: {
+  snapshot: DesktopSnapshot;
+  busy: boolean;
+  onProviders: () => void;
+  onRefresh: () => void;
+}) {
   const connected = snapshot.providers.filter((provider) => provider.state === "connected");
+  const savingsAvailable = snapshot.savings.proofKind !== "unavailable";
+  const savingsProof = snapshot.savings.proofKind === "measured"
+    ? "Medido"
+    : snapshot.savings.proofKind === "replayed"
+      ? "Reproduzido"
+      : snapshot.savings.proofKind === "unavailable"
+        ? "Indisponível"
+        : "Estimado";
+  const monthPercent = Math.min(100, Math.max(0, snapshot.savings.monthPercent));
+  const estimatedCost = snapshot.savings.estimatedUsd === null
+    ? "—"
+    : `≈ ${money.format(snapshot.savings.estimatedUsd)}`;
+  const cacheHit = snapshot.savings.providerCache.hitPercent === null
+    ? "—"
+    : `${number.format(snapshot.savings.providerCache.hitPercent)}%`;
 
   return (
     <div className="page home-page">
@@ -15,8 +40,8 @@ export function HomeScreen({ snapshot, onProviders }: { snapshot: DesktopSnapsho
           <h1>Hoje você <em>economizou.</em></h1>
           <p>Runtime ativo · {connected.length} providers conectados</p>
         </div>
-        <button className="button button-secondary" type="button">
-          <Glyph name="refresh" size={17} /> Atualizar
+        <button className="button button-secondary" type="button" onClick={onRefresh} disabled={busy}>
+          <Glyph name="refresh" size={17} /> {busy ? "Atualizando…" : "Atualizar"}
         </button>
       </section>
 
@@ -24,34 +49,34 @@ export function HomeScreen({ snapshot, onProviders }: { snapshot: DesktopSnapsho
         <article className="metric-card metric-primary">
           <div className="metric-topline">
             <span>Tokens poupados</span>
-            <span className="verified-pill"><Glyph name="check" size={14} /> Verificado</span>
+            <span className="verified-pill"><Glyph name={savingsAvailable ? "check" : "refresh"} size={14} /> {savingsProof}</span>
           </div>
           <div className="metric-value-row">
-            <strong>{number.format(snapshot.savings.monthTokens / 1_000_000)}M</strong>
+            <strong>{savingsAvailable ? `${number.format(snapshot.savings.monthTokens / 1_000_000)}M` : "—"}</strong>
             <div className="metric-unit"><span>tokens</span><small>este mês</small></div>
           </div>
           <div className="metric-footer">
-            <div className="metric-bar"><span style={{ width: `${snapshot.savings.monthPercent}%` }} /></div>
-            <b>{number.format(snapshot.savings.monthPercent)}%</b>
+            <div className="metric-bar"><span style={{ width: `${monthPercent}%` }} /></div>
+            <b>{savingsAvailable ? `${number.format(snapshot.savings.monthPercent)}%` : "—"}</b>
             <span>menos contexto</span>
           </div>
-          <div className="metric-corner">≈ {money.format(snapshot.savings.estimatedUsd)}</div>
+          <div className="metric-corner">{estimatedCost}</div>
         </article>
 
         <article className="metric-card compact-metric">
           <div className="metric-icon"><Glyph name="spark" /></div>
-          <span>Cache hit</span>
-          <strong>{number.format(snapshot.savings.cacheHitPercent)}%</strong>
-          <p>contexto reutilizado</p>
-          <small className="metric-trend">+8,1%</small>
+          <span>Cache da LLM</span>
+          <strong>{cacheHit}</strong>
+          <p>telemetria do provider</p>
+          <small className="metric-trend">{snapshot.savings.providerCache.proofKind === "measured" ? "medido" : "sem telemetria"}</small>
         </article>
 
         <article className="metric-card compact-metric">
           <div className="metric-icon"><Glyph name="shield" /></div>
           <span>CPU-first</span>
-          <strong>{snapshot.savings.deterministicRuns}</strong>
+          <strong>{snapshot.savings.decisionCache.proofKind === "measured" ? snapshot.savings.decisionCache.runs : "—"}</strong>
           <p>execuções</p>
-          <small className="metric-trend">com recibo</small>
+          <small className="metric-trend">{snapshot.savings.decisionCache.proofKind === "measured" ? "com recibo" : "sem recibo"}</small>
         </article>
 
         <article className="metric-card compact-metric providers-metric">
@@ -75,6 +100,7 @@ export function HomeScreen({ snapshot, onProviders }: { snapshot: DesktopSnapsho
             <button className="text-button" type="button">Ver relatório <Glyph name="arrow" size={16} /></button>
           </div>
           <div className="activity-list">
+            {snapshot.activity.length === 0 && <div className="empty-state">Sem atividade verificada.</div>}
             {snapshot.activity.map((item) => (
               <div className="activity-row" key={item.id}>
                 <span className={`activity-status ${item.status}`}>
@@ -100,7 +126,7 @@ export function HomeScreen({ snapshot, onProviders }: { snapshot: DesktopSnapsho
               <span className="eyebrow">Local</span>
               <h2>Runtime</h2>
             </div>
-            <span className="healthy-badge"><span className="status-dot online" /> saudável</span>
+            <span className="healthy-badge"><span className={`status-dot ${snapshot.runtime.state === "healthy" ? "online" : "offline"}`} /> {snapshot.runtime.state}</span>
           </div>
           <div className="runtime-radar" aria-hidden="true">
             <span className="radar-ring ring-a" />
@@ -111,7 +137,8 @@ export function HomeScreen({ snapshot, onProviders }: { snapshot: DesktopSnapsho
           <dl className="runtime-facts">
             <div><dt>Transporte</dt><dd>{snapshot.runtime.transport}</dd></div>
             <div><dt>Versão</dt><dd>v{snapshot.runtime.version}</dd></div>
-            <div><dt>Último recibo</dt><dd>{snapshot.runtime.lastReceiptAt}</dd></div>
+            <div><dt>Último recibo</dt><dd>{snapshot.runtime.lastReceiptAt ?? "—"}</dd></div>
+            <div><dt>Mapa local</dt><dd>{snapshot.savings.mapCache.status}</dd></div>
           </dl>
           <button className="button button-secondary button-wide" type="button">Abrir diagnóstico</button>
         </aside>

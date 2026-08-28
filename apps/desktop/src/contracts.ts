@@ -12,17 +12,31 @@ export interface ProductAccess {
   state: AccessState;
   identityKnown: boolean;
   entitlementKnown: boolean;
-  displayName?: string;
-  email?: string;
-  plan?: string;
-  renewsAt?: string;
+  reasonCode: string;
+  checkedAt: string;
+  expiresAt: string | null;
+  displayName: string | null;
+  email: string | null;
+  plan: string | null;
 }
 
 export interface RuntimeStatus {
   state: "healthy" | "starting" | "degraded" | "offline";
-  version?: string;
+  version: string;
   transport: "sidecar" | "daemon" | "unavailable";
-  lastReceiptAt?: string;
+  lastReceiptAt: string | null;
+  deterministic: {
+    ready: boolean;
+    cpuFirst: true;
+    mapper: "canonical";
+    mapCache: "generation_scoped";
+    hookContext: "receipt_only";
+  };
+  optionalFast: {
+    required: false;
+    hookInjected: false;
+    status: "not_required";
+  };
 }
 
 export interface ProviderConnection {
@@ -33,16 +47,41 @@ export interface ProviderConnection {
   tier: ProviderTier;
   state: ProviderState;
   detail: string;
-  account?: string;
-  version?: string;
+  installState: "installed" | "absent";
+  registrationState: "registered" | "unregistered";
+  handshakeState: "live" | "stale" | "unverified";
+  freshness: "current" | "stale" | "unknown";
+  reasonCode: string;
+  availableActions: Array<"register" | "verify" | "repair">;
 }
 
 export interface SavingsSummary {
   monthTokens: number;
   monthPercent: number;
-  estimatedUsd: number;
-  cacheHitPercent: number;
-  deterministicRuns: number;
+  estimatedUsd: number | null;
+  proofKind: "measured" | "estimated" | "replayed" | "mixed" | "unavailable";
+  ledgerStatus: "valid" | "unavailable";
+  eventCount: number;
+  providerCache: {
+    status: "hit" | "miss" | "mixed" | "unknown";
+    hitPercent: number | null;
+    proofKind: "measured" | "unavailable";
+    telemetrySource: string | null;
+  };
+  decisionCache: {
+    hitPercent: number | null;
+    runs: number;
+    proofKind: "measured" | "unavailable";
+    hits: number;
+  };
+  mapCache: {
+    status: "ready" | "warming" | "invalid" | "unavailable";
+    delivery: "receipt_only";
+    generation: string | null;
+    digest: string | null;
+    bytes: number | null;
+    fastInHooks: false;
+  };
 }
 
 export interface ActivityItem {
@@ -64,4 +103,29 @@ export interface DesktopSnapshot {
   savings: SavingsSummary;
   providers: ProviderConnection[];
   activity: ActivityItem[];
+  actions: Array<{
+    id: "login" | "subscribe" | "refresh_access" | "repair_providers";
+    governed: true;
+    executed: false;
+  }>;
+  freshness: {
+    access: string;
+    runtime: string;
+    savings: string;
+    providers: string;
+  };
+  redaction: {
+    personalPaths: true;
+    configurationBodies: true;
+    credentials: true;
+    prompts: true;
+    skillBodies: true;
+    rawLedgers: true;
+  };
+  limits: {
+    maxBytes: 65536;
+    maxProviders: 32;
+    maxActivity: 5;
+  };
+  snapshotDigest: string;
 }

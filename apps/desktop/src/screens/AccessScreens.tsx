@@ -13,7 +13,15 @@ export function LoadingScreen() {
   );
 }
 
-export function SignInScreen() {
+export function SignInScreen({
+  busy,
+  error,
+  onLogin,
+}: {
+  busy: boolean;
+  error: string | null;
+  onLogin: () => void;
+}) {
   return (
     <div className="access-layout">
       <section className="access-story">
@@ -34,7 +42,7 @@ export function SignInScreen() {
           </article>
           <article>
             <span>✓</span>
-            <strong>Providers conectados</strong>
+            <strong>Providers verificáveis</strong>
           </article>
         </div>
       </section>
@@ -45,11 +53,12 @@ export function SignInScreen() {
           <span className="eyebrow">Bem-vindo</span>
           <h2 id="login-title">Entre no Simplicio</h2>
           <p>Use sua conta SimpleTI.</p>
-          <button className="button button-primary button-wide" type="button">
+          <button className="button button-primary button-wide" type="button" onClick={onLogin} disabled={busy}>
             <span className="google-mark">G</span>
-            Continuar com Google
+            {busy ? "Abrindo login…" : "Continuar com Google"}
             <Glyph name="arrow" />
           </button>
+          {error && <p className="action-error" role="alert">{error}</p>}
           <div className="access-divider"><span>incluído</span></div>
           <ul className="access-checklist">
             <li><Glyph name="check" size={17} /> Assinatura verificada</li>
@@ -88,7 +97,21 @@ const accessContent: Record<Exclude<AccessState, "signed_out" | "active">, {
   },
 };
 
-export function AccessGate({ state, email }: { state: "inactive" | "unknown"; email?: string }) {
+export function AccessGate({
+  state,
+  email,
+  busy,
+  error,
+  onRefresh,
+  onSubscribe,
+}: {
+  state: "inactive" | "unknown";
+  email?: string | null;
+  busy: boolean;
+  error: string | null;
+  onRefresh: () => void;
+  onSubscribe?: () => void;
+}) {
   const content = accessContent[state];
   return (
     <div className="locked-layout">
@@ -107,9 +130,21 @@ export function AccessGate({ state, email }: { state: "inactive" | "unknown"; em
         <h1>{content.title}</h1>
         <p>{content.description}</p>
         <div className="locked-actions">
-          <button className="button button-primary" type="button">{content.primary}<Glyph name="arrow" /></button>
-          <button className="button button-secondary" type="button">{content.secondary}</button>
+          <button
+            className="button button-primary"
+            type="button"
+            onClick={state === "inactive" ? onSubscribe : onRefresh}
+            disabled={busy}
+          >
+            {busy ? "Aguarde…" : content.primary}<Glyph name="arrow" />
+          </button>
+          {state === "inactive" && (
+            <button className="button button-secondary" type="button" onClick={onRefresh} disabled={busy}>
+              {content.secondary}
+            </button>
+          )}
         </div>
+        {error && <p className="action-error" role="alert">{error}</p>}
         <div className="locked-safe-actions">
           <span><Glyph name="shield" size={17} /> Sempre disponíveis</span>
           <strong>Conta · cobrança · diagnóstico</strong>
