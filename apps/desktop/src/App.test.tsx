@@ -39,6 +39,18 @@ describe("Simplicio Desktop product states", () => {
     expect(html).toContain("Demonstração");
   });
 
+  it("exposes the complete v1 shell only after active access", () => {
+    const html = renderToStaticMarkup(
+      <DesktopApp snapshot={createDemoSnapshot("active")} />,
+    );
+    expect(html).toContain("Início");
+    expect(html).toContain("Providers");
+    expect(html).toContain("Atividade");
+    expect(html).toContain("Memória");
+    expect(html).toContain("Configurações");
+    expect(html).toContain("v3.8.36");
+  });
+
   it("does not invent cost or cache metrics without evidence", () => {
     const snapshot = createDemoSnapshot("active");
     snapshot.savings.estimatedUsd = null;
