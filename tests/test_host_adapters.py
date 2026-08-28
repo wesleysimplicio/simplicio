@@ -116,3 +116,28 @@ def test_claude_code_contract_uses_exact_probe_and_user_scope(tmp_path: Path) ->
     document = json.loads(config.read_text(encoding="utf-8"))
     assert document["mcpServers"]["simplicio"]["command"] == "/opt/simplicio/bin/simplicio"
     assert not (home / ".claude" / "settings.json.simplicio.bak").is_symlink()
+
+
+def test_cursor_contract_selects_requested_user_or_workspace_scope(tmp_path: Path) -> None:
+    spec = next(item for item in HOSTS if item.host_id == "cursor")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    _command(bin_dir / "cursor")
+    home = tmp_path / "home"
+    workspace = tmp_path / "workspace"
+    (home / ".cursor").mkdir(parents=True)
+    (workspace / ".cursor").mkdir(parents=True)
+
+    user = install_detected_hosts(
+        "/opt/simplicio/bin/simplicio", home=home, cwd=workspace,
+        env={"PATH": str(bin_dir)}, scope="user", specs=(spec,)
+    )
+    workspace_result = install_detected_hosts(
+        "/opt/simplicio/bin/simplicio", home=home, cwd=workspace,
+        env={"PATH": str(bin_dir)}, scope="workspace", specs=(spec,)
+    )
+
+    assert user["failed_hosts"] == []
+    assert workspace_result["failed_hosts"] == []
+    assert json.loads((home / ".cursor/mcp.json").read_text())["mcpServers"]["simplicio"]
+    assert json.loads((workspace / ".cursor/mcp.json").read_text())["mcpServers"]["simplicio"]
