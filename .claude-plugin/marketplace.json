@@ -25,6 +25,12 @@
       "source": "./plugins/simplicio-sprint",
       "category": "development",
       "description": "SendSprint intake and delivery skill for Jira, Azure DevOps, and GitHub sprint-to-draft-PR workflows."
+    },
+    {
+      "name": "simplicio-hermes",
+      "source": "./plugins/simplicio-hermes",
+      "category": "development",
+      "description": "Native Hermes middleware adapter for deterministic Runtime preparation and provider receipts."
     }
   ]
 }
