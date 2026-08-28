@@ -226,3 +226,27 @@ def test_unverified_antigravity_is_reported_without_guessing_a_binary(tmp_path: 
 
     assert result["results"][0]["status"] == "unsupported"
     assert result["results"][0]["reason_code"] == "unsupported"
+
+
+def test_kiro_contract_is_atomic_and_idempotent(tmp_path: Path) -> None:
+    spec = next(item for item in HOSTS if item.host_id == "kiro")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    _command(bin_dir / "kiro-cli")
+    home = tmp_path / "home"
+    config = home / ".kiro/settings/mcp.json"
+    config.parent.mkdir(parents=True)
+    config.write_text(json.dumps({"enabled": True}) + "\n", encoding="utf-8")
+
+    first = install_detected_hosts(
+        "/opt/simplicio/bin/simplicio", home=home, cwd=tmp_path,
+        env={"PATH": str(bin_dir)}, specs=(spec,)
+    )
+    second = install_detected_hosts(
+        "/opt/simplicio/bin/simplicio", home=home, cwd=tmp_path,
+        env={"PATH": str(bin_dir)}, specs=(spec,)
+    )
+
+    assert first["failed_hosts"] == []
+    assert second["results"][0]["reason_code"] == "already_registered"
+    assert json.loads(config.read_text())["enabled"] is True
