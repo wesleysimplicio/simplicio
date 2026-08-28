@@ -90,6 +90,15 @@ def test_opencode_has_runtime_registration_contract() -> None:
     assert opencode.default_scope == "user"
 
 
+def test_vscode_declares_all_supported_configuration_scopes() -> None:
+    vscode = next(spec for spec in HOSTS if spec.host_id == "vscode")
+    assert vscode.executable_names == ("code", "code-insiders")
+    assert vscode.scopes == ("user", "workspace", "remote")
+    assert vscode.default_scope == "user"
+    assert vscode.config_paths == ("~/.vscode/mcp.json", ".vscode/mcp.json")
+    assert vscode.verification_command[-1] == "--json"
+
+
 def test_skip_controls_are_explicit_and_do_not_touch_host_files(tmp_path: Path) -> None:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
