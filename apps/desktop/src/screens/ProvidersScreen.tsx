@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import type { DesktopSnapshot, ProviderConnection, ProviderState } from "../contracts";
 import { Glyph } from "../components/Brand";
+import { providerRegistry } from "../provider_registry";
 
 const stateCopy: Record<ProviderState, string> = {
   connected: "Conectado",
+  registered: "Registrado",
   detected: "Detectado",
   needs_attention: "Requer atenção",
   not_installed: "Não instalado",
@@ -11,6 +13,7 @@ const stateCopy: Record<ProviderState, string> = {
 
 const actionCopy: Record<ProviderState, string> = {
   connected: "Ver detalhes",
+  registered: "Verificar",
   detected: "Conectar",
   needs_attention: "Corrigir conexão",
   not_installed: "Como instalar",
@@ -49,19 +52,18 @@ export function ProvidersScreen({
 }) {
   const [filter, setFilter] = useState<"all" | "ready" | "available">("all");
   const ordered = useMemo(() => {
-    const rank: Record<ProviderState, number> = { connected: 0, needs_attention: 1, detected: 2, not_installed: 3 };
-    return [...snapshot.providers]
+    return providerRegistry(snapshot.providers)
       .filter((provider) => {
         if (filter === "ready") return provider.state === "connected" || provider.state === "needs_attention";
-        if (filter === "available") return provider.state === "detected" || provider.state === "not_installed";
+        if (filter === "available") return provider.state === "registered" || provider.state === "detected" || provider.state === "not_installed";
         return true;
       })
-      .sort((a, b) => rank[a.state] - rank[b.state]);
   }, [filter, snapshot.providers]);
 
-  const connected = snapshot.providers.filter((provider) => provider.state === "connected").length;
-  const detected = snapshot.providers.filter((provider) => provider.state === "detected").length;
-  const attention = snapshot.providers.filter((provider) => provider.state === "needs_attention").length;
+  const canonical = providerRegistry(snapshot.providers);
+  const connected = canonical.filter((provider) => provider.state === "connected").length;
+  const detected = canonical.filter((provider) => provider.state === "detected" || provider.state === "registered").length;
+  const attention = canonical.filter((provider) => provider.state === "needs_attention").length;
 
   return (
     <div className="page providers-page">
@@ -85,14 +87,14 @@ export function ProvidersScreen({
 
       <div className="provider-toolbar">
         <div className="segmented-control" role="group" aria-label="Filtrar providers">
-          <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")} type="button">Todos</button>
-          <button className={filter === "ready" ? "active" : ""} onClick={() => setFilter("ready")} type="button">Em uso</button>
-          <button className={filter === "available" ? "active" : ""} onClick={() => setFilter("available")} type="button">Disponíveis</button>
+          <button aria-pressed={filter === "all"} className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")} type="button">Todos</button>
+          <button aria-pressed={filter === "ready"} className={filter === "ready" ? "active" : ""} onClick={() => setFilter("ready")} type="button">Em uso</button>
+          <button aria-pressed={filter === "available"} className={filter === "available" ? "active" : ""} onClick={() => setFilter("available")} type="button">Disponíveis</button>
         </div>
         <span className="provider-count">{ordered.length} providers</span>
       </div>
 
-      <section className="provider-grid">
+      <section className="provider-grid" aria-label="Lista de providers">
         {ordered.map((provider) => <ProviderCard provider={provider} key={provider.id} />)}
       </section>
 
