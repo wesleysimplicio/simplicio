@@ -146,6 +146,14 @@ def test_compatibility_matrix_covers_every_requested_remaining_host() -> None:
         assert spec.executable_names == ()
 
 
+def test_command_code_is_fail_closed_until_official_contract_is_confirmed() -> None:
+    command_code = next(spec for spec in HOSTS if spec.host_id == "command-code")
+    assert command_code.executable_names == ()
+    assert command_code.capability == "unsupported"
+    assert command_code.contract == "unverified"
+    assert command_code.verification_command == ()
+
+
 def test_skip_controls_are_explicit_and_do_not_touch_host_files(tmp_path: Path) -> None:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()

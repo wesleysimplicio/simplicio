@@ -86,6 +86,11 @@ OrcaDev / Orca ADE is represented as a `portable-cli` entry. The exact probe is
 Installer work stays outside project worktrees; host-specific skills and MCP
 behavior remain owned by Orca's documented CLI contract.
 
+Command Code follows the same fail-closed rule as the other unverified rows.
+Until its official executable and plugin/MCP contract are confirmed, the
+registry records the product name and documentation pointer only. It does not
+launch a guessed command or claim that a configuration file proves support.
+
 ## Opt-out and scope
 
 Skip every host with a comma-separated list or one host with an environment
