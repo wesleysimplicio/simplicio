@@ -4,7 +4,7 @@ type DemoProvider = Pick<ProviderConnection, "id" | "name" | "kind" | "protocol"
 
 function demoProvider(provider: DemoProvider): ProviderConnection {
   const installed = provider.state !== "not_installed";
-  const registered = provider.state === "detected" || provider.state === "connected";
+  const registered = provider.state === "connected" || provider.state === "needs_attention";
   return {
     ...provider,
     installState: installed ? "installed" : "absent",
@@ -13,9 +13,11 @@ function demoProvider(provider: DemoProvider): ProviderConnection {
     freshness: "current",
     reasonCode: !installed
       ? "host_not_installed"
-      : registered
-        ? "handshake_not_observed"
-        : "registration_missing_or_drifted",
+      : provider.state === "needs_attention"
+        ? "handshake_failed"
+        : provider.state === "detected"
+          ? "host_detected"
+          : "handshake_not_observed",
     availableActions: !installed ? ["register"] : registered ? ["verify", "repair"] : ["register"],
   };
 }
