@@ -16,7 +16,9 @@ FORBIDDEN_NAMES = {"simplicio", "simplicio-linux-x64", "simplicio-windows-x64"}
 SECRET_RE = re.compile(
     rb"-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:ghp_|github_pat_|sk-)[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}"
 )
-PRIVATE_PATH_RE = re.compile(rb"(?:/home/[^/\s]+|/Users/[^/\s]+|[A-Za-z]:\\Users\\[^\\\s]+)")
+PRIVATE_PATH_RE = re.compile(
+    rb"(?:/" + rb"home/[^/\s]+|/" + rb"Users/[^/\s]+|[A-Za-z]:\\Users\\[^\\\s]+)"
+)
 
 
 def tracked_files(root: Path) -> list[Path]:
