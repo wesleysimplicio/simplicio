@@ -234,6 +234,24 @@ HOSTS = HOSTS + tuple(
 )
 
 
+def compatibility_matrix() -> Tuple[Dict[str, object], ...]:
+    """Expose the complete, redacted host contract table for UIs and CI."""
+
+    return tuple(
+        {
+            "id": spec.host_id,
+            "name": spec.name,
+            "capability": spec.capability,
+            "contract": spec.contract,
+            "executable_names": list(spec.executable_names),
+            "scopes": list(spec.scopes),
+            "verification": list(spec.verification_command),
+            "documentation": spec.documentation,
+        }
+        for spec in HOSTS
+    )
+
+
 def _home_path(value: str, home: Path) -> Path:
     if value.startswith("~/"):
         return home / value[2:]
