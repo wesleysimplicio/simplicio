@@ -4,6 +4,7 @@ import { DesktopApp } from "./App";
 import { createDemoSnapshot } from "./demo";
 import { MemoryScreen } from "./screens/MemoryScreen";
 import { SettingsScreen, redactedDiagnostic } from "./screens/SettingsScreen";
+import { ActivityScreen, redactedActivity } from "./screens/ActivityScreen";
 
 describe("Simplicio Desktop product states", () => {
   it("offers browser login when there is no identity", () => {
@@ -80,5 +81,14 @@ describe("Simplicio Desktop product states", () => {
     expect(html).toContain("Atualizar estado");
     expect(JSON.stringify(diagnostic)).not.toContain("voce@example.com");
     expect(JSON.stringify(diagnostic)).not.toContain("sonnet");
+  });
+
+  it("renders bounded activity receipts and redacts details on export", () => {
+    const snapshot = createDemoSnapshot("active");
+    const html = renderToStaticMarkup(<ActivityScreen snapshot={snapshot} />);
+    expect(html).toContain("Exportar recibos");
+    expect(html).toContain("Todos");
+    expect(html).toContain("máximo 5");
+    expect(redactedActivity(snapshot.activity)[0]).not.toHaveProperty("detail");
   });
 });
