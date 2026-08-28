@@ -3,6 +3,8 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 use std::process::{Command, Output};
 
+mod supervisor;
+
 const SNAPSHOT_SCHEMA: &str = "simplicio.desktop-snapshot/v1";
 const MAX_SNAPSHOT_BYTES: usize = 65_536;
 const SNAPSHOT_ARGS: &[&str] = &["desktop", "snapshot", "--json"];
