@@ -41,6 +41,12 @@ scopes, with user scope as the default. The Runtime receives the selected
 scope and must preserve every unrelated provider, rule, extension, and MCP
 entry when reconciling the managed server.
 
+DeepSeek Harness is intentionally fail-closed. No executable name or
+verification command is registered until the official harness plugin/MCP
+contract is confirmed. It therefore appears as `unsupported`/`unverified`
+instead of treating a similarly named binary or arbitrary configuration file
+as proof of compatibility.
+
 ## Opt-out and scope
 
 Skip every host with a comma-separated list or one host with an environment
