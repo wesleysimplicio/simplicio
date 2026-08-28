@@ -2,13 +2,14 @@ import { useMemo, useState } from "react";
 import type { DesktopSnapshot, ProviderConnection, ProviderState } from "../contracts";
 import { Glyph } from "../components/Brand";
 import { providerRegistry } from "../provider_registry";
+import { t } from "../i18n";
 
 const stateCopy: Record<ProviderState, string> = {
-  connected: "Conectado",
-  registered: "Registrado",
-  detected: "Detectado",
-  needs_attention: "Requer atenção",
-  not_installed: "Não instalado",
+  connected: t("provider.connected"),
+  registered: t("provider.registered"),
+  detected: t("provider.detected"),
+  needs_attention: t("provider.needs_attention"),
+  not_installed: t("provider.not_installed"),
 };
 
 const actionCopy: Record<ProviderState, string> = {
