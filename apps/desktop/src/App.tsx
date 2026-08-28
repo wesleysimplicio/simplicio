@@ -12,6 +12,7 @@ import { HomeScreen } from "./screens/HomeScreen";
 import { ProvidersScreen } from "./screens/ProvidersScreen";
 import { SecondaryScreen } from "./screens/SecondaryScreen";
 import { MemoryScreen } from "./screens/MemoryScreen";
+import { SettingsScreen } from "./screens/SettingsScreen";
 
 function initialView(): View {
   if (typeof window === "undefined") return "home";
@@ -124,7 +125,10 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
         <ProvidersScreen snapshot={snapshot} busy={action === "refresh"} onRefresh={refresh} />
       )}
       {view === "memory" && <MemoryScreen snapshot={snapshot} />}
-      {view !== "home" && view !== "providers" && view !== "memory" && <SecondaryScreen view={view} snapshot={snapshot} />}
+      {view === "settings" && (
+        <SettingsScreen snapshot={snapshot} busy={action === "refresh"} onRefresh={refresh} onSubscribe={subscribe} />
+      )}
+      {view !== "home" && view !== "providers" && view !== "memory" && view !== "settings" && <SecondaryScreen view={view} snapshot={snapshot} />}
     </Shell>
   );
 }

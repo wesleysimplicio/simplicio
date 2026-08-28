@@ -1394,6 +1394,27 @@ p { margin-top: 0; }
 .memory-boundary { margin-top: 18px; padding: 9px; border: 1px solid #c9ddc5; border-radius: 8px; display: flex; align-items: center; gap: 7px; color: var(--green-dark); background: var(--green-pale); font: 8px/1.2 var(--mono); }
 .memory-note { margin: 12px 0 0; color: #999487; font-size: 9px; line-height: 1.45; }
 
+.settings-grid { min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+.settings-card { min-height: 285px; padding: 21px; display: flex; flex-direction: column; }
+.settings-card-heading { display: flex; align-items: center; gap: 10px; }
+.settings-card-heading > .glyph { width: 36px; height: 36px; padding: 8px; border: 1px solid #bfd2b9; border-radius: 9px; color: var(--green-dark); background: var(--green-soft); }
+.settings-card-heading .eyebrow { margin-bottom: 3px; font-size: 8px; }
+.settings-card h2 { margin: 0; font-size: 15px; letter-spacing: -0.02em; }
+.settings-card dl { margin: 18px 0; }
+.settings-card dl > div { padding: 9px 0; border-bottom: 1px solid var(--line-soft); display: flex; justify-content: space-between; gap: 12px; }
+.settings-card dt, .settings-card dd { margin: 0; font: 8px/1.2 var(--mono); }
+.settings-card dt { color: #999487; }
+.settings-card dd { max-width: 180px; overflow: hidden; color: #66675f; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.settings-card > .button { margin-top: auto; }
+.settings-actions { margin-top: auto; display: flex; flex-wrap: wrap; gap: 7px; }
+.settings-actions .button { flex: 1 1 140px; }
+.settings-note { margin: 11px 0 0; color: #999487; font-size: 9px; line-height: 1.4; }
+.settings-safety { margin-top: 11px; padding: 15px 18px; display: flex; align-items: flex-start; gap: 11px; color: var(--green-dark); background: var(--green-pale); }
+.settings-safety > .glyph { flex: 0 0 auto; margin-top: 2px; }
+.settings-safety .eyebrow { margin-bottom: 3px; font-size: 8px; }
+.settings-safety strong { display: block; color: #465447; font-size: 11px; }
+.settings-safety p { margin: 4px 0 0; color: #7f897b; font-size: 9px; line-height: 1.4; }
+
 @media (max-width: 1080px) {
   .metrics-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .metric-primary { grid-column: 1 / -1; }

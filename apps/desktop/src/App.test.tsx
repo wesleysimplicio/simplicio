@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { DesktopApp } from "./App";
 import { createDemoSnapshot } from "./demo";
 import { MemoryScreen } from "./screens/MemoryScreen";
+import { SettingsScreen, redactedDiagnostic } from "./screens/SettingsScreen";
 
 describe("Simplicio Desktop product states", () => {
   it("offers browser login when there is no identity", () => {
@@ -68,5 +69,16 @@ describe("Simplicio Desktop product states", () => {
     expect(html).toContain("preview-20260828");
     expect(html).toContain("Entrega protegida por recibo");
     expect(html).not.toContain("repo_map");
+  });
+
+  it("offers account diagnostics and a redacted export", () => {
+    const snapshot = createDemoSnapshot("active");
+    const html = renderToStaticMarkup(<SettingsScreen snapshot={snapshot} busy={false} onRefresh={() => undefined} onSubscribe={() => undefined} />);
+    const diagnostic = redactedDiagnostic(snapshot);
+    expect(html).toContain("Gerenciar plano");
+    expect(html).toContain("Exportar diagnóstico");
+    expect(html).toContain("Atualizar estado");
+    expect(JSON.stringify(diagnostic)).not.toContain("voce@example.com");
+    expect(JSON.stringify(diagnostic)).not.toContain("sonnet");
   });
 });
