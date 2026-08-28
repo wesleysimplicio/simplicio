@@ -23,6 +23,19 @@
   --warning: #bb7b34;
   --danger: #bd665d;
   --mono: "SFMono-Regular", "IBM Plex Mono", Consolas, monospace;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --radius-sm: 7px;
+  --radius-md: 9px;
+  --radius-lg: 13px;
+  --radius-pill: 999px;
+  --motion-fast: 140ms;
+  --motion-calm: 220ms;
+  --focus-ring: 2px solid var(--green-dark);
+  --target-min: 44px;
   color-scheme: light;
 }
 
@@ -50,7 +63,7 @@ textarea { font: inherit; }
 button { color: inherit; }
 
 button:focus-visible {
-  outline: 2px solid rgba(47, 112, 78, 0.58);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -128,10 +141,10 @@ p { margin-top: 0; }
 .status-dot.offline { background: #aaa492; }
 
 .button {
-  min-height: 36px;
+  min-height: var(--target-min);
   padding: 0 13px;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -139,7 +152,7 @@ p { margin-top: 0; }
   font-size: 12px;
   font-weight: 650;
   cursor: pointer;
-  transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+  transition: background var(--motion-fast) ease, border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
 }
 
 .button-primary {
@@ -168,6 +181,7 @@ p { margin-top: 0; }
 .button-wide { width: 100%; }
 
 .text-button {
+  min-height: 36px;
   padding: 4px 0;
   border: 0;
   display: inline-flex;
@@ -178,6 +192,12 @@ p { margin-top: 0; }
   font-size: 11px;
   font-weight: 650;
   cursor: pointer;
+}
+
+@media (forced-colors: active) {
+  button:focus-visible { outline: 2px solid CanvasText; }
+  .status-dot { forced-color-adjust: none; background: CanvasText; }
+  .nav-item.active, .button-primary { border: 2px solid ButtonText; }
 }
 
 .text-button:hover { color: var(--green-dark); }
