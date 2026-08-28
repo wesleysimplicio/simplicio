@@ -191,3 +191,24 @@ def test_opencode_contract_registers_documented_user_config(tmp_path: Path) -> N
     document = json.loads(config.read_text(encoding="utf-8"))
     assert document["provider"] == "local"
     assert document["mcpServers"]["simplicio"]["args"] == ["serve", "--mcp", "--stdio"]
+
+
+def test_vscode_contract_supports_user_workspace_and_remote_scopes(tmp_path: Path) -> None:
+    spec = next(item for item in HOSTS if item.host_id == "vscode")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    _command(bin_dir / "code")
+    home = tmp_path / "home"
+    workspace = tmp_path / "remote-workspace"
+    (home / ".vscode").mkdir(parents=True)
+    (workspace / ".vscode").mkdir(parents=True)
+
+    for scope in ("user", "workspace", "remote"):
+        result = install_detected_hosts(
+            "/opt/simplicio/bin/simplicio", home=home, cwd=workspace,
+            env={"PATH": str(bin_dir)}, scope=scope, specs=(spec,)
+        )
+        assert result["failed_hosts"] == []
+
+    assert json.loads((home / ".vscode/mcp.json").read_text())["mcpServers"]["simplicio"]
+    assert json.loads((workspace / ".vscode/mcp.json").read_text())["mcpServers"]["simplicio"]
