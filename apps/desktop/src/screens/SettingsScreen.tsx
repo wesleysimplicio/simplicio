@@ -30,11 +30,15 @@ export function SettingsScreen({
   busy,
   onRefresh,
   onSubscribe,
+  onLogout,
+  logoutBusy,
 }: {
   snapshot: DesktopSnapshot;
   busy: boolean;
   onRefresh: () => void;
   onSubscribe: () => void;
+  onLogout: () => void;
+  logoutBusy: boolean;
 }) {
   return (
     <div className="page secondary-page">
@@ -54,6 +58,9 @@ export function SettingsScreen({
             <div><dt>Expiração</dt><dd>{snapshot.access.expiresAt ? new Date(snapshot.access.expiresAt).toLocaleDateString("pt-BR") : "não informada"}</dd></div>
           </dl>
           <button className="button button-secondary button-wide" type="button" onClick={onSubscribe}>Gerenciar plano</button>
+          <button className="button button-secondary button-wide" type="button" onClick={onLogout} disabled={logoutBusy}>
+            {logoutBusy ? "Saindo…" : "Sair da conta"}
+          </button>
         </article>
         <article className="panel settings-card">
           <div className="settings-card-heading"><Glyph name="activity" size={20} /><div><span className="eyebrow">Diagnóstico</span><h2>Estado do Runtime</h2></div></div>
@@ -71,7 +78,7 @@ export function SettingsScreen({
       </section>
       <section className="panel settings-safety">
         <Glyph name="lock" size={18} />
-        <div><span className="eyebrow">Privacidade</span><strong>Dados locais sob controle</strong><p>Para sair da conta ou desinstalar, use o fluxo da aplicação nativa; nenhum token é mantido nesta tela.</p></div>
+        <div><span className="eyebrow">Privacidade</span><strong>Dados locais sob controle</strong><p>O logout revoga a sessão no Runtime e limpa as credenciais locais; nenhum token é mantido nesta tela.</p></div>
       </section>
     </div>
   );
