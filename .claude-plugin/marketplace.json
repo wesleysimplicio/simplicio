@@ -5,9 +5,15 @@
     "email": "wesleybob4@gmail.com"
   },
   "metadata": {
-    "description": "Public Simplicio marketplace: evidence-gated Loop orchestration, Prompt fan-out, and Sprint delivery skills over the Simplicio Runtime MCP."
+    "description": "Public Simplicio marketplace: verified Runtime bootstrap, portable agent plugins, evidence-gated Loop orchestration, Prompt fan-out, and Sprint delivery skills."
   },
   "plugins": [
+    {
+      "name": "simplicio",
+      "source": "./plugins/simplicio",
+      "category": "development",
+      "description": "Verified Runtime MCP bootstrap and governed Simplicio skills for Claude Code."
+    },
     {
       "name": "simplicio-loop",
       "source": "./plugin",

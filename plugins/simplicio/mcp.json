@@ -1,0 +1,11 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "simplicio-runtime": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["./bin/simplicio-mcp-bootstrap.js"],
+      "cwd": "${PLUGIN_ROOT}"
+    }
+  }
+}

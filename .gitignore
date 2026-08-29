@@ -32,6 +32,16 @@ dist/
 simplicio
 simplicio-*
 
+# Public multi-host plugin manifests live inside the intentionally ignored
+# Runtime binary-name directory.
+!plugins/simplicio/
+!plugins/simplicio/plugin.json
+!plugins/simplicio/mcp.json
+!plugins/simplicio/.claude-plugin/
+!plugins/simplicio/.claude-plugin/plugin.json
+!plugins/simplicio/gemini-extension.json
+!plugins/simplicio/host-surfaces.json
+
 # Desktop browser test artifacts
 apps/desktop/test-results/
 apps/desktop/playwright-report/

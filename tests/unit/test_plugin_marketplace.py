@@ -55,6 +55,46 @@ def test_codex_marketplace_packages_simplicio_plugin() -> None:
     assert any((source / "skills").rglob("SKILL.md"))
 
 
+
+def test_portable_agent_plugin_contract() -> None:
+    source = ROOT / "plugins/simplicio"
+    manifest = _load_json("plugins/simplicio/plugin.json")
+    mcp = _load_json("plugins/simplicio/mcp.json")
+
+    assert manifest["$schema"].endswith("/1.0.0/plugin.schema.json")
+    assert manifest["name"] == "simplicio"
+    assert mcp["$schema"].endswith("/1.0.0/mcp.schema.json")
+    server = mcp["mcpServers"]["simplicio-runtime"]
+    assert server["type"] == "stdio"
+    assert server["command"] == "node"
+    assert server["cwd"] == "${PLUGIN_ROOT}"
+    assert (source / server["args"][0].removeprefix("./")).is_file()
+
+
+def test_native_claude_and_gemini_manifests_reuse_the_bootstrap() -> None:
+    claude = _load_json("plugins/simplicio/.claude-plugin/plugin.json")
+    gemini = _load_json("plugins/simplicio/gemini-extension.json")
+
+    assert claude["name"] == gemini["name"] == "simplicio"
+    assert claude["mcpServers"] == "./.mcp.json"
+    args = gemini["mcpServers"]["simplicio-runtime"]["args"]
+    assert args == ["${extensionPath}/bin/simplicio-mcp-bootstrap.js"]
+
+
+def test_host_surface_registry_is_complete_and_honest() -> None:
+    registry = _load_json("plugins/simplicio/host-surfaces.json")
+    hosts = registry["hosts"]
+    ids = {host["id"] for host in hosts}
+
+    assert len(hosts) == len(ids) == 32
+    assert {"claude-code", "codex", "cursor", "github-copilot", "kiro",
+            "qwen-code", "gemini", "opencode", "pi", "orca-dev"} <= ids
+    for host in hosts:
+        assert host["preHooks"] in {"runtime-managed", "host-managed"}
+        if "manifest" in host:
+            assert (ROOT / "plugins/simplicio" / host["manifest"]).is_file()
+
+
 def test_published_adapters_point_to_their_canonical_commands() -> None:
     prompt = _load_json("plugins/simplicio-prompt/.claude-plugin/plugin.json")
     assert prompt["name"] == "simplicio-prompt"
