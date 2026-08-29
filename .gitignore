@@ -31,4 +31,8 @@ dist/
 *.gguf
 simplicio
 simplicio-*
+
+# Desktop browser test artifacts
+apps/desktop/test-results/
+apps/desktop/playwright-report/
 *.exe

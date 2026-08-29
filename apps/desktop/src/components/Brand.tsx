@@ -3,13 +3,7 @@ import type { ReactNode } from "react";
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <div className="brand" aria-label="Simplicio">
-      <svg className="brand-mark" viewBox="0 0 44 44" aria-hidden="true">
-        <path className="brand-mark-shell" d="M22 2.5 39 12v20L22 41.5 5 32V12Z" />
-        <path
-          className="brand-mark-path"
-          d="m29.8 13.6-7.9-4.4-8.2 4.6v8.5l8.2 4.6 4.1-2.3v3.7l-4.1 2.3-8.2-4.6-4.5 2.6 12.7 7.1 12.6-7.1v-8.8l-8.1-4.5-4.5 2.5 4.5 2.5 3.4-1.9v3.8l-7.9 4.4-3.7-2.1v-7.7l3.7-2.1 3.5 1.9Z"
-        />
-      </svg>
+      <img className="brand-mark" src="/icon.png" width="30" height="30" alt="" />
       {!compact && (
         <div className="brand-copy">
           <strong>Simplicio</strong>

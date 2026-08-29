@@ -6,6 +6,7 @@ import {
   logoutDesktop,
   openDesktopSubscription,
   refreshDesktopSnapshot,
+  repairDesktopProviders,
 } from "./bridge";
 import { Shell, type View } from "./components/Shell";
 import { AccessGate, LoadingScreen, SignInScreen } from "./screens/AccessScreens";
@@ -34,7 +35,7 @@ function initialView(): View {
 export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSnapshot }) {
   const [snapshot, setSnapshot] = useState<DesktopSnapshot | undefined>(initialSnapshot);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [action, setAction] = useState<"login" | "logout" | "refresh" | "subscribe" | null>(null);
+  const [action, setAction] = useState<"login" | "logout" | "refresh" | "repair" | "subscribe" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [view, setView] = useState<View>(initialView);
 
@@ -61,6 +62,19 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       setLoadFailed(false);
     } catch {
       setActionError("Não foi possível atualizar o Runtime.");
+    } finally {
+      setAction(null);
+    }
+  }
+
+  async function repairProviders() {
+    setAction("repair");
+    setActionError(null);
+    try {
+      setSnapshot(await repairDesktopProviders());
+      setLoadFailed(false);
+    } catch {
+      setActionError("Não foi possível reparar as integrações com segurança.");
     } finally {
       setAction(null);
     }
@@ -133,11 +147,19 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
           snapshot={snapshot}
           busy={action === "refresh"}
           onProviders={() => setView("providers")}
+          onActivity={() => setView("activity")}
+          onDiagnostics={() => setView("settings")}
           onRefresh={refresh}
         />
       )}
       {view === "providers" && (
-        <ProvidersScreen snapshot={snapshot} busy={action === "refresh"} onRefresh={refresh} />
+        <ProvidersScreen
+          snapshot={snapshot}
+          busy={action === "refresh" || action === "repair"}
+          repairing={action === "repair"}
+          onRefresh={refresh}
+          onRepair={repairProviders}
+        />
       )}
       {view === "memory" && <MemoryScreen snapshot={snapshot} />}
       {view === "settings" && (

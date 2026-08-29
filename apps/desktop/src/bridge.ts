@@ -42,6 +42,15 @@ export async function refreshDesktopSnapshot(): Promise<DesktopSnapshot> {
   return invoke<DesktopSnapshot>("refresh_desktop_snapshot");
 }
 
+export async function repairDesktopProviders(): Promise<DesktopSnapshot> {
+  if (!isTauri()) return createDemoSnapshot(previewState());
+  return withTimeout(
+    invoke<DesktopSnapshot>("desktop_repair_providers"),
+    120_000,
+    "Tempo limite do reparo de integrações excedido.",
+  );
+}
+
 export async function openDesktopSubscription(): Promise<void> {
   if (!isTauri()) {
     window.open("https://simpleti.com.br/simplicio", "_blank", "noopener,noreferrer");

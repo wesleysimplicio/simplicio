@@ -29,6 +29,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "icon": ["icons/icon.icns", "icons/icon.ico", "icons/icon.png"],
     "category": "DeveloperTool",
     "shortDescription": "Controle local do Simplicio Runtime",
     "longDescription": "Login, acesso, economia, memória, diagnósticos e providers do Simplicio Runtime em uma interface nativa."
