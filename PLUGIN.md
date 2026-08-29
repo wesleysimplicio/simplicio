@@ -1,7 +1,9 @@
-# Simplicio public plugin marketplaces
+# Simplicio public plugins and host integrations
 
-This repository publishes installable Codex and Claude Code marketplaces for
-the Simplicio ecosystem.
+This repository publishes one Simplicio package through native Codex and Claude
+Code marketplaces, the portable Agent Plugins v1 contract, and a Gemini CLI
+extension. Hosts without a verified plugin API use the Runtime-owned MCP/config
+integration instead of an invented plugin format.
 
 ## Install in Codex
 
@@ -20,31 +22,51 @@ the user's behalf.
 The Codex package, including its official Simplicio logo, lives at
 [`plugins/simplicio`](plugins/simplicio).
 
+## Install as an Agent Plugin
+
+The portable package at `plugins/simplicio` contains the Agent Plugins v1
+`plugin.json`, `mcp.json`, and shared `skills/`. Cursor, GitHub Copilot,
+Kiro, and Qwen Code can consume this format according to their own install UI or
+CLI.
+
+For a local checkout, select or install:
+
+```text
+./plugins/simplicio
+```
+
+## Install in Gemini CLI
+
+Install the repository checkout's package directory:
+
+```bash
+gemini extensions install ./plugins/simplicio
+```
+
+The native `gemini-extension.json` starts the same verified bootstrap and
+Gemini discovers the bundled skills.
+
 ## Install in Claude Code
 
 In Claude Code:
 
 ```text
 /plugin marketplace add wesleysimplicio/simplicio
+/plugin install simplicio@simplicio
 /plugin install simplicio-loop@simplicio
 /plugin install simplicio-prompt@simplicio
 /plugin install simplicio-sprint@simplicio
 ```
 
-Install the Runtime MCP separately for Claude Code and restart the host:
-
-```bash
-simplicio install --global --dry-run --json
-simplicio install --global --yes --json
-```
-
-The Runtime entrypoint is `simplicio serve --mcp --stdio`.
+The main `simplicio` package bootstraps the verified Runtime automatically.
+The separate `simplicio-loop`, `simplicio-prompt`, and `simplicio-sprint`
+packages remain available for their specialized workflows.
 
 ## Published components
 
 | Plugin | Owns | Source |
 |---|---|---|
-| `simplicio` (Codex) | Verified Runtime bootstrap, complete live MCP surface, all CLI commands through `simplicio_exec`, setup and Runtime skills | This repository |
+| `simplicio` (Codex, Claude, Agent Plugins v1, Gemini) | Verified Runtime bootstrap, complete live MCP surface, shared skills, and Runtime-managed pre-hooks | This repository |
 | `simplicio-loop` | Loop, tasks alias, orient, review, compress, learn, autoresearch, Prism, Mapper, Fast, Dev CLI, Runtime skills and safety hooks | [`simplicio-loop`](https://github.com/wesleysimplicio/simplicio-loop) |
 | `simplicio-prompt` | Tuple-Space/Yool prompt contract, fan-out commands, and opt-in prompt adapter | [`simplicio-prompt`](https://github.com/wesleysimplicio/simplicio-prompt) |
 | `simplicio-sprint` | Sprint intake, mapping, evidence collection, and draft-PR delivery | [`simplicio-sprint`](https://github.com/wesleysimplicio/simplicio-sprint) |

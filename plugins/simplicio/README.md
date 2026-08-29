@@ -1,16 +1,32 @@
-# Simplicio for Codex
+# Simplicio agent plugin
 
 ![Simplicio Runtime](./assets/simplicio-hero.png)
 
-This Codex plugin bootstraps a release-contract-valid Simplicio Runtime, exposes
-its complete live MCP surface, and teaches Codex the governed Simplicio
-workflow.
+This multi-host package preserves the native Codex plugin and adds official
+portable Agent Plugins v1, Claude Code, and Gemini CLI manifests. Every package
+starts the same verified Simplicio Runtime bootstrap, exposes its live MCP
+surface, and ships the same governed Simplicio skills.
+
+## Host packages
+
+| Host family | Entry point | Contract |
+|---|---|---|
+| Codex | `.codex-plugin/plugin.json` | Native Codex plugin |
+| Claude Code | `.claude-plugin/plugin.json` | Native Claude Code plugin |
+| Cursor, GitHub Copilot, Kiro, Qwen Code | `plugin.json` + `mcp.json` | Agent Plugins v1 |
+| Gemini CLI | `gemini-extension.json` | Native Gemini extension |
+| Other CLI/IDE/agent harnesses | Runtime `mcp register` | MCP/config or guided integration |
+
+The package does not pretend every product has the same plugin API. The
+machine-readable `host-surfaces.json` records the supported surface for all 32
+Runtime host contracts. Native pre-hooks remain Runtime-managed so they can be
+installed transactionally, preserve unrelated host configuration, and stay
+version-aligned with the running binary.
 
 ## Automatic Runtime bootstrap
 
-Codex plugins do not have an install-time script event. The bundled MCP server
-therefore performs an idempotent bootstrap when the first new Codex task loads
-the enabled plugin:
+The bundled MCP server performs an idempotent bootstrap when a supported host
+first activates the package:
 
 1. Reuse a valid Simplicio Runtime v3.8.35 or newer when one is already present.
 2. Otherwise download the official installer from an immutable repository
@@ -44,11 +60,10 @@ $HOME/.simplicio/bin/simplicio auth status --json
 
 ## Commands and tools
 
-The plugin does not hard-code a stale command list. Runtime v3.8.35 currently
-advertises 44 MCP tools, and later compatible releases supply their schemas
-dynamically. `simplicio_exec` is the governed supertool for every valid
-Simplicio CLI subcommand; individual CLI commands are not duplicated as 44+
-separate plugin definitions.
+The plugin does not hard-code a stale command list. The Runtime advertises its policy-governed MCP surface dynamically, so plugin
+validation checks required capabilities by name instead of freezing a tool
+count. `simplicio_exec` is the governed supertool for every valid
+Simplicio CLI subcommand; individual CLI commands are not duplicated as separate plugin definitions.
 
 Included skills:
 

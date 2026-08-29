@@ -268,7 +268,7 @@ printf '%s' "$*" > "$SIMPLICIO_TEST_ARGS_FILE"
   }
 });
 
-test("real bootstrap completes an MCP handshake and exposes simplicio_exec", { timeout: 30000 }, async (context) => {
+test("real bootstrap completes an MCP handshake and exposes governed tools", { timeout: 30000 }, async (context) => {
   const installed = bootstrap.findRuntime();
   if (!installed) {
     context.skip("no compatible Runtime is installed for the live handshake");
@@ -342,8 +342,11 @@ test("real bootstrap completes an MCP handshake and exposes simplicio_exec", { t
     })}\n`);
     const listed = await waitFor(2);
     const tools = listed.result.tools;
-    assert.ok(tools.length >= 44, `expected at least 44 tools, got ${tools.length}`);
-    assert.ok(tools.some((tool) => tool.name === "simplicio_exec"));
+    const names = tools.map((tool) => tool.name);
+    assert.ok(names.length > 0, "expected a non-empty governed tool surface");
+    assert.equal(new Set(names).size, names.length, "tool names must be unique");
+    assert.ok(names.includes("simplicio_context"));
+    assert.ok(names.includes("simplicio_edit"));
   } finally {
     child.stdin.end();
     child.kill("SIGTERM");
