@@ -19,8 +19,8 @@
 #   SIMPLICIO_ALLOW_UNVERIFIED  - "1" to proceed even if no checksum is
 #                                 published for this target (default: refuse)
 #   SIMPLICIO_BUNDLE_DIR       - bundle report directory (default: ~/.simplicio)
-#   SIMPLICIO_INSTALL_HOST_PLUGINS - "0" skips detected native host plugins
-#                                    (default: install Codex/Claude/Gemini packages)
+#   SIMPLICIO_INSTALL_HOST_PLUGINS - "0" skips detected host plugins
+#                                    (default: install every compatible package)
 #
 # Asset naming follows distribution/targets.json (the canonical target
 # triplet table for the whole ecosystem): id "macos-arm64" -> asset
@@ -37,6 +37,7 @@ ED25519_PUBLIC_KEY="2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok="
 ED25519_HELPER_URL="https://raw.githubusercontent.com/$REPO/master/scripts/verify_ed25519.py"
 ED25519_HELPER_SHA256="f03a0719dd557ddea27dc4cf1456d6f06a47b9056505e4d4b8453090697600d0"
 BIN_NAME="simplicio"
+MARKETPLACE_PLUGINS="simplicio simplicio-loop simplicio-prompt simplicio-sprint simplicio-hermes"
 
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
@@ -277,6 +278,54 @@ PY
   return 1
 }
 
+install_portable_agent_plugin() {
+  target_dir="$1"
+  host_name="$2"
+  if ! command -v python3 >/dev/null 2>&1; then
+    warn "$host_name detectado, mas Python 3 é necessário para preparar o Agent Plugin"
+    return 1
+  fi
+
+  plugin_tmp="$(mktemp -d)"
+  plugin_zip="$plugin_tmp/simplicio-master.zip"
+  plugin_url="$GITHUB/archive/refs/heads/master.zip"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$plugin_url" -o "$plugin_zip" || { rm -rf "$plugin_tmp"; return 1; }
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q "$plugin_url" -O "$plugin_zip" || { rm -rf "$plugin_tmp"; return 1; }
+  else
+    rm -rf "$plugin_tmp"
+    return 1
+  fi
+
+  plugin_dir="$(python3 - "$plugin_zip" "$plugin_tmp/unpacked" <<'PY'
+import pathlib, sys, zipfile
+archive, destination = sys.argv[1:]
+root = pathlib.Path(destination).resolve()
+root.mkdir(parents=True, exist_ok=True)
+with zipfile.ZipFile(archive) as bundle:
+    for member in bundle.infolist():
+        target = (root / member.filename).resolve()
+        if target != root and root not in target.parents:
+            raise SystemExit("unsafe plugin archive path")
+    bundle.extractall(root)
+matches = list(root.glob("*/plugins/simplicio/plugin.json"))
+if len(matches) != 1:
+    raise SystemExit("Agent Plugin manifest not found exactly once")
+print(matches[0].parent)
+PY
+)" || { rm -rf "$plugin_tmp"; return 1; }
+
+  mkdir -p "$target_dir" || { rm -rf "$plugin_tmp"; return 1; }
+  if cp -R "$plugin_dir/." "$target_dir/"; then
+    rm -rf "$plugin_tmp"
+    ok "Agent Plugin do Simplicio instalado para $host_name"
+    return 0
+  fi
+  rm -rf "$plugin_tmp"
+  return 1
+}
+
 install_detected_host_plugins() {
   if [ "${SIMPLICIO_INSTALL_HOST_PLUGINS:-1}" = "0" ]; then
     info "instalação de plugins nativos ignorada por SIMPLICIO_INSTALL_HOST_PLUGINS=0"
@@ -299,12 +348,14 @@ install_detected_host_plugins() {
   if command -v claude >/dev/null 2>&1; then
     detected=$((detected + 1))
     claude plugin marketplace add "$REPO" >/dev/null 2>&1 || true
-    if claude plugin install simplicio@simplicio --scope user >/dev/null 2>&1; then
-      ok "plugin nativo do Claude Code instalado"
-    else
-      warn "Claude Code detectado, mas o plugin simplicio@simplicio não pôde ser instalado"
-      failures=$((failures + 1))
-    fi
+    for plugin_name in $MARKETPLACE_PLUGINS; do
+      if claude plugin install "$plugin_name@simplicio" --scope user >/dev/null 2>&1; then
+        ok "plugin $plugin_name instalado no Claude Code"
+      else
+        warn "Claude Code detectado, mas $plugin_name@simplicio não pôde ser instalado"
+        failures=$((failures + 1))
+      fi
+    done
   fi
 
   if command -v gemini >/dev/null 2>&1; then
@@ -315,8 +366,68 @@ install_detected_host_plugins() {
     fi
   fi
 
+  if command -v copilot >/dev/null 2>&1; then
+    detected=$((detected + 1))
+    copilot plugin marketplace add "$REPO" >/dev/null 2>&1 || true
+    for plugin_name in $MARKETPLACE_PLUGINS; do
+      if copilot plugin install "$plugin_name@simplicio" >/dev/null 2>&1; then
+        ok "plugin $plugin_name instalado no GitHub Copilot CLI"
+      else
+        warn "GitHub Copilot CLI detectado, mas $plugin_name@simplicio não pôde ser instalado"
+        failures=$((failures + 1))
+      fi
+    done
+  fi
+
+  if command -v qwen >/dev/null 2>&1; then
+    detected=$((detected + 1))
+    for plugin_name in $MARKETPLACE_PLUGINS; do
+      if qwen extensions install "$REPO:$plugin_name" >/dev/null 2>&1; then
+        ok "extensão $plugin_name instalada no Qwen Code"
+      else
+        warn "Qwen Code detectado, mas $plugin_name não pôde ser instalado"
+        failures=$((failures + 1))
+      fi
+    done
+  fi
+
+  if command -v hermes >/dev/null 2>&1; then
+    detected=$((detected + 1))
+    if hermes plugins install "$REPO/plugins/simplicio-hermes" --force --enable >/dev/null 2>&1 &&
+       hermes plugins doctor simplicio-hermes --ci >/dev/null 2>&1; then
+      ok "plugin simplicio-hermes instalado, habilitado e validado"
+    else
+      warn "Hermes detectado, mas o plugin simplicio-hermes não pôde ser instalado e habilitado"
+      failures=$((failures + 1))
+    fi
+  fi
+
+  cursor_detected=0
+  if command -v cursor >/dev/null 2>&1 || command -v cursor-agent >/dev/null 2>&1 ||
+     [ -d "$HOME/.cursor" ] || [ -d "$HOME/Library/Application Support/Cursor" ]; then
+    cursor_detected=1
+  fi
+  if [ "$cursor_detected" -eq 1 ]; then
+    detected=$((detected + 1))
+    if ! install_portable_agent_plugin "$HOME/.cursor/plugins/local/simplicio" "Cursor"; then
+      failures=$((failures + 1))
+    fi
+  fi
+
+  kiro_detected=0
+  if command -v kiro >/dev/null 2>&1 || command -v kiro-cli >/dev/null 2>&1 ||
+     [ -d "$HOME/.kiro" ] || [ -d "/Applications/Kiro.app" ]; then
+    kiro_detected=1
+  fi
+  if [ "$kiro_detected" -eq 1 ]; then
+    detected=$((detected + 1))
+    if ! install_portable_agent_plugin "$HOME/.kiro/powers/simplicio" "Kiro"; then
+      failures=$((failures + 1))
+    fi
+  fi
+
   if [ "$detected" -eq 0 ]; then
-    info "nenhum host com pacote nativo detectado; o registro MCP cobre os demais clientes"
+    info "nenhum host com pacote de plugin compatível detectado; o registro MCP cobre os demais clientes"
   fi
   [ "$failures" -eq 0 ]
 }
@@ -629,13 +740,14 @@ else
   err "o Runtime foi instalado, mas o registro automático de MCP/hooks falhou: $DEST_PATH mcp register --binary $DEST_PATH --json"
 fi
 
-# Native packages add skills, commands and host-specific lifecycle behavior on
-# top of the Runtime MCP registration. Only hosts with a documented installer
-# contract are attempted; every other detected client stays on MCP/hooks.
+# Host packages add skills, commands and host-specific lifecycle behavior on
+# top of Runtime MCP registration. Every detected host with a documented
+# package surface is installed automatically; MCP remains the compatibility
+# path for clients without a package API.
 if install_detected_host_plugins; then
   ok "plugins nativos reconciliados para os hosts detectados"
 else
-  warn "Runtime/MCP estão prontos, mas um ou mais plugins nativos exigem ação manual; consulte PLUGIN.md"
+  err "Runtime/MCP estão prontos, mas a instalação automática de um ou mais plugins detectados falhou; consulte PLUGIN.md"
 fi
 report_login_state
 ok "MCP direto: $DEST_PATH serve --mcp --stdio; SIMPLICIO_MCP_URL=${SIMPLICIO_MCP_URL}"

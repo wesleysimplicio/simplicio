@@ -16,8 +16,8 @@
 #   SIMPLICIO_ALLOW_UNVERIFIED  - "1" to proceed even if no checksum is
 #                                 published for this target (default: refuse)
 #   SIMPLICIO_BUNDLE_DIR       - Runtime report directory (default: ~/.simplicio)
-#   SIMPLICIO_INSTALL_HOST_PLUGINS - "0" skips detected native host plugins
-#                                    (default: install Codex/Claude/Gemini packages)
+#   SIMPLICIO_INSTALL_HOST_PLUGINS - "0" skips detected host plugins
+#                                    (default: install every compatible package)
 #
 # Asset naming follows distribution/targets.json (the canonical target
 # triplet table for the whole ecosystem) — target "windows-x64", asset
@@ -37,6 +37,7 @@ $ErrorActionPreference = "Stop"
 
 $Repo = "wesleysimplicio/simplicio"
 $BinName = "simplicio.exe"
+$MarketplacePlugins = @("simplicio", "simplicio-loop", "simplicio-prompt", "simplicio-sprint", "simplicio-hermes")
 $Target = "windows-x64"
 $Asset = "simplicio-windows-x64.exe"
 $Ed25519PublicKey = "2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok="
@@ -208,6 +209,39 @@ function Invoke-NativeHostCommand([string]$Command, [string[]]$Arguments) {
   }
 }
 
+function Test-AnyPath([string[]]$Paths) {
+  foreach ($path in $Paths) {
+    if (-not [string]::IsNullOrWhiteSpace($path) -and (Test-Path $path)) { return $true }
+  }
+  return $false
+}
+
+function Install-PortableAgentPlugin([string]$TargetDir, [string]$HostName) {
+  $tempRoot = Join-Path ([IO.Path]::GetTempPath()) ("simplicio-agent-plugin-" + [guid]::NewGuid().ToString("N"))
+  $archive = Join-Path $tempRoot "simplicio-master.zip"
+  $unpacked = Join-Path $tempRoot "unpacked"
+  try {
+    New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+    Invoke-WebRequest -Uri "https://github.com/$Repo/archive/refs/heads/master.zip" -OutFile $archive -UseBasicParsing
+    Expand-Archive -Path $archive -DestinationPath $unpacked -Force
+    $manifest = Get-ChildItem -Path $unpacked -Recurse -File -Filter "plugin.json" |
+      Where-Object { $_.FullName -match "[\\/]plugins[\\/]simplicio[\\/]plugin\.json$" } |
+      Select-Object -First 1
+    if ($null -eq $manifest) { return $false }
+    New-Item -ItemType Directory -Force -Path $TargetDir | Out-Null
+    Get-ChildItem -Force -Path $manifest.DirectoryName | Copy-Item -Destination $TargetDir -Recurse -Force
+    if (-not (Test-Path (Join-Path $TargetDir "plugin.json"))) { return $false }
+    Write-Host "  ✓ Simplicio Agent Plugin installed for $HostName"
+    return $true
+  } catch {
+    return $false
+  } finally {
+    if (Test-Path $tempRoot) {
+      Remove-Item -Recurse -Force $tempRoot -ErrorAction SilentlyContinue
+    }
+  }
+}
+
 function Install-GeminiExtension {
   $installedManifest = Join-Path $env:USERPROFILE ".gemini\extensions\simplicio\gemini-extension.json"
   if (Test-Path $installedManifest) {
@@ -262,11 +296,13 @@ function Install-DetectedHostPlugins {
   if (Get-Command claude -CommandType Application -ErrorAction SilentlyContinue) {
     $detected += 1
     [void](Invoke-NativeHostCommand "claude" @("plugin", "marketplace", "add", $Repo))
-    if (Invoke-NativeHostCommand "claude" @("plugin", "install", "simplicio@simplicio", "--scope", "user")) {
-      Write-Host "  ✓ Claude Code native plugin installed"
-    } else {
-      Write-Warning "Claude Code detected, but simplicio@simplicio could not be installed"
-      $failures += 1
+    foreach ($pluginName in $MarketplacePlugins) {
+      if (Invoke-NativeHostCommand "claude" @("plugin", "install", "$pluginName@simplicio", "--scope", "user")) {
+        Write-Host "  ✓ plugin $pluginName installed in Claude Code"
+      } else {
+        Write-Warning "Claude Code detected, but $pluginName@simplicio could not be installed"
+        $failures += 1
+      }
     }
   }
 
@@ -278,8 +314,76 @@ function Install-DetectedHostPlugins {
     }
   }
 
+  if (Get-Command copilot -CommandType Application -ErrorAction SilentlyContinue) {
+    $detected += 1
+    [void](Invoke-NativeHostCommand "copilot" @("plugin", "marketplace", "add", $Repo))
+    foreach ($pluginName in $MarketplacePlugins) {
+      if (Invoke-NativeHostCommand "copilot" @("plugin", "install", "$pluginName@simplicio")) {
+        Write-Host "  ✓ plugin $pluginName installed in GitHub Copilot CLI"
+      } else {
+        Write-Warning "GitHub Copilot CLI detected, but $pluginName@simplicio could not be installed"
+        $failures += 1
+      }
+    }
+  }
+
+  if (Get-Command qwen -CommandType Application -ErrorAction SilentlyContinue) {
+    $detected += 1
+    foreach ($pluginName in $MarketplacePlugins) {
+      if (Invoke-NativeHostCommand "qwen" @("extensions", "install", "${Repo}:$pluginName")) {
+        Write-Host "  ✓ extension $pluginName installed in Qwen Code"
+      } else {
+        Write-Warning "Qwen Code detected, but $pluginName could not be installed"
+        $failures += 1
+      }
+    }
+  }
+
+  if (Get-Command hermes -CommandType Application -ErrorAction SilentlyContinue) {
+    $detected += 1
+    $installed = Invoke-NativeHostCommand "hermes" @("plugins", "install", "$Repo/plugins/simplicio-hermes", "--force", "--enable")
+    $valid = $installed -and (Invoke-NativeHostCommand "hermes" @("plugins", "doctor", "simplicio-hermes", "--ci"))
+    if ($valid) {
+      Write-Host "  ✓ simplicio-hermes plugin installed, enabled, and validated"
+    } else {
+      Write-Warning "Hermes detected, but simplicio-hermes could not be installed and enabled"
+      $failures += 1
+    }
+  }
+
+  $cursorPaths = @(
+    (Join-Path $env:USERPROFILE ".cursor"),
+    $(if ($env:APPDATA) { Join-Path $env:APPDATA "Cursor" } else { "" }),
+    $(if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA "Programs\cursor" } else { "" })
+  )
+  $cursorDetected = [bool](
+    (Get-Command cursor -ErrorAction SilentlyContinue) -or
+    (Get-Command cursor-agent -ErrorAction SilentlyContinue) -or
+    (Test-AnyPath $cursorPaths)
+  )
+  if ($cursorDetected) {
+    $detected += 1
+    $target = Join-Path $env:USERPROFILE ".cursor\plugins\local\simplicio"
+    if (-not (Install-PortableAgentPlugin $target "Cursor")) { $failures += 1 }
+  }
+
+  $kiroPaths = @(
+    (Join-Path $env:USERPROFILE ".kiro"),
+    $(if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA "Programs\Kiro" } else { "" })
+  )
+  $kiroDetected = [bool](
+    (Get-Command kiro -ErrorAction SilentlyContinue) -or
+    (Get-Command kiro-cli -ErrorAction SilentlyContinue) -or
+    (Test-AnyPath $kiroPaths)
+  )
+  if ($kiroDetected) {
+    $detected += 1
+    $target = Join-Path $env:USERPROFILE ".kiro\powers\simplicio"
+    if (-not (Install-PortableAgentPlugin $target "Kiro")) { $failures += 1 }
+  }
+
   if ($detected -eq 0) {
-    Write-Host "  - no native-package host detected; Runtime MCP registration covers the other clients"
+    Write-Host "  - no compatible plugin-package host detected; Runtime MCP registration covers the other clients"
   }
   return ($failures -eq 0)
 }
@@ -550,13 +654,15 @@ if (Test-McpToolSurface $DestPath) {
   exit 1
 }
 
-# Native packages add skills, commands and host-specific lifecycle behavior on
-# top of Runtime MCP registration. Unsupported/undocumented host installers are
-# never guessed; those clients remain on the verified MCP/hooks path.
+# Host packages add skills, commands and host-specific lifecycle behavior on
+# top of Runtime MCP registration. Every detected host with a documented
+# package surface is installed automatically; MCP remains the compatibility
+# path for clients without a package API.
 if (Install-DetectedHostPlugins) {
   Write-Host "  ✓ native plugins reconciled for detected hosts"
 } else {
-  Write-Warning "Runtime/MCP are ready, but one or more native plugins need manual action; see PLUGIN.md"
+  Write-Error "Runtime/MCP are ready, but automatic installation of one or more detected plugins failed; see PLUGIN.md"
+  exit 1
 }
 Report-LoginState
 Write-Host "  ✓ Direct MCP: $DestPath serve --mcp --stdio; SIMPLICIO_MCP_URL=$SimplicioMcpUrl"

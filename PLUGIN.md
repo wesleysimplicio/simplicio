@@ -5,6 +5,12 @@ Code marketplaces, the portable Agent Plugins v1 contract, and a Gemini CLI
 extension. Hosts without a verified plugin API use the Runtime-owned MCP/config
 integration instead of an invented plugin format.
 
+The official `install.sh` and `install.ps1` detect installed hosts and install
+every compatible published package automatically. Claude Code, GitHub Copilot
+CLI, and Qwen Code receive all five marketplace plugins; Codex and Gemini
+receive their native package; Cursor and Kiro receive the portable Agent Plugin;
+and Hermes receives and enables the native `simplicio-hermes` plugin.
+
 ## Install in Codex
 
 ```bash
@@ -56,6 +62,7 @@ In Claude Code:
 /plugin install simplicio-loop@simplicio
 /plugin install simplicio-prompt@simplicio
 /plugin install simplicio-sprint@simplicio
+/plugin install simplicio-hermes@simplicio
 ```
 
 The main `simplicio` package bootstraps the verified Runtime automatically.
@@ -70,6 +77,7 @@ packages remain available for their specialized workflows.
 | `simplicio-loop` | Loop, tasks alias, orient, review, compress, learn, autoresearch, Prism, Mapper, Fast, Dev CLI, Runtime skills and safety hooks | [`simplicio-loop`](https://github.com/wesleysimplicio/simplicio-loop) |
 | `simplicio-prompt` | Tuple-Space/Yool prompt contract, fan-out commands, and opt-in prompt adapter | [`simplicio-prompt`](https://github.com/wesleysimplicio/simplicio-prompt) |
 | `simplicio-sprint` | Sprint intake, mapping, evidence collection, and draft-PR delivery | [`simplicio-sprint`](https://github.com/wesleysimplicio/simplicio-sprint) |
+| `simplicio-hermes` | Native `pre_llm_call` context preparation and post-call Runtime receipts for Hermes Agent | This repository |
 
 The Loop plugin is the default integration. Prompt and Sprint remain separate
 installable plugins so their hooks and commands do not create duplicate runtime

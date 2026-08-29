@@ -403,6 +403,7 @@ This public repository also publishes the Simplicio Claude Code marketplace:
 /plugin install simplicio-loop@simplicio
 /plugin install simplicio-prompt@simplicio
 /plugin install simplicio-sprint@simplicio
+/plugin install simplicio-hermes@simplicio
 ```
 
 The plugin bundle is documented in [`PLUGIN.md`](PLUGIN.md). These are optional
