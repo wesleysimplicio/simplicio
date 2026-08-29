@@ -16,6 +16,8 @@
 #   SIMPLICIO_ALLOW_UNVERIFIED  - "1" to proceed even if no checksum is
 #                                 published for this target (default: refuse)
 #   SIMPLICIO_BUNDLE_DIR       - Runtime report directory (default: ~/.simplicio)
+#   SIMPLICIO_INSTALL_HOST_PLUGINS - "0" skips detected native host plugins
+#                                    (default: install Codex/Claude/Gemini packages)
 #
 # Asset naming follows distribution/targets.json (the canonical target
 # triplet table for the whole ecosystem) — target "windows-x64", asset
@@ -195,6 +197,91 @@ function Test-McpToolSurface([string]$BinaryPath) {
   } catch {
     return $false
   }
+}
+
+function Invoke-NativeHostCommand([string]$Command, [string[]]$Arguments) {
+  try {
+    & $Command @Arguments *> $null
+    return ($LASTEXITCODE -eq 0)
+  } catch {
+    return $false
+  }
+}
+
+function Install-GeminiExtension {
+  $installedManifest = Join-Path $env:USERPROFILE ".gemini\extensions\simplicio\gemini-extension.json"
+  if (Test-Path $installedManifest) {
+    Write-Host "  ✓ Gemini CLI native extension already installed"
+    return $true
+  }
+
+  $tempRoot = Join-Path ([IO.Path]::GetTempPath()) ("simplicio-plugin-" + [guid]::NewGuid().ToString("N"))
+  $archive = Join-Path $tempRoot "simplicio-master.zip"
+  $unpacked = Join-Path $tempRoot "unpacked"
+  try {
+    New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+    Invoke-WebRequest -Uri "https://github.com/$Repo/archive/refs/heads/master.zip" -OutFile $archive -UseBasicParsing
+    Expand-Archive -Path $archive -DestinationPath $unpacked -Force
+    $manifest = Get-ChildItem -Path $unpacked -Recurse -File -Filter "gemini-extension.json" |
+      Where-Object { $_.FullName -match "[\\/]plugins[\\/]simplicio[\\/]gemini-extension\.json$" } |
+      Select-Object -First 1
+    if ($null -eq $manifest) { return $false }
+    if (Invoke-NativeHostCommand "gemini" @("extensions", "install", $manifest.DirectoryName, "--consent")) {
+      Write-Host "  ✓ Gemini CLI native extension installed"
+      return $true
+    }
+    return $false
+  } catch {
+    return $false
+  } finally {
+    if (Test-Path $tempRoot) {
+      Remove-Item -Recurse -Force $tempRoot -ErrorAction SilentlyContinue
+    }
+  }
+}
+
+function Install-DetectedHostPlugins {
+  if ($env:SIMPLICIO_INSTALL_HOST_PLUGINS -eq "0") {
+    Write-Host "  - native host plugin installation skipped by SIMPLICIO_INSTALL_HOST_PLUGINS=0"
+    return $true
+  }
+
+  $detected = 0
+  $failures = 0
+  if (Get-Command codex -CommandType Application -ErrorAction SilentlyContinue) {
+    $detected += 1
+    [void](Invoke-NativeHostCommand "codex" @("plugin", "marketplace", "add", $Repo, "--ref", "master"))
+    if (Invoke-NativeHostCommand "codex" @("plugin", "add", "simplicio@simplicio-codex")) {
+      Write-Host "  ✓ Codex native plugin installed"
+    } else {
+      Write-Warning "Codex detected, but simplicio@simplicio-codex could not be installed"
+      $failures += 1
+    }
+  }
+
+  if (Get-Command claude -CommandType Application -ErrorAction SilentlyContinue) {
+    $detected += 1
+    [void](Invoke-NativeHostCommand "claude" @("plugin", "marketplace", "add", $Repo))
+    if (Invoke-NativeHostCommand "claude" @("plugin", "install", "simplicio@simplicio", "--scope", "user")) {
+      Write-Host "  ✓ Claude Code native plugin installed"
+    } else {
+      Write-Warning "Claude Code detected, but simplicio@simplicio could not be installed"
+      $failures += 1
+    }
+  }
+
+  if (Get-Command gemini -CommandType Application -ErrorAction SilentlyContinue) {
+    $detected += 1
+    if (-not (Install-GeminiExtension)) {
+      Write-Warning "Gemini CLI detected, but the Simplicio native extension could not be installed"
+      $failures += 1
+    }
+  }
+
+  if ($detected -eq 0) {
+    Write-Host "  - no native-package host detected; Runtime MCP registration covers the other clients"
+  }
+  return ($failures -eq 0)
 }
 
 # ─── -Doctor: idempotent, read-only health check ───────────────────────────
@@ -461,6 +548,15 @@ if (Test-McpToolSurface $DestPath) {
 } else {
   Write-Error "Runtime installed, but automatic MCP/hooks registration failed: $DestPath mcp register --binary $DestPath --json"
   exit 1
+}
+
+# Native packages add skills, commands and host-specific lifecycle behavior on
+# top of Runtime MCP registration. Unsupported/undocumented host installers are
+# never guessed; those clients remain on the verified MCP/hooks path.
+if (Install-DetectedHostPlugins) {
+  Write-Host "  ✓ native plugins reconciled for detected hosts"
+} else {
+  Write-Warning "Runtime/MCP are ready, but one or more native plugins need manual action; see PLUGIN.md"
 }
 Report-LoginState
 Write-Host "  ✓ Direct MCP: $DestPath serve --mcp --stdio; SIMPLICIO_MCP_URL=$SimplicioMcpUrl"

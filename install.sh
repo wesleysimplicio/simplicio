@@ -19,6 +19,8 @@
 #   SIMPLICIO_ALLOW_UNVERIFIED  - "1" to proceed even if no checksum is
 #                                 published for this target (default: refuse)
 #   SIMPLICIO_BUNDLE_DIR       - bundle report directory (default: ~/.simplicio)
+#   SIMPLICIO_INSTALL_HOST_PLUGINS - "0" skips detected native host plugins
+#                                    (default: install Codex/Claude/Gemini packages)
 #
 # Asset naming follows distribution/targets.json (the canonical target
 # triplet table for the whole ecosystem): id "macos-arm64" -> asset
@@ -222,6 +224,101 @@ verify_mcp_tools() {
   binary_path="$1"
   [ -x "$binary_path" ] || return 1
   SIMPLICIO_MCP_URL="$SIMPLICIO_MCP_URL" "$binary_path" mcp register --binary "$binary_path" --json >/dev/null 2>&1
+}
+
+
+install_gemini_extension() {
+  installed_manifest="$HOME/.gemini/extensions/simplicio/gemini-extension.json"
+  if [ -f "$installed_manifest" ]; then
+    ok "extensão nativa do Gemini CLI já instalada"
+    return 0
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    warn "Gemini CLI detectado, mas Python 3 é necessário para preparar a extensão"
+    return 1
+  fi
+
+  plugin_tmp="$(mktemp -d)"
+  plugin_zip="$plugin_tmp/simplicio-master.zip"
+  plugin_url="$GITHUB/archive/refs/heads/master.zip"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$plugin_url" -o "$plugin_zip" || { rm -rf "$plugin_tmp"; return 1; }
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q "$plugin_url" -O "$plugin_zip" || { rm -rf "$plugin_tmp"; return 1; }
+  else
+    rm -rf "$plugin_tmp"
+    return 1
+  fi
+
+  plugin_dir="$(python3 - "$plugin_zip" "$plugin_tmp/unpacked" <<'PY'
+import pathlib, sys, zipfile
+archive, destination = sys.argv[1:]
+root = pathlib.Path(destination).resolve()
+root.mkdir(parents=True, exist_ok=True)
+with zipfile.ZipFile(archive) as bundle:
+    for member in bundle.infolist():
+        target = (root / member.filename).resolve()
+        if target != root and root not in target.parents:
+            raise SystemExit("unsafe plugin archive path")
+    bundle.extractall(root)
+matches = list(root.glob("*/plugins/simplicio/gemini-extension.json"))
+if len(matches) != 1:
+    raise SystemExit("Gemini extension manifest not found exactly once")
+print(matches[0].parent)
+PY
+)" || { rm -rf "$plugin_tmp"; return 1; }
+
+  if gemini extensions install "$plugin_dir" --consent >/dev/null 2>&1; then
+    rm -rf "$plugin_tmp"
+    ok "extensão nativa do Gemini CLI instalada"
+    return 0
+  fi
+  rm -rf "$plugin_tmp"
+  return 1
+}
+
+install_detected_host_plugins() {
+  if [ "${SIMPLICIO_INSTALL_HOST_PLUGINS:-1}" = "0" ]; then
+    info "instalação de plugins nativos ignorada por SIMPLICIO_INSTALL_HOST_PLUGINS=0"
+    return 0
+  fi
+
+  detected=0
+  failures=0
+  if command -v codex >/dev/null 2>&1; then
+    detected=$((detected + 1))
+    codex plugin marketplace add "$REPO" --ref master >/dev/null 2>&1 || true
+    if codex plugin add simplicio@simplicio-codex >/dev/null 2>&1; then
+      ok "plugin nativo do Codex instalado"
+    else
+      warn "Codex detectado, mas o plugin simplicio@simplicio-codex não pôde ser instalado"
+      failures=$((failures + 1))
+    fi
+  fi
+
+  if command -v claude >/dev/null 2>&1; then
+    detected=$((detected + 1))
+    claude plugin marketplace add "$REPO" >/dev/null 2>&1 || true
+    if claude plugin install simplicio@simplicio --scope user >/dev/null 2>&1; then
+      ok "plugin nativo do Claude Code instalado"
+    else
+      warn "Claude Code detectado, mas o plugin simplicio@simplicio não pôde ser instalado"
+      failures=$((failures + 1))
+    fi
+  fi
+
+  if command -v gemini >/dev/null 2>&1; then
+    detected=$((detected + 1))
+    if ! install_gemini_extension; then
+      warn "Gemini CLI detectado, mas a extensão nativa do Simplicio não pôde ser instalada"
+      failures=$((failures + 1))
+    fi
+  fi
+
+  if [ "$detected" -eq 0 ]; then
+    info "nenhum host com pacote nativo detectado; o registro MCP cobre os demais clientes"
+  fi
+  [ "$failures" -eq 0 ]
 }
 
 # ─── --doctor: idempotent, read-only health check ──────────────────────────
@@ -530,6 +627,15 @@ if verify_mcp_tools "$DEST_PATH"; then
   ok "MCP e hooks registrados automaticamente para os clientes detectados"
 else
   err "o Runtime foi instalado, mas o registro automático de MCP/hooks falhou: $DEST_PATH mcp register --binary $DEST_PATH --json"
+fi
+
+# Native packages add skills, commands and host-specific lifecycle behavior on
+# top of the Runtime MCP registration. Only hosts with a documented installer
+# contract are attempted; every other detected client stays on MCP/hooks.
+if install_detected_host_plugins; then
+  ok "plugins nativos reconciliados para os hosts detectados"
+else
+  warn "Runtime/MCP estão prontos, mas um ou mais plugins nativos exigem ação manual; consulte PLUGIN.md"
 fi
 report_login_state
 ok "MCP direto: $DEST_PATH serve --mcp --stdio; SIMPLICIO_MCP_URL=${SIMPLICIO_MCP_URL}"

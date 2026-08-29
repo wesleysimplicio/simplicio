@@ -40,6 +40,14 @@ the signed SHA256/Ed25519 Runtime release, and installs the platform binary.
 If the Python script directory is not already on `PATH`, add it before running
 `simplicio install`.
 
+After the Runtime registers MCP/hooks for every detected client, both direct
+installers also reconcile native packages for installed Codex, Claude Code and
+Gemini CLI hosts. Those are the host surfaces with documented non-interactive
+plugin or extension installers. Other detected IDEs and harnesses remain on the
+verified Runtime MCP integration instead of receiving guessed commands. Set
+`SIMPLICIO_INSTALL_HOST_PLUGINS=0` only in managed/bootstrap environments that
+already installed the package.
+
 Known installer incidents and regression sentinels are tracked in
 [docs/INSTALL_ERROR_REGISTRY.md](docs/INSTALL_ERROR_REGISTRY.md).
 
