@@ -15,6 +15,7 @@ surface, and ships the same governed Simplicio skills.
 | Claude Code | `.claude-plugin/plugin.json` | Native Claude Code plugin |
 | Cursor, GitHub Copilot, Kiro, Qwen Code | `plugin.json` + `mcp.json` | Agent Plugins v1 |
 | Gemini CLI | `gemini-extension.json` | Native Gemini extension |
+| Hermes Agent | `../simplicio-hermes/plugin.yaml` | Native Hermes Python plugin |
 | Other CLI/IDE/agent harnesses | Runtime `mcp register` | MCP/config or guided integration |
 
 The package does not pretend every product has the same plugin API. The

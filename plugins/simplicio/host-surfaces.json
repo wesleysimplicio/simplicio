@@ -15,7 +15,7 @@
     {"id":"antigravity","name":"Antigravity","surface":"runtime-mcp","preHooks":"runtime-managed"},
     {"id":"pi","name":"Pi","surface":"runtime-mcp","preHooks":"runtime-managed"},
     {"id":"oh-my-pi","name":"oh-my-pi","surface":"runtime-mcp","preHooks":"runtime-managed"},
-    {"id":"hermes","name":"Hermes Agent","surface":"runtime-mcp","preHooks":"runtime-managed"},
+    {"id":"hermes","name":"Hermes Agent","surface":"native-plugin","manifest":"../simplicio-hermes/plugin.yaml","preHooks":"host-managed"},
     {"id":"devin","name":"Devin","surface":"guided-runtime","preHooks":"runtime-managed"},
     {"id":"goose","name":"Goose","surface":"runtime-mcp","preHooks":"runtime-managed"},
     {"id":"auggie","name":"Auggie","surface":"runtime-mcp","preHooks":"runtime-managed"},

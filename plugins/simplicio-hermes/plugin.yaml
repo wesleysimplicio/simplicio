@@ -1,0 +1,9 @@
+name: simplicio-hermes
+version: 0.2.0
+description: Simplicio Runtime context preparation and provider receipts for Hermes Agent.
+author: Wesley Simplicio
+provides_hooks:
+  - on_session_start
+  - pre_llm_call
+  - post_llm_call
+  - on_session_end

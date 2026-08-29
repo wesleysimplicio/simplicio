@@ -14,9 +14,20 @@ def test_shell_installs_documented_native_plugins_after_runtime_registration() -
     assert "codex plugin add simplicio@simplicio-codex" in text
     assert 'command -v claude' in text
     assert 'claude plugin marketplace add "$REPO"' in text
-    assert "claude plugin install simplicio@simplicio --scope user" in text
+    assert 'MARKETPLACE_PLUGINS="simplicio simplicio-loop simplicio-prompt simplicio-sprint simplicio-hermes"' in text
+    assert 'claude plugin install "$plugin_name@simplicio" --scope user' in text
     assert 'command -v gemini' in text
     assert 'gemini extensions install "$plugin_dir" --consent' in text
+    assert 'command -v copilot' in text
+    assert 'copilot plugin install "$plugin_name@simplicio"' in text
+    assert 'command -v qwen' in text
+    assert 'qwen extensions install "$REPO:$plugin_name"' in text
+    assert 'command -v hermes' in text
+    assert 'hermes plugins install "$REPO/plugins/simplicio-hermes" --force --enable' in text
+    assert 'hermes plugins doctor simplicio-hermes --ci' in text
+    assert '"$HOME/.cursor/plugins/local/simplicio"' in text
+    assert '"$HOME/.kiro/powers/simplicio"' in text
+    assert 'err "Runtime/MCP estão prontos, mas a instalação automática' in text
     assert text.index(registration) < text.index(plugin_install, text.index(registration))
 
 
@@ -30,13 +41,24 @@ def test_powershell_installs_documented_native_plugins_after_runtime_registratio
     assert '@("plugin", "add", "simplicio@simplicio-codex")' in text
     assert "Get-Command claude -CommandType Application" in text
     assert '@("plugin", "marketplace", "add", $Repo)' in text
-    assert '@("plugin", "install", "simplicio@simplicio", "--scope", "user")' in text
+    assert '$MarketplacePlugins = @("simplicio", "simplicio-loop", "simplicio-prompt", "simplicio-sprint", "simplicio-hermes")' in text
+    assert '@("plugin", "install", "$pluginName@simplicio", "--scope", "user")' in text
     assert "Get-Command gemini -CommandType Application" in text
     assert '@("extensions", "install", $manifest.DirectoryName, "--consent")' in text
+    assert "Get-Command copilot -CommandType Application" in text
+    assert '@("plugin", "install", "$pluginName@simplicio")' in text
+    assert "Get-Command qwen -CommandType Application" in text
+    assert '@("extensions", "install", "${Repo}:$pluginName")' in text
+    assert "Get-Command hermes -CommandType Application" in text
+    assert '@("plugins", "install", "$Repo/plugins/simplicio-hermes", "--force", "--enable")' in text
+    assert '@("plugins", "doctor", "simplicio-hermes", "--ci")' in text
+    assert '".cursor\\plugins\\local\\simplicio"' in text
+    assert '".kiro\\powers\\simplicio"' in text
+    assert 'Write-Error "Runtime/MCP are ready, but automatic installation' in text
     assert text.index(registration) < text.index(plugin_install, text.index(registration))
 
 
-def test_host_plugin_bootstrap_is_idempotent_and_does_not_guess_unsupported_clis() -> None:
+def test_host_plugin_bootstrap_is_idempotent_and_uses_documented_surfaces() -> None:
     shell = (ROOT / "install.sh").read_text(encoding="utf-8")
     powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
     bootstrap = (
@@ -45,12 +67,7 @@ def test_host_plugin_bootstrap_is_idempotent_and_does_not_guess_unsupported_clis
 
     for text in (shell, powershell):
         assert "SIMPLICIO_INSTALL_HOST_PLUGINS" in text
-        for unsupported in (
-            "cursor plugin install",
-            "code plugin install",
-            "kiro plugin install",
-            "qwen plugin install",
-        ):
+        for unsupported in ("cursor plugin install", "code plugin install", "kiro plugin install"):
             assert unsupported not in text.lower()
 
     assert 'SIMPLICIO_INSTALL_HOST_PLUGINS: "0"' in bootstrap

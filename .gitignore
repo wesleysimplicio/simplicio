@@ -38,6 +38,10 @@ simplicio-*
 !plugins/simplicio/plugin.json
 !plugins/simplicio/mcp.json
 !plugins/simplicio/.claude-plugin/
+!plugins/simplicio-hermes/
+!plugins/simplicio-hermes/plugin.yaml
+!plugins/simplicio-hermes/__init__.py
+!plugins/simplicio-hermes/hermes_plugin.py
 !plugins/simplicio/.claude-plugin/plugin.json
 !plugins/simplicio/gemini-extension.json
 !plugins/simplicio/host-surfaces.json

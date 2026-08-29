@@ -41,12 +41,14 @@ If the Python script directory is not already on `PATH`, add it before running
 `simplicio install`.
 
 After the Runtime registers MCP/hooks for every detected client, both direct
-installers also reconcile native packages for installed Codex, Claude Code and
-Gemini CLI hosts. Those are the host surfaces with documented non-interactive
-plugin or extension installers. Other detected IDEs and harnesses remain on the
-verified Runtime MCP integration instead of receiving guessed commands. Set
+installers reconcile every compatible host package. Claude Code, GitHub Copilot
+CLI, and Qwen Code receive all published marketplace plugins (`simplicio`, Loop,
+Prompt, Sprint, and Hermes). Codex and Gemini receive their native package,
+Cursor and Kiro receive the portable Agent Plugin, and Hermes receives the
+enabled native Python plugin with `pre_llm_call` and `post_llm_call` hooks.
+Hosts without a package API remain on the verified Runtime MCP integration. Set
 `SIMPLICIO_INSTALL_HOST_PLUGINS=0` only in managed/bootstrap environments that
-already installed the package.
+already installed the packages.
 
 Known installer incidents and regression sentinels are tracked in
 [docs/INSTALL_ERROR_REGISTRY.md](docs/INSTALL_ERROR_REGISTRY.md).
