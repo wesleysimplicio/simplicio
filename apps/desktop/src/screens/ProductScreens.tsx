@@ -12,6 +12,7 @@ import { createWorkItemProjection } from "../work_item_projection";
 import { createLiveProjection } from "../live_projection";
 import { createRoomProjection } from "../room_projection";
 import { createTokenReport } from "../token_report";
+import { createOmniSearchProjection } from "../omnisearch_projection";
 
 type ProductView = Extract<View, "today" | "chats" | "teams" | "automations" | "apps">;
 
@@ -140,12 +141,13 @@ function AutomationsScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
   );
 }
 
-function AppsScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
+function AppsScreen({ snapshot, botCenter }: { snapshot: DesktopSnapshot; botCenter: BotCenterSnapshot }) {
   const registry = createCapabilityRegistry(snapshot);
   const tokenReport = createTokenReport(snapshot);
+  const search = createOmniSearchProjection(snapshot, botCenter);
   const apps = registry.capabilities;
   return (
-    <div className="page product-page"><SurfaceHeading view="apps" snapshot={snapshot} /><div className="apps-toolbar"><div className="search-field"><Glyph name="search" size={16} /><span>Buscar capabilities, artifacts ou comandos</span><kbd>⌘K</kbd></div><ActionButton>Favoritos</ActionButton></div><section className="app-grid">{apps.map((app) => <article className="panel app-card" key={app.id}><div className="app-card-head"><span className="app-icon"><Glyph name={app.category === "Learn" ? "spark" : app.category === "Explore" ? "search" : app.category === "Act" ? "live" : app.category === "Build" ? "providers" : "apps"} size={19} /></span><span className="app-category">{app.category}</span></div><h2>{app.name}</h2><p>{app.description}</p><code>{app.reasonCode}</code><ActionButton>Abrir</ActionButton></article>)}</section><div className="apps-bottom-grid"><section className="panel library-card"><div className="panel-heading"><div><span className="eyebrow">Artifact Graph</span><h2>Library</h2></div><ActionButton>Ver tudo</ActionButton></div><p>Artifacts, versões e proveniência aparecem quando o Runtime fornecer handles canônicos.</p><div className="library-row"><span className="file-icon">MD</span><div><strong>desktop-bot-mode-plan.md</strong><span>preview · sem cópia local</span></div></div></section><section className="panel token-card"><div className="panel-heading"><div><span className="eyebrow">Receipts</span><h2>Token Reports</h2></div><Glyph name="activity" size={18} /></div><strong className="report-value">{tokenReport.savedTokens === null ? "—" : tokenReport.savedTokens.toLocaleString("pt-BR")}</strong><p>{tokenReport.estimatedUsd === null ? "Sem métrica agregada verificável para este período." : `Economia estimada: US$ ${tokenReport.estimatedUsd.toFixed(2)}`}</p><code>proof: {tokenReport.proofKind} · {tokenReport.reasonCode}</code></section></div><UnavailableNotice code={registry.reasonCode}>Apps só ficam acionáveis depois de um probe do backend; o launcher não presume capacidades instaladas.</UnavailableNotice></div>
+    <div className="page product-page"><SurfaceHeading view="apps" snapshot={snapshot} /><div className="apps-toolbar"><div className="search-field"><Glyph name="search" size={16} /><span>Buscar capabilities, artifacts ou comandos · {search.entities.length} itens</span><kbd>⌘K</kbd></div><ActionButton>Favoritos</ActionButton></div><section className="app-grid">{apps.map((app) => <article className="panel app-card" key={app.id}><div className="app-card-head"><span className="app-icon"><Glyph name={app.category === "Learn" ? "spark" : app.category === "Explore" ? "search" : app.category === "Act" ? "live" : app.category === "Build" ? "providers" : "apps"} size={19} /></span><span className="app-category">{app.category}</span></div><h2>{app.name}</h2><p>{app.description}</p><code>{app.reasonCode}</code><ActionButton>Abrir</ActionButton></article>)}</section><div className="apps-bottom-grid"><section className="panel library-card"><div className="panel-heading"><div><span className="eyebrow">Artifact Graph</span><h2>Library</h2></div><ActionButton>Ver tudo</ActionButton></div><p>Artifacts, versões e proveniência aparecem quando o Runtime fornecer handles canônicos.</p><div className="library-row"><span className="file-icon">MD</span><div><strong>desktop-bot-mode-plan.md</strong><span>preview · sem cópia local</span></div></div></section><section className="panel token-card"><div className="panel-heading"><div><span className="eyebrow">Receipts</span><h2>Token Reports</h2></div><Glyph name="activity" size={18} /></div><strong className="report-value">{tokenReport.savedTokens === null ? "—" : tokenReport.savedTokens.toLocaleString("pt-BR")}</strong><p>{tokenReport.estimatedUsd === null ? "Sem métrica agregada verificável para este período." : `Economia estimada: US$ ${tokenReport.estimatedUsd.toFixed(2)}`}</p><code>proof: {tokenReport.proofKind} · {tokenReport.reasonCode}</code></section></div><UnavailableNotice code={`${registry.reasonCode}; ${search.reasonCode}`}>Apps só ficam acionáveis depois de um probe do backend; o launcher não presume capacidades instaladas.</UnavailableNotice></div>
   );
 }
 
@@ -154,5 +156,5 @@ export function ProductSurfaceScreen({ view, snapshot, botCenter }: { view: Prod
   if (view === "chats") return <ChatsScreen snapshot={snapshot} botCenter={botCenter} />;
   if (view === "teams") return <TeamsScreen snapshot={snapshot} botCenter={botCenter} />;
   if (view === "automations") return <AutomationsScreen snapshot={snapshot} />;
-  return <AppsScreen snapshot={snapshot} />;
+  return <AppsScreen snapshot={snapshot} botCenter={botCenter} />;
 }
