@@ -4,22 +4,32 @@
 
 ## Purpose
 
-This is the **public distribution repo** for [Simplicio](https://github.com/wesleysimplicio/simplicio), a Rust-based terminal AI coding agent. It contains installers, packages, documentation (15 languages), and release assets.
+This is the **public distribution repo** for [Simplicio](https://github.com/wesleysimplicio/simplicio), a Rust-based terminal AI coding agent. It contains installers, packages, documentation (15 languages), release metadata, and the first-party Desktop source in `apps/desktop`.
 
-**Not the source code.** The Rust runtime source lives in the private [`simplicio-runtime`](https://github.com/wesleysimplicio/simplicio-runtime) repo.
+The Rust Runtime source lives in the private [`simplicio-runtime`](https://github.com/wesleysimplicio/simplicio-runtime) repo. Runtime and Desktop executables are GitHub Release assets, not tracked source files.
 
 ## Runtime snapshot: v3.8.39
 
 ## Current Version: v3.8.39
 
 - **Source:** `simplicio-runtime` main at commit
-  `d91aa04b39ab33c252c628fab6806bf8ea2c39a8` (merged Runtime v3.8.24 release metadata).
-- **Runtime targets:** macOS ARM64, macOS x64, Linux x64, and Windows x64.\n  The canonical target table and release manifest define the asset, checksum,\n  signature, SBOM, and provenance for each Runtime platform.\n- **Desktop assets:** macOS ARM64 DMG and ZIP are published alongside the\n  Runtime release and tracked by exact filename, SHA-256, size, and signing\n  status in `docs/RELEASE_RUNBOOK.md`. The
-  canonical target table and release manifest define the asset, checksum,
-  signature, SBOM, and provenance for each platform.
-- **Release status:** GitHub Release v3.8.24 metadata is published manually, without GitHub Actions. Installers
-  and the update command resolve GitHub's latest release, verify its signed
-  manifest, and fail closed if an artifact signature or checksum is invalid.
+  `d91aa04b39ab33c252c628fab6806bf8ea2c39a8` (Runtime v3.8.39).
+- **Runtime targets:** macOS ARM64, macOS x64, Linux x64, and Windows x64.
+  The canonical target table and release manifest define the asset, checksum,
+  Ed25519 signature, SBOM, and provenance for each Runtime platform.
+- **Desktop assets:** `Simplicio-3.8.39-arm64.dmg` and `.zip` are published
+  alongside the Runtime release, built from public commit
+  `dd7dd0665630fcdd6c9a76d07956d840f80fc0a9`. Exact filenames, SHA-256,
+  sizes, verification evidence, and signing status are recorded in
+  [the release runbook](docs/RELEASE_RUNBOOK.md#published-desktop-v3839).
+- **Release status:** GitHub Release v3.8.39 and `simplicio-installer 3.8.39`
+  on PyPI are published manually, without GitHub Actions. Installers and the
+  update command resolve the release metadata, verify the required Ed25519
+  artifact signatures, and fail closed on an invalid signature or checksum.
+- **Readiness limits:** the macOS ARM64 Desktop package has a valid ad-hoc
+  code signature but no Apple Developer ID signature or notarization;
+  Gatekeeper rejects it. Installed Ambient/Workspace/Agent action contracts
+  and the remaining native-host release-train gates are not declared complete.
 - **Default branch:** master
 - **Release-channel gates:** the installer enforces embedded ecosystem sources,
   the configured update key, SHA256, Ed25519 signatures, and active Google login.
@@ -42,7 +52,9 @@ This is the **public distribution repo** for [Simplicio](https://github.com/wesl
 ├── install.sh / install.ps1  # Installers
 ├── distribution/targets.json # Canonical platform-to-asset mapping
 ├── simplicio-update-manifest.json # Checksums, signatures, provenance
-├── release binaries           # Runtime assets published in GitHub Releases\n└── Desktop DMG/ZIP             # Desktop assets published in GitHub Releases
+├── apps/desktop              # First-party Desktop source
+├── release binaries           # Runtime assets published in GitHub Releases
+└── Desktop DMG/ZIP             # Desktop assets published in GitHub Releases
 ~~~
 
 The current release targets are macOS ARM64, macOS x64 (Intel), Linux x64,
