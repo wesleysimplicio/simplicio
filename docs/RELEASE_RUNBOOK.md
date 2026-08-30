@@ -2,8 +2,10 @@
 
 This repository is the public distribution surface for Simplicio Runtime. It
 does not build source from sibling `simplicio-*` repositories during install.
-The release files committed here and attached to the GitHub Release must be
-the four signed Runtime binaries plus the Desktop artifacts listed for the release.
+Release metadata, signatures, SBOMs, provenance, checksums, manifests, and hooks
+are committed here. Runtime and Desktop executables are staged locally and
+attached to the GitHub Release; the source-tree policy intentionally refuses to
+track executable build products.
 
 ## Required release files
 
@@ -73,7 +75,8 @@ only permitted for an explicitly selected unofficial channel.
 1. Build and sign the artifacts from the intended `simplicio-runtime` main
    commit.
 2. Commit the Runtime metadata and release record into a release branch;
-   keep oversized Desktop artifacts in staging for GitHub Release upload.
+   keep all Runtime and Desktop executables in local staging for GitHub Release
+   upload. Never force-add executable build products to the source tree.
 3. Run `python3 scripts/verify_distribution_consistency.py`,
    `python3 -m unittest discover -s tests -p 'test_verify_ed25519.py'`, and
    the release provenance tests.
