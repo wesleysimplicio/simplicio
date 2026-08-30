@@ -20,11 +20,17 @@ import { MemoryScreen } from "./screens/MemoryScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { ActivityScreen } from "./screens/ActivityScreen";
 import { BotCenterScreen } from "./screens/BotCenterScreen";
+import { ProductSurfaceScreen } from "./screens/ProductScreens";
 
 function initialView(): View {
   if (typeof window === "undefined") return "home";
   const requested = new URLSearchParams(window.location.search).get("view");
   if (
+    requested === "today" ||
+    requested === "chats" ||
+    requested === "teams" ||
+    requested === "automations" ||
+    requested === "apps" ||
     requested === "home" ||
     requested === "bot" ||
     requested === "providers" ||
@@ -181,6 +187,9 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
           onRefresh={refresh}
         />
       )}
+      {(view === "today" || view === "chats" || view === "teams" || view === "automations" || view === "apps") && (
+        <ProductSurfaceScreen view={view} snapshot={snapshot} botCenter={botCenter ?? snapshotWithDemoBots(snapshot)} />
+      )}
       {view === "bot" && <BotCenterScreen snapshot={botCenter ?? snapshotWithDemoBots(snapshot)} onAction={botAction} />}
       {view === "providers" && (
         <ProvidersScreen
@@ -196,7 +205,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
         <SettingsScreen snapshot={snapshot} busy={action === "refresh"} onRefresh={refresh} onSubscribe={subscribe} onLogout={logout} logoutBusy={action === "logout"} />
       )}
       {view === "activity" && <ActivityScreen snapshot={snapshot} />}
-      {view !== "home" && view !== "bot" && view !== "providers" && view !== "memory" && view !== "settings" && view !== "activity" && <SecondaryScreen view={view} snapshot={snapshot} />}
+      {(view === "bot" || view === "memory" || view === "settings" || view === "activity") && <SecondaryScreen view={view} snapshot={snapshot} />}
     </Shell>
   );
 }
