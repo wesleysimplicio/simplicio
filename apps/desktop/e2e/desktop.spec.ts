@@ -61,6 +61,17 @@ test("all navigation, provider, receipt, and account controls work", async ({ pa
   await expect(page.getByRole("heading", { name: "Entre no Simplicio" })).toBeVisible();
 });
 
+test("Bot Center exposes the canonical roster, timeline, rooms, and honest computer state", async ({ page }) => {
+  await page.goto("/?state=active&view=bot");
+  await expect(page.getByRole("heading", { name: "Bot Center" })).toBeVisible();
+  await expect(page.getByText("Roster canônico")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cora" })).toBeVisible();
+  await expect(page.getByText("Rooms", { exact: true })).toBeVisible();
+  await expect(page.getByText("computer_backend_unavailable")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Assumir controle" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Aprovar" })).toBeVisible();
+});
+
 test("primary layouts fit desktop and compact widths", async ({ page }) => {
   for (const width of [1280, 768, 390]) {
     await page.setViewportSize({ width, height: 900 });

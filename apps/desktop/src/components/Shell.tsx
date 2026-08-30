@@ -3,10 +3,11 @@ import type { DesktopSnapshot } from "../contracts";
 import { Brand, Glyph, type GlyphName } from "./Brand";
 import { t } from "../i18n";
 
-export type View = "home" | "providers" | "activity" | "memory" | "settings";
+export type View = "home" | "bot" | "providers" | "activity" | "memory" | "settings";
 
 const navigation: Array<{ id: View; label: string; icon: GlyphName }> = [
   { id: "home", label: t("nav.home"), icon: "home" },
+  { id: "bot", label: "Bot Center", icon: "spark" },
   { id: "providers", label: t("nav.providers"), icon: "providers" },
   { id: "activity", label: t("nav.activity"), icon: "activity" },
   { id: "memory", label: t("nav.memory"), icon: "memory" },
@@ -29,7 +30,7 @@ export function Shell({ children, snapshot, view, onViewChange }: ShellProps) {
         <Brand />
         <nav className="primary-nav" aria-label="Navegação principal">
           <p className="nav-caption">VISÃO GERAL</p>
-          {navigation.slice(0, 3).map((item) => (
+          {navigation.slice(0, 4).map((item) => (
             <button
               key={item.id}
               className={`nav-item ${view === item.id ? "active" : ""}`}
@@ -48,7 +49,7 @@ export function Shell({ children, snapshot, view, onViewChange }: ShellProps) {
             </button>
           ))}
           <p className="nav-caption nav-caption-spaced">SISTEMA</p>
-          {navigation.slice(3).map((item) => (
+          {navigation.slice(4).map((item) => (
             <button
               key={item.id}
               className={`nav-item ${view === item.id ? "active" : ""}`}

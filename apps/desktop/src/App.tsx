@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import type { DesktopSnapshot } from "./contracts";
+import type { BotActionRequest } from "./bot_center";
+import { snapshotWithDemoBots } from "./bot_center";
 import {
   beginDesktopLogin,
   loadDesktopSnapshot,
@@ -7,6 +9,7 @@ import {
   openDesktopSubscription,
   refreshDesktopSnapshot,
   repairDesktopProviders,
+  dispatchDesktopBotAction,
 } from "./bridge";
 import { Shell, type View } from "./components/Shell";
 import { AccessGate, LoadingScreen, SignInScreen } from "./screens/AccessScreens";
@@ -16,12 +19,14 @@ import { SecondaryScreen } from "./screens/SecondaryScreen";
 import { MemoryScreen } from "./screens/MemoryScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { ActivityScreen } from "./screens/ActivityScreen";
+import { BotCenterScreen } from "./screens/BotCenterScreen";
 
 function initialView(): View {
   if (typeof window === "undefined") return "home";
   const requested = new URLSearchParams(window.location.search).get("view");
   if (
     requested === "home" ||
+    requested === "bot" ||
     requested === "providers" ||
     requested === "activity" ||
     requested === "memory" ||
@@ -34,8 +39,9 @@ function initialView(): View {
 
 export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSnapshot }) {
   const [snapshot, setSnapshot] = useState<DesktopSnapshot | undefined>(initialSnapshot);
+  const [botCenter, setBotCenter] = useState(initialSnapshot?.botCenter);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [action, setAction] = useState<"login" | "logout" | "refresh" | "repair" | "subscribe" | null>(null);
+  const [action, setAction] = useState<"login" | "logout" | "refresh" | "repair" | "subscribe" | "bot" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [view, setView] = useState<View>(initialView);
 
@@ -44,7 +50,10 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
     let current = true;
     loadDesktopSnapshot()
       .then((next) => {
-        if (current) setSnapshot(next);
+        if (current) {
+          setSnapshot(next);
+          setBotCenter(next.botCenter);
+        }
       })
       .catch(() => {
         if (current) setLoadFailed(true);
@@ -58,7 +67,9 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
     setAction("refresh");
     setActionError(null);
     try {
-      setSnapshot(await refreshDesktopSnapshot());
+      const next = await refreshDesktopSnapshot();
+      setSnapshot(next);
+      setBotCenter(next.botCenter);
       setLoadFailed(false);
     } catch {
       setActionError("Não foi possível atualizar o Runtime.");
@@ -71,7 +82,9 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
     setAction("repair");
     setActionError(null);
     try {
-      setSnapshot(await repairDesktopProviders());
+      const next = await repairDesktopProviders();
+      setSnapshot(next);
+      setBotCenter(next.botCenter);
       setLoadFailed(false);
     } catch {
       setActionError("Não foi possível reparar as integrações com segurança.");
@@ -84,7 +97,9 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
     setAction("login");
     setActionError(null);
     try {
-      setSnapshot(await beginDesktopLogin());
+      const next = await beginDesktopLogin();
+      setSnapshot(next);
+      setBotCenter(next.botCenter);
       setLoadFailed(false);
     } catch {
       setActionError("O login não foi concluído.");
@@ -109,10 +124,24 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
     setAction("logout");
     setActionError(null);
     try {
-      setSnapshot(await logoutDesktop());
+      const next = await logoutDesktop();
+      setSnapshot(next);
+      setBotCenter(next.botCenter);
       setView("home");
     } catch {
       setActionError("Não foi possível sair com segurança.");
+    } finally {
+      setAction(null);
+    }
+  }
+
+  async function botAction(request: BotActionRequest) {
+    setAction("bot");
+    setActionError(null);
+    try {
+      setBotCenter(await dispatchDesktopBotAction(request, botCenter ?? snapshotWithDemoBots(snapshot!)));
+    } catch {
+      setActionError("O Agent API não aceitou esta ação; nenhuma mudança local foi aplicada.");
     } finally {
       setAction(null);
     }
@@ -152,6 +181,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
           onRefresh={refresh}
         />
       )}
+      {view === "bot" && <BotCenterScreen snapshot={botCenter ?? snapshotWithDemoBots(snapshot)} onAction={botAction} />}
       {view === "providers" && (
         <ProvidersScreen
           snapshot={snapshot}
@@ -166,7 +196,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
         <SettingsScreen snapshot={snapshot} busy={action === "refresh"} onRefresh={refresh} onSubscribe={subscribe} onLogout={logout} logoutBusy={action === "logout"} />
       )}
       {view === "activity" && <ActivityScreen snapshot={snapshot} />}
-      {view !== "home" && view !== "providers" && view !== "memory" && view !== "settings" && view !== "activity" && <SecondaryScreen view={view} snapshot={snapshot} />}
+      {view !== "home" && view !== "bot" && view !== "providers" && view !== "memory" && view !== "settings" && view !== "activity" && <SecondaryScreen view={view} snapshot={snapshot} />}
     </Shell>
   );
 }
