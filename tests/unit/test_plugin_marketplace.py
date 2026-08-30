@@ -81,6 +81,17 @@ def test_native_claude_and_gemini_manifests_reuse_the_bootstrap() -> None:
     assert args == ["${extensionPath}/bin/simplicio-mcp-bootstrap.js"]
 
 
+def test_simplicio_plugin_manifests_share_one_version() -> None:
+    manifests = [
+        _load_json("plugins/simplicio/plugin.json"),
+        _load_json("plugins/simplicio/.codex-plugin/plugin.json"),
+        _load_json("plugins/simplicio/.claude-plugin/plugin.json"),
+        _load_json("plugins/simplicio/gemini-extension.json"),
+    ]
+
+    assert {manifest["version"] for manifest in manifests} == {"0.2.4"}
+
+
 def test_host_surface_registry_is_complete_and_honest() -> None:
     registry = _load_json("plugins/simplicio/host-surfaces.json")
     hosts = registry["hosts"]
