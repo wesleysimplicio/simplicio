@@ -61,9 +61,11 @@ run_case() {
   fi
 }
 
+session_repo="$(mktemp -d)"
 run_case "SessionStart without repository emits bounded bridge context" \
-  '{"hook_event_name":"SessionStart","source":"startup","cwd":"/tmp"}' \
+  "{\"hook_event_name\":\"SessionStart\",\"source\":\"startup\",\"cwd\":\"$session_repo\"}" \
   0 'Simplicio context bridge'
+rm -rf -- "$session_repo"
 run_case "allow Simplicio tool unchanged" \
   '{"hook_event_name":"PreToolUse","tool_name":"simplicio__simplicio_read","tool_input":{"path":"x"},"cwd":"/tmp"}' \
   0 '__EMPTY__'
