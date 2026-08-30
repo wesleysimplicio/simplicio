@@ -15,7 +15,6 @@ import { Shell, type View } from "./components/Shell";
 import { AccessGate, LoadingScreen, SignInScreen } from "./screens/AccessScreens";
 import { HomeScreen } from "./screens/HomeScreen";
 import { ProvidersScreen } from "./screens/ProvidersScreen";
-import { SecondaryScreen } from "./screens/SecondaryScreen";
 import { MemoryScreen } from "./screens/MemoryScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { ActivityScreen } from "./screens/ActivityScreen";
@@ -205,7 +204,6 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
         <SettingsScreen snapshot={snapshot} busy={action === "refresh"} onRefresh={refresh} onSubscribe={subscribe} onLogout={logout} logoutBusy={action === "logout"} />
       )}
       {view === "activity" && <ActivityScreen snapshot={snapshot} />}
-      {(view === "bot" || view === "memory" || view === "settings" || view === "activity") && <SecondaryScreen view={view} snapshot={snapshot} />}
     </Shell>
   );
 }

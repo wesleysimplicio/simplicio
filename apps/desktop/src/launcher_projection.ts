@@ -18,7 +18,6 @@ export interface LauncherProjection {
 }
 
 export function createLauncherProjection(snapshot: DesktopSnapshot, generatedAt = snapshot.generatedAt): LauncherProjection {
-  const live = snapshot.source === "runtime" && snapshot.runtime.state === "healthy";
   const actions: Array<Pick<LauncherAction, "id" | "label" | "capabilityId" | "requiresApproval">> = [
     { id: "chat.new", label: "Start Chat", capabilityId: "chat.session.create", requiresApproval: false },
     { id: "team.new", label: "Create Team", capabilityId: "workspace.team.create", requiresApproval: true },
@@ -30,7 +29,7 @@ export function createLauncherProjection(snapshot: DesktopSnapshot, generatedAt 
     schema: "desktop.launcher/v1",
     generatedAt,
     source: snapshot.source,
-    actions: actions.map((action) => ({ ...action, available: live, reasonCode: live ? "action_descriptor_verified" : "capability_unverified" })),
-    reasonCode: live ? "desktop.launcher_ready" : "desktop.launcher_unavailable",
+    actions: actions.map((action) => ({ ...action, available: false, reasonCode: "action_descriptor_unavailable" })),
+    reasonCode: "desktop.launcher_unavailable",
   };
 }

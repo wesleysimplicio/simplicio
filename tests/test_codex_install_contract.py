@@ -103,8 +103,8 @@ def test_codex_hooks_have_all_required_lifecycle_events():
     assert "permissionDecision = 'deny'" in powershell_hook
     assert "hookEventName" in shell_hook
     assert "hookEventName" in powershell_hook
-    assert "simplicio-hook-version: 3240-v8" in shell_hook
-    assert "simplicio-hook-version: 3240-v8" in powershell_hook
+    assert "simplicio-hook-version: 3240-v11" in shell_hook
+    assert "simplicio-hook-version: 3240-v11" in powershell_hook
     assert "Empty stdout is the portable allow-unchanged contract" in shell_hook
     assert "No decision means allow unchanged" in powershell_hook
     assert "Allow-Unchanged" in powershell_hook

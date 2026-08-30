@@ -19,8 +19,8 @@ test("login and conservative access states remain actionable", async ({ page }) 
 });
 
 test("all navigation, provider, receipt, and account controls work", async ({ page }) => {
-  await page.goto("/?state=active&view=today");
-  await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
+  await page.goto("/?state=active&view=home");
+  await expect(page.getByRole("heading", { name: /Hoje você economizou/, level: 1 })).toBeVisible();
   const brandMark = page.locator(".brand-mark").first();
   await expect(brandMark).toBeVisible();
   await expect.poll(() => brandMark.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth >= 1024)).toBe(true);
@@ -33,9 +33,9 @@ test("all navigation, provider, receipt, and account controls work", async ({ pa
   await page.getByRole("button", { name: "Exportar recibos" }).click();
   await expect((await activityDownload).suggestedFilename()).toBe("simplicio-activity.json");
 
-  await page.getByRole("button", { name: "Today" }).click();
+  await page.goto("/?state=active&view=home");
   await page.getByRole("button", { name: "Abrir diagnóstico" }).click();
-  await expect(page.getByRole("heading", { name: "Configurações" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Configurações", level: 1 })).toBeVisible();
   const diagnosticDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "Exportar diagnóstico" }).click();
   await expect((await diagnosticDownload).suggestedFilename()).toBe("simplicio-diagnostic.json");
@@ -63,9 +63,11 @@ test("all navigation, provider, receipt, and account controls work", async ({ pa
 
 test("Bot Center exposes the canonical roster, timeline, rooms, and honest computer state", async ({ page }) => {
   await page.goto("/?state=active&view=bot");
-  await expect(page.getByRole("heading", { name: "Bot Center" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Bot Center", level: 1 })).toBeVisible();
   await expect(page.getByText("Roster canônico")).toBeVisible();
   await expect(page.getByRole("button", { name: "Cora" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Criar novo Bot" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Abrir desktop-bot-mode-plan.md" })).toBeDisabled();
   await expect(page.getByText("Rooms", { exact: true })).toBeVisible();
   await expect(page.getByText("computer_backend_unavailable")).toBeVisible();
   await expect(page.getByRole("button", { name: "Assumir controle" })).toBeDisabled();
@@ -87,13 +89,17 @@ test("the installed ambient path stays on the canonical five-surface route", asy
   await page.goto("/?state=active&view=today");
   await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
   await page.getByRole("button", { name: "Chats" }).click();
-  await expect(page.getByRole("heading", { name: "Chats" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Chats", level: 1 })).toBeVisible();
+  await expect(page.locator(".session-card").first()).toBeDisabled();
   await page.getByRole("button", { name: "Teams" }).click();
-  await expect(page.getByRole("heading", { name: "Teams" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Teams", level: 1 })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Discuss" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Execute" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Review" })).toBeDisabled();
   await page.getByRole("button", { name: "Automations" }).click();
-  await expect(page.getByRole("heading", { name: "Automations" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Automations", level: 1 })).toBeVisible();
   await page.getByRole("button", { name: "Apps" }).click();
-  await expect(page.getByRole("heading", { name: "Apps" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Abrir" }).first()).toBeDisabled();
-  await expect(page.getByRole("button", { name: /Novo/ })).toBeDisabled();
+  await expect(page.getByRole("heading", { name: "Apps", level: 1 })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Abrir", exact: true }).first()).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Novo", exact: true })).toBeDisabled();
 });

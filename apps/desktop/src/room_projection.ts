@@ -27,7 +27,7 @@ export function createRoomProjection(snapshot: DesktopSnapshot, botCenter: BotCe
     members: room?.members.map((member) => member.label) ?? [],
     modes: ["Discuss", "Execute", "Review"],
     activeMode: room ? "Discuss" : null,
-    modeChangeAvailable: live,
-    reasonCode: live ? "room.projection_ready" : "room.projection_unavailable",
+    modeChangeAvailable: false,
+    reasonCode: live ? "room.mode_action_descriptor_unavailable" : "room.projection_unavailable",
   };
 }

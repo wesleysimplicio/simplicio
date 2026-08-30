@@ -78,7 +78,7 @@ export function createDemoSnapshot(state: AccessState = "active"): DesktopSnapsh
     },
     runtime: {
       state: "healthy",
-      version: "3.8.36",
+      version: "3.8.38",
       transport: "sidecar",
       lastReceiptAt: generatedAt,
       deterministic: {
