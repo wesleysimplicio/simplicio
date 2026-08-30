@@ -10,7 +10,13 @@ export const designTokens = {
   },
   space: { xs: "4px", sm: "8px", md: "12px", lg: "16px", xl: "24px" },
   radius: { sm: "7px", md: "9px", lg: "13px", pill: "999px" },
-  motion: { fast: "140ms", calm: "220ms" },
+  motion: {
+    instant: "100ms",
+    fast: "160ms",
+    standard: "220ms",
+    deliberate: "320ms",
+    ambient: "3200ms",
+  },
   focus: "2px solid #2f704e",
   targetMinimum: "44px",
 } as const;
