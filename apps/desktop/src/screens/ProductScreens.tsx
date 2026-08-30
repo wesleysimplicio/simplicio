@@ -3,6 +3,9 @@ import type { View } from "../components/Shell";
 import { Glyph } from "../components/Brand";
 import { createTodayProjection } from "../today_projection";
 import { createAmbientProjection } from "../ambient";
+import { createChatProjection } from "../chat_projection";
+import { createCapabilityRegistry } from "../capability_registry";
+import { createAutomationProjection } from "../automation_projection";
 
 type ProductView = Extract<View, "today" | "chats" | "teams" | "automations" | "apps">;
 
@@ -79,15 +82,16 @@ function QueueRow({ title, detail, status }: { title: string; detail: string; st
 }
 
 function ChatsScreen({ snapshot, botCenter }: { snapshot: DesktopSnapshot; botCenter: BotCenterSnapshot }) {
+  const projection = createChatProjection(botCenter);
   const session = botCenter.sessions[0];
-  const events = session?.events ?? [];
+  const events = projection.events;
   return (
     <div className="page product-page">
       <SurfaceHeading view="chats" snapshot={snapshot} />
       <div className="chat-layout">
         <aside className="panel session-list"><div className="panel-heading"><div><span className="eyebrow">Sessões</span><h2>Chats</h2></div><span className="queue-count">{botCenter.sessions.length}</span></div><button className="session-card active" type="button"><span className="bot-avatar">C</span><span><strong>Cora</strong><small>{session?.state ?? "sem sessão"} · {session?.revision ? `rev. ${session.revision}` : "—"}</small></span></button><ActionButton title="Criar sessão exige o Agent API do Runtime">+ Novo chat</ActionButton></aside>
-        <section className="panel chat-session"><div className="chat-session-head"><div><span className="eyebrow">Session Service</span><h2>Cora <small>· {session?.sessionId ?? "sem sessão"}</small></h2></div><div className="chat-head-actions"><ActionButton>Steer</ActionButton><ActionButton>Cancelar</ActionButton></div></div>
-          <UnavailableNotice code={botCenter.actionAuthority === "preview" ? "agent_api_preview_only" : "agent_api_unavailable"}>O histórico é redigido e limitado; streaming, approvals e envio dependem do contrato canônico do Runtime.</UnavailableNotice>
+        <section className="panel chat-session"><div className="chat-session-head"><div><span className="eyebrow">Session Service</span><h2>Cora <small>· {projection.sessionId ?? "sem sessão"}</small></h2></div><div className="chat-head-actions"><ActionButton>Steer</ActionButton><ActionButton>Cancelar</ActionButton></div></div>
+          <UnavailableNotice code={projection.reasonCode}>O histórico é redigido e limitado; streaming, approvals e envio dependem do contrato canônico do Runtime.</UnavailableNotice>
           <div className="chat-events">{events.filter((event) => event.kind === "message" || event.kind === "tool_result" || event.kind === "approval_request" || event.kind === "artifact").map((event) => <article className={`chat-event ${event.actorKind} ${event.state === "blocked" ? "blocked" : ""}`} key={event.eventId}><span className="chat-event-avatar">{event.actorKind === "human" ? "V" : event.actorKind === "bot" ? "C" : "R"}</span><div><div className="chat-event-meta"><strong>{event.actorLabel}</strong><span>{event.kind.replaceAll("_", " ")}</span></div><p>{event.content}</p>{event.toolName && <code>tool: {event.toolName}</code>}{event.approvalId && <code>approval: {event.approvalId}</code>}{event.artifactName && <button className="inline-link" type="button" disabled>{event.artifactName}</button>}</div></article>)}</div>
           <div className="chat-composer"><textarea aria-label="Mensagem do chat" placeholder="Escreva uma mensagem…" disabled /><div><span>Enviar cria um evento no Runtime e requer sessão ativa.</span><ActionButton>Enviar</ActionButton></div></div>
         </section>
@@ -111,27 +115,23 @@ function TeamsScreen({ snapshot, botCenter }: { snapshot: DesktopSnapshot; botCe
 }
 
 function AutomationsScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
-  const suggestions = snapshot.activity.slice(0, 2);
+  const projection = createAutomationProjection(snapshot);
+  const suggestions = projection.suggestions;
   return (
     <div className="page product-page">
       <SurfaceHeading view="automations" snapshot={snapshot} />
-      <div className="automation-layout"><section className="panel suggestion-panel"><div className="panel-heading"><div><span className="eyebrow">Inbox</span><h2>Sugestões</h2></div><span className="queue-count">{suggestions.length}</span></div>{suggestions.length ? suggestions.map((item, index) => <article className="suggestion-card" key={item.id}><span className="suggestion-icon"><Glyph name="spark" size={17} /></span><div><strong>{index === 0 ? "Reutilizar contexto recorrente" : "Agrupar validações do Runtime"}</strong><p>Proposta baseada em recibos; nenhum fluxo será criado sem revisão.</p><span>{item.provider} · {item.occurredAt}</span></div><div className="suggestion-actions"><ActionButton>Aceitar</ActionButton><ActionButton>Descartar</ActionButton></div></article>) : <p className="empty-state">Nenhuma sugestão disponível.</p>}</section><section className="panel studio-panel"><div className="panel-heading"><div><span className="eyebrow">Studio</span><h2>Nova automação</h2></div><Glyph name="automation" size={18} /></div><div className="studio-step"><span>1</span><div><strong>Quando</strong><p>Escolha um evento do Runtime ou uma rotina.</p></div></div><div className="studio-step"><span>2</span><div><strong>Fazer</strong><p>Selecione uma capability e sua política.</p></div></div><div className="studio-step"><span>3</span><div><strong>Revisar</strong><p>Salvar cria apenas um rascunho versionado.</p></div></div><ActionButton>Salvar rascunho</ActionButton></section></div>
+      <div className="automation-layout"><section className="panel suggestion-panel"><div className="panel-heading"><div><span className="eyebrow">Inbox</span><h2>Sugestões</h2></div><span className="queue-count">{suggestions.length}</span></div>{suggestions.length ? suggestions.map((item) => <article className="suggestion-card" key={item.id}><span className="suggestion-icon"><Glyph name="spark" size={17} /></span><div><strong>{item.title}</strong><p>{item.description}</p><span>receipt: {item.sourceEventId} · {item.state}</span></div><div className="suggestion-actions"><ActionButton>Aceitar</ActionButton><ActionButton>Descartar</ActionButton></div></article>) : <p className="empty-state">Nenhuma sugestão disponível.</p>}</section><section className="panel studio-panel"><div className="panel-heading"><div><span className="eyebrow">Studio</span><h2>Nova automação</h2></div><Glyph name="automation" size={18} /></div><div className="studio-step"><span>1</span><div><strong>Quando</strong><p>Escolha um evento do Runtime ou uma rotina.</p></div></div><div className="studio-step"><span>2</span><div><strong>Fazer</strong><p>Selecione uma capability e sua política.</p></div></div><div className="studio-step"><span>3</span><div><strong>Revisar</strong><p>Salvar cria apenas um rascunho versionado.</p></div></div><ActionButton>Salvar rascunho</ActionButton></section></div>
       <section className="panel automation-receipts"><div className="panel-heading"><div><span className="eyebrow">Activity Center</span><h2>Recibos recentes</h2></div><ActionButton>Exportar</ActionButton></div><div className="receipt-strip"><span><strong>{snapshot.activity.length}</strong> eventos limitados</span><span><strong>—</strong> automações ativas</span><span><strong>—</strong> ações aguardando você</span></div></section>
-      <UnavailableNotice code="automation.projection_unavailable">Triggers, budgets, quiet hours, cancelamento e políticas são autoridade do Runtime; a UI fica sem efeito até a capability ser verificada.</UnavailableNotice>
+      <UnavailableNotice code={projection.reasonCode}>Triggers, budgets, quiet hours, cancelamento e políticas são autoridade do Runtime; a UI fica sem efeito até a capability ser verificada.</UnavailableNotice>
     </div>
   );
 }
 
 function AppsScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
-  const apps = [
-    ["Create", "Video Studio", "video", "capability_unverified"],
-    ["Explore", "Browser & Research", "browser", "backend_unavailable"],
-    ["Act", "Computer", "computer", "computer_backend_unavailable"],
-    ["Build", "Files, PDF & Code", "code", "runtime_projection_unavailable"],
-    ["Learn", "Teach Simplicio", "learn", "compiler_unavailable"],
-  ];
+  const registry = createCapabilityRegistry(snapshot);
+  const apps = registry.capabilities;
   return (
-    <div className="page product-page"><SurfaceHeading view="apps" snapshot={snapshot} /><div className="apps-toolbar"><div className="search-field"><Glyph name="search" size={16} /><span>Buscar capabilities, artifacts ou comandos</span><kbd>⌘K</kbd></div><ActionButton>Favoritos</ActionButton></div><section className="app-grid">{apps.map(([category, name, icon, reason]) => <article className="panel app-card" key={name}><div className="app-card-head"><span className={`app-icon app-${icon}`}><Glyph name={icon === "learn" ? "spark" : icon === "browser" ? "search" : icon === "computer" ? "live" : icon === "code" ? "providers" : "apps"} size={19} /></span><span className="app-category">{category}</span></div><h2>{name}</h2><p>Capability compartilhada com Chat, Work Items, Live e artifacts.</p><code>{reason}</code><ActionButton>Abrir</ActionButton></article>)}</section><div className="apps-bottom-grid"><section className="panel library-card"><div className="panel-heading"><div><span className="eyebrow">Artifact Graph</span><h2>Library</h2></div><ActionButton>Ver tudo</ActionButton></div><p>Artifacts, versões e proveniência aparecem quando o Runtime fornecer handles canônicos.</p><div className="library-row"><span className="file-icon">MD</span><div><strong>desktop-bot-mode-plan.md</strong><span>preview · sem cópia local</span></div></div></section><section className="panel token-card"><div className="panel-heading"><div><span className="eyebrow">Receipts</span><h2>Token Reports</h2></div><Glyph name="activity" size={18} /></div><strong className="report-value">—</strong><p>Sem métrica agregada verificável para este período.</p><code>proof: unavailable</code></section></div><UnavailableNotice code="capability.registry_unavailable">Apps só ficam acionáveis depois de um probe do backend; o launcher não presume capacidades instaladas.</UnavailableNotice></div>
+    <div className="page product-page"><SurfaceHeading view="apps" snapshot={snapshot} /><div className="apps-toolbar"><div className="search-field"><Glyph name="search" size={16} /><span>Buscar capabilities, artifacts ou comandos</span><kbd>⌘K</kbd></div><ActionButton>Favoritos</ActionButton></div><section className="app-grid">{apps.map((app) => <article className="panel app-card" key={app.id}><div className="app-card-head"><span className="app-icon"><Glyph name={app.category === "Learn" ? "spark" : app.category === "Explore" ? "search" : app.category === "Act" ? "live" : app.category === "Build" ? "providers" : "apps"} size={19} /></span><span className="app-category">{app.category}</span></div><h2>{app.name}</h2><p>{app.description}</p><code>{app.reasonCode}</code><ActionButton>Abrir</ActionButton></article>)}</section><div className="apps-bottom-grid"><section className="panel library-card"><div className="panel-heading"><div><span className="eyebrow">Artifact Graph</span><h2>Library</h2></div><ActionButton>Ver tudo</ActionButton></div><p>Artifacts, versões e proveniência aparecem quando o Runtime fornecer handles canônicos.</p><div className="library-row"><span className="file-icon">MD</span><div><strong>desktop-bot-mode-plan.md</strong><span>preview · sem cópia local</span></div></div></section><section className="panel token-card"><div className="panel-heading"><div><span className="eyebrow">Receipts</span><h2>Token Reports</h2></div><Glyph name="activity" size={18} /></div><strong className="report-value">—</strong><p>Sem métrica agregada verificável para este período.</p><code>proof: unavailable</code></section></div><UnavailableNotice code={registry.reasonCode}>Apps só ficam acionáveis depois de um probe do backend; o launcher não presume capacidades instaladas.</UnavailableNotice></div>
   );
 }
 
