@@ -42,6 +42,57 @@ are not part of the signed Runtime update manifest because they are consumed
 by the Desktop distribution path. The release record must include their exact
 filename, SHA-256, size, and platform signing/notarization status.
 
+### Published Desktop v3.8.39
+
+The Desktop assets were added manually to the existing public `v3.8.39`
+release after [PR #263](https://github.com/wesleysimplicio/simplicio/pull/263)
+merged. Their source commit is `dd7dd0665630fcdd6c9a76d07956d840f80fc0a9`;
+the already published Runtime tag was not moved and no existing asset was
+overwritten.
+
+| Asset | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `Simplicio-3.8.39-arm64.dmg` | 33754359 | `5b2c6380d9f5b52ee0371cb3937a4279a806e22dd88f5a80e121e48e7de96735` |
+| `Simplicio-3.8.39-arm64.zip` | 32030285 | `38c73a9c7d6a80a2e370b3ce59d4299fae9f760e440dd406a9d453c6394ca290` |
+
+Both packages and their `.sig`, `.spdx.json`, and `.provenance.json` sidecars
+were downloaded again from GitHub. All eight assets matched the verified
+local files byte-for-byte; Ed25519 signatures, SBOM digests, provenance sizes,
+version, and source commit were checked against the downloaded files.
+
+The bundled `simplicio` must preserve the exact digest of the official
+`simplicio-macos-arm64` release asset:
+`c6dca7c384aaedb0226f6ea93a0dbe259a175f999c070e6c8ef609af519e5130`.
+When repairing the local ad-hoc app signature, sign the outer bundle only.
+Do not use `codesign --force --deep --sign -`: it rewrites the Runtime
+sidecar signature and changes its digest. `--deep` is appropriate for the
+subsequent verification, not for this signing step. Verify the sidecar hash
+before and after signing, then package, hash, and sign the final archives.
+
+Verified locally on macOS ARM64:
+
+- DMG mount, ZIP extraction, and installed app report Desktop `3.8.39`;
+- the bundled Runtime hash matches the official asset in all three locations;
+- `codesign --verify --deep --strict` passes in all three locations;
+- the installed app opens with Runtime `3.8.39`, active account, and working
+  navigation; frontend tests/build, Rust tests, and repository validation pass.
+
+Still open, and not implied by successful publication:
+
+- Apple Developer ID signing and notarization are unavailable. The signature
+  is ad-hoc and `spctl`/Gatekeeper rejects the app. Ed25519 distribution
+  authentication does not replace Apple platform trust.
+- Ambient/Workspace/Agent action contracts are incomplete in the installed
+  path. Today reports `ambient.today_projection_unavailable`; disabled
+  actions are not counted as working workflows.
+- Native installed smoke for Windows, Linux, and macOS Intel, plus composed
+  Loop/Agent/Code N/N-1 release-train gates, are not proven by this host's run.
+- Desktop provenance truthfully records
+  `optimization_profile_receipt_not_supplied`; no optimization result is
+  inferred from a successful build.
+
+### Historical Desktop v3.8.24
+
 For `v3.8.24`:
 
 - `Simplicio-3.8.24-arm64.dmg` — 135,726,628 bytes —
