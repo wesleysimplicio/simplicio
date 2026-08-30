@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { DesktopSnapshot } from "../contracts";
 import { Brand, Glyph, type GlyphName } from "./Brand";
 import { t } from "../i18n";
+import { createLauncherProjection } from "../launcher_projection";
 
 export type View =
   | "today"
@@ -42,6 +43,7 @@ interface ShellProps {
 
 export function Shell({ children, snapshot, view, onViewChange }: ShellProps) {
   const isHealthy = snapshot.runtime.state === "healthy";
+  const launcher = createLauncherProjection(snapshot);
 
   return (
     <div className="app-shell">
@@ -108,7 +110,7 @@ export function Shell({ children, snapshot, view, onViewChange }: ShellProps) {
             <button className="space-switcher" type="button" disabled title="Space switcher aguardando o contrato Workspace do Runtime">
               <span className="space-dot" /> Pessoal <Glyph name="chevron" size={14} />
             </button>
-            <button className="toolbar-button" type="button" disabled title="O launcher será habilitado quando o registro de capabilities estiver disponível"><Glyph name="plus" size={16} /> <span>Novo</span></button>
+            <button className="toolbar-button" type="button" disabled={!launcher.actions.some((action) => action.available)} title={launcher.reasonCode}><Glyph name="plus" size={16} /> <span>Novo</span></button>
             <button className="toolbar-button toolbar-search" type="button" disabled title="OmniSearch aguardando o índice canônico do Runtime"><Glyph name="search" size={16} /> <span>Buscar</span><kbd>⌘K</kbd></button>
             <button className="toolbar-icon-button" type="button" disabled title="Live indisponível até o Runtime expor uma sessão ativa"><Glyph name="live" size={16} /></button>
             <button className="toolbar-icon-button" type="button" disabled title="Sem novas atenções"><Glyph name="attention" size={16} /></button>
