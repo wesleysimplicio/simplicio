@@ -1,7 +1,7 @@
 :root {
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #25261f;
-  background: #f3edda;
+  background: #ffffff;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   --ink: #25261f;
@@ -13,13 +13,13 @@
   --green-pale: #eef5e9;
   --yellow: #e7c66a;
   --yellow-soft: #f6e9bd;
-  --canvas: #f3edda;
-  --sidebar: #ece4cc;
-  --surface: #faf7ea;
-  --surface-strong: #fffdf6;
-  --surface-muted: #f0ead7;
-  --line: #d8d0b9;
-  --line-soft: rgba(117, 108, 79, 0.14);
+  --canvas: #ffffff;
+  --sidebar: #ffffff;
+  --surface: #ffffff;
+  --surface-strong: #ffffff;
+  --surface-muted: #f5f6f7;
+  --line: #dfe3e6;
+  --line-soft: rgba(37, 38, 31, 0.12);
   --warning: #bb7b34;
   --danger: #bd665d;
   --mono: "SFMono-Regular", "IBM Plex Mono", Consolas, monospace;
@@ -163,11 +163,11 @@ p { margin-top: 0; }
 .button-secondary {
   color: #4f5148;
   border-color: var(--line);
-  background: rgba(255, 253, 246, 0.68);
+  background: var(--surface);
 }
 
 .button-secondary:hover {
-  border-color: #bdb49b;
+  border-color: #b9c1c7;
   background: var(--surface-strong);
 }
 
@@ -255,7 +255,7 @@ p { margin-top: 0; }
 
 .nav-item:hover {
   color: #41433b;
-  background: rgba(255, 253, 246, 0.48);
+  background: var(--surface-muted);
 }
 
 .nav-item.active {
@@ -281,9 +281,9 @@ p { margin-top: 0; }
 .sidebar-runtime {
   margin-top: auto;
   padding: 11px;
-  border: 1px solid #d3cab1;
+  border: 1px solid var(--line);
   border-radius: 10px;
-  background: rgba(255, 253, 246, 0.52);
+  background: var(--surface);
 }
 
 .runtime-row {
@@ -338,7 +338,7 @@ p { margin-top: 0; }
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 16px;
-  background: rgba(250, 247, 234, 0.82);
+  background: var(--surface);
   backdrop-filter: blur(14px);
 }
 
@@ -814,7 +814,7 @@ p { margin-top: 0; }
   display: flex;
   align-items: center;
   gap: 18px;
-  background: rgba(250, 247, 234, 0.72);
+  background: var(--surface);
 }
 
 .provider-summary > div {
@@ -854,7 +854,7 @@ p { margin-top: 0; }
   border: 1px solid var(--line);
   border-radius: 9px;
   display: inline-flex;
-  background: rgba(236, 228, 204, 0.56);
+  background: var(--surface-muted);
 }
 
 .segmented-control button {
@@ -1007,13 +1007,13 @@ p { margin-top: 0; }
   min-width: 0;
   margin-top: 10px;
   padding: 13px 15px;
-  border: 1px solid #d3cbb3;
+  border: 1px solid var(--line);
   border-radius: 11px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 13px;
-  background: #eee7d1;
+  background: var(--surface-muted);
 }
 
 .principle-icon {
@@ -1149,7 +1149,7 @@ p { margin-top: 0; }
   border-radius: 20px 0 0 20px;
   display: flex;
   flex-direction: column;
-  background: var(--yellow-soft);
+  background: var(--surface);
 }
 
 .access-story > .brand { margin-bottom: 40px; }
@@ -1183,7 +1183,7 @@ p { margin-top: 0; }
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(255, 253, 246, 0.42);
+  background: var(--surface-muted);
 }
 
 .access-proof-grid article > span { color: var(--green-dark); font-size: 10px; }
