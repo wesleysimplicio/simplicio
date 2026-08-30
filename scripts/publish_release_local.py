@@ -319,7 +319,10 @@ def stage_bundle(bundle: Path) -> list[Path]:
     for name in required_release_assets():
         destination = ROOT / name
         shutil.copy2(bundle / name, destination)
-        staged.append(destination)
+        # Executables are immutable GitHub Release assets, not source-tree
+        # files. The repository policy intentionally rejects tracked binaries.
+        if name not in ASSETS:
+            staged.append(destination)
     return staged
 
 

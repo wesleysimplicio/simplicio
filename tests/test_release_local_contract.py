@@ -116,6 +116,31 @@ def test_public_publisher_stages_versioned_codex_hooks(tmp_path, monkeypatch):
     assert (public / "codex/mcp-route.sh").stat().st_mode & 0o111
 
 
+
+def test_public_publisher_keeps_executables_out_of_the_source_commit(tmp_path, monkeypatch):
+    script = ROOT / "scripts/publish_release_local.py"
+    spec = importlib.util.spec_from_file_location("publish_release_local_assets", script)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+
+    bundle = tmp_path / "bundle"
+    public = tmp_path / "public"
+    bundle.mkdir()
+    public.mkdir()
+    for name in module.required_release_assets():
+        (bundle / name).write_bytes(("fixture:" + name).encode("utf-8"))
+
+    monkeypatch.setattr(module, "ROOT", public)
+    changed = module.stage_bundle(bundle)
+    changed_names = {path.relative_to(public).as_posix() for path in changed}
+
+    assert changed_names == set(module.required_release_assets()) - set(module.ASSETS)
+    assert not (changed_names & set(module.ASSETS))
+    for name in module.required_release_assets():
+        assert (public / name).read_bytes() == (bundle / name).read_bytes()
+
+
 def test_publication_paths_gate_the_executable_codex_hook_contract():
     publisher = (ROOT / "scripts/publish_release_local.py").read_text(encoding="utf-8")
     assert 'shutil.which("pwsh")' in publisher
