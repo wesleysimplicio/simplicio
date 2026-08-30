@@ -1,0 +1,17 @@
+:root {
+  --motion-instant: 100ms;
+  --motion-fast: 160ms;
+  --motion-standard: 220ms;
+  --motion-deliberate: 320ms;
+  --motion-ambient: 3200ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-instant: 1ms;
+    --motion-fast: 1ms;
+    --motion-standard: 1ms;
+    --motion-deliberate: 1ms;
+    --motion-ambient: 1ms;
+  }
+}
