@@ -10,9 +10,10 @@ describe("capability.registry/v1", () => {
     expect(registry.capabilities.every((item) => item.available === false)).toBe(true);
   });
 
-  it("requires a healthy Runtime source before exposing an app", () => {
+  it("does not substitute Runtime health for a capability probe or dispatch contract", () => {
     const snapshot = createDemoSnapshot("active");
     snapshot.source = "runtime";
-    expect(createCapabilityRegistry(snapshot).capabilities.every((item) => item.available)).toBe(true);
+    expect(createCapabilityRegistry(snapshot).capabilities.every((item) => !item.available)).toBe(true);
+    expect(createCapabilityRegistry(snapshot).capabilities.every((item) => item.reasonCode !== "capability_probe_verified")).toBe(true);
   });
 });

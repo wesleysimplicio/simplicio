@@ -4,6 +4,8 @@ import { createDemoSnapshot } from "./demo";
 import type { BotCenterSnapshot } from "./contracts";
 import type { BotActionRequest } from "./bot_center";
 import { applyDemoBotAction } from "./bot_center";
+import { parseTokenExportReceipt, parseTokenUsageReport, type TokenQuery, type TokenUsageReport } from "./token_usage";
+import { parseIntegrationPlan, type IntegrationPlan } from "./integration_setup";
 
 function previewState(): AccessState {
   const requested = new URLSearchParams(window.location.search).get("state");
@@ -32,7 +34,8 @@ export async function loadDesktopSnapshot(): Promise<DesktopSnapshot> {
 
 export async function beginDesktopLogin(): Promise<DesktopSnapshot> {
   if (!isTauri()) return createDemoSnapshot("active");
-  return withTimeout(invoke<DesktopSnapshot>("desktop_login"), 120_000, "Tempo limite do login excedido.");
+  // Runtime owns OAuth expiry; a frontend timeout must not authorize a duplicate login.
+  return invoke<DesktopSnapshot>("desktop_login");
 }
 
 export async function logoutDesktop(): Promise<DesktopSnapshot> {
@@ -45,13 +48,26 @@ export async function refreshDesktopSnapshot(): Promise<DesktopSnapshot> {
   return invoke<DesktopSnapshot>("refresh_desktop_snapshot");
 }
 
-export async function repairDesktopProviders(): Promise<DesktopSnapshot> {
+export async function planDesktopIntegrations(): Promise<IntegrationPlan> {
+  if (!isTauri()) return { schema: "simplicio.desktop-integration-plan/v1", source: "preview", planDigest: `sha256:${"0".repeat(64)}`, changes: [{ label: "codex", exists: true, changed: false }, { label: "grok", exists: true, changed: true }] };
+  return parseIntegrationPlan(await withTimeout(invoke<unknown>("desktop_plan_integrations"), 60_000, "integration_plan_timeout"));
+}
+
+export async function loadDesktopTokenReport(request: TokenQuery): Promise<TokenUsageReport> {
+  if (!isTauri()) throw new Error("preview_no_runtime");
+  return parseTokenUsageReport(await withTimeout(invoke<unknown>("desktop_token_report", { request }), 60_000, "token_report_timeout"));
+}
+
+export async function exportDesktopTokenReport(reportHash: string, format: "json" | "csv") {
+  if (!isTauri()) throw new Error("preview_no_runtime");
+  // Native state owns the report and destination. Never send a file body or path over IPC.
+  return parseTokenExportReceipt(await invoke<unknown>("desktop_export_token_report", { reportHash, format }));
+}
+
+export async function repairDesktopProviders(planDigest: string): Promise<DesktopSnapshot> {
   if (!isTauri()) return createDemoSnapshot(previewState());
-  return withTimeout(
-    invoke<DesktopSnapshot>("desktop_repair_providers"),
-    120_000,
-    "Tempo limite do reparo de integrações excedido.",
-  );
+  // Do not release the UI mutation lock on a timer while the native installer may still run.
+  return invoke<DesktopSnapshot>("desktop_repair_providers", { planDigest });
 }
 
 export async function dispatchDesktopBotAction(

@@ -13,6 +13,7 @@ export type View =
   | "home"
   | "bot"
   | "providers"
+  | "tokens"
   | "activity"
   | "memory"
   | "settings";
@@ -29,6 +30,7 @@ const legacyLabels: Partial<Record<View, string>> = {
   home: t("nav.today"),
   bot: "Bot Center",
   providers: t("nav.providers"),
+  tokens: "Relatório de tokens",
   activity: t("nav.activity"),
   memory: t("nav.memory"),
   settings: t("nav.settings"),
@@ -64,6 +66,11 @@ export function Shell({ children, snapshot, view, onViewChange }: ShellProps) {
               <span>{item.label}</span>
             </button>
           ))}
+          <p className="nav-caption nav-caption-spaced">RUNTIME</p>
+          {([
+            { id: "providers", label: "Integrações MCP", icon: "providers" },
+            { id: "tokens", label: "Relatório de tokens", icon: "activity" },
+          ] as const).map((item) => <button key={item.id} className={`nav-item ${view === item.id ? "active" : ""}`} type="button" aria-current={view === item.id ? "page" : undefined} onClick={() => onViewChange(item.id)}><Glyph name={item.icon} /><span>{item.label}</span></button>)}
           <p className="nav-caption nav-caption-spaced">CONTA</p>
           <button
             className={`nav-item ${view === "settings" ? "active" : ""}`}

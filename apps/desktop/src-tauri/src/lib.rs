@@ -2,9 +2,14 @@ use serde_json::Value;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use tauri::Manager;
 
+mod desktop_queries;
 mod legacy_snapshot;
 mod supervisor;
+mod token_exports;
+
+static INSTALL_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 const SNAPSHOT_SCHEMA: &str = "simplicio.desktop-snapshot/v1";
 const MAX_SNAPSHOT_BYTES: usize = 65_536;
@@ -17,7 +22,8 @@ const LEGACY_AUTH_ARGS: &[&str] = &["auth", "status", "--json"];
 const LEGACY_STATUS_ARGS: &[&str] = &["status", "--json"];
 const LEGACY_SAVINGS_ARGS: &[&str] = &["savings", "report", "--json"];
 const LEGACY_INSTALL_ARGS: &[&str] = &["install", "--global", "--dry-run", "--json"];
-const INSTALL_ARGS: &[&str] = &["install", "--global", "--json"];
+// Only dispatched after the reviewed plan digest and explicit UI consent match.
+const INSTALL_ARGS: &[&str] = &["install", "--global", "--yes", "--json"];
 const SUBSCRIPTION_URL: &str = "https://simpleti.com.br/simplicio";
 
 fn runtime_candidates_with(
@@ -101,8 +107,73 @@ fn run_runtime_action(args: &[&str]) -> Result<(), String> {
 }
 
 fn repair_provider_integrations() -> Result<(), String> {
-    run_runtime_action(INSTALL_ARGS)
-        .map_err(|_| "O Runtime não conseguiu reparar as integrações".to_string())
+    let receipt = run_runtime_json(INSTALL_ARGS)
+        .map_err(|_| "integration_install_unconfirmed".to_string())?;
+    desktop_queries::validate_install_receipt(&receipt)
+}
+
+fn require_active_access() -> Result<(), String> {
+    if snapshot_from_runtime()?
+        .pointer("/access/state")
+        .and_then(Value::as_str)
+        != Some("active")
+    {
+        return Err("desktop_access_not_active".into());
+    }
+    Ok(())
+}
+
+fn integration_plan_from_runtime() -> Result<Value, String> {
+    require_active_access()?;
+    desktop_queries::project_install_plan(run_runtime_json(LEGACY_INSTALL_ARGS)?)
+}
+
+#[tauri::command]
+async fn desktop_plan_integrations() -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(integration_plan_from_runtime)
+        .await
+        .map_err(|_| "integration_plan_unavailable".to_string())?
+}
+
+#[tauri::command]
+async fn desktop_token_report(
+    request: Value,
+    reports: tauri::State<'_, token_exports::TokenReports>,
+) -> Result<Value, String> {
+    let reports = reports.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        require_active_access()?;
+        let default_repo = std::env::var_os("SIMPLICIO_DESKTOP_REPO")
+            .or_else(|| std::env::var_os("HOME"))
+            .or_else(|| std::env::var_os("USERPROFILE"))
+            .map(PathBuf::from)
+            .ok_or("token_query_invalid")?;
+        let args = desktop_queries::token_query_args(&request, &default_repo)?;
+        let borrowed = args.iter().map(String::as_str).collect::<Vec<_>>();
+        reports.remember(run_runtime_json(&borrowed).map_err(|_| "token_report_unavailable")?)
+    })
+    .await
+    .map_err(|_| "token_report_unavailable".to_string())?
+}
+
+#[tauri::command]
+async fn desktop_export_token_report(
+    app: tauri::AppHandle,
+    reports: tauri::State<'_, token_exports::TokenReports>,
+    report_hash: String,
+    format: String,
+) -> Result<Value, String> {
+    let reports = reports.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        require_active_access()?;
+        let downloads = app
+            .path()
+            .download_dir()
+            .map_err(|_| "token_export_downloads_unavailable")?;
+        reports.save(&report_hash, &format, &downloads)
+    })
+    .await
+    .map_err(|_| "token_export_write_failed".to_string())?
 }
 
 fn open_subscription_url() -> Result<(), String> {
@@ -257,8 +328,15 @@ async fn desktop_logout() -> Result<Value, String> {
 }
 
 #[tauri::command]
-async fn desktop_repair_providers() -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(|| {
+async fn desktop_repair_providers(plan_digest: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = INSTALL_LOCK
+            .try_lock()
+            .map_err(|_| "integration_install_busy")?;
+        let plan = integration_plan_from_runtime()?;
+        if plan["planDigest"].as_str() != Some(plan_digest.as_str()) {
+            return Err("integration_plan_changed_review_again".into());
+        }
         repair_provider_integrations()?;
         snapshot_from_runtime()
     })
@@ -293,12 +371,16 @@ async fn runtime_status() -> Result<Value, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(token_exports::TokenReports::default())
         .invoke_handler(tauri::generate_handler![
             desktop_snapshot,
             refresh_desktop_snapshot,
             desktop_login,
             desktop_logout,
             desktop_repair_providers,
+            desktop_plan_integrations,
+            desktop_token_report,
+            desktop_export_token_report,
             desktop_open_subscription,
             desktop_bot_action,
             runtime_status
@@ -368,7 +450,7 @@ mod tests {
             LEGACY_INSTALL_ARGS,
             ["install", "--global", "--dry-run", "--json"]
         );
-        assert_eq!(INSTALL_ARGS, ["install", "--global", "--json"]);
+        assert_eq!(INSTALL_ARGS, ["install", "--global", "--yes", "--json"]);
         assert_eq!(SUBSCRIPTION_URL, "https://simpleti.com.br/simplicio");
     }
 

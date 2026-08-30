@@ -1,4 +1,5 @@
 import type { DesktopSnapshot } from "./contracts";
+import { providerRegistry } from "./provider_registry";
 
 export interface SettingsProjection {
   schema: "settings.projection/v1";
@@ -13,16 +14,19 @@ export interface SettingsProjection {
 }
 
 export function createSettingsProjection(snapshot: DesktopSnapshot, generatedAt = snapshot.generatedAt): SettingsProjection {
-  const runtime = snapshot.source === "runtime" && snapshot.runtime.state === "healthy";
+  const bots = snapshot.source === "runtime" && snapshot.botCenter?.source === "runtime" ? snapshot.botCenter.bots.slice(0, 32) : [];
+  const models = [...new Set(bots.filter((bot) => bot.model).map((bot) => `${bot.provider ?? "provider não informado"} · ${bot.model}`))];
+  const tools = [...new Set(bots.flatMap((bot) => bot.toolset))].slice(0, 128);
+  const skills = [...new Set(bots.flatMap((bot) => bot.skills))].slice(0, 128);
   return {
     schema: "settings.projection/v1",
     generatedAt,
     source: snapshot.source,
-    providers: snapshot.providers.slice(0, 32).map((provider) => ({ id: provider.id, name: provider.name, state: provider.state, availableActions: provider.availableActions })),
-    models: [{ id: "model-runtime-default", label: "Modelo fornecido pelo Runtime", selectable: runtime, reasonCode: runtime ? "model_probe_verified" : "model_probe_unavailable" }],
-    tools: [{ id: "tool-runtime-registry", label: "Registry de tools", enabled: runtime, reasonCode: runtime ? "tool_probe_verified" : "tool_probe_unavailable" }],
-    skills: [{ id: "skill-runtime-registry", label: "Registry de skills", enabled: runtime, reasonCode: runtime ? "skill_probe_verified" : "skill_probe_unavailable" }],
+    providers: providerRegistry(snapshot.providers).slice(0, 32).map((provider) => ({ id: provider.id, name: provider.name, state: provider.state, availableActions: provider.availableActions })),
+    models: models.map((label) => ({ id: label, label, selectable: false, reasonCode: "runtime_reported_read_only" })),
+    tools: tools.map((label) => ({ id: label, label, enabled: false, reasonCode: "runtime_reported_read_only" })),
+    skills: skills.map((label) => ({ id: label, label, enabled: false, reasonCode: "runtime_reported_read_only" })),
     secretPolicy: { bodiesVisible: false, writeOnly: true, rawExport: false },
-    reasonCode: runtime ? "settings.projection_ready" : "settings.projection_unavailable",
+    reasonCode: bots.length ? "settings.runtime_reported_inventory" : "settings.model_inventory_unavailable",
   };
 }

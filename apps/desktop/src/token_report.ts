@@ -14,7 +14,7 @@ export interface TokenReport {
 
 export function createTokenReport(snapshot: DesktopSnapshot, generatedAt = snapshot.generatedAt): TokenReport {
   const savings = snapshot.savings;
-  const measured = savings.proofKind === "measured" || savings.proofKind === "mixed" || savings.proofKind === "replayed";
+  const measured = savings.proofKind === "measured" && savings.ledgerStatus === "valid";
   return {
     schema: "insights.tokens/v1",
     generatedAt,
@@ -24,6 +24,6 @@ export function createTokenReport(snapshot: DesktopSnapshot, generatedAt = snaps
     providerCacheHitPercent: savings.providerCache.proofKind === "measured" ? savings.providerCache.hitPercent : null,
     proofKind: savings.proofKind,
     telemetrySource: savings.providerCache.telemetrySource,
-    reasonCode: measured ? "insights.tokens_projection_ready" : "insights.tokens_telemetry_unavailable",
+    reasonCode: measured ? "insights.tokens_projection_ready" : savings.proofKind === "mixed" || savings.proofKind === "replayed" ? "insights.savings_not_measured_usage" : "insights.tokens_telemetry_unavailable",
   };
 }

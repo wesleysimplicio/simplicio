@@ -11,10 +11,12 @@ describe("settings.projection/v1", () => {
     expect(JSON.stringify(projection)).not.toContain("voce@example.com");
   });
 
-  it("requires Runtime authority for model/tool/skill enablement", () => {
+  it("does not infer model/tool/skill inventory from a healthy Runtime", () => {
     const snapshot = createDemoSnapshot("active");
-    expect(createSettingsProjection(snapshot).models[0].selectable).toBe(false);
+    expect(createSettingsProjection(snapshot).models).toEqual([]);
     snapshot.source = "runtime";
-    expect(createSettingsProjection(snapshot).models[0].selectable).toBe(true);
+    expect(createSettingsProjection(snapshot).models).toEqual([]);
+    expect(createSettingsProjection(snapshot).tools).toEqual([]);
+    expect(createSettingsProjection(snapshot).reasonCode).toBe("settings.model_inventory_unavailable");
   });
 });
