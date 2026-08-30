@@ -2,8 +2,8 @@ export const designTokens = {
   color: {
     ink: "#25261f",
     muted: "#777567",
-    canvas: "#f3edda",
-    surface: "#faf7ea",
+    canvas: "#ffffff",
+    surface: "#ffffff",
     green: "#54a879",
     greenDark: "#2f704e",
     warning: "#bb7b34",

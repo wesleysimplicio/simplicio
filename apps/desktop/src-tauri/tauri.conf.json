@@ -14,6 +14,8 @@
       {
         "label": "main",
         "title": "Simplicio",
+        "theme": "Light",
+        "backgroundColor": "#ffffff",
         "width": 1280,
         "height": 820,
         "minWidth": 860,
