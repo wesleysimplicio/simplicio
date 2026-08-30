@@ -15,3 +15,8 @@ sidebar-to-bottom navigation, a reduced-motion media query, and a forced-colors
 fallback. Screens keep loading, empty, offline, recoverable-error, and
 updating states short and actionable. Review screenshots at narrow and wide
 window sizes before shipping a visual change.
+
+Motion uses named durations: instant 80–120ms, fast 140–180ms, standard
+180–240ms, deliberate 260–360ms, and ambient 2.4–4s. Motion never delays an
+action, and reduced-motion removes decorative movement while preserving state
+changes and focus visibility.

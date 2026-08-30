@@ -13,5 +13,9 @@ describe("desktop design system", () => {
     expect(designTokens.targetMinimum).toBe("44px");
     expect(designTokens.focus).toContain("2px");
     expect(designTokens.radius.md).toBe("9px");
+    expect(designTokens.motion.instant).toBe("100ms");
+    expect(designTokens.motion.standard).toBe("220ms");
+    expect(designTokens.motion.deliberate).toBe("320ms");
+    expect(designTokens.motion.ambient).toBe("3200ms");
   });
 });
