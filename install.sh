@@ -36,6 +36,9 @@ GITHUB="https://github.com/$REPO"
 ED25519_PUBLIC_KEY="2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok="
 ED25519_HELPER_URL="https://raw.githubusercontent.com/$REPO/master/scripts/verify_ed25519.py"
 ED25519_HELPER_SHA256="f03a0719dd557ddea27dc4cf1456d6f06a47b9056505e4d4b8453090697600d0"
+PUBLIC_ROUTE_REF="cc9950025baf823cdecc657228ff1e89d7701e7e"
+PUBLIC_ROUTE_URL="https://raw.githubusercontent.com/$REPO/$PUBLIC_ROUTE_REF/codex/mcp-route.sh"
+PUBLIC_ROUTE_SHA256="0f3a6a32c6f224fb3aedea5336f60c5c63917b134113d4c4e524e8ae7b4a31a4"
 BIN_NAME="simplicio"
 MARKETPLACE_PLUGINS="simplicio simplicio-loop simplicio-prompt simplicio-sprint simplicio-hermes"
 
@@ -96,6 +99,33 @@ sha256_of() {
   else
     err "Precisa de sha256sum ou shasum para verificar a integridade do download"
   fi
+}
+
+reconcile_public_route_overlay() {
+  hook_dir="$PURGE_DIR/hooks"
+  hook_path="$hook_dir/mcp-route.sh"
+
+  if [ -f "$hook_path" ] && [ "$(sha256_of "$hook_path")" = "$PUBLIC_ROUTE_SHA256" ]; then
+    return 0
+  fi
+
+  mkdir -p "$hook_dir" || return 1
+  hook_tmp="$hook_dir/.mcp-route.sh.download-$$"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$PUBLIC_ROUTE_URL" -o "$hook_tmp" || { rm -f "$hook_tmp"; return 1; }
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q "$PUBLIC_ROUTE_URL" -O "$hook_tmp" || { rm -f "$hook_tmp"; return 1; }
+  else
+    return 1
+  fi
+
+  if [ "$(sha256_of "$hook_tmp")" != "$PUBLIC_ROUTE_SHA256" ] ||
+     ! grep -q 'simplicio-hook-version: 3240-v11' "$hook_tmp"; then
+    rm -f "$hook_tmp"
+    return 1
+  fi
+  chmod 0755 "$hook_tmp" || { rm -f "$hook_tmp"; return 1; }
+  mv -f "$hook_tmp" "$hook_path"
 }
 
 verify_ed25519_signature() {
@@ -739,6 +769,11 @@ if verify_mcp_tools "$DEST_PATH"; then
   ok "MCP e hooks registrados automaticamente para os clientes detectados"
 else
   err "o Runtime foi instalado, mas o registro automático de MCP/hooks falhou: $DEST_PATH mcp register --binary $DEST_PATH --json"
+fi
+if reconcile_public_route_overlay; then
+  ok "hook público v11 verificado e reconciliado após o registro do Runtime"
+else
+  err "o Runtime registrou o MCP, mas o hook público v11 não pôde ser verificado e ativado"
 fi
 
 # Host packages add skills, commands and host-specific lifecycle behavior on

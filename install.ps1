@@ -43,6 +43,9 @@ $Asset = "simplicio-windows-x64.exe"
 $Ed25519PublicKey = "2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok="
 $Ed25519HelperUrl = "https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/scripts/verify_ed25519.py"
 $Ed25519HelperSha256 = "f03a0719dd557ddea27dc4cf1456d6f06a47b9056505e4d4b8453090697600d0"
+$PublicRouteRef = "cc9950025baf823cdecc657228ff1e89d7701e7e"
+$PublicRouteUrl = "https://raw.githubusercontent.com/$Repo/$PublicRouteRef/codex/mcp-route.ps1"
+$PublicRouteSha256 = "fea2b06c95c9f75bf17fc46b603c8e3817aa6f680af468fa73c066210970c89c"
 $PinnedPublicKey = ([string]$Ed25519PublicKey).Trim()
 $script:Ed25519VerifyError = ""
 $SimplicioMcpUrl = if ($env:SIMPLICIO_MCP_URL) { $env:SIMPLICIO_MCP_URL } else { "http://127.0.0.1:8787/mcp" }
@@ -206,6 +209,33 @@ function Invoke-NativeHostCommand([string]$Command, [string[]]$Arguments) {
     return ($LASTEXITCODE -eq 0)
   } catch {
     return $false
+  }
+}
+
+function Sync-PublicRouteOverlay {
+  $hookDir = Join-Path $PurgeDir "hooks"
+  $hookPath = Join-Path $hookDir "mcp-route.ps1"
+  if (Test-Path $hookPath) {
+    $currentHash = (Get-FileHash -Algorithm SHA256 -Path $hookPath).Hash.ToLowerInvariant()
+    if ($currentHash -eq $PublicRouteSha256) { return $true }
+  }
+
+  New-Item -ItemType Directory -Force -Path $hookDir | Out-Null
+  $hookTemp = Join-Path $hookDir (".mcp-route.ps1.download-$PID")
+  try {
+    Invoke-WebRequest -Uri $PublicRouteUrl -OutFile $hookTemp -UseBasicParsing
+    $downloadHash = (Get-FileHash -Algorithm SHA256 -Path $hookTemp).Hash.ToLowerInvariant()
+    $downloadText = Get-Content -Raw -Path $hookTemp
+    if ($downloadHash -ne $PublicRouteSha256 -or
+        $downloadText -notmatch 'simplicio-hook-version: 3240-v11') {
+      return $false
+    }
+    Move-Item -Force -Path $hookTemp -Destination $hookPath
+    return $true
+  } catch {
+    return $false
+  } finally {
+    if (Test-Path $hookTemp) { Remove-Item -Force $hookTemp -ErrorAction SilentlyContinue }
   }
 }
 
@@ -654,6 +684,12 @@ if (Test-McpToolSurface $DestPath) {
   Write-Host "  ✓ MCP and hooks registered automatically for detected clients"
 } else {
   Write-Error "Runtime installed, but automatic MCP/hooks registration failed: $DestPath mcp register --binary $DestPath --json"
+  exit 1
+}
+if (Sync-PublicRouteOverlay) {
+  Write-Host "  ✓ verified public v11 hook reconciled after Runtime registration"
+} else {
+  Write-Error "Runtime registered MCP, but the public v11 hook could not be verified and activated"
   exit 1
 }
 
