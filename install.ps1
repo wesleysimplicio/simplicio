@@ -284,7 +284,10 @@ function Install-DetectedHostPlugins {
   $failures = 0
   if (Get-Command codex -CommandType Application -ErrorAction SilentlyContinue) {
     $detected += 1
-    [void](Invoke-NativeHostCommand "codex" @("plugin", "marketplace", "add", $Repo, "--ref", "master"))
+    [void](Invoke-NativeHostCommand "codex" @(
+      "plugin", "marketplace", "add", $Repo, "--ref", "master",
+      "--sparse", ".agents/plugins", "--sparse", "plugins/simplicio"
+    ))
     if (Invoke-NativeHostCommand "codex" @("plugin", "add", "simplicio@simplicio-codex")) {
       Write-Host "  ✓ Codex native plugin installed"
     } else {
