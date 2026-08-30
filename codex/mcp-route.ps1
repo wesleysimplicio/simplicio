@@ -1,6 +1,8 @@
 # Simplicio MCP route — advisory Map cache for Windows hosts.
-# simplicio-hook-version: 3240-v8
-# Native shell/terminal is denied unless it directly invokes Simplicio.
+# simplicio-hook-version: 3240-v11
+# Lifecycle events inject a bounded Map excerpt once per generation.
+# Native shell/terminal execution is governed: only direct Simplicio Shell/CLI
+# invocations pass; third-party MCP/apps remain available unchanged.
 param([switch]$WarmWorker)
 
 $ErrorActionPreference = 'Stop'
@@ -161,8 +163,23 @@ if ([string]::IsNullOrWhiteSpace($raw)) {
   $raw = [Console]::In.ReadToEnd()
 }
 if ([string]::IsNullOrWhiteSpace($raw)) { Allow-Unchanged }
-try { $hook = $raw | ConvertFrom-Json } catch { Allow-Unchanged }
-if ($null -eq $hook) { Allow-Unchanged }
+function Emit-UnclassifiablePayload([string]$Reason) {
+  @{
+    hookSpecificOutput = @{
+      hookEventName = 'PreToolUse'
+      permissionDecision = 'deny'
+      permissionDecisionReason = $Reason
+    }
+  } | ConvertTo-Json -Compress
+  exit 2
+}
+
+try { $hook = $raw | ConvertFrom-Json } catch {
+  Emit-UnclassifiablePayload 'Simplicio hook received an invalid payload; native shell/terminal execution is blocked until the hook input is repaired.'
+}
+if ($null -eq $hook -or $hook -isnot [pscustomobject]) {
+  Emit-UnclassifiablePayload 'Simplicio hook received an unclassifiable payload; native shell/terminal execution is blocked until the hook input is repaired.'
+}
 
 $event = [string]($hook.hookEventName)
 if ([string]::IsNullOrWhiteSpace($event)) { $event = [string]($hook.hook_event_name) }
@@ -180,25 +197,31 @@ function Emit-Context([string]$Name, [string]$Body) {
   exit 0
 }
 
-function Emit-DenyNativeShell {
-  @{
-    hookSpecificOutput = @{
-      hookEventName = 'PreToolUse'
-      permissionDecision = 'deny'
-      permissionDecisionReason = (
-        'Native shell/terminal is disabled; use a Simplicio MCP tool or ' +
-        'invoke the command directly through simplicio.'
-      )
-    }
-  } | ConvertTo-Json -Compress
-  exit 0
-}
-
 function Get-HookToolName {
   $name = [string]($hook.toolName)
   if ([string]::IsNullOrWhiteSpace($name)) { $name = [string]($hook.tool_name) }
   if ([string]::IsNullOrWhiteSpace($name)) { $name = [string]($hook.name) }
   return $name
+}
+
+function Get-HookToolInputValue {
+  if ($null -ne $hook.toolInput) { return $hook.toolInput }
+  if ($null -ne $hook.tool_input) { return $hook.tool_input }
+  if ($null -ne $hook.input) { return $hook.input }
+  return $null
+}
+
+function Get-HookToolInputText {
+  $value = Get-HookToolInputValue
+  if ($null -eq $value) { return '' }
+  if ($value -is [string]) { return [string]$value }
+  foreach ($key in @('input', 'code', 'source', 'script', 'javascript', 'text')) {
+    $property = $value.PSObject.Properties[$key]
+    if ($null -ne $property -and $property.Value -is [string]) {
+      return [string]$property.Value
+    }
+  }
+  try { return ($value | ConvertTo-Json -Compress -Depth 20) } catch { return '' }
 }
 
 function Test-NativeShellTool([string]$Name) {
@@ -212,11 +235,36 @@ function Test-NativeShellTool([string]$Name) {
   $parts = @($normalized -split '(?:__|::|\.)')
   $leaf = if ($parts.Count -gt 0) { $parts[-1] } else { $normalized }
   $shellNames = @(
-    'bash', 'cmd', 'exec_command', 'execute_command', 'powershell', 'pwsh',
-    'run_command', 'run_shell_command', 'run_terminal_command', 'shell',
-    'shell_command', 'terminal', 'terminal_command', 'write_stdin'
+    'bash', 'cmd', 'exec_command', 'execute_command', 'fish', 'powershell', 'pwsh',
+    'run_command', 'run_shell_command', 'run_terminal_command', 'sh', 'shell',
+    'shell_command', 'terminal', 'terminal_command', 'wsl', 'write_stdin', 'zsh'
   )
   return $shellNames -contains $leaf
+}
+
+function Test-OrchestratorExecTool([string]$Name) {
+  $normalized = $Name.Trim().ToLowerInvariant().Replace('-', '_')
+  return @('functions.exec', 'functions__exec') -contains $normalized
+}
+
+function Test-NestedNativeShellRequest {
+  $payload = Get-HookToolInputText
+  if ([string]::IsNullOrWhiteSpace($payload)) { return $false }
+  $compact = [regex]::Replace($payload, '\s+', '')
+  foreach ($token in @(
+    'tools.exec_command', 'tools?.exec_command', 'tools["exec_command"]',
+    "tools['exec_command']", 'tools.write_stdin', 'tools?.write_stdin',
+    'tools["write_stdin"]', "tools['write_stdin']"
+  )) {
+    if ($compact.IndexOf($token, [StringComparison]::OrdinalIgnoreCase) -ge 0) {
+      return $true
+    }
+  }
+  return [regex]::IsMatch(
+    $compact,
+    '\{[^}]*\b(?:exec_command|write_stdin)\b[^}]*\}=tools\b',
+    [Text.RegularExpressions.RegexOptions]::IgnoreCase
+  )
 }
 
 function Get-HookCommand {
@@ -238,9 +286,11 @@ function Test-DirectSimplicioCommand([string]$Command) {
   $value = $Command.Trim()
   if ($value.StartsWith('&')) { $value = $value.Substring(1).TrimStart() }
   if ([string]::IsNullOrWhiteSpace($value)) { return $false }
-  foreach ($marker in @("`r", "`n", ';', '&&', '||', '|', '`', '$(', '>', '<', '&')) {
+  if ($value.Contains([char]13) -or $value.Contains([char]10)) { return $false }
+  foreach ($marker in @(';', '&&', '||', '|', '$(', '>', '<', '&')) {
     if ($value.Contains($marker)) { return $false }
   }
+  if ($value.Contains([char]96)) { return $false }
 
   $executable = ''
   if ($value[0] -eq '"' -or $value[0] -eq "'") {
@@ -255,8 +305,20 @@ function Test-DirectSimplicioCommand([string]$Command) {
   }
   $parts = @(($executable.Replace('\', '/')) -split '/')
   $leaf = if ($parts.Count -gt 0) { $parts[-1].ToLowerInvariant() } else { '' }
-  return $leaf -eq 'simplicio' -or $leaf -eq 'simplicio.exe'
+  return $leaf -in @('simplicio', 'simplicio.exe', 'simplicio-shell', 'simplicio-shell.exe')
 }
+
+function Emit-DenyNativeShell {
+  @{
+    hookSpecificOutput = @{
+      hookEventName = 'PreToolUse'
+      permissionDecision = 'deny'
+      permissionDecisionReason = 'Native shell/terminal is blocked; use the governed Simplicio Shell/CLI or a Simplicio MCP tool.'
+    }
+  } | ConvertTo-Json -Compress
+  exit 0
+}
+
 
 function Get-Sha256Text([string]$Text) {
   $sha = [Security.Cryptography.SHA256]::Create()
@@ -433,12 +495,27 @@ function Start-WarmContext([string]$Root) {
   }
 }
 
+function Get-DeliveryScope {
+  $material = [ordered]@{
+    host = if (-not [string]::IsNullOrWhiteSpace([string]$hook.host)) { [string]$hook.host } elseif (-not [string]::IsNullOrWhiteSpace([string]$hook.host_id)) { [string]$hook.host_id } else { [Environment]::GetEnvironmentVariable('SIMPLICIO_HOST_ID') }
+    session = if (-not [string]::IsNullOrWhiteSpace([string]$hook.session_id)) { [string]$hook.session_id } elseif (-not [string]::IsNullOrWhiteSpace([string]$hook.sessionId)) { [string]$hook.sessionId } else { [Environment]::GetEnvironmentVariable('SIMPLICIO_SESSION_ID') }
+    subagent = if (-not [string]::IsNullOrWhiteSpace([string]$hook.subagent_id)) { [string]$hook.subagent_id } elseif (-not [string]::IsNullOrWhiteSpace([string]$hook.agent_id)) { [string]$hook.agent_id } else { [Environment]::GetEnvironmentVariable('SIMPLICIO_SUBAGENT_ID') }
+  }
+  return Get-Sha256Text ($material | ConvertTo-Json -Compress)
+}
+
 function Get-CompactSummaryOnce([string]$Root, [string]$Generation) {
   $state = Join-Path $Root '.simplicio/hook-context'
+  try { New-Item -ItemType Directory -Force -Path $state | Out-Null } catch { return '' }
   $receipt = Get-ReadyReceipt $state $Generation
-  if ($null -eq $receipt) { return '' }
+  $mapSha = ''
+  $mapBytes = 0
+  if ($null -ne $receipt) {
+    $mapSha = [string]$receipt.map_sha256
+    $mapBytes = [long]$receipt.map_bytes
+  }
   try {
-    $marker = Join-Path $state 'summary-receipt.json'
+    $marker = Join-Path $state ('summary-receipt-{0}.json' -f (Get-DeliveryScope))
     $lock = Join-Path $state 'summary-receipt.lock'
     if (-not (Try-AcquireLock $lock 30)) { return '' }
     try {
@@ -448,7 +525,7 @@ function Get-CompactSummaryOnce([string]$Root, [string]$Generation) {
           if (
             $prior.schema -eq $InjectionReceiptSchema -and
             $prior.generation -eq $Generation -and
-            $prior.map_sha256 -eq $receipt.map_sha256
+            [string]$prior.map_sha256 -eq $mapSha
           ) { return '' }
         } catch {}
       }
@@ -456,7 +533,7 @@ function Get-CompactSummaryOnce([string]$Root, [string]$Generation) {
       [ordered]@{
         schema = $InjectionReceiptSchema
         generation = $Generation
-        map_sha256 = [string]$receipt.map_sha256
+        map_sha256 = $mapSha
       } | ConvertTo-Json -Compress | Set-Content -LiteralPath $markerTmp -NoNewline
       Move-Item -LiteralPath $markerTmp -Destination $marker -Force
     } finally {
@@ -466,14 +543,21 @@ function Get-CompactSummaryOnce([string]$Root, [string]$Generation) {
     return ''
   }
 
-  return (
-    'Simplicio Map cache: generation={0} map_sha256={1} map_bytes={2}. ' +
-    'The complete generated Map is available on demand via simplicio_context; ' +
-    'Map content is not injected into the prompt. Native shell/terminal tools ' +
-    'are disabled unless routed directly through Simplicio; third-party MCP/apps ' +
-    'and non-shell native tools remain allowed. Agent fan-out is off by default; ' +
-    'one optional subagent may be used economically through Simplicio MCP.'
-  ) -f $Generation, $receipt.map_sha256, $receipt.map_bytes
+  $body = (
+    'Simplicio context bridge: use simplicio_context for the complete cached Map ' +
+    'and simplicio_edit for governed edits when relevant. Preserve explicit user ' +
+    'intent, keep normal reasoning for ' +
+    'ambiguous or multi-step work, and route native shell/terminal through ' +
+    'the governed Simplicio Shell/CLI; third-party MCP/apps and non-shell tools ' +
+    'remain available unchanged.'
+  )
+  if ($null -eq $receipt) {
+    return $body + ' Map cache is still warming or unavailable; continue normally.'
+  }
+  $body += ((' MapHandle: schema=simplicio.map-handle/v1 generation={0} ' +
+    'map_sha256={1} map_bytes={2}. Call simplicio_context for the complete Map; ' +
+    'no context body was injected.') -f $Generation, $mapSha, $mapBytes)
+  return $body
 }
 
 function Get-RepoFromHook {
@@ -498,13 +582,18 @@ if ($contextEvents.ContainsKey($event)) {
   Allow-Unchanged
 }
 
-# Deny native terminal execution unless the command enters through the governed
-# Simplicio CLI. Third-party MCP/apps and non-shell native tools pass unchanged.
-if (
-  @('', 'pretooluse', 'pre_tool_use') -contains $event -and
-  (Test-NativeShellTool (Get-HookToolName)) -and
-  -not (Test-DirectSimplicioCommand (Get-HookCommand))
-) { Emit-DenyNativeShell }
+# Native shell/terminal is blocked unless the command enters through the governed
+# Simplicio Shell/CLI. Third-party MCP/apps and non-shell tools pass unchanged.
+if (@('', 'pretooluse', 'pre_tool_use') -contains $event) {
+  $toolName = Get-HookToolName
+  if ((Test-OrchestratorExecTool $toolName) -and (Test-NestedNativeShellRequest)) {
+    Emit-DenyNativeShell
+  }
+  if (
+    (Test-NativeShellTool $toolName) -and
+    -not (Test-DirectSimplicioCommand (Get-HookCommand))
+  ) { Emit-DenyNativeShell }
+}
 
-Start-WarmContext $repo | Out-Null
+# PreToolUse is safety-only: never scan Git or warm/build a Map here.
 Allow-Unchanged
