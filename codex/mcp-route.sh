@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Simplicio MCP route — advisory Map cache for every supported host.
-# simplicio-hook-version: 3240-v8
+# simplicio-hook-version: 3240-v11
 #
-# Native shell/terminal is denied unless it directly invokes Simplicio.
-# Third-party MCP/apps and non-shell native tools remain allowed unchanged.
-# The hook builds one complete Map artifact per repository generation and emits
-# only a compact content-addressed receipt once per repository generation.
+# The hook builds one complete Map artifact per repository generation.
+# Lifecycle events inject a bounded Map excerpt once per generation; callers can
+# retrieve the complete artifact with simplicio_context. Native shell/terminal
+# execution is governed: only direct Simplicio Shell/CLI invocations pass.
 set -uo pipefail
 
 SIMPLICIO_BIN="${SIMPLICIO_BIN:-${SIMPLICIO_BIN_DIR:-${HOME}/.simplicio/bin}/simplicio}"
@@ -17,7 +17,8 @@ INPUT="$(cat 2>/dev/null || true)"
 [ -n "$INPUT" ] || exit 0
 
 if ! command -v python3 >/dev/null 2>&1; then
-  exit 0
+  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Simplicio hook parser unavailable; native shell/terminal execution is blocked until the governed route is restored."}}'
+  exit 2
 fi
 
 export SIMPLICIO_MCP_ROUTE_INPUT="$INPUT"
@@ -38,11 +39,34 @@ RUNTIME_BIN = os.environ.get("SIMPLICIO_BIN") or str(
 MAP_RECEIPT_SCHEMA = "simplicio.hook-map-receipt/v1"
 INJECTION_RECEIPT_SCHEMA = "simplicio.hook-context-injection/v1"
 
+def deny_unclassifiable_payload(reason: str) -> None:
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": reason,
+                }
+            },
+            separators=(",", ":"),
+        )
+    )
+    raise SystemExit(2)
+
+
 try:
     hook = json.loads(raw)
 except Exception:
-    # Advisory hooks fail open for malformed third-party payloads.
-    raise SystemExit(0)
+    deny_unclassifiable_payload(
+        "Simplicio hook received an invalid payload; native shell/terminal execution "
+        "is blocked until the hook input is repaired."
+    )
+if not isinstance(hook, dict):
+    deny_unclassifiable_payload(
+        "Simplicio hook received an unclassifiable payload; native shell/terminal "
+        "execution is blocked until the hook input is repaired."
+    )
 
 event = (
     hook.get("hookEventName")
@@ -73,9 +97,33 @@ def hook_tool_name() -> str:
     )
 
 
+def hook_tool_input_value():
+    for key in ("toolInput", "tool_input", "input"):
+        if key in hook and hook[key] is not None:
+            return hook[key]
+    return {}
+
+
 def hook_tool_input() -> dict:
-    value = hook.get("toolInput") or hook.get("tool_input") or hook.get("input") or {}
+    value = hook_tool_input_value()
     return value if isinstance(value, dict) else {}
+
+
+def hook_tool_input_text() -> str:
+    value = hook_tool_input_value()
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (dict, list)):
+        if isinstance(value, dict):
+            for key in ("input", "code", "source", "script", "javascript", "text"):
+                candidate = value.get(key)
+                if isinstance(candidate, str):
+                    return candidate
+        try:
+            return json.dumps(value, sort_keys=True, separators=(",", ":"))
+        except (TypeError, ValueError):
+            return ""
+    return ""
 
 
 def is_native_shell_tool(name: str) -> bool:
@@ -84,22 +132,33 @@ def is_native_shell_tool(name: str) -> bool:
         return False
     leaf = re.split(r"(?:::|__|\.)", normalized)[-1]
     shell_names = {
-        "bash",
-        "cmd",
-        "exec_command",
-        "execute_command",
-        "powershell",
-        "pwsh",
-        "run_command",
-        "run_shell_command",
-        "run_terminal_command",
-        "shell",
-        "shell_command",
-        "terminal",
-        "terminal_command",
-        "write_stdin",
+        "bash", "cmd", "exec_command", "execute_command", "fish",
+        "powershell", "pwsh", "run_command", "run_shell_command",
+        "run_terminal_command", "sh", "shell", "shell_command",
+        "terminal", "terminal_command", "wsl", "write_stdin", "zsh",
     }
     return normalized in shell_names or leaf in shell_names
+
+
+def is_orchestrator_exec_tool(name: str) -> bool:
+    normalized = name.strip().lower().replace("-", "_")
+    return normalized in {"functions.exec", "functions__exec"}
+
+
+def nested_native_shell_request() -> bool:
+    payload = hook_tool_input_text()
+    if not payload:
+        return False
+    property_access = re.compile(
+        r"""\btools(?:\?\.)?(?:\.(?:exec_command|write_stdin)\b|"""
+        r"""\[\s*['"](?:exec_command|write_stdin)['"]\s*\])""",
+        re.IGNORECASE,
+    )
+    destructured = re.compile(
+        r"""\{[^}]*\b(?:exec_command|write_stdin)\b[^}]*\}\s*=\s*tools\b""",
+        re.IGNORECASE | re.DOTALL,
+    )
+    return bool(property_access.search(payload) or destructured.search(payload))
 
 
 def requested_command() -> str:
@@ -118,8 +177,8 @@ def is_direct_simplicio_command(command: str) -> bool:
     if value.startswith("&"):
         value = value[1:].lstrip()
     if not value or any(marker in value for marker in (
-        "\r", "\n", ";", "&&", "||", "|", "`", "$(", ">", "<", "&"
-    )):
+        "\r", "\n", ";", "&&", "||", "|", "$(", ">", "<", "&"
+    )) or "`" in value:
         return False
     if value[0] in ("'", '"'):
         quote = value[0]
@@ -130,7 +189,7 @@ def is_direct_simplicio_command(command: str) -> bool:
     else:
         executable = value.split(None, 1)[0]
     leaf = re.split(r"[\\/]", executable)[-1].lower()
-    return leaf in {"simplicio", "simplicio.exe"}
+    return leaf in {"simplicio", "simplicio.exe", "simplicio-shell", "simplicio-shell.exe"}
 
 
 def deny_native_shell() -> None:
@@ -141,8 +200,8 @@ def deny_native_shell() -> None:
                     "hookEventName": "PreToolUse",
                     "permissionDecision": "deny",
                     "permissionDecisionReason": (
-                        "Native shell/terminal is disabled; use a Simplicio MCP "
-                        "tool or invoke the command directly through simplicio."
+                        "Native shell/terminal is blocked; use the governed "
+                        "Simplicio Shell/CLI or a Simplicio MCP tool."
                     ),
                 }
             },
@@ -150,6 +209,7 @@ def deny_native_shell() -> None:
         )
     )
     raise SystemExit(0)
+
 
 
 def repository_generation(root: pathlib.Path) -> str:
@@ -344,13 +404,29 @@ def warm_context(repo: str) -> tuple[pathlib.Path, str] | None:
     return root, generation
 
 
+def delivery_scope() -> str:
+    material = {
+        "host": hook.get("host") or hook.get("host_id") or os.environ.get("SIMPLICIO_HOST_ID", "unknown"),
+        "session": hook.get("session_id") or hook.get("sessionId") or os.environ.get("SIMPLICIO_SESSION_ID", "unknown"),
+        "subagent": hook.get("subagent_id") or hook.get("agent_id") or os.environ.get("SIMPLICIO_SUBAGENT_ID", "none"),
+    }
+    encoded = json.dumps(material, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()[:32]
+
+
 def compact_summary_once(root: pathlib.Path, generation: str) -> str:
     state = root / ".simplicio" / "hook-context"
-    receipt = read_ready_receipt(state, generation)
-    if receipt is None:
-        return ""
     try:
-        marker = state / "summary-receipt.json"
+        state.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return ""
+    receipt = read_ready_receipt(state, generation)
+    map_sha = receipt.get("map_sha256", "") if receipt else ""
+    map_bytes = receipt.get("map_bytes", 0) if receipt else 0
+    excerpt = ""
+
+    try:
+        marker = state / f"summary-receipt-{delivery_scope()}.json"
         lock = state / "summary-receipt.lock"
         if not acquire_lock(lock, stale_after=30):
             return ""
@@ -360,7 +436,7 @@ def compact_summary_once(root: pathlib.Path, generation: str) -> str:
                 if (
                     prior.get("schema") == INJECTION_RECEIPT_SCHEMA
                     and prior.get("generation") == generation
-                    and prior.get("map_sha256") == receipt["map_sha256"]
+                    and prior.get("map_sha256", "") == map_sha
                 ):
                     return ""
             except (OSError, ValueError, TypeError):
@@ -371,7 +447,7 @@ def compact_summary_once(root: pathlib.Path, generation: str) -> str:
                     {
                         "schema": INJECTION_RECEIPT_SCHEMA,
                         "generation": generation,
-                        "map_sha256": receipt["map_sha256"],
+                        "map_sha256": map_sha,
                     },
                     sort_keys=True,
                     separators=(",", ":"),
@@ -387,15 +463,23 @@ def compact_summary_once(root: pathlib.Path, generation: str) -> str:
     except OSError:
         return ""
 
+    base = (
+        "Simplicio context bridge: use simplicio_context for the complete cached Map "
+        "and simplicio_edit for governed edits when relevant. Preserve explicit user "
+        "intent, keep normal reasoning "
+        "for ambiguous or multi-step work, and route native shell/terminal "
+        "through the governed Simplicio Shell/CLI; third-party MCP/apps and "
+        "non-shell tools remain available unchanged."
+    )
+    if receipt is None:
+        return base + " Map cache is still warming or unavailable; continue normally."
+    # Only a stable, bounded handle crosses the hook boundary. The complete
+    # Map remains a Runtime-owned artifact retrieved explicitly through MCP.
     return (
-        "Simplicio Map cache: "
-        f"generation={generation} map_sha256={receipt['map_sha256']} "
-        f"map_bytes={receipt['map_bytes']}. "
-        "The complete generated Map is available on demand via simplicio_context; "
-        "Map content is not injected into the prompt. Native shell/terminal tools "
-        "are disabled unless routed directly through Simplicio; third-party MCP/apps "
-        "and non-shell native tools remain allowed. Agent fan-out is off by default; "
-        "one optional subagent may be used economically through Simplicio MCP."
+        base
+        + f" MapHandle: schema=simplicio.map-handle/v1 generation={generation} "
+        + f"map_sha256={map_sha} map_bytes={map_bytes}. "
+        + "Call simplicio_context for the complete Map; no context body was injected."
     )
 
 
@@ -427,12 +511,15 @@ if event in context_events:
     raise SystemExit(0)
 
 
-# PreToolUse blocks native terminal execution unless the command enters through
-# the governed Simplicio CLI. Third-party MCP/apps and non-shell native tools pass.
-if event in {"", "pretooluse", "pre_tool_use"} and is_native_shell_tool(hook_tool_name()):
-    if not is_direct_simplicio_command(requested_command()):
+# Native shell/terminal is blocked unless the command enters through the governed
+# Simplicio Shell/CLI. Third-party MCP/apps and non-shell tools pass unchanged.
+if event in {"", "pretooluse", "pre_tool_use"}:
+    tool_name = hook_tool_name()
+    if is_orchestrator_exec_tool(tool_name) and nested_native_shell_request():
+        deny_native_shell()
+    if is_native_shell_tool(tool_name) and not is_direct_simplicio_command(requested_command()):
         deny_native_shell()
 
-warm_context(repo_from_hook())
+# PreToolUse is safety-only: never scan Git or warm/build a Map here.
 raise SystemExit(0)
 PY

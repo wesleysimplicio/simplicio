@@ -61,9 +61,9 @@ run_case() {
   fi
 }
 
-run_case "SessionStart without repository is empty" \
+run_case "SessionStart without repository emits bounded bridge context" \
   '{"hook_event_name":"SessionStart","source":"startup","cwd":"/tmp"}' \
-  0 '__EMPTY__'
+  0 'Simplicio context bridge'
 run_case "allow Simplicio tool unchanged" \
   '{"hook_event_name":"PreToolUse","tool_name":"simplicio__simplicio_read","tool_input":{"path":"x"},"cwd":"/tmp"}' \
   0 '__EMPTY__'
@@ -75,19 +75,25 @@ run_case "allow native edit unchanged" \
   0 '__EMPTY__'
 run_case "deny native shell" \
   '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git status"},"cwd":"/tmp"}' \
-  0 'Native shell/terminal is disabled'
+  0 'Native shell/terminal is blocked'
 run_case "allow direct Simplicio shell unchanged" \
   '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"simplicio status --json"},"cwd":"/tmp"}' \
   0 '__EMPTY__'
+run_case "deny nested exec_command through functions.exec" \
+  '{"hook_event_name":"PreToolUse","tool_name":"functions.exec","tool_input":{"input":"const r = await tools.exec_command({cmd: \"git status\"}); text(r);"},"cwd":"/tmp"}' \
+  0 'Native shell/terminal is blocked'
+run_case "allow Simplicio MCP orchestration through functions.exec" \
+  '{"hook_event_name":"PreToolUse","tool_name":"functions.exec","tool_input":{"input":"const r = await tools.mcp__simplicio__simplicio_map({repo: \".\"}); text(r);"},"cwd":"/tmp"}' \
+  0 '__EMPTY__'
 run_case "deny shell wrapper around Simplicio" \
   '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"bash -lc '\''simplicio status --json'\''"},"cwd":"/tmp"}' \
-  0 'Native shell/terminal is disabled'
+  0 'Native shell/terminal is blocked'
 run_case "allow third-party tool unchanged" \
   '{"hook_event_name":"PreToolUse","tool_name":"mcp__cloudflare__zones_list","tool_input":{},"cwd":"/tmp"}' \
   0 '__EMPTY__'
-run_case "fail open on malformed input" 'not-json' 0 '__EMPTY__'
+run_case "fail closed on malformed input" 'not-json' 2 'invalid payload'
 
-if ! grep -q 'Simplicio Map cache:' "$HOOK" ||
+if ! grep -q 'MapHandle:' "$HOOK" ||
    ! grep -q 'map_sha256' "$HOOK" ||
    ! grep -q 'simplicio_context' "$HOOK"; then
   printf 'FAIL hook context is missing compact Map receipt/context routing\n' >&2
