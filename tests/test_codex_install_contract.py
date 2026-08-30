@@ -1,5 +1,6 @@
 """Static contract checks for the public Codex integration."""
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -70,18 +71,29 @@ def test_installers_preserve_stable_login_state_during_upgrades():
     assert "auth login" in powershell
 
 
-def test_windows_installer_migrates_legacy_unix_hooks():
+def test_windows_installer_reconciles_the_pinned_public_hook_after_runtime_registration():
     powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
+    hook_digest = hashlib.sha256((ROOT / "codex" / "mcp-route.ps1").read_bytes()).hexdigest()
     assert "Install-CodexRouteHook" not in powershell
     assert "SIMPLICIO_CODEX_HOOK_REF" not in powershell
     assert "mcp register --binary $BinaryPath --json" in powershell
+    assert '$PublicRouteRef = "cc9950025baf823cdecc657228ff1e89d7701e7e"' in powershell
+    assert f'$PublicRouteSha256 = "{hook_digest}"' in powershell
+    assert "Sync-PublicRouteOverlay" in powershell
+    assert powershell.index("Test-McpToolSurface $DestPath") < powershell.index("if (Sync-PublicRouteOverlay)")
 
-def test_unix_installer_migrates_legacy_hook_events():
+
+def test_unix_installer_reconciles_the_pinned_public_hook_after_runtime_registration():
     shell = (ROOT / "install.sh").read_text(encoding="utf-8")
+    hook_digest = hashlib.sha256((ROOT / "codex" / "mcp-route.sh").read_bytes()).hexdigest()
     assert "CODEX_ROUTE_HOOK_URL" not in shell
     assert "install_codex_route_hook" not in shell
     assert "SIMPLICIO_CODEX_HOOK_REF" not in shell
     assert 'mcp register --binary "$binary_path" --json' in shell
+    assert 'PUBLIC_ROUTE_REF="cc9950025baf823cdecc657228ff1e89d7701e7e"' in shell
+    assert f'PUBLIC_ROUTE_SHA256="{hook_digest}"' in shell
+    assert "reconcile_public_route_overlay" in shell
+    assert shell.index('if verify_mcp_tools "$DEST_PATH"') < shell.index("if reconcile_public_route_overlay")
 
 def test_unix_installer_accepts_release_manifest_target_aliases():
     shell = (ROOT / "install.sh").read_text(encoding="utf-8")
