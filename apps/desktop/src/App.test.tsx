@@ -55,7 +55,7 @@ describe("Simplicio Desktop product states", () => {
     expect(html).toContain("Automations");
     expect(html).toContain("Apps");
     expect(html).toContain("Configurações");
-    expect(html).toContain("v3.8.38");
+    expect(html).toContain("v3.8.39");
     expect((html.match(/class=\"nav-item/g) ?? []).length).toBe(6);
   });
 
