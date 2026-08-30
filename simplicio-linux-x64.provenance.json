@@ -2,13 +2,13 @@
   "schema": "simplicio.provenance/v1",
   "subject": {
     "name": "simplicio-linux-x64",
-    "sha256": "5f1d94a651a0440b1463b35580d6f4756a60c424cdd11348920b54e25d0f9354",
-    "size": 59633056
+    "sha256": "e77bd61e7ec74f5c3cc3dbac221979fc4a7d668d13723034941cbf18d736225a",
+    "size": 60148944
   },
   "build": {
-    "version": "3.8.38",
+    "version": "3.8.39",
     "target": "linux-x64",
-    "source_commit": "bce25364634ef2614de18cbec4b3c3d03f983c05",
+    "source_commit": "d91aa04b39ab33c252c628fab6806bf8ea2c39a8",
     "builder": "local manual release"
   },
   "optimization_profile": {
@@ -17,5 +17,5 @@
       "optimization_profile_receipt_not_supplied"
     ]
   },
-  "generated_at": "2026-08-30T14:45:32.356230Z"
+  "generated_at": "2026-08-30T19:31:22.825113Z"
 }
