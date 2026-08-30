@@ -1,5 +1,6 @@
 import type { DesktopSnapshot } from "../contracts";
 import { Glyph } from "../components/Brand";
+import { createSettingsProjection } from "../settings_projection";
 
 export function redactedDiagnostic(snapshot: DesktopSnapshot) {
   return {
@@ -40,6 +41,7 @@ export function SettingsScreen({
   onLogout: () => void;
   logoutBusy: boolean;
 }) {
+  const inventory = createSettingsProjection(snapshot);
   return (
     <div className="page secondary-page">
       <section className="page-heading">
@@ -57,8 +59,8 @@ export function SettingsScreen({
             <div><dt>Identidade</dt><dd>{snapshot.access.identityKnown ? "confirmada" : "não disponível"}</dd></div>
             <div><dt>Expiração</dt><dd>{snapshot.access.expiresAt ? new Date(snapshot.access.expiresAt).toLocaleDateString("pt-BR") : "não informada"}</dd></div>
           </dl>
-          <button className="button button-secondary button-wide" type="button" onClick={onSubscribe}>Gerenciar plano</button>
-          <button className="button button-secondary button-wide" type="button" onClick={onLogout} disabled={logoutBusy}>
+          <button className="button button-secondary button-wide" type="button" onClick={onSubscribe} disabled={busy}>Gerenciar plano</button>
+          <button className="button button-secondary button-wide" type="button" onClick={onLogout} disabled={busy || logoutBusy}>
             {logoutBusy ? "Saindo…" : "Sair da conta"}
           </button>
         </article>
@@ -75,6 +77,11 @@ export function SettingsScreen({
           </div>
           <p className="settings-note">O export omite email, caminhos, prompts, configurações, credenciais, skills e ledger bruto.</p>
         </article>
+      </section>
+      <section className="panel token-evidence">
+        <h2>Modelos / LLMs informados pelo Runtime</h2>
+        {inventory.models.length ? <ul>{inventory.models.map((model) => <li key={model.id}>{model.label} · somente leitura</li>)}</ul> : <p>Nenhum modelo foi informado pelo Runtime. Login ativo e MCP configurado não significam que um LLM esteja conectado.</p>}
+        <p>O inventário depende do Agent Plane; não são criadas credenciais, modelos padrão ou conexões presumidas.</p>
       </section>
       <section className="panel settings-safety">
         <Glyph name="lock" size={18} />

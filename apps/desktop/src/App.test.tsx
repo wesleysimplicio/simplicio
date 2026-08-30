@@ -56,7 +56,9 @@ describe("Simplicio Desktop product states", () => {
     expect(html).toContain("Apps");
     expect(html).toContain("Configurações");
     expect(html).toContain("v3.8.39");
-    expect((html.match(/class=\"nav-item/g) ?? []).length).toBe(6);
+    expect(html).toContain("Integrações MCP");
+    expect(html).toContain("Relatório de tokens");
+    expect((html.match(/class=\"nav-item/g) ?? []).length).toBe(8);
   });
 
   it("keeps the five main surfaces projection-first and bounded", () => {

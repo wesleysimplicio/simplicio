@@ -28,16 +28,15 @@ export function createCapabilityRegistry(snapshot: DesktopSnapshot, generatedAt 
     { id: "build.workspace", category: "Build", name: "Files, PDF & Code", description: "Construir em um Workspace governado.", requiresApproval: true },
     { id: "teach.compiler", category: "Learn", name: "Teach Simplicio", description: "Gravar e revisar uma rotina reproduzível.", requiresApproval: true },
   ];
-  const runtime = snapshot.source === "runtime" && snapshot.runtime.state === "healthy";
   return {
     schema: "capability.registry/v1",
     generatedAt,
     source: snapshot.source,
     capabilities: descriptions.map((capability) => ({
       ...capability,
-      available: runtime,
-      reasonCode: runtime ? "capability_probe_verified" : "capability_unverified",
+      available: false,
+      reasonCode: "desktop_capability_dispatch_unavailable",
     })),
-    reasonCode: runtime ? "capability.registry_ready" : "capability.registry_unavailable",
+    reasonCode: "capability.registry_unavailable",
   };
 }

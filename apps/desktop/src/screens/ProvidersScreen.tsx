@@ -3,6 +3,7 @@ import type { DesktopSnapshot, ProviderConnection, ProviderState } from "../cont
 import { Glyph } from "../components/Brand";
 import { providerRegistry } from "../provider_registry";
 import { t } from "../i18n";
+import { IntegrationSetup } from "../components/IntegrationSetup";
 
 const stateCopy: Record<ProviderState, string> = {
   connected: t("provider.connected"),
@@ -45,7 +46,7 @@ export function ProvidersScreen({
   busy: boolean;
   repairing: boolean;
   onRefresh: () => void;
-  onRepair: () => void;
+  onRepair: (digest: string) => Promise<boolean>;
 }) {
   const [filter, setFilter] = useState<"all" | "ready" | "available">("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -61,10 +62,10 @@ export function ProvidersScreen({
 
   const canonical = providerRegistry(snapshot.providers);
   const connected = canonical.filter((provider) => provider.state === "connected").length;
-  const detected = canonical.filter((provider) => provider.state === "detected" || provider.state === "registered").length;
+  const registered = canonical.filter((provider) => provider.state === "registered").length;
+  const detected = canonical.filter((provider) => provider.state === "detected").length;
   const attention = canonical.filter((provider) => provider.state === "needs_attention").length;
   const selected = canonical.find((provider) => provider.id === selectedId) ?? null;
-  const repairAvailable = canonical.some((provider) => provider.availableActions.includes("repair") || provider.availableActions.includes("register"));
 
   return (
     <div className="page providers-page">
@@ -72,22 +73,21 @@ export function ProvidersScreen({
         <div>
           <span className="eyebrow">Conexões</span>
           <h1>Providers</h1>
-          <p>{connected} conectados · {detected} detectados</p>
+          <p>Harnesses, IDEs e ADEs conectados ao Simplicio MCP. Registro não comprova uma sessão ativa.</p>
+          <p>{connected} conectados · {registered} registrados · {detected} detectados</p>
         </div>
         <div className="provider-heading-actions">
-          {repairAvailable && (
-            <button className="button button-secondary" type="button" onClick={onRepair} disabled={busy}>
-              <Glyph name="settings" size={17} /> {repairing ? "Reparando…" : "Reparar integrações"}
-            </button>
-          )}
           <button className="button button-primary" type="button" onClick={onRefresh} disabled={busy}>
             <Glyph name="refresh" size={17} /> {busy && !repairing ? "Verificando…" : "Verificar"}
           </button>
         </div>
       </section>
 
+      <IntegrationSetup busy={busy} onApply={onRepair} />
+
       <section className="provider-summary" aria-label="Resumo das conexões">
         <div><strong>{connected}</strong><span>conectados</span></div>
+        <div><strong>{registered}</strong><span>registrados</span></div>
         <div><strong>{detected}</strong><span>detectados</span></div>
         <div className={attention ? "summary-attention" : ""}><strong>{attention}</strong><span>requer atenção</span></div>
         <p><Glyph name="shield" size={18} /> Credenciais permanecem no provider.</p>

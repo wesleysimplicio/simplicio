@@ -6,8 +6,9 @@ describe("insights.tokens/v1", () => {
   it("keeps measured/estimated evidence distinguishable", () => {
     const report = createTokenReport(createDemoSnapshot("active"));
     expect(report.schema).toBe("insights.tokens/v1");
-    expect(report.savedTokens).toBe(1_842_610);
+    expect(report.savedTokens).toBeNull();
     expect(report.proofKind).toBe("mixed");
+    expect(report.reasonCode).toBe("insights.savings_not_measured_usage");
     expect(report.providerCacheHitPercent).toBeNull();
   });
 

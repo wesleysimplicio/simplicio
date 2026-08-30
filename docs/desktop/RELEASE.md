@@ -24,3 +24,18 @@ The Tauri bundle must include the exact verified Runtime release binary through
 SHA-256 matches the public Runtime asset. The Desktop bridge resolves this
 bundled sidecar before any managed per-user or `PATH` fallback. Target-specific
 binary files are release staging material and remain outside Git.
+
+Repeat this identity check **after bundling and all platform signing**, against
+the sidecar inside the final app (on macOS: `Contents/MacOS/simplicio`). Tauri's
+macOS bundler can re-sign `externalBin` even with an ad-hoc identity, changing
+the Runtime bytes after the initial staging check. Such a package is not the
+verified Runtime release and must not be published as one.
+
+For local ad-hoc macOS packaging, restore the exact already-verified Runtime
+asset inside the app and re-seal only the outer app, without recursive signing.
+Then verify the app's code signature recursively and compare the sidecar SHA-256
+and Ed25519 signature against the original Runtime release again. Do not rewrite
+the Runtime's public signature or provenance to accept a bundler-modified binary.
+Any required change to the Runtime's platform signature belongs in a new signed
+Runtime release, not an invisible Desktop packaging rewrite. Ad-hoc signing is
+not Developer ID signing or Apple notarization.

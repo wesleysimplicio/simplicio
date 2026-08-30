@@ -23,3 +23,24 @@ back the resulting document before reporting `registered`. Connect, verify,
 repair, and instruction actions must be idempotent. The registry intentionally
 does not mark `hermes-agent` as supported until its clean-profile installer and
 provider-path E2E contract is available.
+
+## Reviewed installation from Desktop
+
+The **Integrações MCP** navigation entry exposes a read-only review first.
+`desktop_plan_integrations` runs `install --global --dry-run --json`, returns
+only bounded target labels/change states, and hashes the underlying proposed
+configuration without disclosing config bodies or paths to the webview.
+
+After explicit consent, `desktop_repair_providers` serializes installation,
+requires active access, regenerates the plan and rejects a changed digest.
+It then runs `install --global --yes --json`: omitting `--yes` only produces
+a plan, even on exit zero. Success requires `simplicio.install-apply/v1`,
+`status: applied`, successful/skipped actions and a completed rollback
+manifest. A failure may leave partial changes; the UI asks for diagnostics
+and a fresh review rather than claiming that nothing happened.
+
+This flow copies the bundled Runtime to its managed location and delegates
+MCP/hook writes and backups to Runtime. It does not change PATH, launch a
+global service or install every host's marketplace plugin. Those remain
+explicit host-specific steps. A successful install is not a live MCP
+handshake; reopen the client session to verify connection separately.

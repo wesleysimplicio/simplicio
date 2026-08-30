@@ -2,7 +2,7 @@ import type { DesktopSnapshot } from "../contracts";
 import type { View } from "../components/Shell";
 import { Glyph } from "../components/Brand";
 
-type LegacyView = Exclude<View, "today" | "chats" | "teams" | "automations" | "apps" | "home" | "providers">;
+type LegacyView = Exclude<View, "today" | "chats" | "teams" | "automations" | "apps" | "home" | "providers" | "tokens">;
 
 const copy: Record<LegacyView, { eyebrow: string; title: string; description: string }> = {
   bot: {

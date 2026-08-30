@@ -77,7 +77,7 @@ test("Bot Center exposes the canonical roster, timeline, rooms, and honest compu
 test("primary layouts fit desktop and compact widths", async ({ page }) => {
   for (const width of [1280, 768, 390]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const view of ["today", "chats", "teams", "automations", "apps", "home", "providers", "activity", "memory", "settings"]) {
+    for (const view of ["today", "chats", "teams", "automations", "apps", "home", "providers", "tokens", "activity", "memory", "settings"]) {
       await page.goto(`/?state=active&view=${view}`);
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
       expect(overflow, `${view} overflows at ${width}px`).toBe(false);
@@ -85,7 +85,7 @@ test("primary layouts fit desktop and compact widths", async ({ page }) => {
   }
 });
 
-test("the installed ambient path stays on the canonical five-surface route", async ({ page }) => {
+test("the preview ambient path stays on the canonical five-surface route", async ({ page }) => {
   await page.goto("/?state=active&view=today");
   await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
   await page.getByRole("button", { name: "Chats" }).click();
