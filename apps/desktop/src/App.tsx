@@ -40,7 +40,7 @@ function initialView(): View {
   ) {
     return requested;
   }
-  return "home";
+  return "today";
 }
 
 export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSnapshot }) {
