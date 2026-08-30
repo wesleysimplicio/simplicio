@@ -2,7 +2,9 @@ import type { DesktopSnapshot } from "../contracts";
 import type { View } from "../components/Shell";
 import { Glyph } from "../components/Brand";
 
-const copy: Record<Exclude<View, "home" | "providers">, { eyebrow: string; title: string; description: string }> = {
+type LegacyView = Exclude<View, "today" | "chats" | "teams" | "automations" | "apps" | "home" | "providers">;
+
+const copy: Record<LegacyView, { eyebrow: string; title: string; description: string }> = {
   bot: {
     eyebrow: "Agent Plane",
     title: "Bot Center",
@@ -25,7 +27,7 @@ const copy: Record<Exclude<View, "home" | "providers">, { eyebrow: string; title
   },
 };
 
-export function SecondaryScreen({ view, snapshot }: { view: Exclude<View, "home" | "providers">; snapshot: DesktopSnapshot }) {
+export function SecondaryScreen({ view, snapshot }: { view: LegacyView; snapshot: DesktopSnapshot }) {
   const content = copy[view];
   return (
     <div className="page secondary-page">
