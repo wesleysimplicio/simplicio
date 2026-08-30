@@ -16,11 +16,20 @@ export function Brand({ compact = false }: { compact?: boolean }) {
 
 export type GlyphName =
   | "home"
+  | "chat"
+  | "teams"
+  | "automation"
+  | "apps"
   | "providers"
   | "activity"
   | "memory"
   | "settings"
   | "arrow"
+  | "chevron"
+  | "search"
+  | "plus"
+  | "live"
+  | "attention"
   | "check"
   | "shield"
   | "spark"
@@ -29,6 +38,32 @@ export type GlyphName =
 
 const paths: Record<GlyphName, ReactNode> = {
   home: <path d="M3 10.8 12 3l9 7.8v9.7a.5.5 0 0 1-.5.5H15v-6H9v6H3.5a.5.5 0 0 1-.5-.5Z" />,
+  chat: (
+    <>
+      <path d="M4 5.2A2.2 2.2 0 0 1 6.2 3h11.6A2.2 2.2 0 0 1 20 5.2v7.6a2.2 2.2 0 0 1-2.2 2.2H10l-4.8 4v-4.4A2.2 2.2 0 0 1 4 12.8Z" />
+      <path d="M8 8h8M8 11h5" />
+    </>
+  ),
+  teams: (
+    <>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 20a5.5 5.5 0 0 1 11 0M17 6a2.5 2.5 0 1 1 0 5M16 14a4.5 4.5 0 0 1 4 4.5" />
+    </>
+  ),
+  automation: (
+    <>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1" />
+    </>
+  ),
+  apps: (
+    <>
+      <rect x="3" y="3" width="7" height="7" rx="1.4" />
+      <rect x="14" y="3" width="7" height="7" rx="1.4" />
+      <rect x="3" y="14" width="7" height="7" rx="1.4" />
+      <rect x="14" y="14" width="7" height="7" rx="1.4" />
+    </>
+  ),
   providers: (
     <>
       <path d="M8 3v5M16 3v5M6 8h12v3a6 6 0 0 1-6 6v4" />
@@ -49,6 +84,11 @@ const paths: Record<GlyphName, ReactNode> = {
     </>
   ),
   arrow: <path d="M5 12h14M14 7l5 5-5 5" />,
+  chevron: <path d="m7 9 5 5 5-5" />,
+  search: <><circle cx="10.8" cy="10.8" r="6.3" /><path d="m16 16 4.5 4.5" /></>,
+  plus: <path d="M12 5v14M5 12h14" />,
+  live: <><circle cx="12" cy="12" r="8.5" /><path d="M9 9.2v5.6l5-2.8Z" /></>,
+  attention: <><path d="M12 3 21 20H3Z" /><path d="M12 9v4M12 16h.01" /></>,
   check: <path d="m5 12 4 4L19 6" />,
   shield: <path d="M12 2.8 20 6v5.4c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6Z" />,
   spark: <path d="m12 2 1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8Z" />,

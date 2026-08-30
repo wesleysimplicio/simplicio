@@ -7,6 +7,7 @@ import { SettingsScreen, redactedDiagnostic } from "./screens/SettingsScreen";
 import { ActivityScreen, redactedActivity } from "./screens/ActivityScreen";
 import { BotCenterScreen } from "./screens/BotCenterScreen";
 import { createDemoBotCenter, createUnavailableBotCenter } from "./bot_center";
+import { ProductSurfaceScreen } from "./screens/ProductScreens";
 
 describe("Simplicio Desktop product states", () => {
   it("offers browser login when there is no identity", () => {
@@ -44,16 +45,35 @@ describe("Simplicio Desktop product states", () => {
     expect(html).toContain("Demonstração");
   });
 
-  it("exposes the complete v1 shell only after active access", () => {
+  it("exposes the canonical five-destination shell only after active access", () => {
     const html = renderToStaticMarkup(
       <DesktopApp snapshot={createDemoSnapshot("active")} />,
     );
-    expect(html).toContain("Início");
-    expect(html).toContain("Providers");
-    expect(html).toContain("Atividade");
-    expect(html).toContain("Memória");
+    expect(html).toContain("Today");
+    expect(html).toContain("Chats");
+    expect(html).toContain("Teams");
+    expect(html).toContain("Automations");
+    expect(html).toContain("Apps");
     expect(html).toContain("Configurações");
     expect(html).toContain("v3.8.36");
+    expect((html.match(/class=\"nav-item/g) ?? []).length).toBe(6);
+  });
+
+  it("keeps the five main surfaces projection-first and bounded", () => {
+    const snapshot = createDemoSnapshot("active");
+    const botCenter = createDemoBotCenter(snapshot.generatedAt);
+    for (const view of ["today", "chats", "teams", "automations", "apps"] as const) {
+      const html = renderToStaticMarkup(<ProductSurfaceScreen view={view} snapshot={snapshot} botCenter={botCenter} />);
+      expect(html).toContain("Contrato aguardando o Runtime");
+      expect(html).toContain("reason:");
+    }
+    const today = renderToStaticMarkup(<ProductSurfaceScreen view="today" snapshot={snapshot} botCenter={botCenter} />);
+    expect(today).toContain("Focus");
+    expect(today).toContain("In Progress");
+    expect(today).toContain("Up Next");
+    const apps = renderToStaticMarkup(<ProductSurfaceScreen view="apps" snapshot={snapshot} botCenter={botCenter} />);
+    expect(apps).toContain("Library");
+    expect(apps).toContain("Token Reports");
   });
 
   it("does not invent cost or cache metrics without evidence", () => {
