@@ -2,6 +2,7 @@ import type { BotCenterSnapshot, DesktopSnapshot } from "../contracts";
 import type { View } from "../components/Shell";
 import { Glyph } from "../components/Brand";
 import { createTodayProjection } from "../today_projection";
+import { createAmbientProjection } from "../ambient";
 
 type ProductView = Extract<View, "today" | "chats" | "teams" | "automations" | "apps">;
 
@@ -44,6 +45,7 @@ function ActionButton({ children, title = "Ação bloqueada até o Runtime confi
 
 function TodayScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
   const projection = createTodayProjection(snapshot);
+  const ambient = createAmbientProjection(snapshot);
   const { focus, inProgress, upNext } = projection;
   return (
     <div className="page product-page">
@@ -58,7 +60,7 @@ function TodayScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
           <div className="focus-footer"><span>Uma decisão por vez</span><ActionButton>Trocar foco</ActionButton></div>
         </article>
         <aside className="today-side panel">
-          <div className="panel-heading"><div><span className="eyebrow">Ambiente</span><h2>Estado</h2></div><span className={`healthy-badge ${snapshot.runtime.state === "healthy" ? "" : "warning"}`}><span className={`status-dot ${snapshot.runtime.state === "healthy" ? "online" : "offline"}`} /> {snapshot.runtime.state}</span></div>
+          <div className="panel-heading"><div><span className="eyebrow">Ambiente</span><h2>Estado</h2></div><span className={`healthy-badge ${ambient.state === "attention" ? "warning" : ""}`}><span className={`status-dot ${ambient.state === "quiet" ? "online" : ambient.state === "unavailable" ? "offline" : "warning"}`} /> {ambient.state}</span></div>
           <div className="ambient-orbit"><span /><span /><span /><Glyph name="spark" size={18} /></div>
           <p>O estado visual permanece quieto até existir um evento novo, atenção ou sessão Live.</p>
           <dl className="compact-facts"><div><dt>Workspace</dt><dd>Personal</dd></div><div><dt>Runtime</dt><dd>{snapshot.runtime.transport}</dd></div><div><dt>Último recibo</dt><dd>{snapshot.runtime.lastReceiptAt ?? "—"}</dd></div></dl>
