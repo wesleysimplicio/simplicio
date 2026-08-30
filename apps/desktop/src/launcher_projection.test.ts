@@ -10,9 +10,12 @@ describe("desktop.launcher/v1", () => {
     expect(projection.actions.every((action) => action.available === false)).toBe(true);
   });
 
-  it("requires a Runtime probe before enabling a launcher action", () => {
+  it("does not treat Runtime health as proof of an action descriptor", () => {
     const snapshot = createDemoSnapshot("active");
     snapshot.source = "runtime";
-    expect(createLauncherProjection(snapshot).actions.every((action) => action.available)).toBe(true);
+    const projection = createLauncherProjection(snapshot);
+    expect(projection.actions.every((action) => action.available === false)).toBe(true);
+    expect(projection.actions.every((action) => action.reasonCode === "action_descriptor_unavailable")).toBe(true);
+    expect(projection.reasonCode).toBe("desktop.launcher_unavailable");
   });
 });

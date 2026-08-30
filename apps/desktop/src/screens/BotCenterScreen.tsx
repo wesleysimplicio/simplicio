@@ -57,7 +57,7 @@ function TimelineEvent({ item, onAction }: { item: BotTimelineEvent; onAction: (
         </div>
         <p>{item.content}</p>
         {item.toolName && <code className="bot-tool-name">{item.toolName}</code>}
-        {item.artifactName && <button className="bot-inline-link" type="button">Abrir {item.artifactName}</button>}
+        {item.artifactName && <button className="bot-inline-link" type="button" disabled title="Abertura de artifacts aguardando action descriptor do Runtime">Abrir {item.artifactName}</button>}
         {item.attachmentName && <span className="bot-attachment-chip"><Glyph name="check" size={13} /> {item.attachmentName}</span>}
         {item.reasonCode && <span className="bot-reason">reason: {item.reasonCode}</span>}
         {approvalAction && (
@@ -134,7 +134,7 @@ export function BotCenterScreen({ snapshot, onAction }: { snapshot: BotCenterSna
         <aside className="panel bot-roster-panel">
           <div className="panel-heading">
             <div><span className="eyebrow">Roster canônico</span><h2>Bots <small>{snapshot.bots.length}/{snapshot.limits.maxBots}</small></h2></div>
-            <button className="text-button" type="button" disabled={actionDisabled} aria-label="Criar novo Bot">Novo <Glyph name="arrow" size={15} /></button>
+            <button className="text-button" type="button" disabled title="Criação de Bot aguardando action descriptor do Runtime" aria-label="Criar novo Bot">Novo <Glyph name="arrow" size={15} /></button>
           </div>
           <div className="bot-roster-list">
             {snapshot.bots.length === 0 ? <p className="empty-state">Nenhum Bot exposto pelo Runtime.</p> : snapshot.bots.map((bot) => (

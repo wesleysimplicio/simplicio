@@ -13,9 +13,11 @@ describe("room/v1", () => {
     expect(room.modeChangeAvailable).toBe(false);
   });
 
-  it("keeps Execute and Review under Runtime authority", () => {
+  it("does not enable mode changes without a verified action descriptor", () => {
     const snapshot = createDemoSnapshot("active");
     snapshot.source = "runtime";
-    expect(createRoomProjection(snapshot, createDemoBotCenter()).modeChangeAvailable).toBe(true);
+    const room = createRoomProjection(snapshot, createDemoBotCenter());
+    expect(room.modeChangeAvailable).toBe(false);
+    expect(room.reasonCode).toBe("room.mode_action_descriptor_unavailable");
   });
 });
