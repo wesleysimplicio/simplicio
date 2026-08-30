@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { ActivityItem, DesktopSnapshot } from "../contracts";
 import { Glyph } from "../components/Brand";
+import { createActivityProjection } from "../activity_projection";
 
 type StatusFilter = "all" | ActivityItem["status"];
 
@@ -26,12 +27,13 @@ function statusLabel(status: ActivityItem["status"]): string {
 }
 
 export function ActivityScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
+  const projection = createActivityProjection(snapshot);
   const [status, setStatus] = useState<StatusFilter>("all");
   const [provider, setProvider] = useState("all");
   const [page, setPage] = useState(0);
   const pageSize = Math.max(1, Math.min(snapshot.limits.maxActivity, 5));
-  const providers = useMemo(() => Array.from(new Set(snapshot.activity.map((item) => item.provider))).sort(), [snapshot.activity]);
-  const filtered = snapshot.activity.filter((item) => (status === "all" || item.status === status) && (provider === "all" || item.provider === provider));
+  const providers = useMemo(() => Array.from(new Set(projection.items.map((item) => item.provider))).sort(), [projection.items]);
+  const filtered = projection.items.filter((item) => (status === "all" || item.status === status) && (provider === "all" || item.provider === provider));
   const visible = filtered.slice(page * pageSize, (page + 1) * pageSize);
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, pageCount - 1);
@@ -73,7 +75,7 @@ export function ActivityScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
           ))}
         </div>
         <footer className="activity-pagination">
-          <span>{filtered.length} recibo(s) · máximo {snapshot.limits.maxActivity}</span>
+          <span>{filtered.length} recibo(s) · máximo {projection.pageSize} · {projection.reasonCode}</span>
           <div><button className="text-button" type="button" disabled={safePage === 0} onClick={() => setPage((current) => Math.max(0, current - 1))}>Anterior</button><span>Página {safePage + 1} de {pageCount}</span><button className="text-button" type="button" disabled={safePage >= pageCount - 1} onClick={() => setPage((current) => Math.min(pageCount - 1, current + 1))}>Próxima</button></div>
         </footer>
       </section>
