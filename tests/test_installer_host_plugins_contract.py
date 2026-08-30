@@ -10,7 +10,8 @@ def test_shell_installs_documented_native_plugins_after_runtime_registration() -
     plugin_install = "install_detected_host_plugins"
 
     assert 'command -v codex' in text
-    assert 'codex plugin marketplace add "$REPO" --ref master' in text
+    assert 'codex plugin marketplace add "$REPO" --ref master \\' in text
+    assert "--sparse .agents/plugins --sparse plugins/simplicio" in text
     assert "codex plugin add simplicio@simplicio-codex" in text
     assert 'command -v claude' in text
     assert 'claude plugin marketplace add "$REPO"' in text
@@ -37,7 +38,8 @@ def test_powershell_installs_documented_native_plugins_after_runtime_registratio
     plugin_install = "Install-DetectedHostPlugins"
 
     assert "Get-Command codex -CommandType Application" in text
-    assert '@("plugin", "marketplace", "add", $Repo, "--ref", "master")' in text
+    assert '"plugin", "marketplace", "add", $Repo, "--ref", "master",' in text
+    assert '"--sparse", ".agents/plugins", "--sparse", "plugins/simplicio"' in text
     assert '@("plugin", "add", "simplicio@simplicio-codex")' in text
     assert "Get-Command claude -CommandType Application" in text
     assert '@("plugin", "marketplace", "add", $Repo)' in text

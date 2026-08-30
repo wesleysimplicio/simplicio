@@ -336,7 +336,8 @@ install_detected_host_plugins() {
   failures=0
   if command -v codex >/dev/null 2>&1; then
     detected=$((detected + 1))
-    codex plugin marketplace add "$REPO" --ref master >/dev/null 2>&1 || true
+    codex plugin marketplace add "$REPO" --ref master \
+      --sparse .agents/plugins --sparse plugins/simplicio >/dev/null 2>&1 || true
     if codex plugin add simplicio@simplicio-codex >/dev/null 2>&1; then
       ok "plugin nativo do Codex instalado"
     else
