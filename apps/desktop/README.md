@@ -39,9 +39,17 @@ cargo test --manifest-path src-tauri/Cargo.toml
 The Tauri process invokes one fixed executable, without a shell. During local
 development it resolves `simplicio` from `PATH`; an explicit
 `SIMPLICIO_RUNTIME_BIN` may be provided by a controlled test or packaging
-harness. The production bundle will stage a signed Runtime as a Tauri sidecar
-only after the release pipeline validates its manifest, checksum, signature,
-SBOM and component lock.
+harness. The production bundle stages the exact signed Runtime release asset as a Tauri
+sidecar after the release pipeline validates its manifest, checksum, Ed25519
+signature, SBOM and provenance. The bridge prefers that bundled binary, then a
+managed per-user installation, and finally the executable on `PATH`.
+
+For a manual build, stage the verified target-specific Runtime at
+`src-tauri/binaries/simplicio-<target-triple>`; for example,
+`simplicio-aarch64-apple-darwin` on Apple Silicon. These executable bytes remain
+ignored by Git and are never committed to the public source tree. The explicit
+`Reparar integrações` action runs the Runtime's governed global installer so
+MCP registrations, hooks and detected-host adapters converge together.
 
 See [`../../docs/desktop/ADR-0001-public-tauri-shell.md`](../../docs/desktop/ADR-0001-public-tauri-shell.md)
 for the ownership and security decision.
