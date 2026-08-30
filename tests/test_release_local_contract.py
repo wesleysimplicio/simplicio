@@ -180,6 +180,34 @@ def test_public_publisher_can_resume_after_an_external_partial_failure():
     assert "already_published_to_pypi" in source
 
 
+
+def test_publication_force_stages_only_known_installer_source_wrappers():
+    script = ROOT / "scripts/publish_release_local.py"
+    spec = importlib.util.spec_from_file_location("publish_release_local_force_paths", script)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+
+    for path in (
+        "npm/simplicio/package.json",
+        "npm/simplicio-installer/package.json",
+        "npm/simplicio-unscoped/package.json",
+        "pypi/simplicio/pyproject.toml",
+        r"pypi\simplicio\simplicio\__main__.py",
+    ):
+        assert module.requires_forced_release_staging(path)
+
+    for path in (
+        "simplicio-macos-arm64",
+        "simplicio-windows-x64.exe",
+        "simplicio-macos-arm64.sig",
+        "SHA256SUMS",
+        "codex/mcp-route.sh",
+        "scripts/publish_release_local.py",
+    ):
+        assert not module.requires_forced_release_staging(path)
+
+
 def test_public_publisher_builds_wheel_from_clean_source(tmp_path, monkeypatch):
     script = ROOT / "scripts/publish_release_local.py"
     spec = importlib.util.spec_from_file_location("publish_release_local_clean_wheel", script)

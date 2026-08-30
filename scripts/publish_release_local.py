@@ -33,6 +33,12 @@ CODEX_HOOK_FILES = (
     "codex/mcp-route.ps1",
 )
 LOCAL_STATE_PREFIXES = (".simplicio/", "pypi/simplicio/build/")
+FORCE_TRACKED_RELEASE_PREFIXES = (
+    "npm/simplicio/",
+    "npm/simplicio-installer/",
+    "npm/simplicio-unscoped/",
+    "pypi/simplicio/",
+)
 
 
 class PublishError(RuntimeError):
@@ -139,6 +145,10 @@ def verify_bundle(bundle: Path, tag: str, version: str, source_commit: str) -> d
 def is_ignored_local_state(path: str) -> bool:
     normalized = path.replace("\\", "/")
     return normalized.startswith(LOCAL_STATE_PREFIXES)
+
+def requires_forced_release_staging(path: str) -> bool:
+    normalized = path.replace("\\", "/")
+    return normalized.startswith(FORCE_TRACKED_RELEASE_PREFIXES)
 
 
 def blocking_tracked_changes() -> list[str]:
@@ -428,7 +438,14 @@ def commit_public(paths: list[Path], tag: str, source_commit: str) -> str:
     relative = sorted({str(path.relative_to(ROOT)) for path in paths})
     branch = "release/" + tag
     run(["git", "switch", "-c", branch])
-    run(["git", "add", "--", *relative])
+    forced = [path for path in relative if requires_forced_release_staging(path)]
+    normal = [path for path in relative if not requires_forced_release_staging(path)]
+    if normal:
+        run(["git", "add", "--", *normal])
+    if forced:
+        # The broad binary-name ignore rules also match these known installer
+        # source directories. Force only this explicit source allowlist.
+        run(["git", "add", "-f", "--", *forced])
     run(["git", "-c", "core.whitespace=cr-at-eol", "diff", "--cached", "--check"])
     run([
         "git", "commit", "-m", "release(public): publish signed Runtime %s" % tag,
