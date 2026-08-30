@@ -280,6 +280,14 @@ async fn desktop_open_subscription() -> Result<(), String> {
     .map_err(|_| "Falha interna ao abrir os planos".to_string())?
 }
 
+/// The Desktop owns the transport boundary, not the Bot/Agent authority.
+/// Runtime releases that expose Agent API can replace this implementation
+/// without changing the frontend contract; until then, fail closed.
+#[tauri::command]
+async fn desktop_bot_action(_request: Value) -> Result<Value, String> {
+    Err("Agent API do Runtime indisponível (agent_api_unavailable)".to_string())
+}
+
 #[tauri::command]
 async fn runtime_status() -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(|| run_runtime_json(STATUS_ARGS))
@@ -297,6 +305,7 @@ pub fn run() {
             desktop_logout,
             desktop_repair_providers,
             desktop_open_subscription,
+            desktop_bot_action,
             runtime_status
         ])
         .run(tauri::generate_context!())

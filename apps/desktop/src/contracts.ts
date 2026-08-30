@@ -95,6 +95,134 @@ export interface ActivityItem {
   status: "verified" | "running" | "attention";
 }
 
+export type BotLifecycle = "disabled" | "idle" | "active" | "busy" | "degraded" | "blocked";
+export type BotControlState = "bot_control" | "human_control" | "paused" | "blocked";
+export type BotActionKind =
+  | "send_turn"
+  | "interrupt"
+  | "cancel"
+  | "steer"
+  | "resume"
+  | "branch"
+  | "handoff"
+  | "approve"
+  | "deny"
+  | "take_over"
+  | "hand_back";
+
+export interface BotCapability {
+  id: string;
+  label: string;
+  available: boolean;
+  reasonCode: string;
+}
+
+export interface BotSummary {
+  botId: string;
+  displayName: string;
+  agentProfileId: string;
+  profileId: string;
+  projectId: string | null;
+  provider: string | null;
+  model: string | null;
+  toolset: string[];
+  skills: string[];
+  lifecycle: BotLifecycle;
+  reasonCode: string;
+  lastSessionId: string | null;
+  lastActivityAt: string | null;
+  capabilities: BotCapability[];
+}
+
+export type BotEventKind =
+  | "message"
+  | "tool_call"
+  | "tool_result"
+  | "approval_request"
+  | "approval_decision"
+  | "artifact"
+  | "attachment"
+  | "status"
+  | "bot_event";
+
+export interface BotTimelineEvent {
+  eventId: string;
+  sessionId: string;
+  botId: string;
+  kind: BotEventKind;
+  actorKind: "human" | "bot" | "runtime";
+  actorId: string;
+  actorLabel: string;
+  content: string;
+  timestamp: string;
+  causalParentId: string | null;
+  state: "streaming" | "complete" | "blocked";
+  toolName?: string | null;
+  approvalId?: string | null;
+  artifactName?: string | null;
+  attachmentName?: string | null;
+  reasonCode?: string | null;
+}
+
+export interface BotSessionProjection {
+  sessionId: string;
+  botId: string;
+  roomId: string | null;
+  state: "idle" | "running" | "paused" | "blocked" | "completed";
+  revision: number;
+  events: BotTimelineEvent[];
+  tokenUsage: {
+    input: number | null;
+    output: number | null;
+    cached: number | null;
+    proofKind: "measured" | "unavailable";
+  };
+  costUsd: number | null;
+  cacheHitPercent: number | null;
+}
+
+export interface BotRoomProjection {
+  roomId: string;
+  displayName: string;
+  members: Array<{ id: string; label: string; kind: "human" | "bot"; role: string }>;
+  sessionId: string | null;
+  unread: number;
+}
+
+export interface ComputerProjection {
+  available: boolean;
+  computerSessionId: string | null;
+  botId: string | null;
+  sessionId: string | null;
+  state: BotControlState;
+  leaseRevision: number | null;
+  reasonCode: string;
+  lastEventAt: string | null;
+}
+
+export interface BotCenterSnapshot {
+  schema: "simplicio.bot-center-snapshot/v1";
+  generatedAt: string;
+  source: "runtime" | "preview";
+  actionAuthority: "runtime" | "preview" | "unavailable";
+  bots: BotSummary[];
+  selectedBotId: string | null;
+  sessions: BotSessionProjection[];
+  rooms: BotRoomProjection[];
+  computer: ComputerProjection;
+  limits: {
+    maxBots: 32;
+    maxEvents: 200;
+    maxRooms: 32;
+  };
+  redaction: {
+    secrets: true;
+    prompts: true;
+    attachmentBodies: true;
+  };
+  snapshotDigest: string;
+}
+
 export interface DesktopSnapshot {
   schema: "simplicio.desktop-snapshot/v1";
   generatedAt: string;
@@ -104,6 +232,7 @@ export interface DesktopSnapshot {
   savings: SavingsSummary;
   providers: ProviderConnection[];
   activity: ActivityItem[];
+  botCenter?: BotCenterSnapshot;
   actions: Array<{
     id: "login" | "subscribe" | "refresh_access" | "repair_providers";
     governed: true;

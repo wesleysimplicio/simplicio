@@ -3,6 +3,11 @@ import type { View } from "../components/Shell";
 import { Glyph } from "../components/Brand";
 
 const copy: Record<Exclude<View, "home" | "providers">, { eyebrow: string; title: string; description: string }> = {
+  bot: {
+    eyebrow: "Agent Plane",
+    title: "Bot Center",
+    description: "Roster, sessões e Rooms são projetados pelo Runtime.",
+  },
   activity: {
     eyebrow: "Recibos",
     title: "Atividade",
@@ -33,7 +38,7 @@ export function SecondaryScreen({ view, snapshot }: { view: Exclude<View, "home"
       </section>
       <section className="secondary-grid">
         <article className="panel secondary-hero">
-          <div className="secondary-visual"><Glyph name={view === "memory" ? "memory" : view === "settings" ? "settings" : "activity"} size={34} /></div>
+          <div className="secondary-visual"><Glyph name={view === "memory" ? "memory" : view === "settings" ? "settings" : view === "bot" ? "spark" : "activity"} size={34} /></div>
           <span className="eyebrow">Em breve</span>
           <h2>Conectado ao mesmo Runtime</h2>
           <p>Dados compactos e versionados.</p>

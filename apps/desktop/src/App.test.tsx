@@ -5,6 +5,8 @@ import { createDemoSnapshot } from "./demo";
 import { MemoryScreen } from "./screens/MemoryScreen";
 import { SettingsScreen, redactedDiagnostic } from "./screens/SettingsScreen";
 import { ActivityScreen, redactedActivity } from "./screens/ActivityScreen";
+import { BotCenterScreen } from "./screens/BotCenterScreen";
+import { createDemoBotCenter, createUnavailableBotCenter } from "./bot_center";
 
 describe("Simplicio Desktop product states", () => {
   it("offers browser login when there is no identity", () => {
@@ -91,5 +93,26 @@ describe("Simplicio Desktop product states", () => {
     expect(html).toContain("Todos");
     expect(html).toContain("máximo 5");
     expect(redactedActivity(snapshot.activity)[0]).not.toHaveProperty("detail");
+  });
+
+  it("renders Bot Center from the canonical projection without local authority", () => {
+    const botCenter = createDemoBotCenter();
+    const html = renderToStaticMarkup(<BotCenterScreen snapshot={botCenter} onAction={async () => undefined} />);
+    expect(html).toContain("Bot Center");
+    expect(html).toContain("Roster canônico");
+    expect(html).toContain("Cora");
+    expect(html).toContain("Rooms");
+    expect(html).toContain("approval_required");
+    expect(html).toContain("computer_backend_unavailable");
+    expect(html).toContain("session: bot-cora-session-01");
+    expect(botCenter.redaction.secrets).toBe(true);
+  });
+
+  it("fails closed when the Runtime has not exposed Agent API", () => {
+    const html = renderToStaticMarkup(<BotCenterScreen snapshot={createUnavailableBotCenter()} onAction={async () => undefined} />);
+    expect(html).toContain("Contrato indisponível");
+    expect(html).toContain("agent_api_unavailable");
+    expect(html).toContain("Nenhum Bot exposto pelo Runtime");
+    expect(html).toContain("disabled");
   });
 });
