@@ -7,6 +7,7 @@ import { createChatProjection } from "../chat_projection";
 import { createCapabilityRegistry } from "../capability_registry";
 import { createAutomationProjection } from "../automation_projection";
 import { createWorkspaceProjection } from "../workspace_projection";
+import { createMultiChatProjection } from "../multi_chat_projection";
 
 type ProductView = Extract<View, "today" | "chats" | "teams" | "automations" | "apps">;
 
@@ -84,13 +85,14 @@ function QueueRow({ title, detail, status }: { title: string; detail: string; st
 
 function ChatsScreen({ snapshot, botCenter }: { snapshot: DesktopSnapshot; botCenter: BotCenterSnapshot }) {
   const projection = createChatProjection(botCenter);
+  const workspace = createMultiChatProjection(botCenter);
   const session = botCenter.sessions[0];
   const events = projection.events;
   return (
     <div className="page product-page">
       <SurfaceHeading view="chats" snapshot={snapshot} />
       <div className="chat-layout">
-        <aside className="panel session-list"><div className="panel-heading"><div><span className="eyebrow">Sessões</span><h2>Chats</h2></div><span className="queue-count">{botCenter.sessions.length}</span></div><button className="session-card active" type="button"><span className="bot-avatar">C</span><span><strong>Cora</strong><small>{session?.state ?? "sem sessão"} · {session?.revision ? `rev. ${session.revision}` : "—"}</small></span></button><ActionButton title="Criar sessão exige o Agent API do Runtime">+ Novo chat</ActionButton></aside>
+        <aside className="panel session-list"><div className="panel-heading"><div><span className="eyebrow">Sessões</span><h2>Chats</h2></div><span className="queue-count">{workspace.sessions.length}</span></div>{workspace.sessions.map((chat) => <button className={`session-card ${workspace.selectedSessionId === chat.sessionId ? "active" : ""}`} type="button" key={chat.sessionId}><span className="bot-avatar">{chat.title.slice(0, 1).toUpperCase()}</span><span><strong>{chat.title}</strong><small>{chat.state} · rev. {chat.revision} · {chat.unread} eventos</small></span></button>)}<ActionButton title="Criar sessão exige o Agent API do Runtime">+ Novo chat</ActionButton></aside>
         <section className="panel chat-session"><div className="chat-session-head"><div><span className="eyebrow">Session Service</span><h2>Cora <small>· {projection.sessionId ?? "sem sessão"}</small></h2></div><div className="chat-head-actions"><ActionButton>Steer</ActionButton><ActionButton>Cancelar</ActionButton></div></div>
           <UnavailableNotice code={projection.reasonCode}>O histórico é redigido e limitado; streaming, approvals e envio dependem do contrato canônico do Runtime.</UnavailableNotice>
           <div className="chat-events">{events.filter((event) => event.kind === "message" || event.kind === "tool_result" || event.kind === "approval_request" || event.kind === "artifact").map((event) => <article className={`chat-event ${event.actorKind} ${event.state === "blocked" ? "blocked" : ""}`} key={event.eventId}><span className="chat-event-avatar">{event.actorKind === "human" ? "V" : event.actorKind === "bot" ? "C" : "R"}</span><div><div className="chat-event-meta"><strong>{event.actorLabel}</strong><span>{event.kind.replaceAll("_", " ")}</span></div><p>{event.content}</p>{event.toolName && <code>tool: {event.toolName}</code>}{event.approvalId && <code>approval: {event.approvalId}</code>}{event.artifactName && <button className="inline-link" type="button" disabled>{event.artifactName}</button>}</div></article>)}</div>
