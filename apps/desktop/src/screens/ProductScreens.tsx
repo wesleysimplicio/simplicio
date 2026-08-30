@@ -1,6 +1,7 @@
 import type { BotCenterSnapshot, DesktopSnapshot } from "../contracts";
 import type { View } from "../components/Shell";
 import { Glyph } from "../components/Brand";
+import { createTodayProjection } from "../today_projection";
 
 type ProductView = Extract<View, "today" | "chats" | "teams" | "automations" | "apps">;
 
@@ -42,9 +43,8 @@ function ActionButton({ children, title = "Ação bloqueada até o Runtime confi
 }
 
 function TodayScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
-  const focus = snapshot.activity[0];
-  const inProgress = snapshot.activity.filter((item) => item.status === "running").slice(0, 3);
-  const upNext = snapshot.activity.filter((item) => item.status !== "running").slice(1, 4);
+  const projection = createTodayProjection(snapshot);
+  const { focus, inProgress, upNext } = projection;
   return (
     <div className="page product-page">
       <SurfaceHeading view="today" snapshot={snapshot} />
