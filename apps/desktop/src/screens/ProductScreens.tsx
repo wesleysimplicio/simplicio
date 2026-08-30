@@ -14,6 +14,7 @@ import { createRoomProjection } from "../room_projection";
 import { createTokenReport } from "../token_report";
 import { createOmniSearchProjection } from "../omnisearch_projection";
 import { createLibraryProjection } from "../library_projection";
+import { createSuggestionInboxProjection } from "../suggestion_inbox";
 
 type ProductView = Extract<View, "today" | "chats" | "teams" | "automations" | "apps">;
 
@@ -131,13 +132,14 @@ function TeamsScreen({ snapshot, botCenter }: { snapshot: DesktopSnapshot; botCe
 
 function AutomationsScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
   const projection = createAutomationProjection(snapshot);
-  const suggestions = projection.suggestions;
+  const inbox = createSuggestionInboxProjection(snapshot);
+  const suggestions = inbox.suggestions;
   return (
     <div className="page product-page">
       <SurfaceHeading view="automations" snapshot={snapshot} />
       <div className="automation-layout"><section className="panel suggestion-panel"><div className="panel-heading"><div><span className="eyebrow">Inbox</span><h2>Sugestões</h2></div><span className="queue-count">{suggestions.length}</span></div>{suggestions.length ? suggestions.map((item) => <article className="suggestion-card" key={item.id}><span className="suggestion-icon"><Glyph name="spark" size={17} /></span><div><strong>{item.title}</strong><p>{item.description}</p><span>receipt: {item.sourceEventId} · {item.state}</span></div><div className="suggestion-actions"><ActionButton>Aceitar</ActionButton><ActionButton>Descartar</ActionButton></div></article>) : <p className="empty-state">Nenhuma sugestão disponível.</p>}</section><section className="panel studio-panel"><div className="panel-heading"><div><span className="eyebrow">Studio</span><h2>Nova automação</h2></div><Glyph name="automation" size={18} /></div><div className="studio-step"><span>1</span><div><strong>Quando</strong><p>Escolha um evento do Runtime ou uma rotina.</p></div></div><div className="studio-step"><span>2</span><div><strong>Fazer</strong><p>Selecione uma capability e sua política.</p></div></div><div className="studio-step"><span>3</span><div><strong>Revisar</strong><p>Salvar cria apenas um rascunho versionado.</p></div></div><ActionButton>Salvar rascunho</ActionButton></section></div>
       <section className="panel automation-receipts"><div className="panel-heading"><div><span className="eyebrow">Activity Center</span><h2>Recibos recentes</h2></div><ActionButton>Exportar</ActionButton></div><div className="receipt-strip"><span><strong>{snapshot.activity.length}</strong> eventos limitados</span><span><strong>—</strong> automações ativas</span><span><strong>—</strong> ações aguardando você</span></div></section>
-      <UnavailableNotice code={projection.reasonCode}>Triggers, budgets, quiet hours, cancelamento e políticas são autoridade do Runtime; a UI fica sem efeito até a capability ser verificada.</UnavailableNotice>
+      <UnavailableNotice code={`${projection.reasonCode}; ${inbox.reasonCode}`}>Triggers, budgets, quiet hours, cancelamento e políticas são autoridade do Runtime; a UI fica sem efeito até a capability ser verificada.</UnavailableNotice>
     </div>
   );
 }
