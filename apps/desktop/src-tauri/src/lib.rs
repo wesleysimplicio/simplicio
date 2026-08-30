@@ -1,10 +1,10 @@
 use serde_json::Value;
 use std::ffi::OsString;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-mod supervisor;
 mod legacy_snapshot;
+mod supervisor;
 
 const SNAPSHOT_SCHEMA: &str = "simplicio.desktop-snapshot/v1";
 const MAX_SNAPSHOT_BYTES: usize = 65_536;
@@ -17,13 +17,14 @@ const LEGACY_AUTH_ARGS: &[&str] = &["auth", "status", "--json"];
 const LEGACY_STATUS_ARGS: &[&str] = &["status", "--json"];
 const LEGACY_SAVINGS_ARGS: &[&str] = &["savings", "report", "--json"];
 const LEGACY_INSTALL_ARGS: &[&str] = &["install", "--global", "--dry-run", "--json"];
-const REGISTER_ARGS_PREFIX: &[&str] = &["mcp", "register", "--binary"];
+const INSTALL_ARGS: &[&str] = &["install", "--global", "--json"];
 const SUBSCRIPTION_URL: &str = "https://simpleti.com.br/simplicio";
 
 fn runtime_candidates_with(
     override_binary: Option<OsString>,
     simplicio_home: Option<OsString>,
     user_home: Option<OsString>,
+    current_executable: Option<OsString>,
 ) -> Vec<OsString> {
     if let Some(binary) = override_binary {
         return vec![binary];
@@ -38,7 +39,13 @@ fn runtime_candidates_with(
         "simplicio"
     };
 
-    let mut candidates = Vec::with_capacity(2);
+    let mut candidates = Vec::with_capacity(3);
+    if let Some(parent) = current_executable
+        .map(PathBuf::from)
+        .and_then(|path| path.parent().map(Path::to_path_buf))
+    {
+        candidates.push(parent.join(executable).into_os_string());
+    }
     if let Some(root) = install_root {
         candidates.push(root.join("bin").join(executable).into_os_string());
     }
@@ -51,6 +58,7 @@ fn runtime_candidates() -> Vec<OsString> {
         std::env::var_os("SIMPLICIO_RUNTIME_BIN"),
         std::env::var_os("SIMPLICIO_HOME"),
         std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")),
+        std::env::current_exe().ok().map(PathBuf::into_os_string),
     )
 }
 
@@ -93,20 +101,8 @@ fn run_runtime_action(args: &[&str]) -> Result<(), String> {
 }
 
 fn repair_provider_integrations() -> Result<(), String> {
-    for binary in runtime_candidates() {
-        let result = Command::new(&binary)
-            .args(REGISTER_ARGS_PREFIX)
-            .arg(&binary)
-            .arg("--json")
-            .env("SIMPLICIO_DESKTOP_BRIDGE", "1")
-            .output();
-        match result {
-            Ok(output) if output.status.success() => return Ok(()),
-            Ok(_) => return Err("O Runtime não conseguiu reparar as integrações".to_string()),
-            Err(_) => continue,
-        }
-    }
-    Err("Simplicio Runtime não encontrado".to_string())
+    run_runtime_action(INSTALL_ARGS)
+        .map_err(|_| "O Runtime não conseguiu reparar as integrações".to_string())
 }
 
 fn open_subscription_url() -> Result<(), String> {
@@ -140,7 +136,6 @@ fn open_subscription_url() -> Result<(), String> {
             }
         })
 }
-
 
 fn validate_snapshot(value: Value) -> Result<Value, String> {
     let encoded = serde_json::to_vec(&value)
@@ -373,20 +368,28 @@ mod tests {
             LEGACY_INSTALL_ARGS,
             ["install", "--global", "--dry-run", "--json"]
         );
-        assert_eq!(REGISTER_ARGS_PREFIX, ["mcp", "register", "--binary"]);
+        assert_eq!(INSTALL_ARGS, ["install", "--global", "--json"]);
         assert_eq!(SUBSCRIPTION_URL, "https://simpleti.com.br/simplicio");
     }
 
     #[test]
-    fn bridge_prefers_the_managed_runtime_and_honors_an_explicit_override() {
+    fn bridge_prefers_the_bundled_runtime_then_managed_install_and_honors_an_explicit_override() {
         let managed = runtime_candidates_with(
             None,
             Some(OsString::from("/managed/simplicio")),
             Some(OsString::from("/ignored/home")),
+            Some(OsString::from("/bundle/simplicio-desktop")),
         );
         assert_eq!(
             managed,
             [
+                PathBuf::from("/bundle")
+                    .join(if cfg!(windows) {
+                        "simplicio.exe"
+                    } else {
+                        "simplicio"
+                    })
+                    .into_os_string(),
                 PathBuf::from("/managed/simplicio")
                     .join("bin")
                     .join(if cfg!(windows) {
@@ -408,6 +411,7 @@ mod tests {
                 Some(OsString::from("/explicit/runtime")),
                 Some(OsString::from("/managed/simplicio")),
                 None,
+                Some(OsString::from("/bundle/simplicio-desktop")),
             ),
             [OsString::from("/explicit/runtime")]
         );

@@ -17,3 +17,10 @@ The updater follows a stage-before-swap transaction:
 The release acceptance suite must exercise both a successful fresh start and
 a failed-start rollback. The Desktop UI never presents an update as complete
 until the Runtime returns a healthy receipt.
+
+The Tauri bundle must include the exact verified Runtime release binary through
+`bundle.externalBin`. Before a native build, stage it at
+`apps/desktop/src-tauri/binaries/simplicio-<target-triple>` and verify that its
+SHA-256 matches the public Runtime asset. The Desktop bridge resolves this
+bundled sidecar before any managed per-user or `PATH` fallback. Target-specific
+binary files are release staging material and remain outside Git.

@@ -1,6 +1,6 @@
 [package]
 name = "simplicio-desktop"
-version = "0.1.0"
+version = "3.8.38"
 description = "Public desktop shell for the Simplicio Runtime"
 authors = ["SimpleTI"]
 edition = "2021"
