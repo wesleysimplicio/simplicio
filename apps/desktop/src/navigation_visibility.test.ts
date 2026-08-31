@@ -4,6 +4,7 @@ import { isNavigationVisible, isView, VIEW_LABELS, type View } from "./workbench
 describe("requested navigation visibility", () => {
   it("hides exactly the requested destinations without deleting routes", () => {
     const hidden: View[] = [
+      "agents", "models", "artifacts", "automations",
       "orchestration", "computer-use", "voice", "integrations", "mobile", "memory",
       "share-skills", "git", "task-sources", "terminal", "browser", "emulator", "floating",
       "shortcuts", "input", "notifications", "hosts", "servers", "privacy", "advanced", "experimental", "plugins",

@@ -47,7 +47,7 @@ describe("Simplicio Desktop product states", () => {
       <DesktopApp snapshot={createDemoSnapshot("active")} />,
     );
     expect(html).toContain("Runtime online");
-    expect(html).toContain("Agentes e IDEs");
+    expect(html).toContain("Integrações MCP");
     expect(html).toContain("Demonstração");
   });
 
@@ -57,7 +57,8 @@ describe("Simplicio Desktop product states", () => {
     );
     expect(html).toContain("Início");
     expect(html).toContain("Adicionar projeto");
-    expect(html).toContain("Agentes e IDEs");
+    expect(html).not.toContain("Agentes e IDEs");
+    expect(html).not.toContain("Automações");
     expect(html).toContain("Atividade");
     expect(html).toContain("Configurações");
     expect(html).toContain("v3.8.39");

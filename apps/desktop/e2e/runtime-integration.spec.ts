@@ -139,7 +139,12 @@ test("active login opens guided setup and duplicate account effects stay seriali
   await expect(page.getByRole("heading", { name: "Simplicio", exact: true })).toBeVisible();
   expect(await calls(page, "desktop_login")).toHaveLength(1);
   await page.getByRole("button", { name: "Configurações", exact: true }).click();
-  await page.getByRole("button", { name: "Modelos e skills", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Modelos e skills", exact: true })).toHaveCount(0);
+});
+
+test("hidden model inventory remains available as a direct preview (mocked IPC)", async ({ page }) => {
+  await mockNativeBridge(page);
+  await page.goto("/?view=models");
   await expect(page.getByText(/Nenhum modelo foi informado/)).toBeVisible();
 });
 

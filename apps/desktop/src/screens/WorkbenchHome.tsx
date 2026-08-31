@@ -41,7 +41,7 @@ export function WorkbenchHome({ snapshot, project, onAddProject, onViewChange, o
       <div className="welcome-shortcuts"><span><kbd>⌘ / Ctrl K</kbd> Buscar</span>{isNavigationVisible("shortcuts") && <button type="button" onClick={() => onViewChange("shortcuts")}><Glyph name="keyboard" size={14} />Todos os atalhos</button>}</div>
     </div>
     <section className="welcome-resources" aria-label="Acesso rápido">
-      <button type="button" onClick={() => onViewChange("agents")}><Glyph name="teams" size={20} /><span><strong>Agentes e IDEs</strong><small>{status.installed} detectados · {status.connected} MCP confirmados</small></span><Glyph name="arrow" size={16} /></button>
+      {isNavigationVisible("agents") && <button type="button" onClick={() => onViewChange("agents")}><Glyph name="teams" size={20} /><span><strong>Agentes e IDEs</strong><small>{status.installed} detectados · {status.connected} MCP confirmados</small></span><Glyph name="arrow" size={16} /></button>}
       <button type="button" onClick={() => onTokens()}><Glyph name="activity" size={20} /><span><strong>Tokens e economia</strong><small>Consulte uso, períodos e recibos</small></span><Glyph name="arrow" size={16} /></button>
       <button type="button" onClick={() => onViewChange("diagnostics")}><Glyph name="shield" size={20} /><span><strong>Runtime e diagnóstico</strong><small>{status.label} · v{snapshot.runtime.version || "—"}</small></span><Glyph name="arrow" size={16} /></button>
     </section>
