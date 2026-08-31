@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { planDesktopIntegrations, refreshDesktopSnapshot } from "../bridge";
 import { Brand, Glyph } from "../components/Brand";
 import type { DesktopSnapshot } from "../contracts";
-import { integrationTargetsVerified, type IntegrationPlan } from "../integration_setup";
+import { integrationChangeLabel, integrationTargetsVerified, type IntegrationPlan } from "../integration_setup";
 import type { InstallFailureRecovery } from "../install_failures";
 import { canConfigureRuntime, setupStages, type SetupPhase, type SetupStep } from "../setup_flow";
 
@@ -163,7 +163,7 @@ export function SetupScreen({ snapshot, busy, applicationError, applicationRecov
         </li>)}</ol>
         {phase === "review" && plan && <section className="setup-review" aria-label="Plano de instalação">
           <h2 ref={reviewHeading} tabIndex={-1}>O que será configurado</h2>
-          <ul>{plan.changes.map((row, index) => <li key={`${row.label}-${index}`}><span>{row.label}</span><strong>{row.changed ? row.exists ? "Atualizar" : "Criar" : "Já configurado"}</strong></li>)}</ul>
+          <ul>{plan.changes.map((row, index) => <li key={`${row.label}-${index}`}><span>{row.label}</span><strong>{integrationChangeLabel(row)}</strong></li>)}</ul>
           {plan.changes.length === 0 && <p>Nenhuma mudança foi proposta pelo Runtime.</p>}
           <p>MCP e hooks dos clientes detectados, com backups. Plugins de marketplace e permissões dependem de cada host. Este fluxo não altera o PATH nem inicia um serviço global.</p>
           <label className="setup-consent"><input type="checkbox" checked={confirmed} disabled={locked || reviewBlocked} onChange={(event) => setConfirmed(event.target.checked)} />Autorizo o Runtime a aplicar este plano de instalação e registro.</label>

@@ -99,7 +99,8 @@ for (const state of ["inactive", "unknown"] as const) {
 
     await expect(page.getByRole("alert")).toContainText("A saída da conta não foi confirmada.");
     await expect(page.getByRole("alert")).not.toContainText("logout_unconfirmed");
-    await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Tente novamente", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Ative o Simplicio", exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Sair da conta", exact: true })).toBeEnabled();
     await expect(page.getByRole("button", { name: "Começar", exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Continuar com Google", exact: true })).toHaveCount(0);
