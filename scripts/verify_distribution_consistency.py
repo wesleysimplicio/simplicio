@@ -43,10 +43,12 @@ CURRENT_VERSION_RE = re.compile(r"## Current Version:\s*v([^\s]+)")
 # nodes instead of comments/strings, without importing or running the publisher.
 # Helper implementations have their own executable tests; these ordered entry
 # points prevent skipping their gates, broad uploads, or automatic overwrite.
-LOCAL_CHECKS = '''verify_codex_hook_contract()
+LOCAL_CHECKS = '''verify_plugin_release_policy(version)
+verify_codex_hook_contract()
 run([sys.executable, str(ROOT / "scripts/verify_distribution_consistency.py")])
 run([sys.executable, "-m", "pytest", "-q",
-     "tests/test_codex_integration_cli.py", "tests/test_release_local_contract.py"])
+     "tests/test_codex_integration_cli.py", "tests/test_release_local_contract.py",
+     "tests/test_plugin_release_policy.py"])
 run([str(bundle / "simplicio-macos-arm64"), "version", "--json"])
 if (ROOT / "scripts/verify_mcp_tools.py").is_file():
     run([sys.executable, str(ROOT / "scripts/verify_mcp_tools.py"),
@@ -71,6 +73,7 @@ changed = stage_bundle(bundle)
 changed.extend(stage_codex_hooks(bundle))
 changed.extend(update_public_metadata(tag, version, source_commit))
 changed.extend(prepare_package(version))
+changed.extend(prepare_plugin_release_policy(version))
 ''' + LOCAL_CHECKS + '''with tempfile.TemporaryDirectory(prefix="simplicio-public-wheel-") as raw:
     wheel = build_wheel(Path(raw), version)
     wheel_help_smoke(wheel)

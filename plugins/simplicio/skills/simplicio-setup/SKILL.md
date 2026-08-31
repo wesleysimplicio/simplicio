@@ -7,7 +7,8 @@ description: Verify, repair, authenticate, update, or explicitly register the Si
 
 The plugin has no click-time script lifecycle. Its bundled MCP bootstrap runs on
 the first new Codex task after the plugin is enabled or reinstalled. It reuses a
-valid Runtime v3.8.35 or newer, or runs the pinned official installer and then
+valid Runtime meeting `POLICY.minimumRuntimeVersion` in the plugin's
+`bin/simplicio-mcp-bootstrap.js`, or runs the pinned official installer and then
 starts the complete stdio MCP server.
 
 ## Verify the setup
