@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import type { DesktopSnapshot } from "../contracts";
 import { Brand, Glyph, type GlyphName } from "./Brand";
 import { REFERENCE_SCREENS, type ReferenceSettingsView } from "../reference_screens";
-import { isNavigationVisible, isSettingsView, runtimeSummary, searchMatches, VIEW_LABELS, type LocalProject, type View, type WorkbenchState } from "../workbench";
+import { isNavigationVisible, isSettingsView, runtimeSummary, searchMatches, VIEW_LABELS, type LocalProject, type NavigationEntry, type View, type WorkbenchState } from "../workbench";
+import { rememberWorkspaceRoute } from "../settings_navigation";
 
 export type { View } from "../workbench";
 
@@ -43,7 +44,8 @@ interface ShellProps {
   children: ReactNode;
   snapshot: DesktopSnapshot;
   view: View;
-  onViewChange: (view: View) => void;
+  route: NavigationEntry;
+  onViewChange: (view: View, restoreRoute?: NavigationEntry) => void;
   workbench: WorkbenchState;
   onAddProject: () => void;
   onProject: (project: LocalProject) => void;
@@ -55,7 +57,7 @@ interface ShellProps {
   busy: boolean;
 }
 
-export function Shell({ children, snapshot, view, onViewChange, workbench, onAddProject, onProject,
+export function Shell({ children, snapshot, view, route, onViewChange, workbench, onAddProject, onProject,
   onBack, onForward, canBack, canForward, onRefresh, busy }: ShellProps) {
   const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.innerWidth < 760);
   const [collapsed, setCollapsed] = useState(() => typeof window !== "undefined" && window.innerWidth < 760);
@@ -65,7 +67,7 @@ export function Shell({ children, snapshot, view, onViewChange, workbench, onAdd
   const sidebarScroll = useRef<HTMLDivElement>(null);
   const sidebarToggle = useRef<HTMLButtonElement>(null);
   const mainContent = useRef<HTMLElement>(null);
-  const lastWorkspace = useRef<View>("home");
+  const lastWorkspace = useRef<NavigationEntry>({ view: "home", projectId: route.projectId, tokenRepo: "" });
   const drawerOpen = narrow && !collapsed;
   const inSettings = isSettingsView(view);
   const status = runtimeSummary(snapshot);
@@ -88,9 +90,9 @@ export function Shell({ children, snapshot, view, onViewChange, workbench, onAdd
     else closeSidebar(drawerOpen ? "toggle" : null);
   }, [collapsed, drawerOpen, closeSidebar]);
 
-  const selectView = useCallback((next: View) => {
+  const selectView = useCallback((next: View, restoreRoute?: NavigationEntry) => {
     if (drawerOpen) closeSidebar("content");
-    onViewChange(next);
+    onViewChange(next, restoreRoute);
   }, [drawerOpen, closeSidebar, onViewChange]);
 
   function addProject() {
@@ -139,8 +141,8 @@ export function Shell({ children, snapshot, view, onViewChange, workbench, onAdd
 
   useEffect(() => {
     setQuery("");
-    if (!isSettingsView(view)) lastWorkspace.current = view;
-  }, [view]);
+    lastWorkspace.current = rememberWorkspaceRoute(lastWorkspace.current, { ...route, view });
+  }, [route, view]);
 
   useEffect(() => { sidebarScroll.current?.scrollTo({ top: 0 }); }, [query]);
 
@@ -196,7 +198,7 @@ export function Shell({ children, snapshot, view, onViewChange, workbench, onAdd
       {drawerOpen && <button className="sidebar-scrim" type="button" aria-label="Fechar navegação" tabIndex={-1} onClick={() => closeSidebar()} />}
       <aside ref={sidebar} id="workbench-sidebar" className="sidebar" role={drawerOpen ? "dialog" : undefined} aria-modal={drawerOpen ? true : undefined} aria-label={inSettings ? "Configurações" : "Espaço de trabalho"}>
         <div className="sidebar-heading">
-          {inSettings ? <button className="back-to-app" type="button" onClick={() => selectView(lastWorkspace.current)} aria-label="Voltar ao app"><Glyph name="back" size={18} />{!collapsed && <span>Voltar ao app</span>}</button>
+          {inSettings ? <button className="back-to-app" type="button" onClick={() => selectView(lastWorkspace.current.view, lastWorkspace.current)} aria-label="Voltar ao app"><Glyph name="back" size={18} />{!collapsed && <span>Voltar ao app</span>}</button>
             : <button className="brand-home" type="button" onClick={() => selectView("home")} aria-label="Início do Simplicio"><Brand compact={collapsed} /></button>}
           {drawerOpen && <button className="icon-button sidebar-close" type="button" aria-label="Recolher barra lateral" onClick={() => closeSidebar()}><Glyph name="close" size={18} /></button>}
         </div>

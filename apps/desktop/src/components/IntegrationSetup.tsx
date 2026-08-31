@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { planDesktopIntegrations } from "../bridge";
-import type { IntegrationPlan } from "../integration_setup";
+import { integrationChangeLabel, type IntegrationPlan } from "../integration_setup";
 import type { InstallFailureRecovery } from "../install_failures";
 
 export function IntegrationSetup({ busy, onApply, recovery, onDiagnostics }: {
@@ -40,7 +40,7 @@ export function IntegrationSetup({ busy, onApply, recovery, onDiagnostics }: {
     {blocked && <div className="integration-recovery"><p>{recovery === "refresh" ? "A aplicação foi confirmada; falta verificar o estado final. Consulte o diagnóstico, sem reinstalar." : recovery === "wait" ? "Já há uma instalação em andamento. Aguarde sua conclusão antes de outra aplicação." : "Há uma instalação com resultado incerto. Novas aplicações estão bloqueadas nesta sessão; atualizar ou reiniciar o app não comprova a conclusão."}</p>{onDiagnostics && <button type="button" className="button button-secondary" disabled={busy} onClick={onDiagnostics}>Atualizar diagnóstico</button>}</div>}
     {plan && !blocked && <div className="integration-plan">
       <p>{plan.source === "preview" ? "Demonstração: nenhuma alteração real." : "Plano do Runtime, ainda não executado."} {plan.changes.filter((row) => row.changed).length} alterações propostas.</p>
-      <ul>{plan.changes.map((row) => <li key={row.label}><span>{row.label}</span><strong>{row.changed ? row.exists ? "Atualizar" : "Criar" : "Já configurado"}</strong></li>)}</ul>
+      <ul>{plan.changes.map((row) => <li key={row.label}><span>{row.label}</span><strong>{integrationChangeLabel(row)}</strong></li>)}</ul>
       <label className="setup-consent"><input type="checkbox" checked={confirmed} disabled={busy} onChange={(event) => setConfirmed(event.target.checked)} />Autorizo o Runtime a aplicar este plano de instalação e registro.</label>
       <div className="settings-actions"><button type="button" className="button button-primary" disabled={!confirmed || busy} onClick={() => void apply()}>{busy ? "Configurando…" : "Aplicar configuração MCP"}</button><button type="button" className="button button-secondary" disabled={busy} onClick={() => { setPlan(null); setConfirmed(false); }}>Cancelar</button></div>
     </div>}

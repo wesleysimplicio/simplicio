@@ -5,6 +5,11 @@ export interface IntegrationPlan {
   changes: Array<{ label: string; changed: boolean; exists: boolean }>;
 }
 
+export function integrationChangeLabel(change: IntegrationPlan["changes"][number]): string {
+  if (change.changed) return change.exists ? "Atualizar" : "Criar";
+  return change.exists ? "Já configurado" : "Configuração ausente";
+}
+
 export function parseIntegrationPlan(value: unknown): IntegrationPlan {
   if (!value || typeof value !== "object") throw new Error("integration_plan_invalid");
   const plan = value as Record<string, unknown>;
@@ -18,6 +23,9 @@ export function parseIntegrationPlan(value: unknown): IntegrationPlan {
       || typeof row.changed !== "boolean" || typeof row.exists !== "boolean") throw new Error("integration_plan_invalid");
     return { label: row.label, changed: row.changed, exists: row.exists };
   });
+  if (new Set(changes.map((row) => row.label)).size !== changes.length) {
+    throw new Error("integration_plan_ambiguous_targets");
+  }
   return { schema: "simplicio.desktop-integration-plan/v1", source: plan.source as IntegrationPlan["source"], planDigest: plan.planDigest, changes };
 }
 

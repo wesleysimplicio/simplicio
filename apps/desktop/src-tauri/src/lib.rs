@@ -5,6 +5,7 @@ use std::process::{Command, Output};
 use tauri::Manager;
 
 mod auth_access;
+mod consolidated_tokens;
 mod context_report;
 mod desktop_queries;
 mod install_result;
@@ -285,6 +286,21 @@ async fn desktop_token_report(
 }
 
 #[tauri::command]
+async fn desktop_consolidated_token_report(request: Value) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let executable = std::env::current_exe().map_err(|_| "consolidated_report_unavailable")?;
+        consolidated_tokens::report(
+            &request,
+            &executable,
+            runtime_candidates(),
+            require_read_access,
+        )
+    })
+    .await
+    .map_err(|_| "consolidated_report_unavailable".to_string())?
+}
+
+#[tauri::command]
 async fn desktop_export_token_report(
     app: tauri::AppHandle,
     reports: tauri::State<'_, token_exports::TokenReports>,
@@ -557,6 +573,7 @@ pub fn run() {
             desktop_usage_projects,
             desktop_context_report,
             desktop_token_report,
+            desktop_consolidated_token_report,
             desktop_export_token_report,
             desktop_open_subscription,
             desktop_update_target,
@@ -572,6 +589,11 @@ pub fn run() {
 /// Desktop IPC still requires fresh Runtime access before launching a worker.
 pub fn try_project_discovery_worker() -> Option<Result<Value, String>> {
     project_discovery_process::try_discovery_worker()
+}
+
+/// Internal metadata-only token preflight; dispatch before Tauri initialization.
+pub fn try_consolidated_token_preflight_worker() -> Option<Result<Value, String>> {
+    consolidated_tokens::try_preflight_worker()
 }
 
 #[cfg(test)]

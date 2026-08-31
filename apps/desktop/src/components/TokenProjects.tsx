@@ -3,8 +3,9 @@ import { chooseDesktopProject, loadDesktopUsageProjects } from "../bridge";
 import { projectDiscoveryError, type UsageProjects } from "../project_usage";
 import "../project_usage.css";
 
-export function TokenProjects({ repoPath, allowAutoSelect, onSelect }: {
+export function TokenProjects({ repoPath, allowAutoSelect, onSelect, onDiscovery }: {
   repoPath: string; allowAutoSelect: boolean; onSelect: (path: string) => void;
+  onDiscovery?: (result: UsageProjects | null) => void;
 }) {
   const [discovery, setDiscovery] = useState<UsageProjects | null>(null);
   const [busy, setBusy] = useState(false);
@@ -14,8 +15,8 @@ export function TokenProjects({ repoPath, allowAutoSelect, onSelect }: {
   const readLock = useRef(false);
   const pickerLock = useRef(false);
   const mounted = useRef(false);
-  const latest = useRef({ repoPath, allowAutoSelect, onSelect });
-  latest.current = { repoPath, allowAutoSelect, onSelect };
+  const latest = useRef({ repoPath, allowAutoSelect, onSelect, onDiscovery });
+  latest.current = { repoPath, allowAutoSelect, onSelect, onDiscovery };
 
   async function discover() {
     if (readLock.current) return;
@@ -26,11 +27,12 @@ export function TokenProjects({ repoPath, allowAutoSelect, onSelect }: {
       const result = await loadDesktopUsageProjects();
       if (generation !== request.current) return;
       setDiscovery(result);
+      latest.current.onDiscovery?.(result);
       if (latest.current.allowAutoSelect && !latest.current.repoPath.trim() && result.projects.length) {
         latest.current.onSelect(result.projects[0].path);
       }
     } catch (cause) {
-      if (generation === request.current) setError(projectDiscoveryError(cause));
+      if (generation === request.current) { setError(projectDiscoveryError(cause)); latest.current.onDiscovery?.(null); }
     } finally {
       readLock.current = false;
       if (generation === request.current) setBusy(false);

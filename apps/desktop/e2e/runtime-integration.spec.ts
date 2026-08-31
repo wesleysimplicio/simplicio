@@ -92,26 +92,27 @@ test("token reports use filtered queries and send only a native report digest fo
   await mockNativeBridge(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Relatório de tokens", exact: true }).click();
-  await expect(page.locator(".token-metric").first()).toContainText("137");
+  const individual = page.getByRole("region", { name: "Relatório individual", exact: true });
+  await expect(individual.locator(".token-metric").first()).toContainText("137");
   await page.getByRole("combobox", { name: "Período", exact: true }).selectOption("7d");
   await page.getByLabel("Sessão (opcional)").fill("session-test");
   await page.getByLabel("Pasta do projeto (opcional)").fill("/tmp/project with spaces");
   await page.getByRole("button", { name: "Consultar uso" }).click();
-  await expect(page.locator(".token-metric").first()).toContainText("137");
+  await expect(individual.locator(".token-metric").first()).toContainText("137");
   await page.screenshot({ path: testInfo.outputPath("token-report.png"), fullPage: true });
   const requests = await calls(page, "desktop_token_report");
   expect(requests.at(-1)?.args.request).toMatchObject({ sessionId: "session-test", repoPath: "/tmp/project with spaces" });
   await page.getByRole("button", { name: "Exportar JSON" }).dblclick();
-  await expect(page.getByRole("status")).toContainText("Exportado para /Downloads/simplicio-token-usage.json");
+  await expect(individual.getByRole("status")).toContainText("Exportado para /Downloads/simplicio-token-usage.json");
   await page.getByRole("button", { name: "Exportar CSV" }).click();
-  await expect(page.getByRole("status")).toContainText("Exportado para /Downloads/simplicio-token-usage.csv");
+  await expect(individual.getByRole("status")).toContainText("Exportado para /Downloads/simplicio-token-usage.csv");
   expect(await calls(page, "desktop_export_token_report")).toEqual(["json", "csv"].map((format) => ({
     command: "desktop_export_token_report", args: { reportHash: `sha256:${"a".repeat(64)}`, format },
   })));
   await page.getByLabel("Pasta do projeto (opcional)").fill("/missing");
   await page.getByRole("button", { name: "Consultar uso" }).click();
-  await expect(page.getByRole("alert")).toContainText("não significa consumo zero");
-  await expect(page.locator(".token-metric")).toHaveCount(0);
+  await expect(individual.getByRole("alert")).toContainText("não significa consumo zero");
+  await expect(individual.locator(".token-metric")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Exportar JSON" })).toHaveCount(0);
   await expect(page.getByText(/Exportado para/)).toHaveCount(0);
 });

@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useRef, useState } from "react";
 import type {
   BotActionKind,
   BotCenterSnapshot,
@@ -44,7 +44,26 @@ function statusClass(lifecycle: BotLifecycle): string {
   return lifecycle === "active" || lifecycle === "busy" ? "bot-status-live" : lifecycle === "blocked" ? "bot-status-blocked" : "bot-status-muted";
 }
 
-function TimelineEvent({ item, onAction }: { item: BotTimelineEvent; onAction: (request: BotActionRequest) => Promise<void> }) {
+/** Synchronous admission also covers repeated clicks before React renders busy state. */
+export async function dispatchAvailableBotAction({ request, authority, pending, onAction, onBusy }: {
+  request: BotActionRequest;
+  authority: BotCenterSnapshot["actionAuthority"];
+  pending: { current: boolean };
+  onAction: (request: BotActionRequest) => Promise<void>;
+  onBusy: (action: BotActionKind | null) => void;
+}): Promise<void> {
+  if ((authority !== "runtime" && authority !== "preview") || pending.current) return;
+  pending.current = true;
+  try {
+    onBusy(request.kind);
+    await onAction(request);
+  } finally {
+    pending.current = false;
+    onBusy(null);
+  }
+}
+
+function TimelineEvent({ item, onAction, disabled }: { item: BotTimelineEvent; onAction: (request: BotActionRequest) => Promise<void>; disabled: boolean }) {
   const approvalAction: BotActionKind | null = item.kind === "approval_request" && item.approvalId ? "approve" : null;
   return (
     <article className={`bot-event bot-event-${item.kind} ${item.state === "blocked" ? "is-blocked" : ""}`}>
@@ -62,8 +81,8 @@ function TimelineEvent({ item, onAction }: { item: BotTimelineEvent; onAction: (
         {item.reasonCode && <span className="bot-reason">reason: {item.reasonCode}</span>}
         {approvalAction && (
           <div className="bot-approval-actions">
-            <button className="button button-primary" type="button" onClick={() => onAction({ kind: "approve", botId: item.botId, sessionId: item.sessionId, approvalId: item.approvalId })}>Aprovar</button>
-            <button className="button button-secondary" type="button" onClick={() => onAction({ kind: "deny", botId: item.botId, sessionId: item.sessionId, approvalId: item.approvalId })}>Negar</button>
+            <button className="button button-primary" type="button" disabled={disabled} onClick={() => onAction({ kind: "approve", botId: item.botId, sessionId: item.sessionId, approvalId: item.approvalId })}>Aprovar</button>
+            <button className="button button-secondary" type="button" disabled={disabled} onClick={() => onAction({ kind: "deny", botId: item.botId, sessionId: item.sessionId, approvalId: item.approvalId })}>Negar</button>
           </div>
         )}
       </div>
@@ -76,19 +95,15 @@ export function BotCenterScreen({ snapshot, onAction }: { snapshot: BotCenterSna
   const [message, setMessage] = useState("");
   const [steer, setSteer] = useState("");
   const [busyAction, setBusyAction] = useState<BotActionKind | null>(null);
+  const actionLock = useRef(false);
   const selectedBot = snapshot.bots.find((bot) => bot.botId === selectedBotId) ?? null;
   const session = selectedBotId ? sessionFor(snapshot, selectedBotId) : undefined;
   const room = snapshot.rooms.find((item) => item.sessionId === session?.sessionId) ?? snapshot.rooms[0];
   const recentEvents = useMemo(() => session?.events.slice(-30) ?? [], [session]);
-  const isUnavailable = snapshot.actionAuthority === "unavailable";
+  const isUnavailable = snapshot.actionAuthority !== "runtime" && snapshot.actionAuthority !== "preview";
 
   async function dispatch(request: BotActionRequest) {
-    setBusyAction(request.kind);
-    try {
-      await onAction(request);
-    } finally {
-      setBusyAction(null);
-    }
+    await dispatchAvailableBotAction({ request, authority: snapshot.actionAuthority, pending: actionLock, onAction, onBusy: setBusyAction });
   }
 
   async function submitTurn(event: FormEvent) {
@@ -170,7 +185,7 @@ export function BotCenterScreen({ snapshot, onAction }: { snapshot: BotCenterSna
               <div className="bot-chip-row"><span>toolset: {selectedBot.toolset.join(" · ") || "—"}</span><span>skills: {selectedBot.skills.join(" · ") || "—"}</span></div>
 
               <div className="bot-timeline" aria-live="polite">
-                {recentEvents.length === 0 ? <p className="empty-state">Sem transcript disponível para este Bot.</p> : recentEvents.map((item) => <TimelineEvent key={item.eventId} item={item} onAction={dispatch} />)}
+                {recentEvents.length === 0 ? <p className="empty-state">Sem transcript disponível para este Bot.</p> : recentEvents.map((item) => <TimelineEvent key={item.eventId} item={item} onAction={dispatch} disabled={actionDisabled} />)}
               </div>
 
               <div className="bot-composer-wrap">

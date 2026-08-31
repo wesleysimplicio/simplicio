@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { integrationTargetsVerified, parseIntegrationPlan, type IntegrationPlan } from "./integration_setup";
+import { integrationChangeLabel, integrationTargetsVerified, parseIntegrationPlan, type IntegrationPlan } from "./integration_setup";
 
 describe("Desktop installation review", () => {
   const plan = { schema: "simplicio.desktop-integration-plan/v1", source: "runtime", planDigest: `sha256:${"a".repeat(64)}`, changes: [{ label: "codex", changed: true, exists: true, path: "/private", diff: "secret" }] };
@@ -11,6 +11,19 @@ describe("Desktop installation review", () => {
   it("rejects an absent digest and arbitrary config labels", () => {
     expect(() => parseIntegrationPlan({ ...plan, planDigest: "" })).toThrow();
     expect(() => parseIntegrationPlan({ ...plan, changes: [{ label: "/private", changed: true, exists: true }] })).toThrow();
+  });
+  it("rejects duplicate target labels before a plan can be reviewed or applied", () => {
+    for (const duplicate of [plan.changes[0], { label: "codex", changed: false, exists: false }]) {
+      expect(() => parseIntegrationPlan({ ...plan, changes: [...plan.changes, duplicate] })).toThrow("integration_plan_ambiguous_targets");
+    }
+  });
+  it.each([
+    { exists: true, changed: true, expected: "Atualizar" },
+    { exists: false, changed: true, expected: "Criar" },
+    { exists: true, changed: false, expected: "Já configurado" },
+    { exists: false, changed: false, expected: "Configuração ausente" },
+  ])("labels exists=$exists changed=$changed without assuming configuration", ({ exists, changed, expected }) => {
+    expect(integrationChangeLabel({ label: "codex", exists, changed })).toBe(expected);
   });
 });
 
