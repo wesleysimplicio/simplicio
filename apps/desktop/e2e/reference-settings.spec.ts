@@ -143,7 +143,9 @@ test("read-only evidence is escaped and refresh never dispatches unsupported set
   await expect(panel).not.toContainText("private-person@example.test");
   await expect(panel).not.toContainText("private-configuration-body");
   const sidebar = page.getByRole("complementary", { name: "Configurações", exact: true });
-  await sidebar.getByRole("button", { name: "Plugins", exact: true }).click();
+  // Hidden implementations remain testable by an explicit preview route, not navigation.
+  await expect(sidebar.getByRole("button", { name: "Plugins", exact: true })).toHaveCount(0);
+  await page.goto("/?view=plugins");
   await panel.getByRole("button", { name: "Skills informadas", exact: true }).click();
   await expect(panel.getByText("Skill de teste", { exact: true })).toBeVisible();
   await expect(panel.getByText(malicious, { exact: true })).toBeVisible();
@@ -187,8 +189,8 @@ test("leaving a pending copy ignores its completion and does not carry a spinner
   await copy.click();
   await expect(copy).toBeDisabled();
   const sidebar = page.getByRole("complementary", { name: "Configurações", exact: true });
-  await sidebar.getByRole("button", { name: "Voz", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Voz", exact: true, level: 1 })).toBeVisible();
+  await sidebar.getByRole("button", { name: "Contas de IA", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Contas de IA", exact: true, level: 1 })).toBeVisible();
   await page.evaluate(() => (window as SettingsTestWindow).__referenceResolveCopy(0));
   await expect(page.locator(".reference-settings-page")).not.toContainText("Copiado");
   await sidebar.getByRole("button", { name: "Comandos rápidos", exact: true }).click();
@@ -205,6 +207,5 @@ test("task source details are keyboard-operable without saving a fake connection
   const details = page.locator(".ref-source-details").filter({ has: page.locator("summary").filter({ hasText: "Linear" }) });
   await expect(details).toHaveAttribute("open", "");
   await expect(details.getByRole("switch", { name: "Mostrar tarefas de Linear", exact: true })).toBeDisabled();
-  await details.getByRole("button", { name: "Ver conexão do serviço", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Integrações de serviços", exact: true, level: 1 })).toBeVisible();
+  await expect(details.getByRole("button", { name: "Ver conexão do serviço", exact: true })).toHaveCount(0);
 });

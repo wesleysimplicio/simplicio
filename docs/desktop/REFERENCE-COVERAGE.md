@@ -2,6 +2,14 @@
 
 Este mapa descreve as telas e os contratos presentes no código. Cobertura visual não significa equivalência funcional com outro produto, autorização para executar agentes ou validação nativa em todas as plataformas. Os screenshots privados e seus dados não fazem parte deste documento.
 
+## Visibilidade do produto
+
+Por decisão de produto, 22 destinos permanecem implementados, mas estão ocultos da lateral, das buscas de navegação e dos links entre telas: Orquestração, Uso do computador, Voz, Integrações de serviços, Simplicio Mobile, Memória, Compartilhar skills, Git e código-fonte, Fontes de tarefas, Terminal, Navegador, Emulador mobile, Janela flutuante, Atalhos, Entrada e edição, Notificações, Hosts SSH, Servidores Simplicio, Privacidade e telemetria, Avançado, Experimental e Plugins. Os grupos vazios Hosts Remotos e Experimental não aparecem.
+
+Runtime e diagnóstico continua visível no grupo Avançado. Aparência, Permissões do sistema, Comandos rápidos e as demais opções não solicitadas continuam disponíveis. Ocultar a página Atalhos não desativa os comandos de teclado. O catálogo abaixo documenta implementações, não a visibilidade atual; rotas explícitas de prévia continuam disponíveis para testes. A política está em `isNavigationVisible` de `workbench.ts`, sem alterações de autenticação, Runtime ou dados locais.
+
+Validação dessa política em 31/08/2026: 285 testes unitários, 89 cenários de interface (IPC simulado), TypeScript/Vite e build macOS de validação aprovados. O build local não é uma nova release publicada.
+
 ## Correspondência visual
 
 - **Orca:** estrutura branca do workspace, projetos, navegação lateral pesquisável, grupos de preferências, inventários e relatórios. As seções têm conteúdo próprio, não apenas títulos diferentes.

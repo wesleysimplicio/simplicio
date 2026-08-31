@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import type { DesktopSnapshot } from "../contracts";
 import { Brand, Glyph, type GlyphName } from "./Brand";
 import { REFERENCE_SCREENS, type ReferenceSettingsView } from "../reference_screens";
-import { isSettingsView, runtimeSummary, searchMatches, VIEW_LABELS, type LocalProject, type View, type WorkbenchState } from "../workbench";
+import { isNavigationVisible, isSettingsView, runtimeSummary, searchMatches, VIEW_LABELS, type LocalProject, type View, type WorkbenchState } from "../workbench";
 
 export type { View } from "../workbench";
 
@@ -24,7 +24,7 @@ const groupOrder: Record<string, number> = {
   CAPACIDADES: 0, CONFIGURAÇÃO: 1, FLUXOS: 2, INTERFACE: 3,
   "HOSTS REMOTOS": 4, "PRIVACIDADE E SEGURANÇA": 5, AVANÇADO: 6, EXPERIMENTAL: 7,
 };
-const settings: Destination[] = [
+const settings: Destination[] = ([
   { id: "agents", icon: "teams", group: "CAPACIDADES" },
   { id: "models", icon: "spark", group: "CAPACIDADES" },
   { id: "providers", icon: "providers", group: "CONFIGURAÇÃO" },
@@ -36,7 +36,7 @@ const settings: Destination[] = [
   { id: "shortcuts", icon: "keyboard", group: "INTERFACE" },
   { id: "diagnostics", icon: "monitor", group: "AVANÇADO" },
   ...REFERENCE_SCREENS.map(({ id, group, description }) => ({ id, group, description, icon: referenceIcons[id] })),
-];
+] satisfies Destination[]).filter((item) => isNavigationVisible(item.id));
 settings.sort((left, right) => (groupOrder[left.group ?? ""] ?? 100) - (groupOrder[right.group ?? ""] ?? 100));
 
 interface ShellProps {
@@ -237,7 +237,7 @@ export function Shell({ children, snapshot, view, onViewChange, workbench, onAdd
         </div>
         <div className="sidebar-bottom">
           <button className="nav-item" type="button" aria-label="Configurações" title="Configurações" onClick={() => selectView("settings")}><Glyph name="settings" size={18} />{!collapsed && <span>Configurações</span>}</button>
-          <button className="icon-button" type="button" aria-label="Ver atalhos" title="Atalhos" onClick={() => selectView("shortcuts")}><Glyph name="keyboard" size={18} /></button>
+          {isNavigationVisible("shortcuts") && <button className="icon-button" type="button" aria-label="Ver atalhos" title="Atalhos" onClick={() => selectView("shortcuts")}><Glyph name="keyboard" size={18} /></button>}
         </div>
       </aside>
 

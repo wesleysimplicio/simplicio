@@ -21,7 +21,7 @@ test("narrow navigation overlays the workspace and keeps keyboard focus inside u
 
   await drawer.getByRole("button", { name: "Início do Simplicio", exact: true }).focus();
   await page.keyboard.press("Shift+Tab");
-  await expect(drawer.getByRole("button", { name: "Ver atalhos", exact: true })).toBeFocused();
+  await expect(drawer.getByRole("button", { name: "Configurações", exact: true })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(drawer.getByRole("button", { name: "Início do Simplicio", exact: true })).toBeFocused();
   await page.keyboard.press("Escape");

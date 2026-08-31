@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { DesktopSnapshot } from "../contracts";
 import { Glyph } from "../components/Brand";
 import { openDesktopProject } from "../bridge";
-import { runtimeSummary, type LocalProject, type View } from "../workbench";
+import { isNavigationVisible, runtimeSummary, type LocalProject, type View } from "../workbench";
 
 export function WorkbenchHome({ snapshot, project, onAddProject, onViewChange, onRemoveProject, onTokens }:
   { snapshot: DesktopSnapshot; project?: LocalProject; onAddProject: () => void; onViewChange: (view: View) => void; onRemoveProject: () => void; onTokens: (path?: string) => void }) {
@@ -38,7 +38,7 @@ export function WorkbenchHome({ snapshot, project, onAddProject, onViewChange, o
       <h1>Simplicio</h1>
       <p>Seus projetos. Seus agentes.<br />Um Runtime para conectar tudo.</p>
       <div className="welcome-actions"><button className="button button-primary" type="button" onClick={onAddProject}><Glyph name="plus" size={18} />Adicionar projeto</button><button className="button button-secondary" type="button" onClick={() => onViewChange("providers")}><Glyph name="providers" size={18} />Ver integrações</button></div>
-      <div className="welcome-shortcuts"><span><kbd>⌘ / Ctrl K</kbd> Buscar</span><button type="button" onClick={() => onViewChange("shortcuts")}><Glyph name="keyboard" size={14} />Todos os atalhos</button></div>
+      <div className="welcome-shortcuts"><span><kbd>⌘ / Ctrl K</kbd> Buscar</span>{isNavigationVisible("shortcuts") && <button type="button" onClick={() => onViewChange("shortcuts")}><Glyph name="keyboard" size={14} />Todos os atalhos</button>}</div>
     </div>
     <section className="welcome-resources" aria-label="Acesso rápido">
       <button type="button" onClick={() => onViewChange("agents")}><Glyph name="teams" size={20} /><span><strong>Agentes e IDEs</strong><small>{status.installed} detectados · {status.connected} MCP confirmados</small></span><Glyph name="arrow" size={16} /></button>
