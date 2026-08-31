@@ -1,12 +1,25 @@
 # Desktop release and updater contract
 
-Desktop artifacts are published only through the closed-world release
-workflow. A release is eligible when the signed manifest, SHA256 digests,
-SBOM, provenance records, and component lock all match the immutable staged
-bytes. The workflow refuses a remote release whose tag or asset digests have
-drifted.
+## Current manual delivery
 
-The updater follows a stage-before-swap transaction:
+Follow [the local release runbook](../RELEASE_RUNBOOK.md). Publication is manual,
+not a GitHub Actions workflow. The Runtime's closed-world artifact manifest,
+signatures, SBOM and provenance remain mandatory; Desktop installers are separate
+companion assets, not additional members of that Runtime manifest. Record the
+Desktop source revision, target, installer digest and bundled Runtime identity
+separately. Never replace already-published bytes under an immutable version.
+
+`Check for Updates...` currently performs a read-only check of public GitHub
+release metadata and offers the release page for manual installation when a
+compatible package is listed. Progress reflects received metadata bytes, not an
+installer download. Metadata, a version string and an asset filename do not prove
+signature verification, installation, successful startup or rollback. The UI
+does not replace the app or Runtime in the background.
+
+## Required contract before enabling automatic installation
+
+The automatic updater is not implemented by the current metadata dialog. It must
+follow a stage-before-swap transaction before it can be enabled:
 
 1. download into an isolated staging directory;
 2. verify signature, checksum, provenance, and component membership;
@@ -14,9 +27,11 @@ The updater follows a stage-before-swap transaction:
 4. atomically switch the active sidecar;
 5. start the sidecar and restore the previous candidate if startup fails.
 
-The release acceptance suite must exercise both a successful fresh start and
-a failed-start rollback. The Desktop UI never presents an update as complete
-until the Runtime returns a healthy receipt.
+An automatic-updater acceptance suite must exercise both a successful fresh
+start and a failed-start rollback. The Desktop UI must never present an update
+as complete until the Runtime returns a healthy receipt.
+
+## Native bundle identity
 
 The Tauri bundle must include the exact verified Runtime release binary through
 `bundle.externalBin`. Before a native build, stage it at

@@ -3,6 +3,7 @@ export const DESKTOP_RELEASES_URL = "https://github.com/wesleysimplicio/simplici
 export const DESKTOP_RELEASES_API = "https://api.github.com/repos/wesleysimplicio/simplicio/releases?per_page=30";
 export const MAX_RELEASES = 30;
 export const MAX_RELEASE_BYTES = 2 * 1024 * 1024;
+export const MAX_RELEASE_NOTES = 3_000;
 const MAX_ASSETS = 128;
 const CHECK_TIMEOUT_MS = 15_000;
 
@@ -17,6 +18,13 @@ export type DesktopRelease = {
   releaseUrl: string;
   assetName: string;
   assetBytes: number;
+  publishedAt: string | null;
+  notes: { text: string; truncated: boolean } | null;
+};
+
+export type DesktopUpdateProgress = {
+  stage: "requesting" | "receiving" | "validating";
+  receivedBytes: number;
 };
 
 export type DesktopUpdateResult = {
@@ -114,6 +122,20 @@ function desktopAssetRank(name: string, version: string, target: DesktopUpdateTa
   return rank < 0 ? null : rank;
 }
 
+function releaseNotes(value: unknown): DesktopRelease["notes"] {
+  if (typeof value !== "string") return null;
+  // This is public, untrusted publication text, never HTML/Markdown to execute.
+  const text = value.slice(0, MAX_RELEASE_NOTES).replace(/[\uD800-\uDBFF]$/, "")
+    .replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u061c\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, "").trim();
+  return text ? { text, truncated: value.length > MAX_RELEASE_NOTES } : null;
+}
+
+function publicationDate(value: unknown): string | null {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value)) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) && date.toISOString() === value.replace(/Z$/, ".000Z") ? value : null;
+}
+
 export function selectDesktopRelease(payload: unknown, target: DesktopUpdateTarget): DesktopRelease {
   const validTarget = parseDesktopUpdateTarget(target);
   if (!Array.isArray(payload) || payload.length > MAX_RELEASES) throw new DesktopUpdateError("invalid_response");
@@ -135,14 +157,20 @@ export function selectDesktopRelease(payload: unknown, target: DesktopUpdateTarg
       if (selected === null || rank < selected.rank) selected = { name: asset.name, bytes: asset.size, rank };
     }
     if (selected && (latest === null || compareVersions(version, latest.version) > 0)) {
-      latest = { version, tag: entry.tag_name, releaseUrl, assetName: selected.name, assetBytes: selected.bytes };
+      latest = { version, tag: entry.tag_name, releaseUrl, assetName: selected.name, assetBytes: selected.bytes,
+        publishedAt: publicationDate(entry.published_at), notes: releaseNotes(entry.body) };
     }
   }
   if (!latest) throw new DesktopUpdateError("no_compatible_release");
   return latest;
 }
 
-async function readBoundedJson(response: Response): Promise<unknown> {
+async function readBoundedJson(response: Response, signal: AbortSignal, progress: (value: DesktopUpdateProgress) => void): Promise<unknown> {
+  const interrupted = () => signal.reason instanceof DesktopUpdateError ? signal.reason : new DesktopUpdateError("canceled");
+  if (signal.aborted) {
+    void response.body?.cancel().catch(() => undefined);
+    throw interrupted();
+  }
   const declaredLength = Number(response.headers.get("content-length"));
   if (declaredLength > MAX_RELEASE_BYTES || !response.body ||
     !/^application\/json(?:;|$)/i.test(response.headers.get("content-type") ?? "")) {
@@ -152,10 +180,15 @@ async function readBoundedJson(response: Response): Promise<unknown> {
   const reader = response.body.getReader();
   const decoder = new TextDecoder("utf-8", { fatal: true });
   let size = 0;
+  let reportedSize = 0;
   let text = "";
+  const cancelReader = () => { void reader.cancel().catch(() => undefined); };
+  signal.addEventListener("abort", cancelReader, { once: true });
+  progress({ stage: "receiving", receivedBytes: 0 });
   try {
     while (true) {
       const { done, value } = await reader.read();
+      if (signal.aborted) throw interrupted();
       if (done) break;
       size += value.byteLength;
       if (size > MAX_RELEASE_BYTES) {
@@ -163,12 +196,20 @@ async function readBoundedJson(response: Response): Promise<unknown> {
         throw new DesktopUpdateError("invalid_response");
       }
       text += decoder.decode(value, { stream: true });
+      // Bound observer work even when the stream arrives in tiny chunks.
+      if (size - reportedSize >= 16_384) {
+        progress({ stage: "receiving", receivedBytes: size });
+        reportedSize = size;
+      }
     }
+    if (size !== reportedSize) progress({ stage: "receiving", receivedBytes: size });
+    progress({ stage: "validating", receivedBytes: size });
     return JSON.parse(text + decoder.decode()) as unknown;
   } catch (error) {
     if (error instanceof DesktopUpdateError) throw error;
     throw new DesktopUpdateError("invalid_response");
   } finally {
+    signal.removeEventListener("abort", cancelReader);
     reader.releaseLock();
   }
 }
@@ -180,6 +221,7 @@ export async function checkDesktopUpdate(options: {
   fetcher?: typeof fetch;
   online?: boolean;
   timeoutMs?: number;
+  onProgress?: (value: DesktopUpdateProgress) => void;
 }): Promise<DesktopUpdateResult> {
   versionParts(options.currentVersion);
   const target = parseDesktopUpdateTarget(options.target);
@@ -191,17 +233,23 @@ export async function checkDesktopUpdate(options: {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let cancel: () => void = () => undefined;
   const interrupted = new Promise<never>((_, reject) => {
-    cancel = () => { controller.abort(); reject(new DesktopUpdateError("canceled")); };
+    cancel = () => { const error = new DesktopUpdateError("canceled"); controller.abort(error); reject(error); };
     options.signal?.addEventListener("abort", cancel, { once: true });
-    timer = setTimeout(() => { controller.abort(); reject(new DesktopUpdateError("timeout")); }, timeoutMs);
+    timer = setTimeout(() => { const error = new DesktopUpdateError("timeout"); controller.abort(error); reject(error); }, timeoutMs);
   });
+  const progress = (value: DesktopUpdateProgress) => {
+    if (controller.signal.aborted) return;
+    // Presentation must not decide whether release metadata is valid.
+    try { options.onProgress?.(value); } catch { /* Ignore an optional observer failure. */ }
+  };
   const request = async (): Promise<DesktopUpdateResult> => {
+    progress({ stage: "requesting", receivedBytes: 0 });
     const response = await (options.fetcher ?? fetch)(DESKTOP_RELEASES_API, {
       method: "GET", headers: { Accept: "application/vnd.github+json" },
       credentials: "omit", cache: "no-store", redirect: "error", referrerPolicy: "no-referrer", signal: controller.signal,
     });
     if (!response.ok) throw new DesktopUpdateError(response.status === 403 || response.status === 429 ? "rate_limited" : "request_failed");
-    const release = selectDesktopRelease(await readBoundedJson(response), target);
+    const release = selectDesktopRelease(await readBoundedJson(response, controller.signal, progress), target);
     const comparison = compareVersions(options.currentVersion, release.version);
     return { state: comparison < 0 ? "available" : comparison > 0 ? "newer_local" : "up_to_date", currentVersion: options.currentVersion, target, release };
   };

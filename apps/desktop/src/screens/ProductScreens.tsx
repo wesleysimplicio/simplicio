@@ -15,6 +15,7 @@ import { createTokenReport } from "../token_report";
 import { createOmniSearchProjection } from "../omnisearch_projection";
 import { createLibraryProjection } from "../library_projection";
 import { createSuggestionInboxProjection } from "../suggestion_inbox";
+import { VIEW_LABELS } from "../workbench";
 
 type ProductView = Extract<View, "today" | "chats" | "teams" | "automations" | "apps">;
 
@@ -32,7 +33,7 @@ function SurfaceHeading({ view, snapshot }: { view: ProductView; snapshot: Deskt
     <section className="page-heading product-heading">
       <div>
         <span className="eyebrow">{copy.eyebrow}</span>
-        <h1>{copy.title}</h1>
+        <h1>{VIEW_LABELS[view]}</h1>
         <p>{copy.description}</p>
       </div>
       <span className={`projection-badge ${snapshot.source === "preview" ? "preview" : "live"}`}>

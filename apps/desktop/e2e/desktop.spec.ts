@@ -89,7 +89,7 @@ test("primary layouts fit desktop and compact widths", async ({ page }) => {
 });
 
 test("legacy capability previews stay bounded and do not promise unavailable actions", async ({ page }) => {
-  for (const [view, label] of [["today", "Today"], ["chats", "Chats"], ["teams", "Teams"], ["automations", "Automations"], ["apps", "Apps"]]) {
+  for (const [view, label] of [["today", "Hoje"], ["chats", "Conversas"], ["teams", "Equipes"], ["automations", "Automações"], ["apps", "Aplicativos"]]) {
     await page.goto("/?state=active&view=" + view);
     await expect(page.getByRole("heading", { name: label, level: 1 })).toBeVisible();
   }

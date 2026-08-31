@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Capability mínima da janela principal do Simplicio Desktop",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "dialog:allow-open"]
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { installFailureMessage } from "./install_failures";
+import { installFailureMessage, installFailureRecovery } from "./install_failures";
 
 describe("safe installer failure messages", () => {
   it("shows only a bounded nonzero OS exit code and warns about partial effects", () => {
@@ -36,5 +36,85 @@ describe("safe installer failure messages", () => {
     expect(installFailureMessage("integration_plan_changed_review_again")).toContain("Revise a configuração");
     expect(installFailureMessage("integration_install_busy")).toContain("já está em andamento");
     expect(installFailureMessage("integration_install_busy")).not.toContain("alterações parciais");
+  });
+
+  it("permits a reviewed retry only when the installer is known not to have started", () => {
+    const message = installFailureMessage("integration_install_not_started");
+    expect(message).toContain("não foi iniciado");
+    expect(message).toContain("Revise um novo plano");
+    expect(message).toContain("antes de tentar novamente");
+    expect(message).not.toContain("alterações parciais");
+  });
+
+  it("keeps post-start uncertainty blocked without treating refresh or restart as reconciliation", () => {
+    for (const code of [
+      "integration_install_timeout", "integration_install_stderr_too_large",
+      "integration_install_cleanup_unconfirmed", "integration_install_reconciliation_required",
+      "integration_install_output_unavailable", "integration_install_no_exit_code",
+      "integration_install_invalid_json", "integration_install_response_too_large",
+      "integration_install_receipt_unconfirmed", "integration_install_exit_code:7",
+    ]) {
+      const message = installFailureMessage(code);
+      expect(message).toContain("bloqueadas nesta sessão");
+      expect(message).toContain("reiniciar o app não confirma");
+      expect(message).not.toContain("tentar novamente");
+      expect(message.length).toBeLessThan(400);
+    }
+    expect(installFailureMessage("integration_install_timeout")).toContain("prazo de execução");
+    expect(installFailureMessage("integration_install_stderr_too_large")).toContain("saída de diagnóstico");
+    expect(installFailureMessage("integration_install_cleanup_unconfirmed")).toContain("encerramento do processo");
+    expect(installFailureMessage("integration_install_reconciliation_required")).toContain("tentativa anterior");
+  });
+
+  it("asks only for another query when the receipt already confirmed the installation", () => {
+    const message = installFailureMessage("integration_install_applied_snapshot_unavailable");
+    expect(message).toContain("confirmou a aplicação");
+    expect(message).toContain("Consulte novamente o diagnóstico");
+    expect(message).toContain("não reinstale");
+    expect(message).not.toContain("tentar outra instalação");
+    expect(message).not.toContain("bloqueadas");
+  });
+
+  it("does not authorize a retry or assert a known process state for unknown failures", () => {
+    const message = installFailureMessage("unrecognized-before-or-after-start");
+    expect(message).toContain("Não repita a aplicação até esclarecer o resultado");
+    expect(message).not.toContain("tentar novamente");
+    expect(message).not.toContain("não foi iniciado");
+    expect(message).not.toContain("bloqueadas nesta sessão");
+  });
+});
+
+describe("installer recovery without repeated side effects", () => {
+  it("allows only a fresh review when native preflight failed before any installer started", () => {
+    const code = "integration_preflight_unavailable";
+    expect(installFailureRecovery(code)).toBe("review");
+    expect(installFailureRecovery(new Error(code))).toBe("review");
+    expect(installFailureMessage(code)).toContain("O instalador não foi iniciado");
+    expect(installFailureMessage(code)).toContain("revise um novo plano");
+    expect(installFailureMessage(code)).not.toContain("alterações parciais");
+  });
+
+  it("requires explicit plan review for a changed plan or a proven failure to start", () => {
+    expect(installFailureRecovery("integration_plan_changed_review_again")).toBe("review");
+    expect(installFailureRecovery(new Error("integration_install_not_started"))).toBe("review");
+  });
+
+  it("waits for a running attempt and only refreshes after a confirmed receipt", () => {
+    expect(installFailureRecovery("integration_install_busy")).toBe("wait");
+    expect(installFailureRecovery("integration_install_applied_snapshot_unavailable")).toBe("refresh");
+  });
+
+  it("does not release post-start uncertainty or unknown errors for a new install", () => {
+    for (const error of [
+      "integration_install_timeout", "integration_install_stderr_too_large",
+      "integration_install_cleanup_unconfirmed", "integration_install_reconciliation_required",
+      "integration_install_output_unavailable", "integration_install_no_exit_code",
+      "integration_install_invalid_json", "integration_install_response_too_large",
+      "integration_install_receipt_unconfirmed", "integration_install_exit_code:7",
+      "runtime_not_started", "integration_install_not_started ",
+      "integration_preflight_unavailable ", "integration_preflight_unavailable: extra",
+      new Error("integration_install_not_started: extra"), { message: "integration_install_not_started" },
+      "__proto__", "constructor", null, "x".repeat(100_000),
+    ]) expect(installFailureRecovery(error)).toBe("reconcile");
   });
 });

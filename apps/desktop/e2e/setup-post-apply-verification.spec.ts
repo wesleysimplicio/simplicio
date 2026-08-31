@@ -97,12 +97,8 @@ for (const state of ["pending", "absent", "missing", "duplicate", "wrong-source"
     await expect(page.getByRole("region", { name: "Detalhes da configuração", exact: true })).toContainText("Conferência dos destinos: ainda não confirmada.");
     expect(await commandCount(page, "desktop_repair_providers")).toBe(1);
     expect(await commandCount(page, "desktop_plan_integrations")).toBe(2);
-    if (state === "pending" || state === "stable-pending") {
-      await page.getByRole("button", { name: "Revisar novamente", exact: true }).click();
-      await expect(page.getByRole("checkbox", { name: /Autorizo o Runtime/ })).not.toBeChecked();
-      await expect(page.getByRole("button", { name: "Instalar e conectar", exact: true })).toBeDisabled();
-      expect(await commandCount(page, "desktop_repair_providers")).toBe(1);
-    }
+    await expect(page.getByRole("button", { name: "Revisar novamente", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Atualizar diagnóstico", exact: true })).toBeEnabled();
   });
 }
 

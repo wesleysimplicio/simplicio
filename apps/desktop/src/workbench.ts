@@ -1,15 +1,17 @@
 import type { DesktopSnapshot } from "./contracts";
 import { providerRegistry } from "./provider_registry";
+import { isReferenceSettingsView, REFERENCE_LABELS, type ReferenceSettingsView } from "./reference_screens";
 
-export type View = "home" | "project" | "agents" | "models" | "general" | "shortcuts" | "diagnostics" | "setup"
+export type View = ReferenceSettingsView | "home" | "project" | "agents" | "models" | "general" | "shortcuts" | "diagnostics" | "setup"
   | "today" | "chats" | "teams" | "automations" | "apps" | "bot" | "providers" | "tokens" | "activity" | "memory" | "settings";
 
 export const VIEW_LABELS: Record<View, string> = {
+  ...REFERENCE_LABELS,
   home: "Início", project: "Projeto", agents: "Agentes e IDEs", models: "Modelos e skills", setup: "Instalação guiada",
   general: "Aparência", shortcuts: "Atalhos", diagnostics: "Runtime e diagnóstico",
   providers: "Integrações MCP", tokens: "Relatório de tokens", activity: "Atividade",
-  memory: "Memória", settings: "Conta Simplicio", today: "Today", chats: "Chats",
-  teams: "Teams", automations: "Automations", apps: "Apps", bot: "Bot Center",
+  memory: "Memória", settings: "Conta Simplicio", today: "Hoje", chats: "Conversas",
+  teams: "Equipes", automations: "Automações", apps: "Aplicativos", bot: "Central de agentes",
 };
 
 export function isView(value: string | null): value is View {
@@ -17,7 +19,7 @@ export function isView(value: string | null): value is View {
 }
 
 export function isSettingsView(view: View): boolean {
-  return ["settings", "agents", "providers", "models", "general", "shortcuts", "diagnostics", "memory"].includes(view);
+  return isReferenceSettingsView(view) || ["settings", "agents", "providers", "models", "general", "shortcuts", "diagnostics", "memory"].includes(view);
 }
 
 export function searchMatches(text: string, query: string): boolean {

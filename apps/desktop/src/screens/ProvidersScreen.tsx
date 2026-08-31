@@ -4,6 +4,7 @@ import { Glyph } from "../components/Brand";
 import { providerRegistry } from "../provider_registry";
 import { IntegrationSetup } from "../components/IntegrationSetup";
 import { searchMatches } from "../workbench";
+import type { InstallFailureRecovery } from "../install_failures";
 
 const stateCopy: Record<ProviderState, string> = {
   connected: "Conectado", registered: "Registrado", detected: "Detectado",
@@ -34,8 +35,8 @@ function ProviderRow({ provider }: { provider: ProviderConnection }) {
   </article>;
 }
 
-export function ProvidersScreen({ snapshot, busy, repairing, onRefresh, onRepair, inventoryOnly = false }:
-  { snapshot: DesktopSnapshot; busy: boolean; repairing: boolean; onRefresh: () => void; onRepair: (digest: string) => Promise<boolean>; inventoryOnly?: boolean }) {
+export function ProvidersScreen({ snapshot, busy, repairing, onRefresh, onRepair, inventoryOnly = false, applicationRecovery, onDiagnostics }:
+  { snapshot: DesktopSnapshot; busy: boolean; repairing: boolean; onRefresh: () => void; onRepair: (digest: string) => Promise<boolean>; inventoryOnly?: boolean; applicationRecovery?: InstallFailureRecovery; onDiagnostics?: () => void }) {
   const [filter, setFilter] = useState<"all" | "installed" | "available" | "attention">("all");
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<"all" | "agent" | "editor">("all");
@@ -59,7 +60,7 @@ export function ProvidersScreen({ snapshot, busy, repairing, onRefresh, onRepair
       <button className="button button-secondary" type="button" onClick={onRefresh} disabled={busy}><Glyph name="refresh" size={17} />{busy && !repairing ? "Verificando…" : "Verificar"}</button>
     </section>
 
-    {!inventoryOnly && <IntegrationSetup busy={busy} onApply={onRepair} />}
+    {!inventoryOnly && <IntegrationSetup busy={busy} onApply={onRepair} recovery={applicationRecovery} onDiagnostics={onDiagnostics} />}
 
     <section className="connection-overview" aria-label="Resumo das conexões">
       <div><Glyph name="monitor" size={18} /><span><strong>{installed}</strong> aplicativos detectados</span></div>

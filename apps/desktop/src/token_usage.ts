@@ -108,6 +108,7 @@ export function tokenExportErrorMessage(error: unknown): string {
 
 export function tokenErrorMessage(error: unknown): string {
   const reason = error instanceof Error ? error.message : String(error);
+  if (reason === "desktop_access_unverified") return "O Runtime não confirmou o acesso da conta nesta consulta. Verifique a conta e tente novamente; nenhuma assinatura foi considerada inativa.";
   if (reason.includes("token_ledger_unavailable")) return "Nenhum ledger de uso encontrado nesta pasta. Selecione o projeto que recebeu os eventos do Runtime; ausência de telemetria não significa consumo zero.";
   if (reason.includes("preview_no_runtime")) return "A demonstração não consulta seu uso. Abra o app instalado para ler os recibos do Runtime.";
   if (reason.includes("token_query_invalid")) return "Confira a pasta absoluta, a sessão e as datas. O início deve ser anterior ao fim.";

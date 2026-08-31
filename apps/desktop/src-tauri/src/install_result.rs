@@ -9,6 +9,11 @@ pub enum InstallFailure {
     // Command::output may fail while capturing/waiting, not only when spawning.
     // The absence of an output result does not prove there were no effects.
     OutputUnavailable,
+    NotStarted,
+    TimedOut,
+    StderrTooLarge,
+    CleanupUnconfirmed,
+    ReconciliationRequired,
     ExitCode(i32),
     NoExitCode,
     InvalidJson,
@@ -22,6 +27,11 @@ impl InstallFailure {
     pub fn public_code(&self) -> String {
         match self {
             Self::OutputUnavailable => "integration_install_output_unavailable".into(),
+            Self::NotStarted => "integration_install_not_started".into(),
+            Self::TimedOut => "integration_install_timeout".into(),
+            Self::StderrTooLarge => "integration_install_stderr_too_large".into(),
+            Self::CleanupUnconfirmed => "integration_install_cleanup_unconfirmed".into(),
+            Self::ReconciliationRequired => "integration_install_reconciliation_required".into(),
             Self::ExitCode(code) => format!("integration_install_exit_code:{code}"),
             Self::NoExitCode => "integration_install_no_exit_code".into(),
             Self::InvalidJson => "integration_install_invalid_json".into(),
@@ -30,6 +40,42 @@ impl InstallFailure {
             Self::AppliedSnapshotUnavailable => {
                 "integration_install_applied_snapshot_unavailable".into()
             }
+        }
+    }
+}
+
+/// This state survives closing/reopening the dialog, not application restart.
+/// It is not a substitute for a durable Runtime effect-reconciliation receipt.
+pub struct InstallAttempt {
+    reconciliation_required: bool,
+}
+
+impl InstallAttempt {
+    pub const fn new() -> Self {
+        Self {
+            reconciliation_required: false,
+        }
+    }
+
+    pub fn check_ready(&self) -> Result<(), InstallFailure> {
+        if self.reconciliation_required {
+            Err(InstallFailure::ReconciliationRequired)
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn begin(&mut self) -> Result<(), InstallFailure> {
+        self.check_ready()?;
+        self.reconciliation_required = true;
+        Ok(())
+    }
+
+    pub fn finish(&mut self, result: &Result<(), InstallFailure>) {
+        // Only a validated applied receipt or proof that no Runtime started
+        // settles this attempt. Exit failure can still mean partially applied.
+        if matches!(result, Ok(()) | Err(InstallFailure::NotStarted)) {
+            self.reconciliation_required = false;
         }
     }
 }
@@ -85,6 +131,51 @@ mod tests {
             Err(InstallFailure::NoExitCode)
         );
         assert_eq!(validate_install_output(Some(0), &stdout), Ok(()));
+    }
+
+    #[test]
+    fn an_ambiguous_install_cannot_be_authorized_again_by_releasing_the_mutex() {
+        let lock = std::sync::Mutex::new(InstallAttempt::new());
+        {
+            let mut attempt = lock.lock().unwrap();
+            attempt.begin().unwrap();
+            attempt.finish(&Err(InstallFailure::TimedOut));
+        }
+        let mut next_dialog = lock.lock().unwrap();
+        assert_eq!(
+            next_dialog.check_ready(),
+            Err(InstallFailure::ReconciliationRequired)
+        );
+        assert_eq!(
+            next_dialog.begin(),
+            Err(InstallFailure::ReconciliationRequired)
+        );
+    }
+
+    #[test]
+    fn only_a_confirmed_receipt_or_proven_no_start_can_settle_an_attempt() {
+        for failure in [
+            InstallFailure::TimedOut,
+            InstallFailure::OutputUnavailable,
+            InstallFailure::ExitCode(1),
+            InstallFailure::NoExitCode,
+            InstallFailure::InvalidJson,
+            InstallFailure::ResponseTooLarge,
+            InstallFailure::StderrTooLarge,
+            InstallFailure::ReceiptUnconfirmed,
+            InstallFailure::CleanupUnconfirmed,
+        ] {
+            let mut attempt = InstallAttempt::new();
+            attempt.begin().unwrap();
+            attempt.finish(&Err(failure));
+            assert_eq!(attempt.begin(), Err(InstallFailure::ReconciliationRequired));
+        }
+        for result in [Ok(()), Err(InstallFailure::NotStarted)] {
+            let mut attempt = InstallAttempt::new();
+            attempt.begin().unwrap();
+            attempt.finish(&result);
+            assert!(attempt.begin().is_ok());
+        }
     }
 
     #[test]
@@ -187,6 +278,23 @@ mod tests {
             (
                 InstallFailure::OutputUnavailable,
                 "integration_install_output_unavailable",
+            ),
+            (
+                InstallFailure::NotStarted,
+                "integration_install_not_started",
+            ),
+            (InstallFailure::TimedOut, "integration_install_timeout"),
+            (
+                InstallFailure::StderrTooLarge,
+                "integration_install_stderr_too_large",
+            ),
+            (
+                InstallFailure::CleanupUnconfirmed,
+                "integration_install_cleanup_unconfirmed",
+            ),
+            (
+                InstallFailure::ReconciliationRequired,
+                "integration_install_reconciliation_required",
             ),
             (
                 InstallFailure::ExitCode(1),

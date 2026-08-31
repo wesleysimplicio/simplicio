@@ -18,7 +18,8 @@ import { PreferencesScreen } from "./screens/PreferencesScreen";
 import { SetupScreen } from "./screens/SetupScreen";
 import { ProjectDialog } from "./components/ProjectDialog";
 import { DesktopUpdates } from "./components/DesktopUpdates";
-import { installFailureMessage } from "./install_failures";
+import { installFailureMessage, installFailureRecovery, type InstallFailureRecovery } from "./install_failures";
+import { runtimeFailureMessage } from "./runtime_failures";
 import { isView, loadWorkbench, MAX_PROJECTS, moveHistory, navigate, WORKBENCH_KEY, type LocalProject, type NavigationState, type WorkbenchState } from "./workbench";
 import { ProvidersScreen } from "./screens/ProvidersScreen";
 import { MemoryScreen } from "./screens/MemoryScreen";
@@ -27,6 +28,8 @@ import { ActivityScreen } from "./screens/ActivityScreen";
 import { BotCenterScreen } from "./screens/BotCenterScreen";
 import { ProductSurfaceScreen } from "./screens/ProductScreens";
 import { TokensScreen } from "./screens/TokensScreen";
+import { ReferenceSettingsScreen } from "./screens/ReferenceSettingsScreen";
+import { isReferenceSettingsView } from "./reference_screens";
 import "./runtime_panels.css";
 
 function initialView(fallback: View): View {
@@ -41,6 +44,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
   const [loadFailed, setLoadFailed] = useState(false);
   const [action, setAction] = useState<"login" | "logout" | "refresh" | "repair" | "subscribe" | "bot" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [applicationRecovery, setApplicationRecovery] = useState<InstallFailureRecovery | undefined>();
   const [workbench, setWorkbench] = useState(loadWorkbench);
   const [history, setHistory] = useState<NavigationState>(() => ({ entries: [{
     view: initialView(workbench.selectedProjectId ? "project" : "home"),
@@ -108,9 +112,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       .catch((error: unknown) => {
         if (current) {
           setLoadFailed(true);
-          setActionError(error instanceof Error && error.message === "desktop_snapshot_timeout"
-            ? "O Runtime não respondeu no prazo. A consulta pode continuar em andamento; tente atualizar o estado após verificar o Runtime."
-            : "Não foi possível consultar o Runtime. Tente atualizar o estado para verificar a conexão.");
+          setActionError(runtimeFailureMessage(error, "query"));
         }
       });
     return () => {
@@ -129,9 +131,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       setBotCenter(next.botCenter);
       setLoadFailed(false);
     } catch (error) {
-      setActionError(error instanceof Error && error.message === "desktop_snapshot_timeout"
-        ? "O Runtime não respondeu no prazo. A consulta anterior ainda pode estar em andamento; nenhuma nova consulta foi iniciada enquanto ela estiver pendente."
-        : "Não foi possível atualizar o Runtime.");
+      setActionError(runtimeFailureMessage(error, "query"));
     } finally {
       setAction(null);
       actionLock.current = false;
@@ -139,7 +139,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
   }
 
   async function repairProviders(planDigest: string): Promise<boolean> {
-    if (actionLock.current) return false;
+    if (actionLock.current || (applicationRecovery && applicationRecovery !== "review")) return false;
     actionLock.current = true;
     setAction("repair");
     setActionError(null);
@@ -148,9 +148,11 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       setSnapshot(next);
       setBotCenter(next.botCenter);
       setLoadFailed(false);
+      setApplicationRecovery(undefined);
       return true;
     } catch (error) {
       setActionError(installFailureMessage(error));
+      setApplicationRecovery(installFailureRecovery(error));
       return false;
     } finally {
       setAction(null);
@@ -169,8 +171,8 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       setBotCenter(next.botCenter);
       setLoadFailed(false);
       if (next.access.state === "active") setView("setup");
-    } catch {
-      setActionError("O login não foi concluído.");
+    } catch (error) {
+      setActionError(runtimeFailureMessage(error, "login"));
     } finally {
       setAction(null);
       actionLock.current = false;
@@ -203,8 +205,8 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       setBotCenter(next.botCenter);
       setLoadFailed(false);
       setView("home");
-    } catch {
-      setActionError("Não foi possível sair com segurança.");
+    } catch (error) {
+      setActionError(runtimeFailureMessage(error, "logout"));
     } finally {
       setAction(null);
       actionLock.current = false;
@@ -229,7 +231,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
   if (!snapshot && !loadFailed) return <LoadingScreen />;
 
   if (loadFailed) {
-    return <AccessGate state="unknown" busy={action !== null} error={actionError} onRefresh={refresh} onLogout={logout} logoutBusy={action === "logout"} />;
+    return <AccessGate state="unknown" busy={action !== null} error={actionError} onRefresh={refresh} onLogin={login} loginBusy={action === "login"} onLogout={logout} logoutBusy={action === "logout"} />;
   }
 
   if (!snapshot || snapshot.access.state === "signed_out") {
@@ -243,6 +245,8 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
         busy={action !== null}
         error={actionError}
         onRefresh={refresh}
+        onLogin={login}
+        loginBusy={action === "login"}
         onSubscribe={subscribe}
         onLogout={logout}
         logoutBusy={action === "logout"}
@@ -250,9 +254,10 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
     );
   }
 
-  if (view === "setup") return <SetupScreen snapshot={snapshot} busy={action !== null} applicationError={actionError}
+  if (view === "setup") return <SetupScreen snapshot={snapshot} busy={action !== null} applicationError={actionError} applicationRecovery={applicationRecovery}
     onSnapshot={(next) => { setSnapshot(next); setBotCenter(next.botCenter); }} onApply={repairProviders}
-    onFinish={() => setView("home")} onDiagnostics={() => setView("diagnostics")} />;
+    onVerificationFailure={() => setApplicationRecovery("refresh")}
+    onFinish={() => setView("home")} onDiagnostics={() => { setView("diagnostics"); void refresh(); }} />;
 
   return (
     <Shell snapshot={snapshot} view={view} onViewChange={setView} workbench={{ ...workbench, selectedProjectId: selectedProject?.id ?? null }}
@@ -282,6 +287,8 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
           repairing={action === "repair"}
           onRefresh={refresh}
           onRepair={repairProviders}
+          applicationRecovery={applicationRecovery}
+          onDiagnostics={() => { setView("diagnostics"); void refresh(); }}
         />
       )}
       {view === "memory" && <MemoryScreen snapshot={snapshot} />}
@@ -291,6 +298,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       )}
       {(view === "general" || view === "shortcuts" || view === "models") && <PreferencesScreen view={view} snapshot={snapshot} preferences={workbench.preferences} onPreferences={(preferences) => saveWorkbench({ ...workbench, preferences })} onProviders={() => setView("agents")} />}
       {view === "activity" && <ActivityScreen snapshot={snapshot} />}
+      {isReferenceSettingsView(view) && <ReferenceSettingsScreen key={view} view={view} snapshot={snapshot} onNavigate={setView} onRefresh={refresh} busy={action !== null} />}
       {showProjectDialog && <ProjectDialog onClose={() => setShowProjectDialog(false)} onAdd={addProject} />}
     </Shell>
   );

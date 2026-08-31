@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Glyph } from "../components/Brand";
+import { ContextSavings } from "../components/ContextSavings";
+import { TokenProjects } from "../components/TokenProjects";
 import { exportDesktopTokenReport, loadDesktopTokenReport } from "../bridge";
 import { TOKEN_PERIODS, tokenErrorMessage, tokenExportErrorMessage, type TokenPeriod, type TokenQuery, type TokenUsageReport } from "../token_usage";
 
 export function TokensScreen({ initialRepoPath = "" }: { initialRepoPath?: string }) {
   const [period, setPeriod] = useState<TokenPeriod>("1m");
   const [repoPath, setRepoPath] = useState(initialRepoPath);
+  const [allowAutoSelect, setAllowAutoSelect] = useState(!initialRepoPath);
+  const [autoContext, setAutoContext] = useState(Boolean(initialRepoPath));
   const [sessionId, setSessionId] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -49,10 +53,10 @@ export function TokensScreen({ initialRepoPath = "" }: { initialRepoPath?: strin
     setExportError(null);
   }
 
-  function submit() {
+  function submit(path = repoPath) {
     if (exportLock.current) return;
     const query: TokenQuery = { timezoneOffsetSeconds: -new Date().getTimezoneOffset() * 60 };
-    if (repoPath.trim()) query.repoPath = repoPath.trim();
+    if (path.trim()) query.repoPath = path.trim();
     if (sessionId.trim()) query.sessionId = sessionId.trim();
     if (period === "custom") {
       query.fromEpoch = Math.floor(new Date(from).getTime() / 1000);
@@ -94,9 +98,13 @@ export function TokensScreen({ initialRepoPath = "" }: { initialRepoPath?: strin
       <section className="page-heading">
         <div><span className="eyebrow">Recibos do Runtime</span><h1>Relatório de tokens</h1><p>Uso registrado por período e sessão. Economia de contexto não é consumo faturado.</p></div>
       </section>
+      <TokenProjects repoPath={repoPath} allowAutoSelect={allowAutoSelect} onSelect={(path) => {
+        if (exportLock.current) return;
+        setAllowAutoSelect(false); setAutoContext(true); invalidate(); setRepoPath(path); submit(path);
+      }} />
       <form className="panel token-query" onSubmit={(event) => { event.preventDefault(); submit(); }}>
         <label><span id="token-period-label">Período</span><span className="token-select"><select aria-labelledby="token-period-label" value={period} disabled={exporting} onChange={(event) => { setPeriod(event.target.value as TokenPeriod); if (event.target.value === "custom") invalidate(); }}>{TOKEN_PERIODS.map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select></span></label>
-        <label>Pasta do projeto (opcional)<input value={repoPath} maxLength={4096} disabled={exporting} onChange={(event) => { invalidate(); setRepoPath(event.target.value); }} placeholder="Vazio: pasta pessoal" autoComplete="off" spellCheck={false} /></label>
+        <label>Pasta do projeto (opcional)<input value={repoPath} maxLength={4096} disabled={exporting} onChange={(event) => { setAllowAutoSelect(false); setAutoContext(false); invalidate(); setRepoPath(event.target.value); }} placeholder="Vazio: pasta pessoal" autoComplete="off" spellCheck={false} /></label>
         <label>Sessão (opcional)<input value={sessionId} maxLength={256} disabled={exporting} onChange={(event) => { invalidate(); setSessionId(event.target.value); }} placeholder="Todas as sessões do ledger" autoComplete="off" /></label>
         {period === "custom" && <><label>Início<input type="datetime-local" value={from} required disabled={exporting} onChange={(event) => { invalidate(); setFrom(event.target.value); }} /></label><label>Fim (exclusivo)<input type="datetime-local" value={to} required disabled={exporting} onChange={(event) => { invalidate(); setTo(event.target.value); }} /></label></>}
         <button className="button button-primary" type="submit" disabled={busy || exporting}><Glyph name="refresh" size={17} />{busy ? "Consultando…" : "Consultar uso"}</button>
@@ -122,6 +130,7 @@ export function TokensScreen({ initialRepoPath = "" }: { initialRepoPath?: strin
           {exportError && <p role="alert">{exportError}</p>}
         </section>
       </>}
+      <ContextSavings repoPath={repoPath} autoLoad={autoContext} />
     </div>
   );
 }

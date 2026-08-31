@@ -161,7 +161,8 @@ test("guided setup follows reviewed Runtime operations without fake progress or 
   await expect(page.getByRole("heading", { name: "Configurando o Simplicio…" })).toBeVisible();
   await expect(page.getByRole("progressbar")).toHaveAttribute("value", "2");
   await expect(page.getByRole("button", { name: "Voltar ao app" })).toBeDisabled();
-  await expect(page.getByRole("status")).toContainText("não oferece cancelamento seguro");
+  await expect(page.getByRole("status")).toContainText("Instalar e registrar o MCP");
+  await expect(page.getByText(/Esta operação não oferece cancelamento seguro depois de iniciada/)).toBeVisible();
   await page.getByRole("button", { name: "Mostrar detalhes" }).click();
   await expect(page.getByRole("region", { name: "Detalhes da configuração" })).toContainText(`sha256:${"a".repeat(64)}`);
   await page.screenshot({ path: testInfo.outputPath("setup-progress.png"), fullPage: true });
@@ -206,8 +207,10 @@ test("a failed final verification cannot turn an applied plan into a success scr
   await page.getByRole("button", { name: "Instalar e conectar" }).click();
   await expect(page.getByRole("alert")).toContainText("o plano foi aplicado, mas a verificação final falhou", { ignoreCase: true });
   await expect(page.getByRole("progressbar")).toHaveAttribute("value", "3");
-  await page.getByRole("button", { name: "Abrir diagnóstico" }).click();
+  await expect(page.getByRole("button", { name: "Revisar novamente" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Atualizar diagnóstico" }).click();
   await expect(page.getByRole("heading", { name: "Runtime e diagnóstico", exact: true })).toBeVisible();
+  expect(await calls(page, "desktop_repair_providers")).toHaveLength(1);
 });
 
 test("login never bypasses inactive or unknown entitlement into guided installation (mocked IPC)", async ({ browser, baseURL }) => {

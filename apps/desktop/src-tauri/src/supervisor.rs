@@ -58,12 +58,16 @@ impl SidecarSupervisor {
 
     pub fn mark_failed(&mut self) -> Duration {
         self.failures = self.failures.saturating_add(1);
-        let seconds = 2u64.saturating_pow(self.failures.saturating_sub(1) as u32).min(MAX_BACKOFF_SECONDS);
+        let seconds = 2u64
+            .saturating_pow(self.failures.saturating_sub(1) as u32)
+            .min(MAX_BACKOFF_SECONDS);
         self.backoff = Duration::from_secs(seconds);
         self.state = if self.failures >= self.max_restarts {
             SidecarState::Offline
         } else {
-            SidecarState::Degraded { attempt: self.failures }
+            SidecarState::Degraded {
+                attempt: self.failures,
+            }
         };
         self.backoff
     }
@@ -110,6 +114,9 @@ mod tests {
         for _ in 0..20 {
             supervisor.mark_failed();
         }
-        assert_eq!(supervisor.backoff(), Duration::from_secs(MAX_BACKOFF_SECONDS));
+        assert_eq!(
+            supervisor.backoff(),
+            Duration::from_secs(MAX_BACKOFF_SECONDS)
+        );
     }
 }
