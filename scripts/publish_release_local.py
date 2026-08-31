@@ -266,6 +266,143 @@ def public_preflight(tag: str, version: str, *, require_clean: bool) -> None:
         raise PublishError("PyPI version already exists: " + version)
 
 
+PLUGIN_BOOTSTRAP = "plugins/simplicio/bin/simplicio-mcp-bootstrap.js"
+PLUGIN_MANIFESTS = (
+    "plugins/simplicio/plugin.json",
+    "plugins/simplicio/.codex-plugin/plugin.json",
+    "plugins/simplicio/.claude-plugin/plugin.json",
+)
+PERSISTENT_LOGIN_MINIMUM = "3.8.40"
+
+
+def version_parts(value: str) -> tuple[int, int, int]:
+    return tuple(int(part) for part in normalize_version(value)[1].split("."))
+
+
+def read_plugin_policy() -> dict:
+    # Requiring the module does not start its installer or MCP server.
+    probe = (
+        "const b=require(process.argv[1]);"
+        "process.stdout.write(JSON.stringify({policy:b.POLICY,"
+        "acceptsTarget:b.supportedRuntimeVersion(b.POLICY.runtimeVersion),"
+        "acceptsMinimum:b.supportedRuntimeVersion(b.POLICY.minimumRuntimeVersion),"
+        "acceptsLegacy:b.supportedRuntimeVersion('3.8.39')}));"
+    )
+    return json.loads(run(
+        ["node", "-e", probe, str(ROOT / PLUGIN_BOOTSTRAP)],
+        cwd=ROOT, timeout=30,
+    ).stdout)
+
+
+def plugin_manifests() -> list[tuple[Path, dict]]:
+    manifests = []
+    for relative in PLUGIN_MANIFESTS:
+        path = ROOT / relative
+        document = json.loads(path.read_text(encoding="utf-8"))
+        if document.get("name") != "simplicio":
+            raise PublishError("plugin manifest identity mismatch: " + relative)
+        version_parts(document["version"])
+        manifests.append((path, document))
+    if len({document["version"] for _, document in manifests}) != 1:
+        raise PublishError("plugin manifest versions differ")
+    return manifests
+
+
+def prepare_plugin_release_policy(version: str) -> list[Path]:
+    """Pin installation bytes only when the signed bundle is being published."""
+    policy = read_plugin_policy()["policy"]
+    minimum = max(
+        (policy["minimumRuntimeVersion"], PERSISTENT_LOGIN_MINIMUM),
+        key=version_parts,
+    )
+    if version_parts(version) < version_parts(minimum):
+        raise PublishError("release predates the plugin's required Runtime capabilities")
+    commit = run(["git", "rev-parse", "HEAD"], cwd=ROOT).stdout.strip()
+    remote = run(
+        ["git", "ls-remote", "origin", "refs/heads/master"], cwd=ROOT, timeout=60
+    ).stdout.split()
+    if not remote or remote[0] != commit:
+        raise PublishError("plugin installer pin requires the current published master commit")
+    path = ROOT / PLUGIN_BOOTSTRAP
+    original = path.read_text(encoding="utf-8")
+    body = original
+
+    def replace_once(pattern: str, value: str) -> None:
+        nonlocal body
+        body, count = re.subn(pattern, lambda match: match[1] + value + match[2], body)
+        if count != 1:
+            raise PublishError("plugin bootstrap policy field is missing or ambiguous")
+
+    for field, value in (
+        ("runtimeVersion", version),
+        ("minimumRuntimeVersion", minimum),
+        ("installerCommit", commit),
+    ):
+        replace_once(r'(?m)^(  ' + field + r': ")[^"]+(",?)$', value)
+    for platform, filename in (("posix", "install.sh"), ("win32", "install.ps1")):
+        if policy["installers"][platform]["filename"] != filename:
+            raise PublishError("plugin installer filename mismatch")
+        # Hash Git blob bytes, never text-mode output or checkout EOL conversion.
+        result = subprocess.run(
+            ["git", "show", commit + ":" + filename], cwd=ROOT,
+            capture_output=True, timeout=60, check=False,
+        )
+        if result.returncode != 0 or not result.stdout:
+            raise PublishError("published installer blob is unavailable: " + filename)
+        replace_once(
+            r'(filename: "' + re.escape(filename) + r'",\s+sha256: ")[0-9a-f]{64}(")',
+            hashlib.sha256(result.stdout).hexdigest(),
+        )
+    manifests = plugin_manifests()
+    if body == original:
+        return []
+    major, minor, patch = version_parts(manifests[0][1]["version"])
+    plugin_version = f"{major}.{minor}.{patch + 1}"
+    # Validate the entire update before touching any release metadata.
+    path.write_text(body, encoding="utf-8")
+    changed = [path]
+    for manifest, document in manifests:
+        document["version"] = plugin_version
+        manifest.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+        changed.append(manifest)
+    return changed
+
+
+def verify_plugin_release_policy(version: str) -> None:
+    # Historical releases can still finish an interrupted publication.
+    if version_parts(version) < version_parts(PERSISTENT_LOGIN_MINIMUM):
+        return
+    result = read_plugin_policy()
+    policy = result["policy"]
+    if (
+        policy["runtimeVersion"] != version
+        or not version_parts(PERSISTENT_LOGIN_MINIMUM)
+        <= version_parts(policy["minimumRuntimeVersion"]) <= version_parts(version)
+        or not result["acceptsTarget"] or not result["acceptsMinimum"]
+        or result["acceptsLegacy"]
+    ):
+        raise PublishError("plugin policy does not enforce persistent-login compatibility")
+    plugin_manifests()
+    commit = policy["installerCommit"]
+    if re.fullmatch(r"[0-9a-f]{40}", commit) is None:
+        raise PublishError("plugin installer commit is not immutable")
+    for platform, filename in (("posix", "install.sh"), ("win32", "install.ps1")):
+        installer = policy["installers"][platform]
+        if installer["filename"] != filename:
+            raise PublishError("plugin installer filename mismatch")
+        url = f"https://raw.githubusercontent.com/{PUBLIC_REPOSITORY}/{commit}/{filename}"
+        with urllib.request.urlopen(url, timeout=30) as response:
+            content = response.read(1024 * 1024 + 1)
+        if not content or len(content) > 1024 * 1024:
+            raise PublishError("plugin installer response has an invalid size")
+        if hashlib.sha256(content).hexdigest() != installer["sha256"]:
+            raise PublishError("published plugin installer digest mismatch: " + filename)
+    run(
+        ["node", "--test", "plugins/simplicio/tests/bootstrap.test.js"],
+        cwd=ROOT, timeout=120,
+    )
+
+
 def update_public_metadata(tag: str, version: str, source_commit: str) -> list[Path]:
     changed: list[Path] = []
     version_file = ROOT / "version.txt"
@@ -519,6 +656,8 @@ def publish(bundle: Path, tag: str, version: str, source_commit: str) -> dict:
     changed.extend(stage_codex_hooks(bundle))
     changed.extend(update_public_metadata(tag, version, source_commit))
     changed.extend(prepare_package(version))
+    changed.extend(prepare_plugin_release_policy(version))
+    verify_plugin_release_policy(version)
 
     verify_codex_hook_contract()
     run([sys.executable, str(ROOT / "scripts/verify_distribution_consistency.py")])
@@ -526,6 +665,7 @@ def publish(bundle: Path, tag: str, version: str, source_commit: str) -> dict:
         sys.executable, "-m", "pytest", "-q",
         "tests/test_codex_integration_cli.py",
         "tests/test_release_local_contract.py",
+        "tests/test_plugin_release_policy.py",
     ])
     run([str(bundle / "simplicio-macos-arm64"), "version", "--json"])
     if (ROOT / "scripts/verify_mcp_tools.py").is_file():
@@ -580,6 +720,7 @@ def resume_publish(bundle: Path, tag: str, version: str, source_commit: str) -> 
     resume_state = resume_public_preflight(tag, version, source_commit)
     bundle_receipt = verify_bundle(bundle, tag, version, source_commit)
     verify_public_codex_hooks(bundle)
+    verify_plugin_release_policy(version)
 
     verify_codex_hook_contract()
     run([sys.executable, str(ROOT / "scripts/verify_distribution_consistency.py")])
@@ -587,6 +728,7 @@ def resume_publish(bundle: Path, tag: str, version: str, source_commit: str) -> 
         sys.executable, "-m", "pytest", "-q",
         "tests/test_codex_integration_cli.py",
         "tests/test_release_local_contract.py",
+        "tests/test_plugin_release_policy.py",
     ])
     run([str(bundle / "simplicio-macos-arm64"), "version", "--json"])
     if (ROOT / "scripts/verify_mcp_tools.py").is_file():

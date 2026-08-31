@@ -29,7 +29,7 @@ version-aligned with the running binary.
 The bundled MCP server performs an idempotent bootstrap when a supported host
 first activates the package:
 
-1. Reuse a valid Simplicio Runtime v3.8.35 or newer when one is already present.
+1. Reuse a valid Simplicio Runtime meeting `POLICY.minimumRuntimeVersion` in `bin/simplicio-mcp-bootstrap.js` when one is already present.
 2. Otherwise download the official installer from an immutable repository
    commit and verify the installer SHA-256 before execution.
 3. Install the pinned Runtime release through its fail-closed SHA-256 and
@@ -42,7 +42,7 @@ installs at `~/.local/bin/simplicio` are reused. Concurrent starts share an
 installation lock, and diagnostics go to
 `~/.simplicio/logs/codex-plugin-bootstrap.log`.
 
-Runtime v3.8.35 supports macOS arm64/x64, Linux x64, and Windows x64. The plugin
+The Runtime supports macOS arm64/x64, Linux x64, and Windows x64. The plugin
 launcher requires Node.js 18 or newer to be available to Codex MCP processes.
 The official Unix installer additionally requires Python 3 and either curl or
 wget. The current package is live-tested on macOS arm64; the other targets use

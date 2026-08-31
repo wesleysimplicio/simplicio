@@ -580,11 +580,11 @@ mod tests {
     fn windows_projection_uses_local_drive_text_for_project_root_and_home() {
         for (canonical, displayed) in [
             (
-                r"\\?\C:\Users\person\Projects\project",
-                r"C:\Users\person\Projects\project",
+                r"\\?\C:\Accounts\person\Projects\project",
+                r"C:\Accounts\person\Projects\project",
             ),
-            (r"\\?\C:\Users\person\Projects", r"C:\Users\person\Projects"),
-            (r"\\?\C:\Users\person", r"C:\Users\person"),
+            (r"\\?\C:\Accounts\person\Projects", r"C:\Accounts\person\Projects"),
+            (r"\\?\C:\Accounts\person", r"C:\Accounts\person"),
         ] {
             assert_eq!(display_path_text(canonical), Some(displayed));
         }
@@ -595,7 +595,7 @@ mod tests {
         ] {
             assert_eq!(display_path_text(rejected), None);
         }
-        let canonical = r"\\?\C:\Users\person\Projects\project";
+        let canonical = r"\\?\C:\Accounts\person\Projects\project";
         let project = Candidate {
             path: display_path_text(canonical).unwrap().into(),
             name: "project".into(),
@@ -603,12 +603,12 @@ mod tests {
             modified: None,
         }
         .json();
-        assert_eq!(project["path"], r"C:\Users\person\Projects\project");
+        assert_eq!(project["path"], r"C:\Accounts\person\Projects\project");
         assert_eq!(
             project["id"],
             format!(
                 "project-{:x}",
-                Sha256::digest(r"C:\Users\person\Projects\project".as_bytes())
+                Sha256::digest(r"C:\Accounts\person\Projects\project".as_bytes())
             )
         );
         assert_ne!(

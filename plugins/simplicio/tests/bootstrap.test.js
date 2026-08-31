@@ -127,8 +127,8 @@ test("the release contract accepts the signed-security fallback", () => {
     product: "simplicio-runtime",
     runtime: {
       name: "simplicio-runtime",
-      version: "3.8.35",
-      executable: { path: binary, version: "3.8.35" }
+      version: bootstrap.POLICY.runtimeVersion,
+      executable: { path: binary, version: bootstrap.POLICY.runtimeVersion }
     },
     auto_update: {
       distribution: { source_code_distributed: true },
@@ -244,7 +244,7 @@ test("bootstrap selects a valid Runtime and keeps pre-server stdout empty", { sk
   fs.mkdirSync(path.dirname(fakeRuntime), { recursive: true });
   fs.writeFileSync(fakeRuntime, `#!/bin/sh
 if [ "$1" = "version" ]; then
-  printf '{"schema":"simplicio.release-manifest/v1","product":"simplicio-runtime","runtime":{"name":"simplicio-runtime","version":"3.8.35","executable":{"path":"%s","version":"3.8.35"}},"auto_update":{"distribution":{"source_code_distributed":true}},"identity":{"enabled":true,"login_enabled":true},"security":{"signature_required":true,"public_key_configured":true,"refuse_unsigned":true,"refuse_invalid_signature":true}}' "$0"
+  printf '{"schema":"simplicio.release-manifest/v1","product":"simplicio-runtime","runtime":{"name":"simplicio-runtime","version":"${bootstrap.POLICY.runtimeVersion}","executable":{"path":"%s","version":"${bootstrap.POLICY.runtimeVersion}"}},"auto_update":{"distribution":{"source_code_distributed":true}},"identity":{"enabled":true,"login_enabled":true},"security":{"signature_required":true,"public_key_configured":true,"refuse_unsigned":true,"refuse_invalid_signature":true}}' "$0"
   exit 0
 fi
 printf '%s' "$*" > "$SIMPLICIO_TEST_ARGS_FILE"

@@ -145,7 +145,7 @@ only permitted for an explicitly selected unofficial channel.
 
    ```bash
    python3 scripts/verify_distribution_consistency.py
-   python3 -m pytest -q tests/test_distribution_consistency.py tests/test_release_provenance.py tests/test_verify_ed25519.py tests/test_release_local_contract.py
+   python3 -m pytest -q tests/test_distribution_consistency.py tests/test_release_provenance.py tests/test_verify_ed25519.py tests/test_release_local_contract.py tests/test_plugin_release_policy.py
    ```
 
 4. Inspect the local preflight using the exact intended version, bundle path,
@@ -166,6 +166,16 @@ only permitted for an explicitly selected unofficial channel.
    explicit list of assets. It then checks terminal installation, uploads the
    wheel to PyPI, and verifies package installation and the downloaded release.
    Do not separately create the tag or upload assets before this command.
+
+   The publisher also stages the plugin bootstrap target, its immutable public
+   installer commit, and SHA-256 hashes of the original Git blob bytes. From
+   Runtime 3.8.40 onward, the plugin requires the persistent-login capability
+   floor; later patch releases update the bootstrap target without forcing an
+   upgrade from a compatible installed Runtime. A policy change increments the
+   plugin patch version consistently in its Codex, Claude, and portable manifests.
+   The publisher verifies both downloaded installer scripts and runs the real
+   bootstrap tests before tagging, including when resuming an interrupted release.
+   Do not update a plugin's target to an unpublished Runtime version in advance.
 6. If publication partially fails, inspect the receipts and remote state before
    choosing any recovery. `--resume` requires the matching existing tag, final
    release and exact Runtime asset set; it rechecks the bundle/hooks and skips
