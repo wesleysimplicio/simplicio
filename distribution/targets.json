@@ -1,6 +1,6 @@
 {
   "schema": "simplicio.target-triplets/v1",
-  "$comment": "Single source of truth for platform naming across the ecosystem. Any script, workflow or manifest that needs an asset name for a platform MUST derive it from this table (id -> asset) instead of hard-coding its own convention. provenance_target_aliases lists the only build-target names accepted in published provenance. scripts/verify_distribution_consistency.py enforces that release.yml, install.sh, install.ps1 and simplicio-update-manifest.json all agree with this table.",
+  "$comment": "Single source of truth for platform naming across the ecosystem. Any script or manifest that needs an asset name for a platform MUST derive it from this table (id -> asset) instead of hard-coding its own convention. provenance_target_aliases lists the only build-target names accepted in published provenance. scripts/verify_distribution_consistency.py enforces that scripts/publish_release_local.py, install.sh, install.ps1 and simplicio-update-manifest.json all agree with this table.",
   "targets": [
     {
       "id": "windows-x64",

@@ -8,9 +8,14 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-import yaml
-
 from scripts import verify_distribution_consistency as audit
+
+ARTIFACTS = {
+    "macos-arm64": "simplicio-macos-arm64",
+    "macos-x64": "simplicio-macos-x64",
+    "linux-x64": "simplicio-linux-x64",
+    "windows-x64": "simplicio-windows-x64.exe",
+}
 
 
 class DistributionFixture:
@@ -35,74 +40,7 @@ class DistributionFixture:
             "READMEs/README.pt-BR.md",
         ):
             self.put(relative, "https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh\n")
-        self.put(
-            ".github/workflows/release.yml",
-            '''name: publish-release
-"on":
-  workflow_dispatch:
-    inputs:
-      artifact_base_url:
-        required: true
-        type: string
-permissions:
-  contents: read
-jobs:
-  release:
-    permissions:
-      contents: write
-    runs-on: windows-latest
-    steps:
-      - id: checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - id: setup_python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - id: install
-        run: python -m pip install -r requirements-quality.txt
-      - id: state
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: python scripts/verify_release_provenance.py state
-      - id: provenance
-        env:
-          ARTIFACT_BASE_URL: ${{ inputs.artifact_base_url }}
-          TAG_EXISTS: ${{ steps.state.outputs.tag_exists }}
-        run: python scripts/verify_release_provenance.py plan
-      - id: download
-        if: steps.provenance.outputs.mode == 'publish'
-        env:
-          ARTIFACT_BASE_URL: ${{ inputs.artifact_base_url }}
-        run: python scripts/verify_release_provenance.py download
-      - id: verify_staged
-        if: steps.provenance.outputs.mode == 'publish'
-        run: python scripts/verify_release_provenance.py verify-staged
-      - id: metadata
-        if: steps.provenance.outputs.mode == 'publish'
-        run: python scripts/verify_release_provenance.py metadata
-      - id: publish
-        if: steps.provenance.outputs.mode == 'publish'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.state.outputs.version }}
-          target_commitish: ${{ github.sha }}
-          name: "v${{ steps.state.outputs.version }} — Public Beta"
-          body: |
-            Free public beta. All features remain unlocked during the public-beta phase.
-
-            Windows: `irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex`
-            macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh`
-
-            Checksum-verified update manifest included (`simplicio update check`).
-          prerelease: false
-          make_latest: "true"
-          fail_on_unmatched_files: true
-          overwrite_files: false
-          files: dist/*
-''',
-        )
+        self.put(audit.LOCAL_PUBLISHER, (audit.ROOT / audit.LOCAL_PUBLISHER).read_text(encoding="utf-8"))
         self.put("version.txt", self.version + "\n")
         artifact_url = (
             "https://github.com/wesleysimplicio/simplicio/releases/download/"
@@ -118,13 +56,14 @@ jobs:
                     "entitlement": {"beta_until": None},
                     "artifacts": [
                         {
-                            "target": "macos-arm64",
-                            "artifact": "simplicio-macos-arm64",
-                            "url": artifact_url,
+                            "target": target,
+                            "artifact": asset,
+                            "url": f"https://github.com/wesleysimplicio/simplicio/releases/download/v{self.version}/{asset}",
                             "sha256": artifact_sha,
                             "signature": "ed25519:fixture",
                             "signed": True,
                         }
+                        for target, asset in ARTIFACTS.items()
                     ],
                 }
             ),
@@ -143,13 +82,12 @@ jobs:
                 {
                     "targets": [
                         {
-                            "id": "macos-arm64",
-                            "os": "macos",
-                            "arch": "arm64",
-                            "asset": "simplicio-macos-arm64",
+                            "id": target,
+                            "asset": asset,
                             "installer": None,
-                            "manifest_target": "macos-arm64",
+                            "manifest_target": target,
                         }
+                        for target, asset in ARTIFACTS.items()
                     ]
                 }
             ),
@@ -211,184 +149,110 @@ class DistributionConsistencyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             audit.version_from_pyproject(broken)
 
-    def test_regression_release_must_not_stage_repo_wrapper_binary(self):
-        workflow = self.root / ".github/workflows/release.yml"
-        document = yaml.safe_load(workflow.read_text(encoding="utf-8"))
-        download = next(step for step in document["jobs"]["release"]["steps"] if step.get("id") == "download")
-        download["run"] += "\nCopy-Item simplicio dist/simplicio-macos-arm64"
-        workflow.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
-        errors = [item.message for item in audit.run_audit(self.root) if item.level == "ERROR"]
-        self.assertTrue(
-            any(
-                "release workflow provenance" in message and "canonical single command" in message
-                for message in errors
-            )
-        )
+    def publisher_source(self):
+        return (self.root / audit.LOCAL_PUBLISHER).read_text(encoding="utf-8")
 
-    def test_regression_release_must_be_manual_only(self):
-        workflow = self.root / ".github/workflows/release.yml"
-        document = yaml.safe_load(workflow.read_text(encoding="utf-8"))
-        document["on"]["push"] = {"branches": ["master"]}
-        errors = audit.release_workflow_errors(yaml.safe_dump(document, sort_keys=False))
-        self.assertTrue(any("only workflow_dispatch" in error for error in errors))
+    def test_release_requires_real_local_publisher(self):
+        (self.root / audit.LOCAL_PUBLISHER).unlink()
+        errors = audit.manual_release_errors(self.root)
+        self.assertTrue(any("regular local file" in error for error in errors))
 
-    def test_regression_release_requires_tag_bound_verifier(self):
-        workflow = self.root / ".github/workflows/release.yml"
-        document = yaml.safe_load(workflow.read_text(encoding="utf-8"))
-        provenance_step = next(step for step in document["jobs"]["release"]["steps"] if step.get("id") == "provenance")
-        provenance_step["run"] = provenance_step["run"].replace("scripts/verify_release_provenance.py", "scripts/untrusted.py")
-        errors = audit.release_workflow_errors(yaml.safe_dump(document, sort_keys=False))
-        self.assertTrue(any("canonical single command" in error for error in errors))
+    def test_any_remote_workflow_is_rejected_even_manual_dispatch(self):
+        for filename in ("release.yml", "repository-quality.yml", "other.yaml"):
+            with self.subTest(filename=filename):
+                self.fixture.put(".github/workflows/" + filename, '"on": workflow_dispatch\n')
+                errors = audit.manual_release_errors(self.root)
+                self.assertTrue(any("not workflow files" in error for error in errors))
 
-    def test_regression_release_requires_explicit_no_overwrite(self):
-        workflow = self.root / ".github/workflows/release.yml"
-        clean = yaml.safe_load(workflow.read_text(encoding="utf-8"))
-        for value in (None, True):
-            document = json.loads(json.dumps(clean))
-            publish = next(step for step in document["jobs"]["release"]["steps"] if step.get("id") == "publish")
-            if value is None:
-                del publish["with"]["overwrite_files"]
-            else:
-                publish["with"]["overwrite_files"] = value
-            with self.subTest(value=value):
-                errors = audit.release_workflow_errors(yaml.safe_dump(document, sort_keys=False))
-                self.assertTrue(any("complete canonical mapping" in error for error in errors))
-
-    def test_publish_mapping_rejects_prerelease_name_body_and_latest_mutations(self):
-        workflow = self.root / ".github/workflows/release.yml"
-        clean = yaml.safe_load(workflow.read_text(encoding="utf-8"))
-        for key, value in (
-            ("prerelease", True),
-            ("name", "attacker-controlled release"),
-            ("body", "mutated body"),
-            ("make_latest", "false"),
+    def test_publisher_comments_cannot_replace_executable_gates(self):
+        source = self.publisher_source()
+        for replacement in (
+            "    # bundle_receipt = verify_bundle(bundle, tag, version, source_commit)",
+            "    bundle_receipt = {}",
+            "    if False:\n        bundle_receipt = verify_bundle(bundle, tag, version, source_commit)",
         ):
-            document = json.loads(json.dumps(clean))
-            publish = next(step for step in document["jobs"]["release"]["steps"] if step.get("id") == "publish")
-            publish["with"][key] = value
-            with self.subTest(key=key):
-                errors = audit.release_workflow_errors(yaml.safe_dump(document, sort_keys=False))
-                self.assertEqual(
-                    [error for error in errors if "publish with mapping" in error],
-                    ["publish with mapping must equal the complete canonical mapping"],
+            with self.subTest(replacement=replacement):
+                self.fixture.put(
+                    audit.LOCAL_PUBLISHER,
+                    source.replace("    bundle_receipt = verify_bundle(bundle, tag, version, source_commit)", replacement),
                 )
+                self.assertTrue(any("ordered local" in error for error in audit.manual_release_errors(self.root)))
 
-    def test_adversarial_comments_and_env_cannot_spoof_executable_workflow(self):
-        for workflow in (
-            '''"on":
-  workflow_dispatch:
-    inputs:
-      artifact_base_url: {required: true, type: string}
-# jobs: release: steps: verify_release_provenance overwrite_files: false
-''',
-            '''"on":
-  workflow_dispatch:
-    inputs:
-      artifact_base_url: {required: true, type: string}
-env:
-  SPOOF: "jobs release steps verify_release_provenance overwrite_files false"
-''',
+    def test_publication_step_order_is_semantic(self):
+        source = self.publisher_source()
+        source = source.replace(
+            "    bundle_receipt = verify_bundle(bundle, tag, version, source_commit)\n    changed = stage_bundle(bundle)",
+            "    changed = stage_bundle(bundle)\n    bundle_receipt = verify_bundle(bundle, tag, version, source_commit)",
+        )
+        self.fixture.put(audit.LOCAL_PUBLISHER, source)
+        self.assertTrue(any("publish must match" in error for error in audit.manual_release_errors(self.root)))
+
+    def test_malicious_extra_command_and_overwrite_are_rejected(self):
+        source = self.publisher_source()
+        for command in (
+            'run(["gh", "release", "upload", tag, "--clobber", "unverified.exe"])',
+            'run(["git", "tag", "-f", tag])',
+            'run(["git", "push", "--force", "origin", tag])',
+            'run(["gh", "workflow", "run", "release.yml"])',
         ):
-            with self.subTest(workflow=workflow):
-                errors = audit.release_workflow_errors(workflow)
-                self.assertTrue(any("release job" in error for error in errors))
-        workflow = self.root / ".github/workflows/release.yml"
-        document = yaml.safe_load(workflow.read_text(encoding="utf-8"))
-        provenance_step = next(step for step in document["jobs"]["release"]["steps"] if step.get("id") == "provenance")
-        provenance_step["env"] = {"SPOOF": "scripts/verify_release_provenance.py plan --tag-exists"}
-        provenance_step["run"] = (
-            "# python scripts/verify_release_provenance.py plan --working-manifest "
-            "--tag-manifest --remote-release --artifact-base-url --github-output --tag-exists"
+            with self.subTest(command=command):
+                self.fixture.put(audit.LOCAL_PUBLISHER, source + "\ndef extra_effect():\n    " + command + "\n")
+                self.assertTrue(audit.manual_release_errors(self.root))
+
+    def test_bundle_upload_is_explicit_and_cannot_use_a_glob(self):
+        source = self.publisher_source()
+        for old, new in (
+            ("*[str(bundle / name) for name in required_release_assets()]", '"dist/*"'),
+            ('"--verify-tag",', '"--clobber",'),
+            ('"--repo", PUBLIC_REPOSITORY,', '"--repo", "someone/else",'),
+        ):
+            with self.subTest(replacement=new):
+                self.fixture.put(audit.LOCAL_PUBLISHER, source.replace(old, new))
+                self.assertTrue(audit.manual_release_errors(self.root))
+
+    def test_local_asset_contract_requires_signatures_sbom_and_provenance(self):
+        source = self.publisher_source()
+        for suffix in (".sig", ".spdx.json", ".provenance.json"):
+            with self.subTest(suffix=suffix):
+                self.fixture.put(audit.LOCAL_PUBLISHER, source.replace('asset + "' + suffix + '"', '"unchecked"'))
+                self.assertTrue(any("required_release_assets" in error for error in audit.manual_release_errors(self.root)))
+
+    def test_resume_cannot_create_another_release_or_skip_verification(self):
+        source = self.publisher_source()
+        self.fixture.put(
+            audit.LOCAL_PUBLISHER,
+            source.replace("    verify_public_codex_hooks(bundle)", "    create_public_release(tag, bundle)"),
         )
-        errors = audit.release_workflow_errors(yaml.safe_dump(document, sort_keys=False))
-        self.assertTrue(any("canonical single command" in error for error in errors))
-        self.assertTrue(any("env must match" in error for error in errors))
+        self.assertTrue(any("resume_publish must match" in error for error in audit.manual_release_errors(self.root)))
 
-    def test_regression_release_step_order_is_semantic(self):
-        workflow = self.root / ".github/workflows/release.yml"
-        document = yaml.safe_load(workflow.read_text(encoding="utf-8"))
-        steps = document["jobs"]["release"]["steps"]
-        provenance_index = next(index for index, step in enumerate(steps) if step.get("id") == "provenance")
-        download_index = next(index for index, step in enumerate(steps) if step.get("id") == "download")
-        steps[provenance_index], steps[download_index] = steps[download_index], steps[provenance_index]
-        errors = audit.release_workflow_errors(yaml.safe_dump(document, sort_keys=False))
-        self.assertTrue(any("closed-world allowlist" in error for error in errors))
+    def test_duplicate_missing_and_invalid_python_publishers_fail_closed(self):
+        source = self.publisher_source()
+        for value in (
+            "def invalid(",
+            "# publish verify_bundle create_public_release",
+            source + "\ndef publish():\n    pass\n",
+            source.replace("def publish(", "def unrelated("),
+            source.replace('META_ASSETS = ("SHA256SUMS", "simplicio-update-manifest.json")', 'META_ASSETS = ("SHA256SUMS",)'),
+        ):
+            with self.subTest(value=value[:40]):
+                self.fixture.put(audit.LOCAL_PUBLISHER, value)
+                self.assertTrue(audit.manual_release_errors(self.root))
 
-    def test_malicious_extra_step_command_and_env_are_rejected(self):
-        workflow = self.root / ".github/workflows/release.yml"
-        clean = yaml.safe_load(workflow.read_text(encoding="utf-8"))
-        attack = "gh release upload --clobber; git tag -f; git push --force"
+    def test_publisher_asset_names_must_agree_with_canonical_targets(self):
+        source = self.publisher_source().replace('"simplicio-macos-arm64",', '"simplicio-darwin-arm64",', 1)
+        self.fixture.put(audit.LOCAL_PUBLISHER, source)
+        errors = [item.message for item in audit.run_audit(self.root) if item.level == "ERROR"]
+        self.assertTrue(any("ASSETS differs" in message for message in errors))
 
-        extra = json.loads(json.dumps(clean))
-        extra["jobs"]["release"]["steps"].insert(-1, {"id": "attacker", "run": attack})
-        errors = audit.release_workflow_errors(yaml.safe_dump(extra, sort_keys=False))
-        self.assertTrue(any("closed-world allowlist" in error for error in errors))
-
-        appended = json.loads(json.dumps(clean))
-        state = next(step for step in appended["jobs"]["release"]["steps"] if step.get("id") == "state")
-        state["run"] += "; " + attack
-        errors = audit.release_workflow_errors(yaml.safe_dump(appended, sort_keys=False))
-        self.assertTrue(any("canonical single command" in error for error in errors))
-
-        poisoned_env = json.loads(json.dumps(clean))
-        provenance_step = next(step for step in poisoned_env["jobs"]["release"]["steps"] if step.get("id") == "provenance")
-        provenance_step["env"]["POST_PLAN"] = attack
-        errors = audit.release_workflow_errors(yaml.safe_dump(poisoned_env, sort_keys=False))
-        self.assertTrue(any("env must match" in error for error in errors))
-
-    def test_structured_workflow_rejects_malformed_step_shapes(self):
-        workflow = self.root / ".github/workflows/release.yml"
-        clean = yaml.safe_load(workflow.read_text(encoding="utf-8"))
-
-        self.assertTrue(any("YAML is invalid" in error for error in audit.release_workflow_errors("jobs: [")))
-        self.assertTrue(any("duplicate YAML key" in error for error in audit.release_workflow_errors("jobs: {}\njobs: {}")))
-        self.assertTrue(any("YAML mapping" in error for error in audit.release_workflow_errors("[]")))
-
-        variants = []
-        duplicate = json.loads(json.dumps(clean))
-        duplicate["jobs"]["release"]["steps"].append({"id": "state", "run": "echo duplicate"})
-        variants.append(duplicate)
-        missing = json.loads(json.dumps(clean))
-        missing["jobs"]["release"]["steps"] = [
-            step for step in missing["jobs"]["release"]["steps"] if step.get("id") != "publish"
-        ]
-        variants.append(missing)
-        no_install = json.loads(json.dumps(clean))
-        no_install["jobs"]["release"]["steps"][0]["run"] = "echo no dependencies"
-        variants.append(no_install)
-        bad_state = json.loads(json.dumps(clean))
-        next(step for step in bad_state["jobs"]["release"]["steps"] if step.get("id") == "state")["run"] = (
-            "echo remote-release.json"
-        )
-        variants.append(bad_state)
-        bad_guard = json.loads(json.dumps(clean))
-        next(step for step in bad_guard["jobs"]["release"]["steps"] if step.get("id") == "download")["if"] = "always()"
-        variants.append(bad_guard)
-        bad_download = json.loads(json.dumps(clean))
-        next(step for step in bad_download["jobs"]["release"]["steps"] if step.get("id") == "download")["run"] = (
-            "Invoke-WebRequest -Uri $artifact.url # releases/download"
-        )
-        variants.append(bad_download)
-        bad_staged = json.loads(json.dumps(clean))
-        next(step for step in bad_staged["jobs"]["release"]["steps"] if step.get("id") == "verify_staged")["run"] = (
-            "echo unchecked"
-        )
-        variants.append(bad_staged)
-        bad_action = json.loads(json.dumps(clean))
-        next(step for step in bad_action["jobs"]["release"]["steps"] if step.get("id") == "publish")["uses"] = "example/unsafe@v1"
-        variants.append(bad_action)
-        bad_with = json.loads(json.dumps(clean))
-        next(step for step in bad_with["jobs"]["release"]["steps"] if step.get("id") == "publish")["with"] = "spoof"
-        variants.append(bad_with)
-        bad_inputs = json.loads(json.dumps(clean))
-        publish = next(step for step in bad_inputs["jobs"]["release"]["steps"] if step.get("id") == "publish")
-        publish["with"]["fail_on_unmatched_files"] = False
-        publish["with"]["files"] = "**/*"
-        bad_inputs["jobs"]["release"]["steps"].append({"uses": "softprops/action-gh-release@v2"})
-        variants.append(bad_inputs)
-        for document in variants:
-            with self.subTest(document=document):
-                self.assertTrue(audit.release_workflow_errors(yaml.safe_dump(document, sort_keys=False)))
+    def test_manifest_requires_every_target_exactly_once(self):
+        path = self.root / "simplicio-update-manifest.json"
+        original = json.loads(path.read_text(encoding="utf-8"))
+        for artifacts in (original["artifacts"][:-1], original["artifacts"] + original["artifacts"][:1]):
+            with self.subTest(count=len(artifacts)):
+                value = {**original, "artifacts": artifacts}
+                path.write_text(json.dumps(value), encoding="utf-8")
+                errors = [item.message for item in audit.run_audit(self.root) if item.level == "ERROR"]
+                self.assertTrue(any("each canonical target exactly once" in message for message in errors))
 
     def test_regression_manifest_url_must_be_version_bound(self):
         manifest_path = self.root / "simplicio-update-manifest.json"
@@ -397,6 +261,25 @@ env:
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
         errors = [item.message for item in audit.run_audit(self.root) if item.level == "ERROR"]
         self.assertTrue(any("not version-bound" in message for message in errors))
+
+    def test_signature_requirement_cannot_be_disabled_or_string_coerced(self):
+        path = self.root / "simplicio-update-manifest.json"
+        original = json.loads(path.read_text(encoding="utf-8"))
+        for value in (False, None, "true", "false"):
+            with self.subTest(value=value):
+                manifest = {**original, "security": {"signature_required": value}}
+                path.write_text(json.dumps(manifest), encoding="utf-8")
+                errors = [item.message for item in audit.run_audit(self.root) if item.level == "ERROR"]
+                self.assertTrue(any("must require Ed25519" in message for message in errors))
+
+    def test_signature_requirement_cannot_hide_unsigned_artifacts(self):
+        path = self.root / "simplicio-update-manifest.json"
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        manifest["security"]["signature_required"] = False
+        del manifest["artifacts"][0]["signature"]
+        path.write_text(json.dumps(manifest), encoding="utf-8")
+        errors = [item.message for item in audit.run_audit(self.root) if item.level == "ERROR"]
+        self.assertTrue(any("lacks required Ed25519 signature" in message for message in errors))
 
     def test_junit_and_json_cli_are_machine_readable(self):
         junit = self.root / "artifacts/junit.xml"

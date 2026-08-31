@@ -211,7 +211,6 @@ def test_iter_install_reference_files_yields_root_relative_paths(verify_module, 
         "INSTALL.md",
         "install.sh",
         "install.ps1",
-        ".github/workflows/release.yml",
         "pypi/simplicio/simplicio/__main__.py",
     }
     for relative in fixed_names:

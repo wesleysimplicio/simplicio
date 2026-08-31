@@ -1,6 +1,6 @@
 """Unit + regression tests for scripts/verify_distribution_consistency.py.
 
-These are part of the CI quality gate (issue #10): every acceptance
+These are part of the local/manual quality gate (issue #10): every acceptance
 criterion that says "regression test for a fixed bug" is anchored here.
 """
 
@@ -63,7 +63,7 @@ def test_main_install_regex_allows_master_branch_reference():
 # simplicio-update-manifest.json (3.5.2) disagreed on the release version.
 # That is the exact class of "silent release drift" this quality gate exists
 # to catch. version.txt has been synced to the manifest as part of turning
-# this check into a blocking CI gate (see .github/workflows/quality-gate.yml)
+# this check into a blocking local release gate
 # instead of a warning nobody reads. This test pins the fix so a future
 # change can't silently reintroduce the drift.
 # ---------------------------------------------------------------------------
@@ -86,22 +86,8 @@ def test_audit_script_exits_zero_on_this_repo_checkout():
     default of reading ``sys.argv``) so this stays a library-level check
     and isn't polluted by pytest's own command-line arguments.
 
-    The three ed25519-signature ERRORs below are a known, tracked interim
-    gap (windows-x64/macos-x64/linux-x64 are checksum-verified but not yet
-    signed; see simplicio-update-manifest.json's "signing_note" fields and
-    issue #5) that predates and is unrelated to this audit script's release-
-    workflow provenance work. This test still guards against any *other*
-    ERROR being silently introduced.
+    Every canonical Runtime target is now signed. No historical unsigned-target
+    allowlist may hide a regression in the current release contract.
     """
     findings = vdc.run_audit(vdc.ROOT)
-    known_interim_errors = {
-        "manifest artifact lacks required Ed25519 signature: simplicio-windows-x64.exe",
-        "manifest artifact lacks required Ed25519 signature: simplicio-macos-x64",
-        "manifest artifact lacks required Ed25519 signature: simplicio-linux-x64",
-    }
-    unexpected_errors = [
-        item.message
-        for item in findings
-        if item.level == "ERROR" and item.message not in known_interim_errors
-    ]
-    assert unexpected_errors == []
+    assert [item.message for item in findings if item.level == "ERROR"] == []
