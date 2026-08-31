@@ -1,9 +1,11 @@
 name: simplicio-hermes
-version: 0.2.0
-description: Simplicio Runtime context preparation and provider receipts for Hermes Agent.
+version: 0.3.0
+description: Authenticated Mapper-only context and provider cache telemetry for Hermes Agent.
 author: Wesley Simplicio
 provides_hooks:
   - on_session_start
   - pre_llm_call
   - post_llm_call
   - on_session_end
+  - post_api_request
+  - api_request_error
