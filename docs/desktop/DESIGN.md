@@ -42,6 +42,19 @@ Local projects are bookmarks, not agent worktrees. Native code validates and
 canonicalizes existing directories; opening a bookmark revalidates the path.
 Removal only removes the bookmark. Density, sidebar path visibility and the last
 project are local preferences, never authentication or execution authority.
+The native folder picker fills a canonical path for review; choosing a directory
+does not add the bookmark automatically. A complete path can still be entered
+manually, and confirmation revalidates it. Canceling the picker preserves the
+typed path and returns focus without reporting an error. Browser preview cannot
+open or validate local directories.
+
+Below 760px, expanded navigation overlays the workspace instead of squeezing it.
+Its search, scrollable destinations and fixed controls remain available; Escape,
+outside dismissal, keyboard focus containment and focus restoration are explicit.
+Settings destinations use `src/reference_screens.ts`, with grouped navigation and
+search across labels and descriptions. The status bar separates detected
+registrations from current, confirmed MCP handshakes; lack of a confirmed
+handshake is not proof of disconnection.
 
 Entry uses the supplied Claude references for a focused two-screen sequence:
 welcome, then a sign-in card. Only the supported browser-based Google login is
@@ -52,8 +65,14 @@ The guided installer follows the supplied Hermes references with real stages:
 Runtime/access check, read-only plan, confirmed installation, and final state
 verification. Progress advances only after each operation returns, with no
 simulated download percentage or duration. Applying requires explicit consent to
-the current digest. Failed operations show their stage, preserve uncertainty
-about partial changes and require a new review before retrying. Navigation is
+the current digest. The progress header and action footer stay visible while
+destinations and details scroll; reviewing destinations never checks consent.
+Failed operations show their stage and preserve uncertainty about partial
+changes. Only a changed plan or a process confirmed not started permits a new
+review and consent. Uncertain outcomes block reapplication in the current
+session; a confirmed receipt followed by failed verification offers a read-only
+diagnostic refresh, not reinstallation. Navigating away and back does not remove
+that guard, and restarting is not evidence of reconciliation. Navigation is
 locked during an operation that the backend cannot safely cancel. Completion
 confirms configuration, not a live MCP handshake in every client. Marketplace
 plugins and host permissions are not represented as automatically installed.

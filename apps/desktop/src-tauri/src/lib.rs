@@ -1,25 +1,31 @@
 use serde_json::Value;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+use std::process::{Command, Output};
 use tauri::Manager;
 
+mod auth_access;
+mod context_report;
 mod desktop_queries;
 mod install_result;
 mod legacy_snapshot;
 mod local_projects;
 #[cfg(desktop)]
 mod native_menu;
+mod project_discovery_process;
+mod project_usage;
+mod runtime_process;
 mod snapshot_exports;
 mod supervisor;
 mod token_exports;
 
-static INSTALL_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+static INSTALL_LOCK: std::sync::Mutex<install_result::InstallAttempt> =
+    std::sync::Mutex::new(install_result::InstallAttempt::new());
 
 #[tauri::command]
 async fn desktop_validate_project(path: String) -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        require_active_access()?;
+        require_read_access()?;
         local_projects::validate_project(&path)
     })
     .await
@@ -59,7 +65,6 @@ const MAX_SNAPSHOT_BYTES: usize = 65_536;
 const SNAPSHOT_ARGS: &[&str] = &["desktop", "snapshot", "--json"];
 const LOGIN_ARGS: &[&str] = &["login", "google", "--json"];
 const LOGOUT_ARGS: &[&str] = &["logout", "--json"];
-const SUBSCRIPTION_ARGS: &[&str] = &["desktop", "subscribe", "--json"];
 const STATUS_ARGS: &[&str] = &["desktop", "status", "--json"];
 const LEGACY_AUTH_ARGS: &[&str] = &["auth", "status", "--json"];
 const LEGACY_STATUS_ARGS: &[&str] = &["status", "--json"];
@@ -112,28 +117,45 @@ fn runtime_candidates() -> Vec<OsString> {
     )
 }
 
-fn run_runtime_output(args: &[&str]) -> Result<Output, String> {
-    for binary in runtime_candidates() {
-        match Command::new(binary)
-            .args(args)
-            .env("SIMPLICIO_DESKTOP_BRIDGE", "1")
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-        {
-            // Once a process starts, capture/wait failure must not replay an action
-            // against a different Runtime candidate: effects may already exist.
-            Ok(child) => {
-                return child
-                    .wait_with_output()
-                    .map_err(|_| "runtime_output_unavailable".into())
-            }
-            Err(_) => continue,
-        }
+fn runtime_capture_limits(args: &[&str]) -> runtime_process::CaptureLimits {
+    if args == INSTALL_ARGS {
+        runtime_process::CaptureLimits::INSTALL
+    } else if args == LOGIN_ARGS {
+        runtime_process::CaptureLimits::OAUTH
+    } else {
+        runtime_process::CaptureLimits::QUERY
     }
+}
 
-    Err("Simplicio Runtime não encontrado".to_string())
+fn run_runtime_capture(args: &[&str]) -> Result<Output, runtime_process::ProcessFailure> {
+    let commands = runtime_candidates().into_iter().map(|binary| {
+        let mut command = Command::new(binary);
+        command.args(args).env("SIMPLICIO_DESKTOP_BRIDGE", "1");
+        command
+    });
+    runtime_process::capture_candidates(commands, runtime_capture_limits(args))
+}
+
+fn runtime_failure_code(args: &[&str], failure: runtime_process::ProcessFailure) -> String {
+    use runtime_process::{ChildState, FailureKind};
+    if failure.child_state == ChildState::Retained {
+        return "runtime_process_cleanup_unconfirmed".into();
+    }
+    match failure.kind {
+        FailureKind::Spawn => "runtime_not_started",
+        FailureKind::Deadline if args == LOGIN_ARGS => "runtime_oauth_timeout",
+        FailureKind::Deadline if args == INSTALL_ARGS => "runtime_install_timeout",
+        FailureKind::Deadline => "runtime_query_timeout",
+        FailureKind::StdoutLimit => "runtime_stdout_limit",
+        FailureKind::StderrLimit => "runtime_stderr_limit",
+        FailureKind::Capture => "runtime_output_unavailable",
+        FailureKind::CleanupPending => "runtime_process_cleanup_unconfirmed",
+    }
+    .into()
+}
+
+fn run_runtime_output(args: &[&str]) -> Result<Output, String> {
+    run_runtime_capture(args).map_err(|failure| runtime_failure_code(args, failure))
 }
 
 fn successful_output(args: &[&str]) -> Result<Output, String> {
@@ -159,11 +181,23 @@ fn run_runtime_action(args: &[&str]) -> Result<(), String> {
     successful_output(args).map(|_| ())
 }
 
-fn repair_provider_integrations() -> Result<(), String> {
-    let output = run_runtime_output(INSTALL_ARGS)
-        .map_err(|_| install_result::InstallFailure::OutputUnavailable.public_code())?;
+fn repair_provider_integrations() -> Result<(), install_result::InstallFailure> {
+    use install_result::InstallFailure;
+    use runtime_process::{ChildState, FailureKind};
+    let output = run_runtime_capture(INSTALL_ARGS).map_err(|failure| {
+        if failure.child_state == ChildState::Retained {
+            return InstallFailure::CleanupUnconfirmed;
+        }
+        match failure.kind {
+            FailureKind::Spawn => InstallFailure::NotStarted,
+            FailureKind::Deadline => InstallFailure::TimedOut,
+            FailureKind::StdoutLimit => InstallFailure::ResponseTooLarge,
+            FailureKind::StderrLimit => InstallFailure::StderrTooLarge,
+            FailureKind::Capture => InstallFailure::OutputUnavailable,
+            FailureKind::CleanupPending => InstallFailure::CleanupUnconfirmed,
+        }
+    })?;
     install_result::validate_install_output(output.status.code(), &output.stdout)
-        .map_err(|failure| failure.public_code())
 }
 
 fn require_active_access() -> Result<(), String> {
@@ -182,11 +216,51 @@ fn integration_plan_from_runtime() -> Result<Value, String> {
     desktop_queries::project_install_plan(run_runtime_json(LEGACY_INSTALL_ARGS)?)
 }
 
+fn require_read_access() -> Result<(), String> {
+    // A fresh Runtime authorization query, not a cached snapshot or installation inventory.
+    auth_access::require_fresh(run_runtime_json)
+}
+
 #[tauri::command]
 async fn desktop_plan_integrations() -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(integration_plan_from_runtime)
         .await
         .map_err(|_| "integration_plan_unavailable".to_string())?
+}
+
+#[tauri::command]
+async fn desktop_usage_projects() -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        require_read_access()?;
+        let home = std::env::var_os("HOME")
+            .or_else(|| std::env::var_os("USERPROFILE"))
+            .map(PathBuf::from)
+            .ok_or("project_discovery_unavailable")?;
+        let configured = std::env::var_os("SIMPLICIO_DESKTOP_REPO").map(PathBuf::from);
+        let executable = std::env::current_exe().map_err(|_| "project_discovery_unavailable")?;
+        project_discovery_process::discover(&home, configured.as_deref(), &executable)
+    })
+    .await
+    .map_err(|_| "project_discovery_unavailable".to_string())?
+}
+
+#[tauri::command]
+async fn desktop_context_report(repo_path: Option<String>) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        require_read_access()?;
+        let default_repo = std::env::var_os("SIMPLICIO_DESKTOP_REPO")
+            .or_else(|| std::env::var_os("HOME"))
+            .or_else(|| std::env::var_os("USERPROFILE"))
+            .map(PathBuf::from)
+            .ok_or("context_query_invalid")?;
+        let args = context_report::query_args(repo_path.as_deref(), &default_repo)?;
+        let borrowed = args.iter().map(String::as_str).collect::<Vec<_>>();
+        context_report::project(
+            run_runtime_json(&borrowed).map_err(|_| "context_report_unavailable")?,
+        )
+    })
+    .await
+    .map_err(|_| "context_report_unavailable".to_string())?
 }
 
 #[tauri::command]
@@ -196,7 +270,7 @@ async fn desktop_token_report(
 ) -> Result<Value, String> {
     let reports = reports.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        require_active_access()?;
+        require_read_access()?;
         let default_repo = std::env::var_os("SIMPLICIO_DESKTOP_REPO")
             .or_else(|| std::env::var_os("HOME"))
             .or_else(|| std::env::var_os("USERPROFILE"))
@@ -413,14 +487,23 @@ async fn desktop_logout() -> Result<Value, String> {
 #[tauri::command]
 async fn desktop_repair_providers(plan_digest: String) -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let _guard = INSTALL_LOCK
-            .try_lock()
-            .map_err(|_| "integration_install_busy")?;
-        let plan = integration_plan_from_runtime()?;
+        let mut attempt = INSTALL_LOCK.try_lock().map_err(|error| match error {
+            std::sync::TryLockError::WouldBlock => "integration_install_busy",
+            std::sync::TryLockError::Poisoned(_) => "integration_install_reconciliation_required",
+        })?;
+        attempt
+            .check_ready()
+            .map_err(|failure| failure.public_code())?;
+        // Preflight is read-only: no installer has started before attempt.begin().
+        let plan =
+            integration_plan_from_runtime().map_err(|_| "integration_preflight_unavailable")?;
         if plan["planDigest"].as_str() != Some(plan_digest.as_str()) {
             return Err("integration_plan_changed_review_again".into());
         }
-        repair_provider_integrations()?;
+        attempt.begin().map_err(|failure| failure.public_code())?;
+        let result = repair_provider_integrations();
+        attempt.finish(&result);
+        result.map_err(|failure| failure.public_code())?;
         snapshot_from_runtime()
             .map_err(|_| install_result::InstallFailure::AppliedSnapshotUnavailable.public_code())
     })
@@ -430,11 +513,10 @@ async fn desktop_repair_providers(plan_digest: String) -> Result<Value, String> 
 
 #[tauri::command]
 async fn desktop_open_subscription() -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(|| {
-        run_runtime_action(SUBSCRIPTION_ARGS).or_else(|_| open_subscription_url())
-    })
-    .await
-    .map_err(|_| "Falha interna ao abrir os planos".to_string())?
+    // One fixed navigation, never retry an uncertain Runtime action with a second opener.
+    tauri::async_runtime::spawn_blocking(open_subscription_url)
+        .await
+        .map_err(|_| "Falha interna ao abrir os planos".to_string())?
 }
 
 /// The Desktop owns the transport boundary, not the Bot/Agent authority.
@@ -455,6 +537,7 @@ async fn runtime_status() -> Result<Value, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(token_exports::TokenReports::default())
         .setup(|app| {
             #[cfg(desktop)]
@@ -471,6 +554,8 @@ pub fn run() {
             desktop_logout,
             desktop_repair_providers,
             desktop_plan_integrations,
+            desktop_usage_projects,
+            desktop_context_report,
             desktop_token_report,
             desktop_export_token_report,
             desktop_open_subscription,
@@ -481,6 +566,12 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Simplicio Desktop");
+}
+
+/// Internal read-only worker entrypoint, checked before initializing the WebView.
+/// Desktop IPC still requires fresh Runtime access before launching a worker.
+pub fn try_project_discovery_worker() -> Option<Result<Value, String>> {
+    project_discovery_process::try_discovery_worker()
 }
 
 #[cfg(test)]
@@ -535,7 +626,6 @@ mod tests {
         assert_eq!(SNAPSHOT_ARGS, ["desktop", "snapshot", "--json"]);
         assert_eq!(LOGIN_ARGS, ["login", "google", "--json"]);
         assert_eq!(LOGOUT_ARGS, ["logout", "--json"]);
-        assert_eq!(SUBSCRIPTION_ARGS, ["desktop", "subscribe", "--json"]);
         assert_eq!(STATUS_ARGS, ["desktop", "status", "--json"]);
         assert_eq!(LEGACY_AUTH_ARGS, ["auth", "status", "--json"]);
         assert_eq!(LEGACY_STATUS_ARGS, ["status", "--json"]);
@@ -549,6 +639,59 @@ mod tests {
         assert_eq!(
             RELEASES_URL,
             "https://github.com/wesleysimplicio/simplicio/releases"
+        );
+    }
+
+    #[test]
+    fn process_deadlines_are_explicit_per_query_oauth_and_install() {
+        use std::time::Duration;
+        assert_eq!(
+            runtime_capture_limits(SNAPSHOT_ARGS).deadline,
+            Duration::from_secs(20)
+        );
+        assert_eq!(
+            runtime_capture_limits(LEGACY_INSTALL_ARGS).deadline,
+            Duration::from_secs(20)
+        );
+        assert_eq!(
+            runtime_capture_limits(LOGIN_ARGS).deadline,
+            Duration::from_secs(180)
+        );
+        assert_eq!(
+            runtime_capture_limits(INSTALL_ARGS).deadline,
+            Duration::from_secs(300)
+        );
+        assert_eq!(runtime_capture_limits(INSTALL_ARGS).stdout_bytes, 65_536);
+    }
+
+    #[test]
+    fn public_process_errors_are_fixed_codes_and_do_not_infer_auth_state() {
+        use runtime_process::{ChildState, FailureKind, ProcessFailure};
+        let timeout = ProcessFailure {
+            kind: FailureKind::Deadline,
+            child_state: ChildState::Reaped,
+        };
+        assert_eq!(
+            runtime_failure_code(LOGIN_ARGS, timeout),
+            "runtime_oauth_timeout"
+        );
+        assert_eq!(
+            runtime_failure_code(SNAPSHOT_ARGS, timeout),
+            "runtime_query_timeout"
+        );
+        assert_eq!(
+            runtime_failure_code(INSTALL_ARGS, timeout),
+            "runtime_install_timeout"
+        );
+        assert_eq!(
+            runtime_failure_code(
+                INSTALL_ARGS,
+                ProcessFailure {
+                    child_state: ChildState::Retained,
+                    ..timeout
+                }
+            ),
+            "runtime_process_cleanup_unconfirmed"
         );
     }
 

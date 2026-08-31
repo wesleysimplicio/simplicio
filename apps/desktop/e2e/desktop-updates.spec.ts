@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 import { createDemoSnapshot } from "../src/demo";
 import { DESKTOP_RELEASES_API, DESKTOP_RELEASES_URL, DESKTOP_UPDATE_EVENT } from "../src/desktop_updates";
 
@@ -8,22 +8,25 @@ type UpdatesWindow = Window & {
   __updatesListeners: () => number;
   __updatesResolveOpen: (index: number) => void;
   __updatesRejectOpen: (index: number) => void;
+  __updatesResolveVersion: () => void;
 };
 
-async function mockUpdates(page: Page) {
+async function mockUpdates(page: Page, options: { holdVersion?: boolean; version?: string; notes?: string } = {}) {
   const snapshot = createDemoSnapshot("active");
   snapshot.source = "runtime";
   await page.clock.install();
-  await page.addInitScript(({ snapshot, eventName }) => {
+  await page.addInitScript(({ snapshot, eventName, options }) => {
     let sequence = 0;
     const callbacks = new Map<number, (event: unknown) => void>();
     const listeners = new Map<number, { event: string; handler: number }>();
     const openers: Array<{ resolve: () => void; reject: () => void }> = [];
     const calls: UpdatesWindow["__updatesCalls"] = [];
+    const versions: Array<(version: string) => void> = [];
+    let holdVersion = options.holdVersion;
     Object.assign(window, {
       isTauri: true,
       __updatesCalls: calls,
-      __updatesListeners: () => listeners.size,
+      __updatesListeners: () => [...listeners.values()].filter((entry) => entry.event === eventName).length,
       __updatesMenu: () => {
         for (const [id, entry] of listeners) {
           if (entry.event === eventName) callbacks.get(entry.handler)?.({ event: eventName, id, payload: null });
@@ -31,6 +34,7 @@ async function mockUpdates(page: Page) {
       },
       __updatesResolveOpen: (index: number) => openers[index].resolve(),
       __updatesRejectOpen: (index: number) => openers[index].reject(),
+      __updatesResolveVersion: () => { holdVersion = false; for (const resolve of versions) resolve(options.version ?? "3.8.39"); },
       __TAURI_EVENT_PLUGIN_INTERNALS__: { unregisterListener: (_event: string, id: number) => listeners.delete(id) },
       __TAURI_INTERNALS__: {
         transformCallback: (callback: (event: unknown) => void) => { const id = ++sequence; callbacks.set(id, callback); return id; },
@@ -42,7 +46,7 @@ async function mockUpdates(page: Page) {
             return id;
           }
           if (command === "plugin:event|unlisten") return;
-          if (command === "plugin:app|version") return "3.8.39";
+          if (command === "plugin:app|version") return holdVersion ? new Promise<string>((resolve) => versions.push(resolve)) : options.version ?? "3.8.39";
           if (command === "desktop_update_target") return { platform: "macos", arch: "arm64" };
           if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
           if (command === "desktop_open_releases") return new Promise<void>((resolve, reject) => openers.push({ resolve, reject: () => reject(new Error("mock opener failed")) }));
@@ -50,11 +54,12 @@ async function mockUpdates(page: Page) {
         },
       },
     });
-  }, { snapshot, eventName: DESKTOP_UPDATE_EVENT });
+  }, { snapshot, eventName: DESKTOP_UPDATE_EVENT, options });
   const name = "Simplicio-3.8.40-arm64.dmg";
   await page.route((url) => url.href === DESKTOP_RELEASES_API, (route) => route.fulfill({
     status: 200, headers: { "content-type": "application/json", "access-control-allow-origin": "*" },
     body: JSON.stringify([{ tag_name: "v3.8.40", draft: false, prerelease: false, html_url: `${DESKTOP_RELEASES_URL}/tag/v3.8.40`,
+      published_at: "2026-08-31T01:34:29Z", body: options.notes ?? "Melhorias no login e nas integrações do Desktop.",
       assets: [{ name, state: "uploaded", size: 100_000, browser_download_url: `${DESKTOP_RELEASES_URL}/download/v3.8.40/${name}` }],
     }]),
   }));
@@ -75,7 +80,7 @@ test("pending release opener times out honestly and ignores late completion afte
   await mockUpdates(page);
   await showUpdates(page);
   await expect(page.getByRole("dialog")).toContainText("Versão deste aplicativo: 3.8.39");
-  const subscriptions = await page.evaluate(() => (window as UpdatesWindow).__updatesCalls.filter((entry) => entry.command === "plugin:event|listen"));
+  const subscriptions = await page.evaluate((eventName) => (window as UpdatesWindow).__updatesCalls.filter((entry) => entry.command === "plugin:event|listen" && entry.args.event === eventName), DESKTOP_UPDATE_EVENT);
   expect(subscriptions.every((entry) => JSON.stringify(entry.args.target) === JSON.stringify({ kind: "AnyLabel", label: "main" }))).toBe(true);
   await page.getByRole("button", { name: "Ver releases oficiais", exact: true }).dblclick();
   await expect(page.getByRole("button", { name: "Abrindo…", exact: true })).toBeDisabled();
@@ -110,5 +115,109 @@ test("closing a pending opener preserves uncertainty on reopen and ignores its l
   await page.clock.fastForward(8_001);
   await expect(page.getByRole("alert")).toContainText("Uma nova tentativa só será feita se você clicar novamente.");
   expect(await openerCalls(page)).toEqual([{ command: "desktop_open_releases", args: {} }]);
+  await expect(page.getByRole("dialog")).toHaveAttribute("data-update-state", "available");
+});
+
+test("shows a white manual-update dialog and public release notes only as inert text (mocked IPC/metadata)", async ({ page }, testInfo) => {
+  const requests: string[] = [];
+  page.on("request", (request) => requests.push(request.url()));
+  const notes = "## Mudanças\n<img src='https://untrusted.invalid/pixel' onerror='alert(1)'>\n[Download](javascript:alert(1))\n<script>alert(1)</script>";
+  await mockUpdates(page, { notes });
+  await showUpdates(page);
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(dialog).toContainText("Download e instalação manuais");
+  await expect(dialog).toContainText("Localize a release v3.8.40 e o pacote acima");
+  await expect(dialog).toContainText("97,7 KiB");
+  await expect(dialog.locator("time")).toHaveAttribute("datetime", "2026-08-31T01:34:29Z");
+  await expect(dialog.locator("time")).toHaveText("31/08/2026");
+  await page.screenshot({ path: testInfo.outputPath("updates-available.png") });
+  await dialog.locator("summary").click();
+  await expect(dialog.locator("pre")).toHaveText(notes);
+  await expect(dialog.locator("a, script, iframe")).toHaveCount(0);
+  await expect(dialog.locator("img")).toHaveCount(1);
+  await expect(page.getByRole("progressbar")).toHaveCount(0);
+  expect(requests.filter((url) => url === DESKTOP_RELEASES_API)).toHaveLength(1);
+  expect(requests.some((url) => url.includes("untrusted.invalid") || url.includes("/releases/download/"))).toBe(false);
+  expect(await openerCalls(page)).toHaveLength(0);
+  await expect(page.getByRole("button", { name: "Ver releases oficiais", exact: true })).toBeInViewport({ ratio: 1 });
+  await page.screenshot({ path: testInfo.outputPath("updates-notes-escaped.png") });
+});
+
+test("keeps real progress cancelable, traps focus and ignores a late local identity response (mocked IPC)", async ({ page }, testInfo) => {
+  const requests: string[] = [];
+  page.on("request", (request) => { if (request.url() === DESKTOP_RELEASES_API) requests.push(request.url()); });
+  await mockUpdates(page, { holdVersion: true });
+  const origin = page.getByRole("button").first();
+  await origin.focus();
+  await page.evaluate(() => { (window as UpdatesWindow).__updatesMenu(); (window as UpdatesWindow).__updatesMenu(); });
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toHaveAttribute("data-update-state", "checking");
+  await expect(dialog.locator("[data-update-stage]")).toHaveAttribute("data-update-stage", "identity");
+  await expect(dialog).toContainText("O instalador não está sendo baixado.");
+  await expect(page.getByRole("progressbar", { name: "Progresso da consulta de atualização" })).not.toHaveAttribute("value", /.*/);
+  await expect(page.getByRole("button", { name: "Fechar atualizações", exact: true })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Cancelar consulta", exact: true })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(page.getByRole("button", { name: "Fechar atualizações", exact: true })).toBeFocused();
+  const versionCalls = await page.evaluate(() => (window as UpdatesWindow).__updatesCalls.filter((entry) => entry.command === "plugin:app|version"));
+  expect(versionCalls).toHaveLength(1);
+  await page.screenshot({ path: testInfo.outputPath("updates-checking.png") });
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(origin).toBeFocused();
+  await page.evaluate(() => (window as UpdatesWindow).__updatesResolveVersion());
+  await page.clock.fastForward(1);
+  await expect(dialog).toHaveCount(0);
+  expect(requests).toHaveLength(0);
+  await showUpdates(page);
+  expect(requests).toHaveLength(1);
+});
+
+test("a stalled metadata request times out without fake success or automatic retries (mocked IPC/metadata)", async ({ page }) => {
+  await mockUpdates(page);
+  const held: Route[] = [];
+  const matchesApi = (url: URL) => url.href === DESKTOP_RELEASES_API;
+  const hold = (route: Route) => { held.push(route); };
+  await page.route(matchesApi, hold);
+  await page.evaluate(() => (window as UpdatesWindow).__updatesMenu());
+  await expect(page.getByRole("dialog").locator("[data-update-stage]")).toHaveAttribute("data-update-stage", "requesting");
+  await expect.poll(() => held.length).toBe(1);
+  await page.clock.fastForward(15_001);
+  await expect(page.getByRole("dialog")).toHaveAttribute("data-update-state", "error");
+  await expect(page.getByRole("dialog")).toContainText("A consulta excedeu o tempo limite");
+  await expect(page.getByRole("progressbar")).toHaveCount(0);
+  await page.clock.fastForward(20_000);
+  expect(held).toHaveLength(1);
+  expect(await openerCalls(page)).toHaveLength(0);
+  await page.unroute(matchesApi, hold);
+  // The browser may already have canceled the held route. Either way it cannot update the UI.
+  await held[0].fulfill({ status: 200, headers: { "content-type": "application/json", "access-control-allow-origin": "*" }, body: "[]" }).catch(() => undefined);
+  await expect(page.getByRole("dialog")).toHaveAttribute("data-update-state", "error");
+  await page.getByRole("button", { name: "Verificar novamente", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveAttribute("data-update-state", "available");
+});
+
+test("an invalid installed version stays unknown without querying release metadata (mocked IPC)", async ({ page }) => {
+  const requests: string[] = [];
+  page.on("request", (request) => { if (request.url() === DESKTOP_RELEASES_API) requests.push(request.url()); });
+  await mockUpdates(page, { version: "latest" });
+  await page.evaluate(() => (window as UpdatesWindow).__updatesMenu());
+  await expect(page.getByRole("dialog")).toHaveAttribute("data-update-state", "error");
+  await expect(page.getByRole("dialog")).toContainText("O aplicativo não informou uma versão válida");
+  await expect(page.getByRole("dialog")).not.toContainText("Simplicio está atualizado");
+  expect(requests).toHaveLength(0);
+});
+
+test("offline checks remain unknown and only retry after the user reconnects and clicks (mocked IPC)", async ({ page, context }) => {
+  await mockUpdates(page);
+  await context.setOffline(true);
+  await page.evaluate(() => (window as UpdatesWindow).__updatesMenu());
+  await expect(page.getByRole("dialog")).toHaveAttribute("data-update-state", "offline");
+  await expect(page.getByRole("dialog")).toContainText("Sem conexão de rede");
+  await context.setOffline(false);
+  await expect(page.getByRole("dialog")).toHaveAttribute("data-update-state", "offline");
+  await page.getByRole("button", { name: "Verificar novamente", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveAttribute("data-update-state", "available");
 });

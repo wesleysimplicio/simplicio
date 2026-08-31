@@ -6,7 +6,7 @@ use std::process::Command;
 
 // Inspect resolved path text without relying on the test host's path syntax.
 // A canonical Win32 device prefix is allowed only for an ordinary local drive.
-fn canonical_local_text(path: &str) -> Result<&str, String> {
+pub(crate) fn canonical_local_text(path: &str) -> Result<&str, String> {
     let rendered = path.strip_prefix("\\\\?\\").unwrap_or(path);
     let bytes = rendered.as_bytes();
     let local_drive = bytes.len() >= 3

@@ -1,0 +1,67 @@
+/* Compact, light update task surface. Progress belongs to metadata, not an installer. */
+.desktop-updates-dialog.project-dialog {
+  width: min(548px, calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+  box-sizing: border-box;
+  padding: 18px 24px 22px;
+  overflow: hidden;
+  background: #fff;
+  color: #23272e;
+  border: 1px solid #dce1e5;
+  border-radius: 14px;
+  box-shadow: 0 24px 80px #17221e26, 0 4px 18px #17221e12;
+}
+.desktop-updates-dialog[open] { display: flex; flex-direction: column; }
+.desktop-updates-dialog > :not(.desktop-update-content) { flex-shrink: 0; }
+.desktop-updates-dialog .desktop-update-content { min-height: 0; overflow: auto; scrollbar-width: thin; scrollbar-color: #cdd6d0 transparent; }
+.desktop-updates-dialog .desktop-update-topline { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 -6px 17px 0; color: #69727d; font-size: 11px; }
+.desktop-updates-dialog .desktop-update-summary { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: start; gap: 18px; }
+.desktop-updates-dialog .desktop-update-icon { display: block; width: 64px; height: 64px; border-radius: 15px; border: 1px solid #e7ebe8; object-fit: cover; box-shadow: 0 2px 5px #233d2909; }
+.desktop-updates-dialog.project-dialog h2 { margin: 2px 0 8px; color: #23272e; font-size: 20px; font-weight: 650; letter-spacing: -.03em; line-height: 1.3; overflow-wrap: anywhere; }
+.desktop-updates-dialog.project-dialog p { margin: 0; font-size: 12px; color: #69727d; line-height: 1.65; overflow-wrap: anywhere; }
+.desktop-updates-dialog .desktop-update-progress { margin-top: 24px; }
+.desktop-updates-dialog .desktop-update-progress-label { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; color: #454e58; font-size: 12px; }
+.desktop-updates-dialog .desktop-update-progress-label > span:last-child { color: #69727d; flex-shrink: 0; font-size: 10px; }
+.desktop-updates-dialog progress { display: block; width: 100%; height: 6px; margin: 10px 0 8px; border: 0; border-radius: 10px; overflow: hidden; appearance: none; background: #e5ede8; }
+.desktop-updates-dialog progress:indeterminate { background: linear-gradient(90deg, #e5ede8 0%, #e5ede8 35%, #299c76 45%, #299c76 55%, #e5ede8 65%, #e5ede8 100%); background-size: 260% 100%; animation: desktop-updates-indeterminate 1.6s ease-in-out infinite; }
+.desktop-updates-dialog progress::-webkit-progress-bar { background: transparent; }
+.desktop-updates-dialog progress::-webkit-progress-value { background: transparent; }
+.desktop-updates-dialog progress::-moz-progress-bar { background: transparent; }
+.desktop-updates-dialog .desktop-update-progress > p { font-size: 11px; }
+.desktop-updates-dialog.project-dialog .desktop-update-installed { margin: 18px 0 0; font-size: 11px; }
+.desktop-updates-dialog .desktop-update-installed strong { color: #454e58; font-weight: 550; font-variant-numeric: tabular-nums; }
+.desktop-updates-dialog .desktop-update-package { margin-top: 14px; padding: 14px 16px; border: 1px solid #e3e8e5; border-radius: 9px; background: #f8faf9; }
+.desktop-updates-dialog .desktop-update-package > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; font-size: 11px; color: #69727d; }
+.desktop-updates-dialog .desktop-update-package > div > span:first-child { display: inline-flex; align-items: center; gap: 6px; color: #365746; }
+.desktop-updates-dialog .desktop-update-package > strong { display: block; font-size: 12px; font-weight: 550; color: #303c35; overflow-wrap: anywhere; }
+.desktop-updates-dialog .desktop-update-package > p { margin-top: 5px; font-size: 10px; }
+.desktop-updates-dialog .desktop-update-notes { margin-top: 12px; border-bottom: 1px solid #edf0f2; padding-bottom: 10px; }
+.desktop-updates-dialog .desktop-update-notes summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; font-size: 12px; font-weight: 550; color: #454e58; cursor: pointer; list-style: none; border-radius: 4px; }
+.desktop-updates-dialog .desktop-update-notes summary::-webkit-details-marker { display: none; }
+.desktop-updates-dialog .desktop-update-notes[open] summary .glyph { transform: rotate(180deg); }
+.desktop-updates-dialog .desktop-update-notes p { margin: 8px 0; font-size: 11px; }
+.desktop-updates-dialog .desktop-update-notes pre { max-height: 168px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 10px 0; padding: 12px; border: 1px solid #edf0f2; border-radius: 6px; background: #fafbfb; color: #454e58; font-size: 12px; font-family: inherit; line-height: 1.7; }
+.desktop-updates-dialog .desktop-update-manual { display: flex; align-items: flex-start; gap: 9px; margin-top: 18px; color: #69727d; }
+.desktop-updates-dialog .desktop-update-manual > .glyph { flex-shrink: 0; margin-top: 2px; }
+.desktop-updates-dialog .desktop-update-manual strong { font-size: 12px; font-weight: 550; color: #454e58; }
+.desktop-updates-dialog .desktop-update-manual p { margin-top: 4px; font-size: 11px; }
+.desktop-updates-dialog.project-dialog .desktop-update-caption { margin-top: 14px; font-size: 10px; line-height: 1.7; }
+.desktop-updates-dialog.project-dialog .inline-error { margin-top: 14px; color: #903b27; }
+.desktop-updates-dialog .desktop-update-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 18px; padding-top: 16px; border-top: 1px solid #edf0f2; background: #fff; }
+.desktop-updates-dialog .button { min-height: 38px; padding: 8px 12px; border-radius: 7px; font-size: 11px; font-weight: 550; }
+.desktop-updates-dialog .button-secondary { background: #fff; border-color: #dce1e5; color: #454e58; }
+.desktop-updates-dialog .button-primary { background: #24694d; border-color: #24694d; color: #fff; }
+.desktop-updates-dialog .button:disabled { opacity: .5; cursor: default; }
+.desktop-updates-dialog .button-primary:hover:not(:disabled) { background: #1b583e; border-color: #1b583e; }
+.desktop-updates-dialog .button-secondary:hover:not(:disabled) { background: #f6f8f7; border-color: #bcc8c1; }
+.desktop-updates-dialog :is(button, summary):focus-visible { outline: 2px solid #176d50; outline-offset: 3px; }
+@keyframes desktop-updates-indeterminate { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .desktop-updates-dialog progress:indeterminate { animation: none; background-position: 50% 0; } }
+@media (max-width: 520px) {
+  .desktop-updates-dialog.project-dialog { padding: 14px 18px 18px; }
+  .desktop-updates-dialog .desktop-update-summary { grid-template-columns: 48px minmax(0, 1fr); gap: 14px; }
+  .desktop-updates-dialog .desktop-update-icon { width: 48px; height: 48px; border-radius: 12px; }
+  .desktop-updates-dialog.project-dialog h2 { font-size: 18px; }
+  .desktop-updates-dialog .desktop-update-progress-label { flex-wrap: wrap; gap: 5px; }
+  .desktop-updates-dialog .desktop-update-actions .button { flex: 1 1 100%; }
+}

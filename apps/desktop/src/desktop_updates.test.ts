@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { checkDesktopUpdate, compareVersions, DESKTOP_RELEASES_API, DESKTOP_RELEASES_URL, MAX_RELEASE_BYTES, MAX_RELEASES, parseDesktopUpdateTarget, selectDesktopRelease, type DesktopUpdateTarget } from "./desktop_updates";
+import { checkDesktopUpdate, compareVersions, DESKTOP_RELEASES_API, DESKTOP_RELEASES_URL, MAX_RELEASE_BYTES, MAX_RELEASE_NOTES, MAX_RELEASES, parseDesktopUpdateTarget, selectDesktopRelease, type DesktopUpdateProgress, type DesktopUpdateTarget } from "./desktop_updates";
 
 const mac: DesktopUpdateTarget = { platform: "macos", arch: "arm64" };
 const windows: DesktopUpdateTarget = { platform: "windows", arch: "x64" };
@@ -110,13 +110,92 @@ describe("published Desktop asset selection", () => {
     expect(() => selectDesktopRelease(Array.from({ length: MAX_RELEASES + 1 }, () => release("3.8.39")), mac)).toThrow("invalid_response");
     const fixture = release("3.8.39");
     expect(() => selectDesktopRelease([{ ...fixture, assets: Array.from({ length: 129 }, () => fixture.assets[0]) }], mac)).toThrow("invalid_response");
-    const selected = selectDesktopRelease([{ ...fixture, body: "<script>secret</script>", author: { token: "secret" } }], mac);
-    expect(Object.keys(selected).sort()).toEqual(["assetBytes", "assetName", "releaseUrl", "tag", "version"]);
+    const selected = selectDesktopRelease([{ ...fixture, body: "Notas públicas", author: { token: "secret" } }], mac);
+    expect(Object.keys(selected).sort()).toEqual(["assetBytes", "assetName", "notes", "publishedAt", "releaseUrl", "tag", "version"]);
     expect(JSON.stringify(selected)).not.toContain("secret");
+  });
+
+  it("returns bounded public notes as inert text, without bidi or control characters", () => {
+    const body = "\u202e## Novidades\u0000\r\n<img src='https://untrusted.invalid'>\rTexto público";
+    const selected = selectDesktopRelease([{ ...release("3.8.39"), body }], mac);
+    expect(selected.notes).toEqual({ text: "## Novidades\n<img src='https://untrusted.invalid'>\nTexto público", truncated: false });
+    const long = selectDesktopRelease([{ ...release("3.8.39"), body: "x".repeat(MAX_RELEASE_NOTES + 20) }], mac);
+    expect(long.notes).toEqual({ text: "x".repeat(MAX_RELEASE_NOTES), truncated: true });
+    const emoji = selectDesktopRelease([{ ...release("3.8.39"), body: "x".repeat(MAX_RELEASE_NOTES - 1) + "🌱" }], mac);
+    expect(emoji.notes?.text).toBe("x".repeat(MAX_RELEASE_NOTES - 1));
+  });
+
+  it("treats missing or non-text notes as unavailable rather than inventing a changelog", () => {
+    for (const body of [null, undefined, {}, "\r\n\u0000\u202e"]) {
+      expect(selectDesktopRelease([{ ...release("3.8.39"), body }], mac).notes).toBeNull();
+    }
+  });
+
+  it("accepts only a real publication date in the expected ISO format", () => {
+    expect(selectDesktopRelease([{ ...release("3.8.39"), published_at: "2026-08-31T01:34:29Z" }], mac).publishedAt).toBe("2026-08-31T01:34:29Z");
+    for (const published_at of [null, 123, "yesterday", "2026-02-30T01:34:29Z", "2026-13-31T01:34:29Z", "2026-08-31T01:34:29Z\n"]) {
+      expect(selectDesktopRelease([{ ...release("3.8.39"), published_at }], mac).publishedAt).toBeNull();
+    }
   });
 });
 
 describe("bounded metadata-only update checks", () => {
+  it("reports real metadata stages and decoded bytes, not an installer download percentage", async () => {
+    const payload = [{ ...release("3.8.39"), body: "Atualização pública" }];
+    const byteLength = new TextEncoder().encode(JSON.stringify(payload)).byteLength;
+    const onProgress = vi.fn<(value: DesktopUpdateProgress) => void>();
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(payload, { "content-length": "40", "content-encoding": "gzip" }));
+    await checkDesktopUpdate({ currentVersion: "3.8.38", target: mac, fetcher, onProgress });
+    expect(onProgress.mock.calls.map(([value]) => value)).toEqual([
+      { stage: "requesting", receivedBytes: 0 }, { stage: "receiving", receivedBytes: 0 },
+      { stage: "receiving", receivedBytes: byteLength }, { stage: "validating", receivedBytes: byteLength },
+    ]);
+  });
+
+  it("bounds progress notifications for tiny stream chunks and isolates observer failures", async () => {
+    const bytes = new TextEncoder().encode(JSON.stringify([{ ...release("3.8.39"), body: "x".repeat(40_000) }]));
+    const body = new ReadableStream<Uint8Array>({ start(controller) {
+      for (let offset = 0; offset < bytes.length; offset += 128) controller.enqueue(bytes.slice(offset, offset + 128));
+      controller.close();
+    } });
+    const onProgress = vi.fn<(value: DesktopUpdateProgress) => void>(() => { throw new Error("observer failed"); });
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(body, { headers: { "content-type": "application/json" } }));
+    await expect(checkDesktopUpdate({ currentVersion: "3.8.39", target: mac, fetcher, onProgress })).resolves.toMatchObject({ state: "up_to_date" });
+    expect(onProgress.mock.calls.length).toBeLessThanOrEqual(Math.ceil(bytes.length / 16_384) + 3);
+    expect(onProgress).toHaveBeenLastCalledWith({ stage: "validating", receivedBytes: bytes.length });
+  });
+
+  it("cancels the pending body reader on deadline and stops reporting progress", async () => {
+    vi.useFakeTimers();
+    const cancelBody = vi.fn();
+    const body = new ReadableStream<Uint8Array>({ cancel: cancelBody });
+    const onProgress = vi.fn<(value: DesktopUpdateProgress) => void>();
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(body, { headers: { "content-type": "application/json" } }));
+    const result = checkDesktopUpdate({ currentVersion: "3.8.39", target: mac, fetcher, onProgress, timeoutMs: 25 });
+    const rejected = expect(result).rejects.toMatchObject({ code: "timeout" });
+    await vi.advanceTimersByTimeAsync(25);
+    await rejected;
+    expect(cancelBody).toHaveBeenCalledTimes(1);
+    expect(onProgress.mock.calls.map(([value]) => value.stage)).toEqual(["requesting", "receiving"]);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores late metadata and cancels its body when a fetch ignores cancellation", async () => {
+    const controller = new AbortController();
+    let resolveFetch: (value: Response) => void = () => undefined;
+    const fetcher = vi.fn<typeof fetch>(() => new Promise<Response>((resolve) => { resolveFetch = resolve; }));
+    const onProgress = vi.fn<(value: DesktopUpdateProgress) => void>();
+    const result = checkDesktopUpdate({ currentVersion: "3.8.39", target: mac, fetcher, onProgress, signal: controller.signal });
+    const rejected = expect(result).rejects.toMatchObject({ code: "canceled" });
+    controller.abort();
+    await rejected;
+    const cancelBody = vi.fn();
+    resolveFetch(new Response(new ReadableStream({ cancel: cancelBody }), { headers: { "content-type": "application/json" } }));
+    await Promise.resolve();
+    expect(cancelBody).toHaveBeenCalledTimes(1);
+    expect(onProgress.mock.calls.map(([value]) => value.stage)).toEqual(["requesting"]);
+  });
+
   it.each([["3.8.38", "available"], ["3.8.39", "up_to_date"], ["3.8.40", "newer_local"]] as const)("reports %s as %s only after validated Desktop metadata", async (currentVersion, state) => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse([release("3.8.39")]));
     await expect(checkDesktopUpdate({ currentVersion, target: mac, fetcher })).resolves.toMatchObject({ state, currentVersion, target: mac });

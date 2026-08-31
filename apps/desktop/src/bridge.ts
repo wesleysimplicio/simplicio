@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
 import type { AccessState, DesktopSnapshot } from "./contracts";
 import { createDemoSnapshot } from "./demo";
 import type { BotCenterSnapshot } from "./contracts";
@@ -8,8 +9,38 @@ import { parseTokenExportReceipt, parseTokenUsageReport, type TokenQuery, type T
 import { parseIntegrationPlan, type IntegrationPlan } from "./integration_setup";
 import { parseLocalProject, type LocalProject } from "./workbench";
 import { createReadonlyRequest } from "./readonly_request";
+import { createContextReader } from "./context_report";
+import { parseUsageProjects } from "./project_usage";
 
 const readSnapshot = createReadonlyRequest<DesktopSnapshot>(30_000, "desktop_snapshot_timeout");
+const readContext = createContextReader((repoPath) => invoke<unknown>("desktop_context_report", { repoPath: repoPath || null }));
+// Fresh authorization (20s) plus at most four isolated root scans (3s + cleanup each).
+const readUsageProjects = createReadonlyRequest<unknown>(45_000, "project_discovery_timeout");
+
+export async function loadDesktopUsageProjects() {
+  if (!isTauri()) throw new Error("preview_no_runtime");
+  return parseUsageProjects(await readUsageProjects(() => invoke<unknown>("desktop_usage_projects")));
+}
+
+export function loadDesktopContextReport(repoPath: string) {
+  if (!isTauri()) return Promise.reject(new Error("preview_no_runtime"));
+  return readContext(repoPath);
+}
+
+let projectPicker: Promise<LocalProject | null> | null = null;
+
+export function chooseDesktopProject(): Promise<LocalProject | null> {
+  if (!isTauri()) return Promise.reject(new Error("preview_no_filesystem"));
+  if (projectPicker) return projectPicker;
+  projectPicker = (async () => {
+    const path = await openFolderDialog({ title: "Adicionar projeto ao Simplicio", directory: true, multiple: false });
+    if (path === null) return null;
+    if (typeof path !== "string") throw new Error("project_path_invalid");
+    // The native validator owns canonicalization and local-path safety even for picker results.
+    return validateDesktopProject(path);
+  })().finally(() => { projectPicker = null; });
+  return projectPicker;
+}
 
 export async function validateDesktopProject(path: string): Promise<LocalProject> {
   if (!isTauri()) throw new Error("preview_no_filesystem");

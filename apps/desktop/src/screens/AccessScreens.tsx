@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AccessState } from "../contracts";
 import { Brand, Glyph } from "../components/Brand";
 
@@ -17,6 +17,8 @@ export function LoadingScreen() {
 export function SignInScreen({ busy, error, onLogin, initialStep = "welcome" }:
   { busy: boolean; error: string | null; onLogin: () => void; initialStep?: "welcome" | "login" }) {
   const [step, setStep] = useState(initialStep);
+  const primaryAction = useRef<HTMLButtonElement>(null);
+  useEffect(() => { primaryAction.current?.focus(); }, [step]);
   const platform = typeof navigator === "undefined" ? "Desktop"
     : /Mac/.test(navigator.platform) ? "Mac" : /Win/.test(navigator.platform) ? "Windows" : "Linux";
   return <div className="access-layout entry-flow">
@@ -25,13 +27,13 @@ export function SignInScreen({ busy, error, onLogin, initialStep = "welcome" }:
       <img className="entry-mark" src="/icon.png" width="88" height="88" alt="" />
       <h1 id="welcome-title">Simplicio <em>para {platform}</em></h1>
       <p>Seu Runtime, pronto para trabalhar com você.</p>
-      <button className="button entry-primary" type="button" onClick={() => setStep("login")}>Começar<Glyph name="arrow" size={18} /></button>
+      <button ref={primaryAction} className="button entry-primary" type="button" onClick={() => setStep("login")}>Começar<Glyph name="arrow" size={18} /></button>
       <span className="entry-caption">Projetos, agentes e economia. No seu computador.</span>
     </section> : <section className="entry-login access-panel" aria-labelledby="login-title">
       <h1 id="login-title">Entre no Simplicio</h1>
       <div className="entry-login-card">
         <p className="entry-account-copy">Conecte sua conta SimpleTI para continuar.</p>
-        <button className="button entry-google" type="button" onClick={onLogin} disabled={busy}>
+        <button ref={primaryAction} className="button entry-google" type="button" onClick={onLogin} disabled={busy} aria-busy={busy}>
           <span className="google-mark" aria-hidden="true">G</span>{busy ? "Aguardando navegador…" : "Continuar com Google"}
         </button>
         {busy && <p className="entry-wait" role="status"><span className="setup-spinner" aria-hidden="true" />Conclua o login no navegador. O app continua quando o Runtime confirmar sua sessão.</p>}
@@ -73,6 +75,8 @@ export function AccessGate({
   busy,
   error,
   onRefresh,
+  onLogin,
+  loginBusy = false,
   onSubscribe,
   onLogout,
   logoutBusy = false,
@@ -82,12 +86,15 @@ export function AccessGate({
   busy: boolean;
   error: string | null;
   onRefresh: () => void;
+  onLogin?: () => void;
+  loginBusy?: boolean;
   onSubscribe?: () => void;
   onLogout?: () => void;
   logoutBusy?: boolean;
 }) {
   const content = accessContent[state];
   const [showDiagnostic, setShowDiagnostic] = useState(false);
+  const actionBusy = busy || loginBusy || logoutBusy;
   return (
     <div className="locked-layout">
       <div className="locked-glow" aria-hidden="true" />
@@ -109,13 +116,18 @@ export function AccessGate({
             className="button button-primary"
             type="button"
             onClick={state === "inactive" ? onSubscribe : onRefresh}
-            disabled={busy}
+            disabled={actionBusy}
           >
-            {busy ? "Aguarde…" : content.primary}<Glyph name="arrow" />
+            {actionBusy ? "Aguarde…" : content.primary}<Glyph name="arrow" />
           </button>
           {state === "inactive" && (
-            <button className="button button-secondary" type="button" onClick={onRefresh} disabled={busy}>
+            <button className="button button-secondary" type="button" onClick={onRefresh} disabled={actionBusy}>
               {content.secondary}
+            </button>
+          )}
+          {state === "unknown" && onLogin && (
+            <button className="button button-secondary" type="button" onClick={onLogin} disabled={actionBusy} aria-busy={loginBusy}>
+              {loginBusy ? "Aguardando navegador…" : "Entrar ou reconectar"}
             </button>
           )}
           {state === "unknown" && (
@@ -124,11 +136,12 @@ export function AccessGate({
             </button>
           )}
           {onLogout && (
-            <button className="button button-secondary" type="button" onClick={onLogout} disabled={busy || logoutBusy} aria-busy={logoutBusy}>
+            <button className="button button-secondary" type="button" onClick={onLogout} disabled={actionBusy} aria-busy={logoutBusy}>
               {logoutBusy ? "Saindo…" : "Sair da conta"}
             </button>
           )}
         </div>
+        {state === "unknown" && loginBusy && <p className="entry-wait" role="status">Conclua o login no navegador. O acesso permanece desconhecido até o Runtime confirmar sua sessão.</p>}
         {error && <p className="action-error" role="alert">{error}</p>}
         {showDiagnostic && state === "unknown" && (
           <div className="access-diagnostic" aria-live="polite">
