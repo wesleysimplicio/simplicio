@@ -112,6 +112,8 @@ describe("Simplicio Desktop product states", () => {
     expect(html).toContain("Exportar diagnóstico");
     expect(html).toContain("Atualizar estado");
     expect(html).toContain("Sair da conta");
+    expect(html).toContain("tenta revogar a sessão remota");
+    expect(html).not.toContain("O Runtime revoga a sessão");
     expect(JSON.stringify(diagnostic)).not.toContain("voce@example.com");
     expect(JSON.stringify(diagnostic)).not.toContain("sonnet");
   });

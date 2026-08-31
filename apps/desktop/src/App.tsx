@@ -166,13 +166,18 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
     actionLock.current = true;
     setAction("login");
     setActionError(null);
+    // Keep the intended next screen while access is gated. A later successful
+    // account verification must resume first-login setup, not skip to the home.
+    setView("setup");
     try {
       const next = await beginDesktopLogin();
       setSnapshot(next);
       setBotCenter(next.botCenter);
       setLoadFailed(false);
-      if (next.access.state === "active") setView("setup");
     } catch (error) {
+      // The account action may have completed before its snapshot query failed.
+      // Never reuse the pre-action signed-out or active state as current proof.
+      setLoadFailed(true);
       setActionError(runtimeFailureMessage(error, "login"));
     } finally {
       setAction(null);
@@ -207,6 +212,9 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       setLoadFailed(false);
       setView("home");
     } catch (error) {
+      // Do not leave authenticated screens available from a stale snapshot when
+      // logout's final state is unknown. Verification is a separate read-only action.
+      setLoadFailed(true);
       setActionError(runtimeFailureMessage(error, "logout"));
     } finally {
       setAction(null);

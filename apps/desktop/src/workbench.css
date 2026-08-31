@@ -374,12 +374,13 @@
 .entry-welcome > .entry-caption { margin-top: 17px; }
 .entry-flow .entry-login { width: min(430px, 100%); }
 .entry-login h1 { font-size: clamp(32px, 4vw, 43px); margin-bottom: 26px; }
-.entry-login-card { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 16px; padding: 28px; box-shadow: 0 3px 14px #20352504; }
+/* The sign-in content sits directly on the white window, without a card frame. */
+.entry-login-card { width: 100%; min-width: 0; border: 0; border-radius: 0; padding: 28px; box-shadow: none; }
 .entry-account-copy { font-size: 14px; color: var(--muted); line-height: 1.6; text-align: center; margin: 0 0 24px; }
 .entry-google { width: 100%; min-height: 48px; background: white; color: #343c37; border-color: #cdd4d0; border-radius: 8px; font-size: 14px; font-weight: 550; gap: 13px; }
 .entry-google:hover { background: #f7f9f8; border-color: #a0b3a7; }
 .entry-google .google-mark { width: 20px; height: 20px; font-size: 17px; font-weight: 650; background: transparent; color: #326cd5; }
-.entry-login-note { border-top: 1px solid var(--line-soft); padding-top: 22px; margin-top: 26px; display: flex; gap: 10px; align-items: flex-start; color: var(--muted); }
+.entry-login-note { border: 0; padding-top: 22px; margin-top: 26px; display: flex; gap: 10px; align-items: flex-start; color: var(--muted); }
 .entry-login-note .glyph { flex: 0 0 auto; margin-top: 2px; }
 .entry-login-note p { font-size: 12px; line-height: 1.7; margin: 0 0 18px; }
 .entry-login-card > .entry-caption { text-align: left; font-size: 11px; }
