@@ -2,10 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { Glyph } from "../components/Brand";
 import { ContextSavings } from "../components/ContextSavings";
 import { TokenProjects } from "../components/TokenProjects";
+import { ConsolidatedTokens } from "../components/ConsolidatedTokens";
+import type { UsageProjects } from "../project_usage";
 import { exportDesktopTokenReport, loadDesktopTokenReport } from "../bridge";
 import { TOKEN_PERIODS, tokenErrorMessage, tokenExportErrorMessage, type TokenPeriod, type TokenQuery, type TokenUsageReport } from "../token_usage";
 
-export function TokensScreen({ initialRepoPath = "" }: { initialRepoPath?: string }) {
+export function TokensScreen({ initialRepoPath = "", projectPaths = [] }: { initialRepoPath?: string; projectPaths?: string[] }) {
+  const [discovery, setDiscovery] = useState<UsageProjects | null>(null);
+  const [discoveryReady, setDiscoveryReady] = useState(false);
+  const [extraPaths, setExtraPaths] = useState<string[]>(initialRepoPath ? [initialRepoPath] : []);
   const [period, setPeriod] = useState<TokenPeriod>("1m");
   const [repoPath, setRepoPath] = useState(initialRepoPath);
   const [allowAutoSelect, setAllowAutoSelect] = useState(!initialRepoPath);
@@ -55,6 +60,7 @@ export function TokensScreen({ initialRepoPath = "" }: { initialRepoPath?: strin
 
   function submit(path = repoPath) {
     if (exportLock.current) return;
+    if (path.trim()) setExtraPaths(paths => paths.includes(path.trim()) ? paths : [...paths.slice(-95), path.trim()]);
     const query: TokenQuery = { timezoneOffsetSeconds: -new Date().getTimezoneOffset() * 60 };
     if (path.trim()) query.repoPath = path.trim();
     if (sessionId.trim()) query.sessionId = sessionId.trim();
@@ -98,7 +104,10 @@ export function TokensScreen({ initialRepoPath = "" }: { initialRepoPath?: strin
       <section className="page-heading">
         <div><span className="eyebrow">Recibos do Runtime</span><h1>Relatório de tokens</h1><p>Uso registrado por período e sessão. Economia de contexto não é consumo faturado.</p></div>
       </section>
-      <TokenProjects repoPath={repoPath} allowAutoSelect={allowAutoSelect} onSelect={(path) => {
+      <ConsolidatedTokens paths={[...projectPaths, ...extraPaths, ...(discovery?.projects.map(project => project.path) ?? [])]} discoveryReady={discoveryReady} discoveryPartial={!discovery || discovery.partial} />
+      <section className="individual-token-report" aria-label="Relatório individual">
+      <h2>Detalhes por projeto</h2>
+      <TokenProjects repoPath={repoPath} allowAutoSelect={allowAutoSelect} onDiscovery={result => { setDiscovery(result); setDiscoveryReady(true); }} onSelect={(path) => {
         if (exportLock.current) return;
         setAllowAutoSelect(false); setAutoContext(true); invalidate(); setRepoPath(path); submit(path);
       }} />
@@ -131,6 +140,7 @@ export function TokensScreen({ initialRepoPath = "" }: { initialRepoPath?: strin
         </section>
       </>}
       <ContextSavings repoPath={repoPath} autoLoad={autoContext} />
+      </section>
     </div>
   );
 }

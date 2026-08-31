@@ -1,7 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    if let Some(result) = simplicio_desktop_lib::try_project_discovery_worker() {
+    if let Some(result) = simplicio_desktop_lib::try_project_discovery_worker()
+        .or_else(simplicio_desktop_lib::try_consolidated_token_preflight_worker)
+    {
         use std::io::Write;
         let code = match result {
             Ok(report) => {

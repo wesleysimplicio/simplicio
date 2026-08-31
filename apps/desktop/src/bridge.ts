@@ -11,11 +11,18 @@ import { parseLocalProject, type LocalProject } from "./workbench";
 import { createReadonlyRequest } from "./readonly_request";
 import { createContextReader } from "./context_report";
 import { parseUsageProjects } from "./project_usage";
+import { createConsolidatedReader, type ConsolidatedQuery, type ConsolidatedReport } from "./consolidated_tokens";
 
 const readSnapshot = createReadonlyRequest<DesktopSnapshot>(30_000, "desktop_snapshot_timeout");
 const readContext = createContextReader((repoPath) => invoke<unknown>("desktop_context_report", { repoPath: repoPath || null }));
 // Fresh authorization (20s) plus at most four isolated root scans (3s + cleanup each).
 const readUsageProjects = createReadonlyRequest<unknown>(45_000, "project_discovery_timeout");
+const readConsolidated = createConsolidatedReader(request => invoke<unknown>("desktop_consolidated_token_report", { request }));
+
+export function loadDesktopConsolidatedTokens(request: ConsolidatedQuery): Promise<ConsolidatedReport> {
+  if (!isTauri()) return Promise.reject(new Error("preview_no_runtime"));
+  return readConsolidated(request);
+}
 
 export async function loadDesktopUsageProjects() {
   if (!isTauri()) throw new Error("preview_no_runtime");

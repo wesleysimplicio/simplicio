@@ -20,7 +20,8 @@ import { ProjectDialog } from "./components/ProjectDialog";
 import { DesktopUpdates } from "./components/DesktopUpdates";
 import { installFailureMessage, installFailureRecovery, type InstallFailureRecovery } from "./install_failures";
 import { runtimeFailureMessage } from "./runtime_failures";
-import { isView, loadWorkbench, MAX_PROJECTS, moveHistory, navigate, WORKBENCH_KEY, type LocalProject, type NavigationState, type WorkbenchState } from "./workbench";
+import { isView, loadWorkbench, MAX_PROJECTS, moveHistory, navigate, WORKBENCH_KEY, type LocalProject, type NavigationEntry, type NavigationState, type WorkbenchState } from "./workbench";
+import { viewNavigationEntry } from "./settings_navigation";
 import { ProvidersScreen } from "./screens/ProvidersScreen";
 import { MemoryScreen } from "./screens/MemoryScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
@@ -59,8 +60,8 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
   const tokenRepo = route.tokenRepo;
   const actionLock = useRef(false);
 
-  function setView(next: View) {
-    setHistory((current) => navigate(current, { view: next, projectId: current.entries[current.index].projectId, tokenRepo: "" }));
+  function setView(next: View, restoreRoute?: NavigationEntry) {
+    setHistory((current) => navigate(current, viewNavigationEntry(current.entries[current.index], next, restoreRoute)));
   }
 
   function moveNavigation(direction: -1 | 1) {
@@ -260,7 +261,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
     onFinish={() => setView("home")} onDiagnostics={() => { setView("diagnostics"); void refresh(); }} />;
 
   return (
-    <Shell snapshot={snapshot} view={view} onViewChange={setView} workbench={{ ...workbench, selectedProjectId: selectedProject?.id ?? null }}
+    <Shell snapshot={snapshot} view={view} route={route} onViewChange={setView} workbench={{ ...workbench, selectedProjectId: selectedProject?.id ?? null }}
       onAddProject={() => setShowProjectDialog(true)} onProject={openProject}
       onBack={() => moveNavigation(-1)} onForward={() => moveNavigation(1)}
       canBack={history.index > 0} canForward={history.index < history.entries.length - 1}
@@ -292,7 +293,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
         />
       )}
       {view === "memory" && <MemoryScreen snapshot={snapshot} />}
-      {view === "tokens" && <TokensScreen key={tokenRepo} initialRepoPath={tokenRepo} />}
+      {view === "tokens" && <TokensScreen key={tokenRepo} initialRepoPath={tokenRepo} projectPaths={workbench.projects.map(project => project.path)} />}
       {(view === "settings" || view === "diagnostics") && (
         <SettingsScreen section={view === "diagnostics" ? "diagnostics" : "account"} snapshot={snapshot} busy={action !== null} onRefresh={refresh} onSubscribe={subscribe} onLogout={logout} logoutBusy={action === "logout"} />
       )}

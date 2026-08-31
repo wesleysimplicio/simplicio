@@ -3,6 +3,7 @@ import type { DesktopSnapshot } from "../contracts";
 import { Glyph } from "../components/Brand";
 import { exportDesktopSnapshot } from "../bridge";
 import { runtimeSummary } from "../workbench";
+import { formatRuntimeTimestamp } from "../runtime_timestamp";
 
 export function redactedDiagnostic(snapshot: DesktopSnapshot) {
   return {
@@ -46,14 +47,14 @@ export function SettingsScreen({ snapshot, busy, onRefresh, onSubscribe, onLogou
     {section !== "diagnostics" && <section className="settings-section"><h2>Minha conta</h2><div className="settings-slab">
       <div className="account-summary"><span className="account-avatar">{snapshot.access.displayName?.slice(0, 1).toUpperCase() ?? "S"}</span><div><h3>{snapshot.access.displayName ?? "Conta conectada"}</h3><p>{snapshot.access.email ?? "Identidade protegida pelo Runtime"}</p></div><span className="neutral-badge">{snapshot.access.plan ?? "Plano não informado"}</span></div>
       <div className="preference-row"><div><strong>Acesso ao produto</strong><p>Identidade e assinatura são verificações independentes.</p></div><span className={snapshot.access.state === "active" ? "access-confirmed" : "neutral-badge"}><Glyph name="shield" size={15} />{snapshot.access.state === "active" ? "Assinatura ativa" : "Acesso não confirmado"}</span></div>
-      <div className="preference-row"><div><strong>Validade informada</strong><p>{snapshot.access.expiresAt ? new Date(snapshot.access.expiresAt).toLocaleString("pt-BR") : "O Runtime não informou uma data de expiração."}</p></div><button className="button button-secondary" type="button" onClick={onRefresh} disabled={busy}>{busy ? "Atualizando…" : "Atualizar estado"}</button></div>
+      <div className="preference-row"><div><strong>Validade informada</strong><p>{formatRuntimeTimestamp(snapshot.access.expiresAt, { fallback: "O Runtime não informou uma data de expiração válida." })}</p></div><button className="button button-secondary" type="button" onClick={onRefresh} disabled={busy}>{busy ? "Atualizando…" : "Atualizar estado"}</button></div>
       <div className="preference-row"><div><strong>Gerenciar assinatura</strong><p>Abre sua conta no site do Simplicio.</p></div><button className="button button-secondary" type="button" onClick={onSubscribe} disabled={busy}>Gerenciar plano<Glyph name="external" size={15} /></button></div>
       <div className="preference-row"><div><strong>Sair deste computador</strong><p>O Runtime revoga a sessão e remove as credenciais locais.</p></div><button className="button button-secondary" type="button" onClick={onLogout} disabled={busy || logoutBusy}>{logoutBusy ? "Saindo…" : "Sair da conta"}</button></div>
     </div></section>}
     {section !== "account" && <>
       <section className="settings-section"><h2>Runtime local</h2><div className="settings-slab">
         <div className="preference-row"><div><strong>{runtime.label}</strong><p>Versão {snapshot.runtime.version || "não informada"} · transporte {snapshot.runtime.transport}</p></div><button className="button button-secondary" type="button" onClick={onRefresh} disabled={busy}><Glyph name="refresh" size={16} />{busy ? "Atualizando…" : "Atualizar estado"}</button></div>
-        <div className="preference-row"><div><strong>Leitura do snapshot</strong><p>{new Date(snapshot.generatedAt).toLocaleString("pt-BR")}</p></div><span className="neutral-badge">{snapshot.source === "runtime" ? "Runtime" : "Demonstração"}</span></div>
+        <div className="preference-row"><div><strong>Leitura do snapshot</strong><p>{formatRuntimeTimestamp(snapshot.generatedAt)}</p></div><span className="neutral-badge">{snapshot.source === "runtime" ? "Runtime" : "Demonstração"}</span></div>
         <div className="preference-row"><div><strong>Conexões MCP</strong><p>Um registro não comprova uma sessão ativa.</p></div><span>{runtime.connected} confirmadas</span></div>
       </div></section>
       <section className="settings-section"><h2>Exportar diagnóstico</h2><div className="settings-slab"><div className="preference-row"><div><strong>Relatório sem dados sensíveis</strong><p>Omite email, caminhos pessoais, prompts, configurações, credenciais, skills e ledger bruto. Salvo em Downloads sem substituir arquivos.</p></div><button className="button button-secondary" type="button" onClick={() => void download()} disabled={exporting}>{exporting ? "Exportando…" : "Exportar diagnóstico"}</button></div></div>
