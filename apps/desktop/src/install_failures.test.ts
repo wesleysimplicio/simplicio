@@ -118,3 +118,52 @@ describe("installer recovery without repeated side effects", () => {
     ]) expect(installFailureRecovery(error)).toBe("reconcile");
   });
 });
+
+describe("typed partial install diagnostics", () => {
+  const partial = (overrides: Record<string, unknown> = {}) => ({
+    schema: "simplicio.desktop-install-error/v1",
+    code: "integration_install_exit_code:1",
+    diagnostic: {
+      schema: "simplicio.desktop-install-diagnostic/v1", status: "partial",
+      failedSteps: ["hermes"], unknownFailedSteps: 0,
+    },
+    ...overrides,
+  });
+
+  it("shows only reviewed step labels without releasing retry protection", () => {
+    const message = installFailureMessage(partial());
+    expect(message).toContain("Hermes");
+    expect(message).toContain("código 1.");
+    expect(message).toContain("bloqueadas nesta sessão");
+    expect(installFailureRecovery(partial())).toBe("reconcile");
+  });
+
+  it("never reflects unknown names, details, paths, or an inconsistent no-start claim", () => {
+    const secret = "DO_NOT_LEAK /private/test-user";
+    for (const diagnostic of [
+      { schema: "simplicio.desktop-install-diagnostic/v1", status: "partial", failedSteps: [secret], unknownFailedSteps: 0 },
+      { schema: "simplicio.desktop-install-diagnostic/v1", status: "partial", failedSteps: ["hermes", "hermes"], unknownFailedSteps: 0 },
+      { schema: "simplicio.desktop-install-diagnostic/v1", status: "partial", failedSteps: ["hermes"], unknownFailedSteps: 129 },
+      { schema: "wrong", status: "partial", failedSteps: ["hermes"], unknownFailedSteps: 0 },
+    ]) {
+      const error = partial({ diagnostic });
+      expect(installFailureMessage(error)).not.toContain(secret);
+      expect(installFailureMessage(error)).not.toContain("Hermes");
+      expect(installFailureRecovery(error)).toBe("reconcile");
+    }
+    const inconsistent = partial({ code: "integration_install_not_started" });
+    expect(installFailureRecovery(inconsistent)).toBe("reconcile");
+    expect(installFailureMessage(inconsistent)).not.toContain("não foi iniciado");
+    expect(installFailureMessage(partial({ code: "integration_install_exit_code:0" }))).not.toContain("Hermes");
+  });
+
+  it("supports typed preflight errors and generic unknown failed steps", () => {
+    expect(installFailureRecovery({ schema: "simplicio.desktop-install-error/v1", code: "integration_preflight_unavailable" })).toBe("review");
+    const error = partial({ diagnostic: {
+      schema: "simplicio.desktop-install-diagnostic/v1", status: "partial",
+      failedSteps: [], unknownFailedSteps: 2,
+    } });
+    expect(installFailureMessage(error)).toContain("2 etapa(s) não identificada(s)");
+    expect(installFailureRecovery(error)).toBe("reconcile");
+  });
+});

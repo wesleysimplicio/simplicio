@@ -54,3 +54,21 @@ the Runtime's public signature or provenance to accept a bundler-modified binary
 Any required change to the Runtime's platform signature belongs in a new signed
 Runtime release, not an invisible Desktop packaging rewrite. Ad-hoc signing is
 not Developer ID signing or Apple notarization.
+
+
+## Authentication-only release gate
+
+This Desktop source requires the authentication capability in [AUTH.md](AUTH.md).
+Before publication, run the exact final sidecar's `desktop status --json` on each
+available native executor and require root schema `simplicio.desktop.app/v1`,
+`action: status`, authentication schema `simplicio.desktop-auth-capabilities/v1`
+and boolean `authentication_only: true`. Do not initiate Google to test the probe.
+Runtime 3.8.39 is not compatible with this login path. A cross-compiled artifact
+without native execution evidence must be reported as unexecuted, not passed.
+
+After the probe and identity/signature verification, a separately authorized
+account acceptance run must confirm `login google --authentication-only --json`
+returns terminal `simplicio.auth-login/v1`, status `authenticated`, and bootstrap
+`skipped/authentication_only`, without new install/bootstrap effects. This check
+does not itself certify a fresh Google grant, remote revocation, package-manager
+plugins or every client's live MCP connection.

@@ -101,6 +101,12 @@ describe("reference settings route coverage", () => {
     expect(html).not.toMatch(/>Conta ativa<|>Autenticado<|>System default</);
   });
 
+  it.each([false, true])("does not expose hidden agent navigation from visible accounts (runtime=%s)", (runtime) => {
+    const html = markup("provider-accounts", snapshot(runtime));
+    expect(html).not.toContain("Ver agente e IDE");
+    expect(html).toContain("Abrir conta Simplicio");
+  });
+
   it("disables refresh while another root action owns its lock", () => {
     const html = renderToStaticMarkup(<ReferenceSettingsScreen view="voice" snapshot={snapshot()} onNavigate={() => {}} onRefresh={() => {}} busy />);
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*aria-label="Atualizar consulta do Runtime"/);

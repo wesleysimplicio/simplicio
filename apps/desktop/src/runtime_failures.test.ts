@@ -2,6 +2,13 @@ import { describe, expect, it } from "vitest";
 import { runtimeFailureMessage } from "./runtime_failures";
 
 describe("safe Runtime failure messages", () => {
+  it("explains auth-only compatibility without claiming account state or reflecting output", () => {
+    const unsupported = runtimeFailureMessage("runtime_auth_only_unsupported", "login");
+    expect(unsupported).toContain("Atualize o Simplicio Desktop");
+    expect(unsupported).toContain("Consulte o estado da conta");
+    expect(runtimeFailureMessage("runtime_auth_result_unconfirmed", "login")).toContain("não confirmou um login sem configuração automática");
+    expect(runtimeFailureMessage("runtime_auth_only_unsupported: SECRET", "login")).not.toContain("SECRET");
+  });
   it("distinguishes the native query deadline from the Desktop waiting deadline", () => {
     expect(runtimeFailureMessage("runtime_query_timeout")).toContain("20 segundos");
     expect(runtimeFailureMessage(new Error("desktop_snapshot_timeout"))).toContain("ainda pode estar concluindo");

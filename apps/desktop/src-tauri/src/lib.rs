@@ -5,6 +5,7 @@ use std::process::{Command, Output};
 use tauri::Manager;
 
 mod auth_access;
+mod auth_login;
 mod consolidated_tokens;
 mod context_report;
 mod desktop_queries;
@@ -64,9 +65,9 @@ async fn desktop_export_snapshot(
 const SNAPSHOT_SCHEMA: &str = "simplicio.desktop-snapshot/v1";
 const MAX_SNAPSHOT_BYTES: usize = 65_536;
 const SNAPSHOT_ARGS: &[&str] = &["desktop", "snapshot", "--json"];
-const LOGIN_ARGS: &[&str] = &["login", "google", "--json"];
+const LOGIN_ARGS: &[&str] = auth_login::LOGIN_ARGS;
 const LOGOUT_ARGS: &[&str] = &["logout", "--json"];
-const STATUS_ARGS: &[&str] = &["desktop", "status", "--json"];
+const STATUS_ARGS: &[&str] = auth_login::STATUS_ARGS;
 const LEGACY_AUTH_ARGS: &[&str] = &["auth", "status", "--json"];
 const LEGACY_STATUS_ARGS: &[&str] = &["status", "--json"];
 const LEGACY_SAVINGS_ARGS: &[&str] = &["savings", "report", "--json"];
@@ -483,7 +484,11 @@ async fn refresh_desktop_snapshot() -> Result<Value, String> {
 #[tauri::command]
 async fn desktop_login() -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(|| {
-        run_runtime_action(LOGIN_ARGS)?;
+        auth_login::authenticate(runtime_candidates(), |binary, args| {
+            let mut command = Command::new(binary);
+            command.args(args).env("SIMPLICIO_DESKTOP_BRIDGE", "1");
+            runtime_process::capture(&mut command, runtime_capture_limits(args))
+        })?;
         snapshot_from_runtime()
     })
     .await
@@ -501,30 +506,35 @@ async fn desktop_logout() -> Result<Value, String> {
 }
 
 #[tauri::command]
-async fn desktop_repair_providers(plan_digest: String) -> Result<Value, String> {
+async fn desktop_repair_providers(
+    plan_digest: String,
+) -> Result<Value, install_result::InstallError> {
+    use install_result::InstallFailure;
     tauri::async_runtime::spawn_blocking(move || {
         let mut attempt = INSTALL_LOCK.try_lock().map_err(|error| match error {
-            std::sync::TryLockError::WouldBlock => "integration_install_busy",
-            std::sync::TryLockError::Poisoned(_) => "integration_install_reconciliation_required",
+            std::sync::TryLockError::WouldBlock => InstallFailure::Busy.public_error(),
+            std::sync::TryLockError::Poisoned(_) => {
+                InstallFailure::ReconciliationRequired.public_error()
+            }
         })?;
         attempt
             .check_ready()
-            .map_err(|failure| failure.public_code())?;
+            .map_err(|failure| failure.public_error())?;
         // Preflight is read-only: no installer has started before attempt.begin().
-        let plan =
-            integration_plan_from_runtime().map_err(|_| "integration_preflight_unavailable")?;
+        let plan = integration_plan_from_runtime()
+            .map_err(|_| InstallFailure::PreflightUnavailable.public_error())?;
         if plan["planDigest"].as_str() != Some(plan_digest.as_str()) {
-            return Err("integration_plan_changed_review_again".into());
+            return Err(InstallFailure::PlanChanged.public_error());
         }
-        attempt.begin().map_err(|failure| failure.public_code())?;
+        attempt.begin().map_err(|failure| failure.public_error())?;
         let result = repair_provider_integrations();
         attempt.finish(&result);
-        result.map_err(|failure| failure.public_code())?;
+        result.map_err(|failure| failure.public_error())?;
         snapshot_from_runtime()
-            .map_err(|_| install_result::InstallFailure::AppliedSnapshotUnavailable.public_code())
+            .map_err(|_| InstallFailure::AppliedSnapshotUnavailable.public_error())
     })
     .await
-    .map_err(|_| "Falha interna durante o reparo das integrações".to_string())?
+    .map_err(|_| InstallFailure::OutputUnavailable.public_error())?
 }
 
 #[tauri::command]
@@ -646,7 +656,10 @@ mod tests {
     #[test]
     fn bridge_exposes_only_fixed_runtime_arguments() {
         assert_eq!(SNAPSHOT_ARGS, ["desktop", "snapshot", "--json"]);
-        assert_eq!(LOGIN_ARGS, ["login", "google", "--json"]);
+        assert_eq!(
+            LOGIN_ARGS,
+            ["login", "google", "--authentication-only", "--json"]
+        );
         assert_eq!(LOGOUT_ARGS, ["logout", "--json"]);
         assert_eq!(STATUS_ARGS, ["desktop", "status", "--json"]);
         assert_eq!(LEGACY_AUTH_ARGS, ["auth", "status", "--json"]);
