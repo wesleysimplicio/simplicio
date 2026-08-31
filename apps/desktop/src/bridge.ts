@@ -6,6 +6,27 @@ import type { BotActionRequest } from "./bot_center";
 import { applyDemoBotAction } from "./bot_center";
 import { parseTokenExportReceipt, parseTokenUsageReport, type TokenQuery, type TokenUsageReport } from "./token_usage";
 import { parseIntegrationPlan, type IntegrationPlan } from "./integration_setup";
+import { parseLocalProject, type LocalProject } from "./workbench";
+import { createReadonlyRequest } from "./readonly_request";
+
+const readSnapshot = createReadonlyRequest<DesktopSnapshot>(30_000, "desktop_snapshot_timeout");
+
+export async function validateDesktopProject(path: string): Promise<LocalProject> {
+  if (!isTauri()) throw new Error("preview_no_filesystem");
+  return parseLocalProject(await invoke<unknown>("desktop_validate_project", { path }));
+}
+
+export async function openDesktopProject(path: string): Promise<void> {
+  if (!isTauri()) throw new Error("preview_no_filesystem");
+  await invoke("desktop_open_project", { path });
+}
+
+export async function exportDesktopSnapshot(kind: "diagnostic" | "activity", filters: { status?: string; provider?: string } = {}): Promise<string | null> {
+  if (!isTauri()) return null;
+  const receipt = await invoke<{ schema: string; path: string; bytes: number }>("desktop_export_snapshot", { kind, filters });
+  if (receipt.schema !== "simplicio.desktop-snapshot-export/v1" || typeof receipt.path !== "string" || receipt.bytes <= 0) throw new Error("snapshot_export_invalid");
+  return receipt.path;
+}
 
 function previewState(): AccessState {
   const requested = new URLSearchParams(window.location.search).get("state");
@@ -29,7 +50,7 @@ export async function loadDesktopSnapshot(): Promise<DesktopSnapshot> {
     return createDemoSnapshot(previewState());
   }
 
-  return invoke<DesktopSnapshot>("desktop_snapshot");
+  return readSnapshot(() => invoke<DesktopSnapshot>("desktop_snapshot"));
 }
 
 export async function beginDesktopLogin(): Promise<DesktopSnapshot> {
@@ -45,7 +66,7 @@ export async function logoutDesktop(): Promise<DesktopSnapshot> {
 
 export async function refreshDesktopSnapshot(): Promise<DesktopSnapshot> {
   if (!isTauri()) return createDemoSnapshot(previewState());
-  return invoke<DesktopSnapshot>("refresh_desktop_snapshot");
+  return readSnapshot(() => invoke<DesktopSnapshot>("refresh_desktop_snapshot"));
 }
 
 export async function planDesktopIntegrations(): Promise<IntegrationPlan> {

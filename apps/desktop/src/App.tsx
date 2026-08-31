@@ -13,7 +13,13 @@ import {
 } from "./bridge";
 import { Shell, type View } from "./components/Shell";
 import { AccessGate, LoadingScreen, SignInScreen } from "./screens/AccessScreens";
-import { HomeScreen } from "./screens/HomeScreen";
+import { WorkbenchHome } from "./screens/WorkbenchHome";
+import { PreferencesScreen } from "./screens/PreferencesScreen";
+import { SetupScreen } from "./screens/SetupScreen";
+import { ProjectDialog } from "./components/ProjectDialog";
+import { DesktopUpdates } from "./components/DesktopUpdates";
+import { installFailureMessage } from "./install_failures";
+import { isView, loadWorkbench, MAX_PROJECTS, moveHistory, navigate, WORKBENCH_KEY, type LocalProject, type NavigationState, type WorkbenchState } from "./workbench";
 import { ProvidersScreen } from "./screens/ProvidersScreen";
 import { MemoryScreen } from "./screens/MemoryScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
@@ -23,26 +29,10 @@ import { ProductSurfaceScreen } from "./screens/ProductScreens";
 import { TokensScreen } from "./screens/TokensScreen";
 import "./runtime_panels.css";
 
-function initialView(): View {
+function initialView(fallback: View): View {
   if (typeof window === "undefined") return "home";
   const requested = new URLSearchParams(window.location.search).get("view");
-  if (
-    requested === "today" ||
-    requested === "chats" ||
-    requested === "teams" ||
-    requested === "automations" ||
-    requested === "apps" ||
-    requested === "home" ||
-    requested === "bot" ||
-    requested === "providers" ||
-    requested === "tokens" ||
-    requested === "activity" ||
-    requested === "memory" ||
-    requested === "settings"
-  ) {
-    return requested;
-  }
-  return "today";
+  return isView(requested) ? requested : fallback;
 }
 
 export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSnapshot }) {
@@ -51,8 +41,59 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
   const [loadFailed, setLoadFailed] = useState(false);
   const [action, setAction] = useState<"login" | "logout" | "refresh" | "repair" | "subscribe" | "bot" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [view, setView] = useState<View>(initialView);
+  const [workbench, setWorkbench] = useState(loadWorkbench);
+  const [history, setHistory] = useState<NavigationState>(() => ({ entries: [{
+    view: initialView(workbench.selectedProjectId ? "project" : "home"),
+    projectId: workbench.selectedProjectId,
+    tokenRepo: "",
+  }], index: 0 }));
+  const route = history.entries[history.index];
+  const selectedProject = workbench.projects.find((project) => project.id === route.projectId);
+  const view = route.view === "project" && !selectedProject ? "home" : route.view;
+  const [showProjectDialog, setShowProjectDialog] = useState(false);
+  const [storageError, setStorageError] = useState<string | null>(null);
+  const tokenRepo = route.tokenRepo;
   const actionLock = useRef(false);
+
+  function setView(next: View) {
+    setHistory((current) => navigate(current, { view: next, projectId: current.entries[current.index].projectId, tokenRepo: "" }));
+  }
+
+  function moveNavigation(direction: -1 | 1) {
+    const next = moveHistory(history, direction);
+    setHistory(next);
+    const projectId = next.entries[next.index].projectId;
+    saveWorkbench({ ...workbench, selectedProjectId: workbench.projects.some((project) => project.id === projectId) ? projectId : null });
+  }
+
+  function saveWorkbench(next: WorkbenchState) {
+    setWorkbench(next);
+    try {
+      window.localStorage.setItem(WORKBENCH_KEY, JSON.stringify({ ...next, selectedProjectId: next.preferences.rememberProject ? next.selectedProjectId : null }));
+      setStorageError(null);
+    } catch {
+      setStorageError("Não foi possível salvar as preferências neste computador. As alterações permanecem nesta sessão; verifique o espaço em disco.");
+    }
+  }
+
+  function openProject(project: LocalProject) {
+    saveWorkbench({ ...workbench, selectedProjectId: project.id });
+    setHistory((current) => navigate(current, { view: "project", projectId: project.id, tokenRepo: "" }));
+  }
+
+  function addProject(project: LocalProject) {
+    const exists = workbench.projects.some((item) => item.id === project.id);
+    if (!exists && workbench.projects.length >= MAX_PROJECTS) {
+      setStorageError("A lista comporta até 32 projetos. Remova um atalho para adicionar outro; isso não exclui arquivos.");
+      return;
+    }
+    saveWorkbench({ ...workbench, projects: exists ? workbench.projects : [...workbench.projects, project], selectedProjectId: project.id });
+    setHistory((current) => navigate(current, { view: "project", projectId: project.id, tokenRepo: "" }));
+  }
+
+  function projectTokens(path = "") {
+    setHistory((current) => navigate(current, { view: "tokens", projectId: current.entries[current.index].projectId, tokenRepo: path }));
+  }
 
   useEffect(() => {
     if (initialSnapshot) return;
@@ -64,8 +105,13 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
           setBotCenter(next.botCenter);
         }
       })
-      .catch(() => {
-        if (current) setLoadFailed(true);
+      .catch((error: unknown) => {
+        if (current) {
+          setLoadFailed(true);
+          setActionError(error instanceof Error && error.message === "desktop_snapshot_timeout"
+            ? "O Runtime não respondeu no prazo. A consulta pode continuar em andamento; tente atualizar o estado após verificar o Runtime."
+            : "Não foi possível consultar o Runtime. Tente atualizar o estado para verificar a conexão.");
+        }
       });
     return () => {
       current = false;
@@ -82,8 +128,10 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       setSnapshot(next);
       setBotCenter(next.botCenter);
       setLoadFailed(false);
-    } catch {
-      setActionError("Não foi possível atualizar o Runtime.");
+    } catch (error) {
+      setActionError(error instanceof Error && error.message === "desktop_snapshot_timeout"
+        ? "O Runtime não respondeu no prazo. A consulta anterior ainda pode estar em andamento; nenhuma nova consulta foi iniciada enquanto ela estiver pendente."
+        : "Não foi possível atualizar o Runtime.");
     } finally {
       setAction(null);
       actionLock.current = false;
@@ -102,9 +150,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       setLoadFailed(false);
       return true;
     } catch (error) {
-      setActionError(String(error).includes("integration_plan_changed")
-        ? "O plano mudou. Revise a configuração novamente antes de aplicar."
-        : "O Runtime não confirmou a instalação completa. Pode haver alterações parciais; atualize o diagnóstico e revise um novo plano antes de tentar novamente.");
+      setActionError(installFailureMessage(error));
       return false;
     } finally {
       setAction(null);
@@ -122,7 +168,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       setSnapshot(next);
       setBotCenter(next.botCenter);
       setLoadFailed(false);
-      if (next.access.state === "active") setView("today");
+      if (next.access.state === "active") setView("setup");
     } catch {
       setActionError("O login não foi concluído.");
     } finally {
@@ -155,6 +201,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       const next = await logoutDesktop();
       setSnapshot(next);
       setBotCenter(next.botCenter);
+      setLoadFailed(false);
       setView("home");
     } catch {
       setActionError("Não foi possível sair com segurança.");
@@ -182,7 +229,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
   if (!snapshot && !loadFailed) return <LoadingScreen />;
 
   if (loadFailed) {
-    return <AccessGate state="unknown" busy={action !== null} error={actionError} onRefresh={refresh} />;
+    return <AccessGate state="unknown" busy={action !== null} error={actionError} onRefresh={refresh} onLogout={logout} logoutBusy={action === "logout"} />;
   }
 
   if (!snapshot || snapshot.access.state === "signed_out") {
@@ -197,29 +244,39 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
         error={actionError}
         onRefresh={refresh}
         onSubscribe={subscribe}
+        onLogout={logout}
+        logoutBusy={action === "logout"}
       />
     );
   }
 
+  if (view === "setup") return <SetupScreen snapshot={snapshot} busy={action !== null} applicationError={actionError}
+    onSnapshot={(next) => { setSnapshot(next); setBotCenter(next.botCenter); }} onApply={repairProviders}
+    onFinish={() => setView("home")} onDiagnostics={() => setView("diagnostics")} />;
+
   return (
-    <Shell snapshot={snapshot} view={view} onViewChange={setView}>
+    <Shell snapshot={snapshot} view={view} onViewChange={setView} workbench={{ ...workbench, selectedProjectId: selectedProject?.id ?? null }}
+      onAddProject={() => setShowProjectDialog(true)} onProject={openProject}
+      onBack={() => moveNavigation(-1)} onForward={() => moveNavigation(1)}
+      canBack={history.index > 0} canForward={history.index < history.entries.length - 1}
+      onRefresh={refresh} busy={action !== null}>
       {actionError && <div className="desktop-action-error" role="alert">{actionError}</div>}
-      {view === "home" && (
-        <HomeScreen
-          snapshot={snapshot}
-          busy={action === "refresh"}
-          onProviders={() => setView("providers")}
-          onActivity={() => setView("activity")}
-          onDiagnostics={() => setView("settings")}
-          onRefresh={refresh}
-        />
-      )}
+      {storageError && <div className="desktop-action-error" role="alert">{storageError}</div>}
+      {(view === "home" || view === "project") && <WorkbenchHome key={selectedProject?.id ?? "home"} snapshot={snapshot}
+        project={view === "project" ? selectedProject : undefined} onAddProject={() => setShowProjectDialog(true)}
+        onViewChange={setView} onTokens={projectTokens} onRemoveProject={() => {
+          saveWorkbench({ ...workbench, projects: workbench.projects.filter((item) => item.id !== selectedProject?.id), selectedProjectId: null });
+          setHistory((current) => navigate({ ...current, entries: current.entries.map((entry) => entry.projectId === selectedProject?.id
+            ? { view: "home" as const, projectId: null, tokenRepo: "" } : entry) }, { view: "home", projectId: null, tokenRepo: "" }));
+        }} />}
       {(view === "today" || view === "chats" || view === "teams" || view === "automations" || view === "apps") && (
         <ProductSurfaceScreen view={view} snapshot={snapshot} botCenter={botCenter ?? snapshotWithDemoBots(snapshot)} />
       )}
       {view === "bot" && <BotCenterScreen snapshot={botCenter ?? snapshotWithDemoBots(snapshot)} onAction={botAction} />}
-      {view === "providers" && (
+      {(view === "providers" || view === "agents") && (
         <ProvidersScreen
+          key={view}
+          inventoryOnly={view === "agents"}
           snapshot={snapshot}
           busy={action !== null}
           repairing={action === "repair"}
@@ -228,15 +285,17 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
         />
       )}
       {view === "memory" && <MemoryScreen snapshot={snapshot} />}
-      {view === "tokens" && <TokensScreen />}
-      {view === "settings" && (
-        <SettingsScreen snapshot={snapshot} busy={action !== null} onRefresh={refresh} onSubscribe={subscribe} onLogout={logout} logoutBusy={action === "logout"} />
+      {view === "tokens" && <TokensScreen key={tokenRepo} initialRepoPath={tokenRepo} />}
+      {(view === "settings" || view === "diagnostics") && (
+        <SettingsScreen section={view === "diagnostics" ? "diagnostics" : "account"} snapshot={snapshot} busy={action !== null} onRefresh={refresh} onSubscribe={subscribe} onLogout={logout} logoutBusy={action === "logout"} />
       )}
+      {(view === "general" || view === "shortcuts" || view === "models") && <PreferencesScreen view={view} snapshot={snapshot} preferences={workbench.preferences} onPreferences={(preferences) => saveWorkbench({ ...workbench, preferences })} onProviders={() => setView("agents")} />}
       {view === "activity" && <ActivityScreen snapshot={snapshot} />}
+      {showProjectDialog && <ProjectDialog onClose={() => setShowProjectDialog(false)} onAdd={addProject} />}
     </Shell>
   );
 }
 
 export default function App() {
-  return <DesktopApp />;
+  return <><DesktopApp /><DesktopUpdates /></>;
 }

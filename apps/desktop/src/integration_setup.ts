@@ -20,3 +20,15 @@ export function parseIntegrationPlan(value: unknown): IntegrationPlan {
   });
   return { schema: "simplicio.desktop-integration-plan/v1", source: plan.source as IntegrationPlan["source"], planDigest: plan.planDigest, changes };
 }
+
+/** Recheck existing or changed reviewed targets, never newly discovered clients or handshakes. */
+export function integrationTargetsVerified(reviewed: IntegrationPlan, observed: IntegrationPlan): boolean {
+  if (reviewed.source !== observed.source
+    || new Set(reviewed.changes.map((row) => row.label)).size !== reviewed.changes.length
+    || new Set(observed.changes.map((row) => row.label)).size !== observed.changes.length) return false;
+  for (const target of reviewed.changes.filter((row) => row.exists || row.changed)) {
+    const current = observed.changes.find((row) => row.label === target.label);
+    if (!current || !current.exists || current.changed) return false;
+  }
+  return true;
+}

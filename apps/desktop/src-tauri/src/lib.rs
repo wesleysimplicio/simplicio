@@ -1,15 +1,58 @@
 use serde_json::Value;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 use tauri::Manager;
 
 mod desktop_queries;
+mod install_result;
 mod legacy_snapshot;
+mod local_projects;
+#[cfg(desktop)]
+mod native_menu;
+mod snapshot_exports;
 mod supervisor;
 mod token_exports;
 
 static INSTALL_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[tauri::command]
+async fn desktop_validate_project(path: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        require_active_access()?;
+        local_projects::validate_project(&path)
+    })
+    .await
+    .map_err(|_| "project_unavailable".to_string())?
+}
+
+#[tauri::command]
+async fn desktop_open_project(path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        require_active_access()?;
+        local_projects::open_project(&path)
+    })
+    .await
+    .map_err(|_| "project_open_failed".to_string())?
+}
+
+#[tauri::command]
+async fn desktop_export_snapshot(
+    app: tauri::AppHandle,
+    kind: String,
+    filters: Value,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let snapshot = snapshot_from_runtime()?;
+        let downloads = app
+            .path()
+            .download_dir()
+            .map_err(|_| "snapshot_export_unavailable")?;
+        snapshot_exports::save(&snapshot, &kind, &filters, &downloads)
+    })
+    .await
+    .map_err(|_| "snapshot_export_failed".to_string())?
+}
 
 const SNAPSHOT_SCHEMA: &str = "simplicio.desktop-snapshot/v1";
 const MAX_SNAPSHOT_BYTES: usize = 65_536;
@@ -25,6 +68,7 @@ const LEGACY_INSTALL_ARGS: &[&str] = &["install", "--global", "--dry-run", "--js
 // Only dispatched after the reviewed plan digest and explicit UI consent match.
 const INSTALL_ARGS: &[&str] = &["install", "--global", "--yes", "--json"];
 const SUBSCRIPTION_URL: &str = "https://simpleti.com.br/simplicio";
+const RELEASES_URL: &str = "https://github.com/wesleysimplicio/simplicio/releases";
 
 fn runtime_candidates_with(
     override_binary: Option<OsString>,
@@ -73,9 +117,18 @@ fn run_runtime_output(args: &[&str]) -> Result<Output, String> {
         match Command::new(binary)
             .args(args)
             .env("SIMPLICIO_DESKTOP_BRIDGE", "1")
-            .output()
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
         {
-            Ok(output) => return Ok(output),
+            // Once a process starts, capture/wait failure must not replay an action
+            // against a different Runtime candidate: effects may already exist.
+            Ok(child) => {
+                return child
+                    .wait_with_output()
+                    .map_err(|_| "runtime_output_unavailable".into())
+            }
             Err(_) => continue,
         }
     }
@@ -107,9 +160,10 @@ fn run_runtime_action(args: &[&str]) -> Result<(), String> {
 }
 
 fn repair_provider_integrations() -> Result<(), String> {
-    let receipt = run_runtime_json(INSTALL_ARGS)
-        .map_err(|_| "integration_install_unconfirmed".to_string())?;
-    desktop_queries::validate_install_receipt(&receipt)
+    let output = run_runtime_output(INSTALL_ARGS)
+        .map_err(|_| install_result::InstallFailure::OutputUnavailable.public_code())?;
+    install_result::validate_install_output(output.status.code(), &output.stdout)
+        .map_err(|failure| failure.public_code())
 }
 
 fn require_active_access() -> Result<(), String> {
@@ -176,36 +230,65 @@ async fn desktop_export_token_report(
     .map_err(|_| "token_export_write_failed".to_string())?
 }
 
-fn open_subscription_url() -> Result<(), String> {
+fn open_browser_url(url: &str) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     let mut command = {
-        let mut command = Command::new("open");
-        command.arg(SUBSCRIPTION_URL);
+        let mut command = Command::new("/usr/bin/open");
+        command.arg(url);
         command
     };
     #[cfg(target_os = "windows")]
     let mut command = {
         let mut command = Command::new("cmd");
-        command.args(["/C", "start", "", SUBSCRIPTION_URL]);
+        command.args(["/C", "start", "", url]);
         command
     };
     #[cfg(all(unix, not(target_os = "macos")))]
     let mut command = {
         let mut command = Command::new("xdg-open");
-        command.arg(SUBSCRIPTION_URL);
+        command.arg(url);
         command
     };
 
     command
         .status()
-        .map_err(|_| "Não foi possível abrir os planos no navegador".to_string())
+        .map_err(|_| "Não foi possível abrir o link no navegador".to_string())
         .and_then(|status| {
             if status.success() {
                 Ok(())
             } else {
-                Err("Não foi possível abrir os planos no navegador".to_string())
+                Err("Não foi possível abrir o link no navegador".to_string())
             }
         })
+}
+
+fn open_subscription_url() -> Result<(), String> {
+    open_browser_url(SUBSCRIPTION_URL)
+}
+
+#[tauri::command]
+fn desktop_update_target() -> Value {
+    let platform = match std::env::consts::OS {
+        "macos" => "macos",
+        "windows" => "windows",
+        "linux" => "linux",
+        _ => "unknown",
+    };
+    let arch = match std::env::consts::ARCH {
+        "aarch64" => "arm64",
+        "x86_64" => "x64",
+        "x86" => "x86",
+        _ => "unknown",
+    };
+    serde_json::json!({ "platform": platform, "arch": arch })
+}
+
+#[tauri::command]
+async fn desktop_open_releases() -> Result<(), String> {
+    // Only the fixed public release page may be opened; IPC accepts no URL.
+    tauri::async_runtime::spawn_blocking(|| open_browser_url(RELEASES_URL))
+        .await
+        .map_err(|_| "release_page_unavailable".to_string())?
 }
 
 fn validate_snapshot(value: Value) -> Result<Value, String> {
@@ -339,6 +422,7 @@ async fn desktop_repair_providers(plan_digest: String) -> Result<Value, String> 
         }
         repair_provider_integrations()?;
         snapshot_from_runtime()
+            .map_err(|_| install_result::InstallFailure::AppliedSnapshotUnavailable.public_code())
     })
     .await
     .map_err(|_| "Falha interna durante o reparo das integrações".to_string())?
@@ -372,8 +456,16 @@ async fn runtime_status() -> Result<Value, String> {
 pub fn run() {
     tauri::Builder::default()
         .manage(token_exports::TokenReports::default())
+        .setup(|app| {
+            #[cfg(desktop)]
+            native_menu::install(app)?;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             desktop_snapshot,
+            desktop_validate_project,
+            desktop_open_project,
+            desktop_export_snapshot,
             refresh_desktop_snapshot,
             desktop_login,
             desktop_logout,
@@ -382,6 +474,8 @@ pub fn run() {
             desktop_token_report,
             desktop_export_token_report,
             desktop_open_subscription,
+            desktop_update_target,
+            desktop_open_releases,
             desktop_bot_action,
             runtime_status
         ])
@@ -452,6 +546,32 @@ mod tests {
         );
         assert_eq!(INSTALL_ARGS, ["install", "--global", "--yes", "--json"]);
         assert_eq!(SUBSCRIPTION_URL, "https://simpleti.com.br/simplicio");
+        assert_eq!(
+            RELEASES_URL,
+            "https://github.com/wesleysimplicio/simplicio/releases"
+        );
+    }
+
+    #[test]
+    fn desktop_build_uses_the_simplicio_product_identity() {
+        let config: Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        assert_eq!(config["productName"], "Simplicio");
+        assert_eq!(config["app"]["windows"][0]["title"], "Simplicio");
+        assert_eq!(config["identifier"], "br.com.simpleti.simplicio");
+    }
+
+    #[test]
+    fn update_target_exposes_only_platform_and_architecture() {
+        let target = desktop_update_target();
+        assert_eq!(target.as_object().unwrap().len(), 2);
+        assert!(matches!(
+            target["platform"].as_str(),
+            Some("macos" | "windows" | "linux" | "unknown")
+        ));
+        assert!(matches!(
+            target["arch"].as_str(),
+            Some("arm64" | "x64" | "x86" | "unknown")
+        ));
     }
 
     #[test]

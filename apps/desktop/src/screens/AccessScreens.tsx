@@ -14,65 +14,34 @@ export function LoadingScreen() {
   );
 }
 
-export function SignInScreen({
-  busy,
-  error,
-  onLogin,
-}: {
-  busy: boolean;
-  error: string | null;
-  onLogin: () => void;
-}) {
-  return (
-    <div className="access-layout">
-      <section className="access-story">
-        <Brand />
-        <div className="access-story-copy">
-          <span className="eyebrow">Simplicio Desktop</span>
-          <h1>Seu Runtime,<br />pronto para usar.</h1>
-          <p>Codex, Claude e seus editores no mesmo lugar.</p>
-        </div>
-        <div className="access-proof-grid">
-          <article>
-            <span>✓</span>
-            <strong>Login seguro</strong>
-          </article>
-          <article>
-            <span>✓</span>
-            <strong>Runtime local</strong>
-          </article>
-          <article>
-            <span>✓</span>
-            <strong>Providers verificáveis</strong>
-          </article>
-        </div>
-      </section>
-
-      <section className="access-panel" aria-labelledby="login-title">
-        <div className="access-card">
-          <div className="access-card-icon"><Glyph name="shield" size={25} /></div>
-          <span className="eyebrow">Bem-vindo</span>
-          <h2 id="login-title">Entre no Simplicio</h2>
-          <p>Use sua conta SimpleTI.</p>
-          <button className="button button-primary button-wide" type="button" onClick={onLogin} disabled={busy}>
-            <span className="google-mark">G</span>
-            {busy ? "Abrindo login…" : "Continuar com Google"}
-            <Glyph name="arrow" />
-          </button>
-          {error && <p className="action-error" role="alert">{error}</p>}
-          <div className="access-divider"><span>incluído</span></div>
-          <ul className="access-checklist">
-            <li><Glyph name="check" size={17} /> Assinatura verificada</li>
-            <li><Glyph name="check" size={17} /> Runtime preparado</li>
-            <li><Glyph name="check" size={17} /> Providers validados</li>
-          </ul>
-          <p className="fine-print">
-            O login abre no navegador. Nenhuma senha passa pelo app.
-          </p>
-        </div>
-      </section>
-    </div>
-  );
+export function SignInScreen({ busy, error, onLogin, initialStep = "welcome" }:
+  { busy: boolean; error: string | null; onLogin: () => void; initialStep?: "welcome" | "login" }) {
+  const [step, setStep] = useState(initialStep);
+  const platform = typeof navigator === "undefined" ? "Desktop"
+    : /Mac/.test(navigator.platform) ? "Mac" : /Win/.test(navigator.platform) ? "Windows" : "Linux";
+  return <div className="access-layout entry-flow">
+    <header className="entry-header"><Brand />{step === "login" && <button className="text-button" type="button" disabled={busy} onClick={() => setStep("welcome")}><Glyph name="back" size={16} />Voltar</button>}</header>
+    {step === "welcome" ? <section className="entry-welcome access-story" aria-labelledby="welcome-title">
+      <img className="entry-mark" src="/icon.png" width="88" height="88" alt="" />
+      <h1 id="welcome-title">Simplicio <em>para {platform}</em></h1>
+      <p>Seu Runtime, pronto para trabalhar com você.</p>
+      <button className="button entry-primary" type="button" onClick={() => setStep("login")}>Começar<Glyph name="arrow" size={18} /></button>
+      <span className="entry-caption">Projetos, agentes e economia. No seu computador.</span>
+    </section> : <section className="entry-login access-panel" aria-labelledby="login-title">
+      <h1 id="login-title">Entre no Simplicio</h1>
+      <div className="entry-login-card">
+        <p className="entry-account-copy">Conecte sua conta SimpleTI para continuar.</p>
+        <button className="button entry-google" type="button" onClick={onLogin} disabled={busy}>
+          <span className="google-mark" aria-hidden="true">G</span>{busy ? "Aguardando navegador…" : "Continuar com Google"}
+        </button>
+        {busy && <p className="entry-wait" role="status"><span className="setup-spinner" aria-hidden="true" />Conclua o login no navegador. O app continua quando o Runtime confirmar sua sessão.</p>}
+        {error && <p className="action-error" role="alert">{error}</p>}
+        <div className="entry-login-note"><Glyph name="lock" size={16} /><p>O login abre no navegador. Nenhuma senha passa pelo app.</p></div>
+        <p className="entry-caption">Sua identidade e assinatura são verificadas separadamente pelo Runtime.</p>
+      </div>
+    </section>}
+    <footer className="entry-footer"><Glyph name="shield" size={14} />Autenticação pelo Runtime · Dados locais sob seu controle</footer>
+  </div>;
 }
 
 const accessContent: Record<Exclude<AccessState, "signed_out" | "active">, {
@@ -105,6 +74,8 @@ export function AccessGate({
   error,
   onRefresh,
   onSubscribe,
+  onLogout,
+  logoutBusy = false,
 }: {
   state: "inactive" | "unknown";
   email?: string | null;
@@ -112,6 +83,8 @@ export function AccessGate({
   error: string | null;
   onRefresh: () => void;
   onSubscribe?: () => void;
+  onLogout?: () => void;
+  logoutBusy?: boolean;
 }) {
   const content = accessContent[state];
   const [showDiagnostic, setShowDiagnostic] = useState(false);
@@ -148,6 +121,11 @@ export function AccessGate({
           {state === "unknown" && (
             <button className="button button-secondary" type="button" onClick={() => setShowDiagnostic((current) => !current)}>
               {showDiagnostic ? "Fechar diagnóstico" : content.secondary}
+            </button>
+          )}
+          {onLogout && (
+            <button className="button button-secondary" type="button" onClick={onLogout} disabled={busy || logoutBusy} aria-busy={logoutBusy}>
+              {logoutBusy ? "Saindo…" : "Sair da conta"}
             </button>
           )}
         </div>

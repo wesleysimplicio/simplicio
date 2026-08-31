@@ -34,9 +34,23 @@ export type GlyphName =
   | "shield"
   | "spark"
   | "refresh"
+  | "folder"
+  | "sidebar"
+  | "back"
+  | "close"
+  | "external"
+  | "keyboard"
+  | "monitor"
   | "lock";
 
 const paths: Record<GlyphName, ReactNode> = {
+  folder: <path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />,
+  sidebar: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></>,
+  back: <path d="M19 12H5l5-5M5 12l5 5" />,
+  close: <path d="m6 6 12 12M6 18 18 6" />,
+  external: <><path d="M14 3h7v7M21 3l-9 9" /><path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5" /></>,
+  keyboard: <><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10" /></>,
+  monitor: <><rect x="3" y="3" width="18" height="13" rx="2" /><path d="M8 21h8M12 16v5" /></>,
   home: <path d="M3 10.8 12 3l9 7.8v9.7a.5.5 0 0 1-.5.5H15v-6H9v6H3.5a.5.5 0 0 1-.5-.5Z" />,
   chat: (
     <>

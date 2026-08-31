@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { exportDesktopSnapshot } from "../bridge";
 import type { ActivityItem, DesktopSnapshot } from "../contracts";
 import { Glyph } from "../components/Brand";
 import { createActivityProjection } from "../activity_projection";
@@ -31,6 +32,10 @@ export function ActivityScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [provider, setProvider] = useState("all");
   const [page, setPage] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const [exported, setExported] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const exportLock = useRef(false);
   const pageSize = Math.max(1, Math.min(snapshot.limits.maxActivity, 5));
   const providers = useMemo(() => Array.from(new Set(projection.items.map((item) => item.provider))).sort(), [projection.items]);
   const filtered = projection.items.filter((item) => (status === "all" || item.status === status) && (provider === "all" || item.provider === provider));
@@ -38,6 +43,17 @@ export function ActivityScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, pageCount - 1);
   const shown = safePage === page ? visible : filtered.slice(safePage * pageSize, (safePage + 1) * pageSize);
+
+  async function exportReceipts() {
+    if (exportLock.current) return;
+    exportLock.current = true; setExporting(true); setExported(null); setExportError(null);
+    try {
+      const path = await exportDesktopSnapshot("activity", { status, provider });
+      if (path) setExported(path);
+      else downloadActivity(filtered);
+    } catch { setExportError("Não foi possível salvar os recibos em Downloads. Verifique as permissões e o espaço em disco."); }
+    finally { exportLock.current = false; setExporting(false); }
+  }
 
   return (
     <div className="page secondary-page">
@@ -47,8 +63,10 @@ export function ActivityScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
           <h1>Atividade</h1>
           <p>Execuções, cache e economia com evidência limitada ao snapshot.</p>
         </div>
-        <button className="button button-secondary" type="button" onClick={() => downloadActivity(filtered)}>Exportar recibos</button>
+        <button className="button button-secondary" type="button" disabled={exporting} onClick={() => void exportReceipts()}>{exporting ? "Exportando…" : "Exportar recibos"}</button>
       </section>
+      {exported && <p className="export-feedback" role="status">Exportado para {exported}</p>}
+      {exportError && <p className="inline-error" role="alert">{exportError}</p>}
       <section className="panel activity-page-panel">
         <div className="activity-toolbar">
           <div className="segmented-control" aria-label="Filtrar por estado">

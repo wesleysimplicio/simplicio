@@ -1,6 +1,8 @@
+import { useRef, useState } from "react";
 import type { DesktopSnapshot } from "../contracts";
 import { Glyph } from "../components/Brand";
-import { createSettingsProjection } from "../settings_projection";
+import { exportDesktopSnapshot } from "../bridge";
+import { runtimeSummary } from "../workbench";
 
 export function redactedDiagnostic(snapshot: DesktopSnapshot) {
   return {
@@ -15,78 +17,49 @@ export function redactedDiagnostic(snapshot: DesktopSnapshot) {
   };
 }
 
-function downloadDiagnostic(snapshot: DesktopSnapshot) {
-  if (typeof document === "undefined") return;
-  const payload = JSON.stringify(redactedDiagnostic(snapshot), null, 2);
-  const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
+function previewDownload(snapshot: DesktopSnapshot) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(redactedDiagnostic(snapshot), null, 2)], { type: "application/json" }));
   const link = document.createElement("a");
-  link.href = url;
-  link.download = "simplicio-diagnostic.json";
-  link.click();
-  URL.revokeObjectURL(url);
+  link.href = url; link.download = "simplicio-diagnostic.json"; link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function SettingsScreen({
-  snapshot,
-  busy,
-  onRefresh,
-  onSubscribe,
-  onLogout,
-  logoutBusy,
-}: {
-  snapshot: DesktopSnapshot;
-  busy: boolean;
-  onRefresh: () => void;
-  onSubscribe: () => void;
-  onLogout: () => void;
-  logoutBusy: boolean;
-}) {
-  const inventory = createSettingsProjection(snapshot);
-  return (
-    <div className="page secondary-page">
-      <section className="page-heading">
-        <div>
-          <span className="eyebrow">Preferências</span>
-          <h1>Configurações</h1>
-          <p>Conta, atualização e diagnóstico sem expor dados sensíveis.</p>
-        </div>
+export function SettingsScreen({ snapshot, busy, onRefresh, onSubscribe, onLogout, logoutBusy, section = "all" }:
+  { snapshot: DesktopSnapshot; busy: boolean; onRefresh: () => void; onSubscribe: () => void; onLogout: () => void; logoutBusy: boolean; section?: "account" | "diagnostics" | "all" }) {
+  const [exporting, setExporting] = useState(false);
+  const [exported, setExported] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const exportLock = useRef(false);
+  const runtime = runtimeSummary(snapshot);
+  async function download() {
+    if (exportLock.current) return;
+    exportLock.current = true; setExporting(true); setExported(null); setExportError(null);
+    try {
+      const path = await exportDesktopSnapshot("diagnostic");
+      if (path) setExported(path);
+      else { previewDownload(snapshot); setExported("download da demonstração"); }
+    } catch { setExportError("Não foi possível salvar o diagnóstico em Downloads. Verifique as permissões e o espaço em disco."); }
+    finally { exportLock.current = false; setExporting(false); }
+  }
+  return <div className="page preferences-page account-page">
+    <section className="page-heading"><div><h1>{section === "diagnostics" ? "Runtime e diagnóstico" : "Conta Simplicio"}</h1><p>{section === "diagnostics" ? "Estado local verificado pelo Runtime. Diagnósticos sem dados sensíveis." : "Sua identidade e assinatura, verificadas pelo Simplicio Runtime."}</p></div></section>
+    {section !== "diagnostics" && <section className="settings-section"><h2>Minha conta</h2><div className="settings-slab">
+      <div className="account-summary"><span className="account-avatar">{snapshot.access.displayName?.slice(0, 1).toUpperCase() ?? "S"}</span><div><h3>{snapshot.access.displayName ?? "Conta conectada"}</h3><p>{snapshot.access.email ?? "Identidade protegida pelo Runtime"}</p></div><span className="neutral-badge">{snapshot.access.plan ?? "Plano não informado"}</span></div>
+      <div className="preference-row"><div><strong>Acesso ao produto</strong><p>Identidade e assinatura são verificações independentes.</p></div><span className={snapshot.access.state === "active" ? "access-confirmed" : "neutral-badge"}><Glyph name="shield" size={15} />{snapshot.access.state === "active" ? "Assinatura ativa" : "Acesso não confirmado"}</span></div>
+      <div className="preference-row"><div><strong>Validade informada</strong><p>{snapshot.access.expiresAt ? new Date(snapshot.access.expiresAt).toLocaleString("pt-BR") : "O Runtime não informou uma data de expiração."}</p></div><button className="button button-secondary" type="button" onClick={onRefresh} disabled={busy}>{busy ? "Atualizando…" : "Atualizar estado"}</button></div>
+      <div className="preference-row"><div><strong>Gerenciar assinatura</strong><p>Abre sua conta no site do Simplicio.</p></div><button className="button button-secondary" type="button" onClick={onSubscribe} disabled={busy}>Gerenciar plano<Glyph name="external" size={15} /></button></div>
+      <div className="preference-row"><div><strong>Sair deste computador</strong><p>O Runtime revoga a sessão e remove as credenciais locais.</p></div><button className="button button-secondary" type="button" onClick={onLogout} disabled={busy || logoutBusy}>{logoutBusy ? "Saindo…" : "Sair da conta"}</button></div>
+    </div></section>}
+    {section !== "account" && <>
+      <section className="settings-section"><h2>Runtime local</h2><div className="settings-slab">
+        <div className="preference-row"><div><strong>{runtime.label}</strong><p>Versão {snapshot.runtime.version || "não informada"} · transporte {snapshot.runtime.transport}</p></div><button className="button button-secondary" type="button" onClick={onRefresh} disabled={busy}><Glyph name="refresh" size={16} />{busy ? "Atualizando…" : "Atualizar estado"}</button></div>
+        <div className="preference-row"><div><strong>Leitura do snapshot</strong><p>{new Date(snapshot.generatedAt).toLocaleString("pt-BR")}</p></div><span className="neutral-badge">{snapshot.source === "runtime" ? "Runtime" : "Demonstração"}</span></div>
+        <div className="preference-row"><div><strong>Conexões MCP</strong><p>Um registro não comprova uma sessão ativa.</p></div><span>{runtime.connected} confirmadas</span></div>
+      </div></section>
+      <section className="settings-section"><h2>Exportar diagnóstico</h2><div className="settings-slab"><div className="preference-row"><div><strong>Relatório sem dados sensíveis</strong><p>Omite email, caminhos pessoais, prompts, configurações, credenciais, skills e ledger bruto. Salvo em Downloads sem substituir arquivos.</p></div><button className="button button-secondary" type="button" onClick={() => void download()} disabled={exporting}>{exporting ? "Exportando…" : "Exportar diagnóstico"}</button></div></div>
+        {exported && <p className="export-feedback" role="status">Exportado para {exported}</p>}{exportError && <p className="inline-error" role="alert">{exportError}</p>}
       </section>
-      <section className="settings-grid">
-        <article className="panel settings-card">
-          <div className="settings-card-heading"><Glyph name="settings" size={20} /><div><span className="eyebrow">Conta</span><h2>{snapshot.access.plan ?? "Simplicio"}</h2></div></div>
-          <dl>
-            <div><dt>Acesso</dt><dd>{snapshot.access.state}</dd></div>
-            <div><dt>Identidade</dt><dd>{snapshot.access.identityKnown ? "confirmada" : "não disponível"}</dd></div>
-            <div><dt>Expiração</dt><dd>{snapshot.access.expiresAt ? new Date(snapshot.access.expiresAt).toLocaleDateString("pt-BR") : "não informada"}</dd></div>
-          </dl>
-          <button className="button button-secondary button-wide" type="button" onClick={onSubscribe} disabled={busy}>Gerenciar plano</button>
-          <button className="button button-secondary button-wide" type="button" onClick={onLogout} disabled={busy || logoutBusy}>
-            {logoutBusy ? "Saindo…" : "Sair da conta"}
-          </button>
-        </article>
-        <article className="panel settings-card">
-          <div className="settings-card-heading"><Glyph name="activity" size={20} /><div><span className="eyebrow">Diagnóstico</span><h2>Estado do Runtime</h2></div></div>
-          <dl>
-            <div><dt>Versão</dt><dd>{snapshot.runtime.version || "indisponível"}</dd></div>
-            <div><dt>Transporte</dt><dd>{snapshot.runtime.transport}</dd></div>
-            <div><dt>Última leitura</dt><dd>{snapshot.runtime.lastReceiptAt ? new Date(snapshot.runtime.lastReceiptAt).toLocaleString("pt-BR") : "sem recibo"}</dd></div>
-          </dl>
-          <div className="settings-actions">
-            <button className="button button-secondary" type="button" onClick={onRefresh} disabled={busy}>{busy ? "Atualizando…" : "Atualizar estado"}</button>
-            <button className="button button-secondary" type="button" onClick={() => downloadDiagnostic(snapshot)}>Exportar diagnóstico</button>
-          </div>
-          <p className="settings-note">O export omite email, caminhos, prompts, configurações, credenciais, skills e ledger bruto.</p>
-        </article>
-      </section>
-      <section className="panel token-evidence">
-        <h2>Modelos / LLMs informados pelo Runtime</h2>
-        {inventory.models.length ? <ul>{inventory.models.map((model) => <li key={model.id}>{model.label} · somente leitura</li>)}</ul> : <p>Nenhum modelo foi informado pelo Runtime. Login ativo e MCP configurado não significam que um LLM esteja conectado.</p>}
-        <p>O inventário depende do Agent Plane; não são criadas credenciais, modelos padrão ou conexões presumidas.</p>
-      </section>
-      <section className="panel settings-safety">
-        <Glyph name="lock" size={18} />
-        <div><span className="eyebrow">Privacidade</span><strong>Dados locais sob controle</strong><p>O logout revoga a sessão no Runtime e limpa as credenciais locais; nenhum token é mantido nesta tela.</p></div>
-      </section>
-    </div>
-  );
+    </>}
+    <p className="settings-footnote"><Glyph name="lock" size={15} />O Desktop não armazena senhas ou tokens de providers na interface.</p>
+  </div>;
 }
