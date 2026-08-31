@@ -177,7 +177,7 @@ function Accounts({ evidence, onNavigate }: { evidence: Evidence; onNavigate: Na
       return <section className="ref-account-card" key={account.id}><div className="ref-account-heading"><span className={"ref-monogram ref-monogram-" + account.id}>{account.mark}</span><div><h2>{account.name}</h2><p>{account.description}</p></div></div>
         <Row title="Contas neste dispositivo" description="O inventário atual não informa contas gerenciadas deste provedor."><Unavailable label={"Adicionar conta " + account.name} reason="Gerenciamento de contas ainda indisponível." /></Row>
         <div className="ref-account-default"><div><strong>Autenticação no cliente</strong><p>Identidade e sessão não consultadas pelo Desktop.</p></div><Badge>Não verificada</Badge></div>
-        <div className="ref-account-evidence"><span>{provider ? providerStateLabels[provider.state] : "Cliente não informado nesta consulta"}</span><button type="button" className="text-button" onClick={() => onNavigate("agents")}>Ver agente e IDE</button></div>
+        <div className="ref-account-evidence"><span>{provider ? providerStateLabels[provider.state] : "Cliente não informado nesta consulta"}</span><LinkButton to="agents" onNavigate={onNavigate}>Ver agente e IDE</LinkButton></div>
       </section>;
     })}
     <Section title="Outros provedores" description="Integrações adicionais continuam pertencendo ao cliente de IA."><Row title="MiniMax e provedores personalizados" description="Cookies de sessão e chaves de API não são coletados nesta tela."><Unavailable label="Configurar provedor" reason="Falta um contrato seguro de autenticação." /></Row></Section>

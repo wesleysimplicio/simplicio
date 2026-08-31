@@ -36,7 +36,7 @@ const MESSAGES: Readonly<Record<string, string>> = {
 };
 
 /** Translate only closed native codes; never reflect stdout, stderr or user paths. */
-export function installFailureMessage(error: unknown): string {
+function baseFailureMessage(error: unknown): string {
   const code = nativeCode(error);
   if (code.length <= 100 && Object.prototype.hasOwnProperty.call(MESSAGES, code)) return MESSAGES[code];
   if (code.length <= 100) {
@@ -52,6 +52,77 @@ export function installFailureMessage(error: unknown): string {
 }
 
 function nativeCode(error: unknown): string {
-  const code = typeof error === "string" ? error : error instanceof Error ? error.message : "";
+  const code = typeof error === "string" ? error : error instanceof Error ? error.message : typedError(error)?.code ?? "";
   return typeof code === "string" && code.length <= 100 ? code : "";
+}
+
+const STEP_LABELS: Readonly<Record<string, string>> = {
+  "binary-copy": "Runtime",
+  "path-registration": "PATH",
+  "install-manifest": "recibo de instalação",
+  "codex": "Codex",
+  "codex-hooks": "hooks do Codex",
+  "mcp-route-hook": "hook de roteamento MCP",
+  "hermes": "Hermes",
+  "claude-code": "Claude Code",
+  "claude-code-hooks": "hooks do Claude Code",
+  "claude-desktop": "Claude Desktop",
+  "cursor": "Cursor",
+  "windsurf": "Windsurf",
+  "windsurf-next": "Windsurf Next",
+  "kiro": "Kiro",
+  "gemini": "Gemini",
+  "trae": "Trae",
+  "antigravity": "Antigravity",
+  "jetbrains-junie": "JetBrains Junie",
+  "vscode-cline": "Cline",
+  "vscode": "VS Code",
+  "zed": "Zed",
+  "opencode": "OpenCode",
+  "grok-mcp-route": "hook MCP do Grok"
+};
+
+type PartialDiagnostic = { failedSteps: string[]; unknownFailedSteps: number };
+type NativeInstallError = { code: string; diagnostic?: PartialDiagnostic };
+
+function record(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function validExitCode(code: string): boolean {
+  const match = /^integration_install_exit_code:(-?\d{1,11})$/.exec(code);
+  if (!match) return false;
+  const value = Number(match[1]);
+  return Number.isInteger(value) && value !== 0 && value >= -2_147_483_648 && value <= 2_147_483_647;
+}
+
+function typedError(error: unknown): NativeInstallError | undefined {
+  if (!record(error) || error.schema !== "simplicio.desktop-install-error/v1") return;
+  const code = error.code;
+  if (typeof code !== "string" || code.length > 100 ||
+      !(Object.prototype.hasOwnProperty.call(MESSAGES, code) || validExitCode(code))) return;
+  if (error.diagnostic === undefined) return { code };
+  // A partial effect can never become a no-start/review/refresh authorization.
+  if (!validExitCode(code)) return;
+  const value = error.diagnostic;
+  if (!record(value) || value.schema !== "simplicio.desktop-install-diagnostic/v1" ||
+      value.status !== "partial" || !Array.isArray(value.failedSteps) ||
+      value.failedSteps.length > 128 || !Number.isInteger(value.unknownFailedSteps) ||
+      typeof value.unknownFailedSteps !== "number" || value.unknownFailedSteps < 0 ||
+      value.unknownFailedSteps > 128) return;
+  const steps = value.failedSteps.filter((step): step is string =>
+    typeof step === "string" && Object.prototype.hasOwnProperty.call(STEP_LABELS, step));
+  if (steps.length !== value.failedSteps.length || new Set(steps).size !== steps.length ||
+      steps.length + value.unknownFailedSteps < 1 || steps.length + value.unknownFailedSteps > 128) return;
+  return { code, diagnostic: { failedSteps: steps, unknownFailedSteps: value.unknownFailedSteps } };
+}
+
+/** Fixed labels only: diagnostic payload details never reach the UI. */
+export function installFailureMessage(error: unknown): string {
+  const message = baseFailureMessage(error);
+  const diagnostic = typedError(error)?.diagnostic;
+  if (!diagnostic) return message;
+  const labels = diagnostic.failedSteps.map((step) => STEP_LABELS[step]);
+  if (diagnostic.unknownFailedSteps > 0) labels.push(`${diagnostic.unknownFailedSteps} etapa(s) não identificada(s)`);
+  return `Etapas com falha: ${labels.join(", ")}. ${message}`;
 }

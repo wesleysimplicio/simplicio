@@ -40,6 +40,38 @@ test("visible reference pages do not expose links back to hidden destinations", 
   for (const view of ["provider-accounts", "general-settings", "quick-commands", "permissions"]) {
     await page.goto("/?view=" + view);
     await expect(page.locator(".reference-settings-page")).toBeVisible();
-    await expect(page.getByRole("main").getByRole("button", { name: /Ver atalhos|Abrir atalhos|Abrir navegador|Abrir terminal|Configurar voz/ })).toHaveCount(0);
+    await expect(page.getByRole("main").getByRole("button", { name: /Ver atalhos|Abrir atalhos|Abrir navegador|Abrir terminal|Configurar voz|Ver agente e IDE/ })).toHaveCount(0);
   }
+});
+
+test("narrow navigation and account pages keep requested destinations hidden", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 740 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Expandir barra lateral", exact: true }).click();
+  const workspaceMenu = page.getByRole("dialog", { name: "Espaço de trabalho", exact: true });
+  await expect(workspaceMenu).toBeVisible();
+  for (const label of hidden) {
+    await workspaceMenu.getByRole("searchbox").fill(label);
+    await expect(workspaceMenu.getByRole("button", { name: label, exact: true })).toHaveCount(0);
+  }
+  await workspaceMenu.getByRole("searchbox").fill("");
+  await workspaceMenu.getByRole("button", { name: "Configurações", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Conta Simplicio", exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Expandir barra lateral", exact: true }).click();
+  const settingsMenu = page.getByRole("dialog", { name: "Configurações", exact: true });
+  const categories = settingsMenu.getByRole("navigation", { name: "Categorias de configurações", exact: true });
+  for (const label of hidden) await expect(categories.getByRole("button", { name: label, exact: true })).toHaveCount(0);
+  for (const group of ["HOSTS REMOTOS", "EXPERIMENTAL"]) await expect(categories.getByText(group, { exact: true })).toHaveCount(0);
+  for (const label of hidden) {
+    await settingsMenu.getByRole("searchbox").fill(label);
+    await expect(categories.getByRole("button", { name: label, exact: true })).toHaveCount(0);
+  }
+  await settingsMenu.getByRole("searchbox").fill("");
+  await categories.getByRole("button", { name: "Contas de IA", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Contas de IA", exact: true, level: 1 })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("button", { name: "Ver agente e IDE", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Abrir conta Simplicio", exact: true })).toBeVisible();
 });

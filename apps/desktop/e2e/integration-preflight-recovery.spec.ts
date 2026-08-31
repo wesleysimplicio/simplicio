@@ -1,6 +1,17 @@
 import { expect, test, type Page } from "@playwright/test";
 import { createDemoSnapshot } from "../src/demo";
 
+// Surface browser exceptions as failures, including asynchronous Tauri event cleanup.
+const browserErrors = new WeakMap<Page, string[]>();
+test.beforeEach(({ page }) => {
+  const errors: string[] = [];
+  browserErrors.set(page, errors);
+  page.on("pageerror", (error) => errors.push(error.message));
+});
+test.afterEach(({ page }) => {
+  expect(browserErrors.get(page)).toEqual([]);
+});
+
 type PreflightWindow = Window & {
   __preflightCalls: string[];
   __preflightDigests: unknown[];
@@ -14,12 +25,15 @@ async function preparePreflightFailure(page: Page) {
     const digests: unknown[] = [];
     let reviews = 0;
     let applied = false;
+    const eventListeners = new Set<number>();
+    let callbackId = 0;
     Object.assign(window, {
       isTauri: true,
       __preflightCalls: calls,
       __preflightDigests: digests,
+      __TAURI_EVENT_PLUGIN_INTERNALS__: { unregisterListener: (_event: string, id: number) => eventListeners.delete(id) },
       __TAURI_INTERNALS__: {
-        transformCallback: () => 1,
+        transformCallback: () => ++callbackId,
         unregisterCallback: () => undefined,
         metadata: { currentWindow: { label: "main" }, currentWebview: { label: "main" } },
         invoke: async (command: string, args: Record<string, unknown> = {}) => {
@@ -41,7 +55,7 @@ async function preparePreflightFailure(page: Page) {
             applied = true;
             return snapshot;
           }
-          if (command === "plugin:event|listen") return 1;
+          if (command === "plugin:event|listen") { const id = ++callbackId; eventListeners.add(id); return id; }
           if (command === "plugin:event|unlisten") return;
           throw "unexpected_preflight_recovery_command";
         },
