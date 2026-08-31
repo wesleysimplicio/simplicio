@@ -8,11 +8,11 @@ import { rememberWorkspaceRoute } from "../settings_navigation";
 export type { View } from "../workbench";
 
 interface Destination { id: View; icon: GlyphName; group?: string; description?: string }
-const navigation: Destination[] = [
+const navigation: Destination[] = ([
   { id: "home", icon: "home" }, { id: "activity", icon: "activity" },
   { id: "automations", icon: "automation" },
   { id: "agents", icon: "teams" }, { id: "providers", icon: "providers" }, { id: "tokens", icon: "spark" },
-];
+] satisfies Destination[]).filter((item) => isNavigationVisible(item.id));
 const referenceIcons: Record<ReferenceSettingsView, GlyphName> = {
   "provider-accounts": "providers", orchestration: "teams", "computer-use": "monitor", voice: "live",
   integrations: "providers", mobile: "monitor", "general-settings": "settings", artifacts: "folder",

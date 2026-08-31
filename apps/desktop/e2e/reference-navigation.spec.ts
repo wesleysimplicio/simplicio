@@ -5,6 +5,7 @@ import { isNavigationVisible } from "../src/workbench";
 const visibleScreens = REFERENCE_SCREENS.filter((screen) => isNavigationVisible(screen.id));
 
 test("every supplied-reference settings destination is searchable and reachable without losing navigation", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 600 });
   await page.goto("/?view=settings");
   const sidebar = page.getByRole("complementary", { name: "Configurações", exact: true });
   const categories = sidebar.getByRole("navigation", { name: "Categorias de configurações", exact: true });
@@ -51,8 +52,9 @@ test("reference navigation is discoverable by description and usable in a narrow
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test("the main sidebar exposes the existing automation surface", async ({ page }) => {
+test("the main sidebar hides automations while retaining its direct preview", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Navegação principal", exact: true }).getByRole("button", { name: "Automações", exact: true }).click();
+  await expect(page.getByRole("navigation", { name: "Navegação principal", exact: true }).getByRole("button", { name: "Automações", exact: true })).toHaveCount(0);
+  await page.goto("/?view=automations");
   await expect(page.getByRole("heading", { name: "Automações", exact: true, level: 1 })).toBeVisible();
 });

@@ -7,6 +7,7 @@ export type View = ReferenceSettingsView | "home" | "project" | "agents" | "mode
 
 /** Presentation policy only: retain implementations and direct preview routes. */
 const HIDDEN_NAVIGATION_VIEWS: ReadonlySet<View> = new Set<View>([
+  "agents", "models", "artifacts", "automations",
   "orchestration", "computer-use", "voice", "integrations", "mobile",
   "memory", "share-skills", "git", "task-sources", "terminal", "browser", "emulator", "floating",
   "shortcuts", "input", "notifications", "hosts", "servers", "privacy", "advanced", "experimental", "plugins",
