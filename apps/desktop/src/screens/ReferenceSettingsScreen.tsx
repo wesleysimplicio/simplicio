@@ -4,7 +4,7 @@ import { Glyph, type GlyphName } from "../components/Brand";
 import { providerRegistry } from "../provider_registry";
 import { createSettingsProjection } from "../settings_projection";
 import { REFERENCE_SCREENS, type ReferenceSettingsView } from "../reference_screens";
-import { searchMatches, type View } from "../workbench";
+import { isNavigationVisible, searchMatches, type View } from "../workbench";
 import "../reference_settings.css";
 
 export interface ReferenceSettingsProps {
@@ -125,6 +125,7 @@ function UnavailableSelect({ label, value = "Não disponível" }: { label: strin
 }
 
 function LinkButton({ children, to, onNavigate, icon = "arrow" }: { children: ReactNode; to: View; onNavigate: Navigate; icon?: GlyphName }) {
+  if (!isNavigationVisible(to)) return null;
   return <button type="button" className="button button-secondary" onClick={() => onNavigate(to)}>{children}<Glyph name={icon} size={16} /></button>;
 }
 

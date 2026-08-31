@@ -5,6 +5,17 @@ import { isReferenceSettingsView, REFERENCE_LABELS, type ReferenceSettingsView }
 export type View = ReferenceSettingsView | "home" | "project" | "agents" | "models" | "general" | "shortcuts" | "diagnostics" | "setup"
   | "today" | "chats" | "teams" | "automations" | "apps" | "bot" | "providers" | "tokens" | "activity" | "memory" | "settings";
 
+/** Presentation policy only: retain implementations and direct preview routes. */
+const HIDDEN_NAVIGATION_VIEWS: ReadonlySet<View> = new Set<View>([
+  "orchestration", "computer-use", "voice", "integrations", "mobile",
+  "memory", "share-skills", "git", "task-sources", "terminal", "browser", "emulator", "floating",
+  "shortcuts", "input", "notifications", "hosts", "servers", "privacy", "advanced", "experimental", "plugins",
+]);
+
+export function isNavigationVisible(view: View): boolean {
+  return !HIDDEN_NAVIGATION_VIEWS.has(view);
+}
+
 export const VIEW_LABELS: Record<View, string> = {
   ...REFERENCE_LABELS,
   home: "Início", project: "Projeto", agents: "Agentes e IDEs", models: "Modelos e skills", setup: "Instalação guiada",

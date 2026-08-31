@@ -33,8 +33,8 @@ test("workbench navigation, settings search, history and sidebar controls work",
   await page.keyboard.type("nenhum-resultadoteste");
   await expect(page.getByText("Nenhum resultado.")).toBeVisible();
   await page.getByRole("button", { name: "Limpar busca", exact: true }).click();
-  await page.getByRole("button", { name: "Atalhos", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Atalhos", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Comandos rápidos", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Comandos rápidos", exact: true })).toBeVisible();
 });
 
 test("provider inventory is searchable and never upgrades detected to connected", async ({ page }) => {
