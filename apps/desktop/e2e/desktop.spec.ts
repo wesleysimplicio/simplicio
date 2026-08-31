@@ -2,9 +2,12 @@ import { expect, test } from "@playwright/test";
 
 test("login and conservative access states remain actionable", async ({ page }) => {
   await page.goto("/?state=signed_out");
+  await page.getByRole("button", { name: "Começar", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Entre no Simplicio" })).toBeVisible();
   await page.getByRole("button", { name: /Continuar com Google/ }).click();
-  await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Um bom começo." })).toBeVisible();
+  await page.getByRole("button", { name: "Agora não", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Simplicio", exact: true })).toBeVisible();
 
   await page.goto("/?state=unknown");
   await expect(page.getByRole("heading", { name: "Tente novamente" })).toBeVisible();
@@ -20,12 +23,12 @@ test("login and conservative access states remain actionable", async ({ page }) 
 
 test("all navigation, provider, receipt, and account controls work", async ({ page }) => {
   await page.goto("/?state=active&view=home");
-  await expect(page.getByRole("heading", { name: /Hoje você economizou/, level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Simplicio", level: 1 })).toBeVisible();
   const brandMark = page.locator(".brand-mark").first();
   await expect(brandMark).toBeVisible();
   await expect.poll(() => brandMark.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth >= 1024)).toBe(true);
 
-  await page.getByRole("button", { name: "Ver relatório" }).click();
+  await page.getByRole("button", { name: "Atividade", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Atividade" })).toBeVisible();
   await page.getByRole("button", { name: "atenção" }).click();
   await page.locator(".activity-provider-filter select").selectOption("all");
@@ -34,17 +37,17 @@ test("all navigation, provider, receipt, and account controls work", async ({ pa
   await expect((await activityDownload).suggestedFilename()).toBe("simplicio-activity.json");
 
   await page.goto("/?state=active&view=home");
-  await page.getByRole("button", { name: "Abrir diagnóstico" }).click();
-  await expect(page.getByRole("heading", { name: "Configurações", level: 1 })).toBeVisible();
+  await page.getByRole("button", { name: /Runtime e diagnóstico/ }).click();
+  await expect(page.getByRole("heading", { name: "Runtime e diagnóstico", level: 1 })).toBeVisible();
   const diagnosticDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "Exportar diagnóstico" }).click();
   await expect((await diagnosticDownload).suggestedFilename()).toBe("simplicio-diagnostic.json");
 
   await page.goto("/?state=active&view=providers");
-  await expect(page.getByRole("heading", { name: "Providers" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Integrações MCP" })).toBeVisible();
   await page.getByRole("button", { name: "Disponíveis" }).click();
   await page.getByRole("button", { name: "Todos" }).click();
-  await page.getByRole("button", { name: "Ver detalhes" }).first().click();
+  await page.getByRole("button", { name: /Ver detalhes de/ }).first().click();
   await expect(page.getByRole("button", { name: "Fechar detalhes" })).toBeVisible();
   await page.getByRole("button", { name: "Fechar detalhes" }).click();
   await page.getByRole("button", { name: /Entender os estados/ }).click();
@@ -56,9 +59,9 @@ test("all navigation, provider, receipt, and account controls work", async ({ pa
   await page.goto("/?state=active&view=activity");
   await expect(page.getByRole("heading", { name: "Atividade" })).toBeVisible();
   await page.getByRole("button", { name: "Abrir configurações da conta" }).click();
-  await expect(page.getByRole("heading", { name: "Configurações" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Conta Simplicio" })).toBeVisible();
   await page.getByRole("button", { name: "Sair da conta" }).click();
-  await expect(page.getByRole("heading", { name: "Entre no Simplicio" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Começar", exact: true })).toBeVisible();
 });
 
 test("Bot Center exposes the canonical roster, timeline, rooms, and honest computer state", async ({ page }) => {
@@ -77,7 +80,7 @@ test("Bot Center exposes the canonical roster, timeline, rooms, and honest compu
 test("primary layouts fit desktop and compact widths", async ({ page }) => {
   for (const width of [1280, 768, 390]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const view of ["today", "chats", "teams", "automations", "apps", "home", "providers", "tokens", "activity", "memory", "settings"]) {
+    for (const view of ["today", "chats", "teams", "automations", "apps", "home", "agents", "providers", "tokens", "activity", "memory", "settings", "general", "shortcuts", "models", "setup"]) {
       await page.goto(`/?state=active&view=${view}`);
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
       expect(overflow, `${view} overflows at ${width}px`).toBe(false);
@@ -85,21 +88,16 @@ test("primary layouts fit desktop and compact widths", async ({ page }) => {
   }
 });
 
-test("the preview ambient path stays on the canonical five-surface route", async ({ page }) => {
-  await page.goto("/?state=active&view=today");
-  await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
-  await page.getByRole("button", { name: "Chats" }).click();
-  await expect(page.getByRole("heading", { name: "Chats", level: 1 })).toBeVisible();
-  await expect(page.locator(".session-card").first()).toBeDisabled();
-  await page.getByRole("button", { name: "Teams" }).click();
-  await expect(page.getByRole("heading", { name: "Teams", level: 1 })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Discuss" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Execute" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Review" })).toBeDisabled();
-  await page.getByRole("button", { name: "Automations" }).click();
-  await expect(page.getByRole("heading", { name: "Automations", level: 1 })).toBeVisible();
-  await page.getByRole("button", { name: "Apps" }).click();
-  await expect(page.getByRole("heading", { name: "Apps", level: 1 })).toBeVisible();
+test("legacy capability previews stay bounded and do not promise unavailable actions", async ({ page }) => {
+  for (const [view, label] of [["today", "Today"], ["chats", "Chats"], ["teams", "Teams"], ["automations", "Automations"], ["apps", "Apps"]]) {
+    await page.goto("/?state=active&view=" + view);
+    await expect(page.getByRole("heading", { name: label, level: 1 })).toBeVisible();
+  }
   await expect(page.getByRole("button", { name: "Abrir", exact: true }).first()).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Novo", exact: true })).toBeDisabled();
+  await page.goto("/?state=active&view=chats");
+  await expect(page.getByRole("button", { name: "Enviar" })).toBeDisabled();
+  await expect(page.getByText("agent_api_unavailable")).toBeVisible();
+  await page.getByRole("button", { name: "Início", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Simplicio", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Novo", exact: true })).toHaveCount(0);
 });

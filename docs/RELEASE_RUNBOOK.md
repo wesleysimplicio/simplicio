@@ -7,6 +7,12 @@ are committed here. Runtime and Desktop executables are staged locally and
 attached to the GitHub Release; the source-tree policy intentionally refuses to
 track executable build products.
 
+Publication is local/manual through `scripts/publish_release_local.py`. This
+public repository must not contain remote workflow definitions. The distribution
+audit checks the actual Python publisher's ordered gates and explicit asset
+set without importing or executing it. Passing this source contract is not a
+build, signature, upload, or installed-platform receipt.
+
 ## Required release files
 
 For each release `vX.Y.Z`, publish:
@@ -15,6 +21,8 @@ For each release `vX.Y.Z`, publish:
 - `simplicio-macos-x64` and `.sig`;
 - `simplicio-linux-x64` and `.sig`;
 - `simplicio-windows-x64.exe` and `.sig`;
+- a `.spdx.json` SBOM and `.provenance.json` record for each of the four Runtime
+  executables, in addition to its matching `.sig`;
 - `SHA256SUMS`;
 - `simplicio-update-manifest.json`;
 - matching `version.txt` and `VERSION.md`;
@@ -124,18 +132,48 @@ only permitted for an explicitly selected unofficial channel.
 ## Manual publication order
 
 1. Build and sign the artifacts from the intended `simplicio-runtime` main
-   commit.
-2. Commit the Runtime metadata and release record into a release branch;
-   keep all Runtime and Desktop executables in local staging for GitHub Release
-   upload. Never force-add executable build products to the source tree.
-3. Run `python3 scripts/verify_distribution_consistency.py`,
-   `python3 -m unittest discover -s tests -p 'test_verify_ed25519.py'`, and
-   the release provenance tests.
-4. Open and merge a PR into `master`.
-5. Create the immutable `vX.Y.Z` tag at that merge commit.
-6. Upload the exact files from the merged tree with `gh release create`.
+   commit: Windows first, then both macOS targets, then Linux. Assemble an
+   external local bundle containing all required Runtime files and Codex hooks.
+   Keep Desktop packages separate; the Runtime publisher's explicit asset set
+   does not upload them. Never force-add executable products to the source tree.
+2. Start from an updated, clean public `master`. Use an authenticated local `gh`
+   session and a Python environment with `requirements-quality.txt`, `build`,
+   and `twine` installed; `pwsh` is mandatory for the Windows hook test. Supply
+   PyPI credentials through the environment/credential manager, never command
+   arguments, source files, or release notes.
+3. Run the local source and regression gates before publishing:
+
+   ```bash
+   python3 scripts/verify_distribution_consistency.py
+   python3 -m pytest -q tests/test_distribution_consistency.py tests/test_release_provenance.py tests/test_verify_ed25519.py tests/test_release_local_contract.py
+   ```
+
+4. Inspect the local preflight using the exact intended version, bundle path,
+   and full 40-character Runtime source commit (replace the placeholders):
+
+   ```bash
+   python3 scripts/publish_release_local.py --bundle /absolute/path/to/verified-bundle --version vX.Y.Z --source-commit RUNTIME_COMMIT_40_HEX --check-only
+   ```
+
+   `--check-only` checks repository/authentication/publication state. It does
+   **not** validate bundle contents or prove signatures, builds, or installation;
+   its `ready` result must not be reported as a verified release.
+5. Invoke the same local command with `--publish` in place of `--check-only`.
+   This is the explicit mutating step: it verifies the signed bundle, stages
+   metadata/hooks, runs the local gates, builds and smoke-tests the wheel,
+   opens and merges the release PR into `master`, compares the merged files,
+   tags that commit, and creates the public release with `--verify-tag` and an
+   explicit list of assets. It then checks terminal installation, uploads the
+   wheel to PyPI, and verifies package installation and the downloaded release.
+   Do not separately create the tag or upload assets before this command.
+6. If publication partially fails, inspect the receipts and remote state before
+   choosing any recovery. `--resume` requires the matching existing tag, final
+   release and exact Runtime asset set; it rechecks the bundle/hooks and skips
+   the PyPI upload only when that version already exists. It does not recreate
+   a release, fix incomplete assets, or authorize overwriting them. Desktop
+   assets already attached to that release are outside this resume contract.
 7. Run the mandatory post-release smoke on the published GitHub Release:
-   `VERSION=vX.Y.Z; python3 scripts/post_release_smoke.py --version "$VERSION" --execute --json`.
+   `python3 scripts/post_release_smoke.py --version vX.Y.Z --execute --json`.
    Run it once on each native host in the support matrix; this re-downloads
    the release and checks every artifact, sidecar, SBOM, provenance record,
    version, clean-home login gate, and MCP login gate.
@@ -143,6 +181,13 @@ only permitted for an explicitly selected unofficial channel.
 The release is not ready for users if any check is skipped or unverified. Do
 not force-move a published tag; use a new patch release if published bytes
 need correction.
+
+`scripts/verify_release_provenance.py` remains a separate local verification
+tool for remote/tag identity and immutable staging: its `state`, `plan`,
+`download`, `verify-staged`, and `metadata` commands do not publish anything.
+Its artifact-only staging set is not the Runtime publisher's complete bundle
+with signature, SBOM, provenance, and hook files. Do not substitute one for
+the other or treat either source check as proof of a completed publication.
 
 The post-release receipt is part of the release evidence. It must contain a
 successful result for all four targets from static verification and a
@@ -166,7 +211,9 @@ instalado sem reutilizar estado do mantenedor:
 python3 scripts/release_install_smoke.py --version vX.Y.Z --json
 ```
 
-O publicador local/manual executa esse mesmo comando antes e depois dos uploads.
+O publicador local/manual verifica o wheel local antes da publicação. Depois
+de criar o GitHub Release, executa o smoke com `--terminal`; após publicar o
+PyPI, executa-o com `--pypi`, seguido de `post_release_smoke.py --execute`.
 Os recibos nativos de Linux, Windows, macOS Intel e macOS Apple Silicon são
 registrados por host, sem delegar build ou publicação a workflows remotos. Uma
 nova release não deve ser considerada pronta se qualquer um dos dois métodos falhar.

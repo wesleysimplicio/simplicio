@@ -3,9 +3,9 @@ import { Glyph } from "../components/Brand";
 import { exportDesktopTokenReport, loadDesktopTokenReport } from "../bridge";
 import { TOKEN_PERIODS, tokenErrorMessage, tokenExportErrorMessage, type TokenPeriod, type TokenQuery, type TokenUsageReport } from "../token_usage";
 
-export function TokensScreen() {
+export function TokensScreen({ initialRepoPath = "" }: { initialRepoPath?: string }) {
   const [period, setPeriod] = useState<TokenPeriod>("1m");
-  const [repoPath, setRepoPath] = useState("");
+  const [repoPath, setRepoPath] = useState(initialRepoPath);
   const [sessionId, setSessionId] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -36,9 +36,9 @@ export function TokensScreen() {
   }
 
   useEffect(() => {
-    void load({ timezoneOffsetSeconds: -new Date().getTimezoneOffset() * 60 });
+    void load({ timezoneOffsetSeconds: -new Date().getTimezoneOffset() * 60, ...(initialRepoPath ? { repoPath: initialRepoPath } : {}) });
     return () => { sequence.current += 1; };
-  }, []);
+  }, [initialRepoPath]);
 
   function invalidate() {
     sequence.current += 1;

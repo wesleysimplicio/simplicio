@@ -8,14 +8,20 @@ import { ActivityScreen, redactedActivity } from "./screens/ActivityScreen";
 import { BotCenterScreen } from "./screens/BotCenterScreen";
 import { createDemoBotCenter, createUnavailableBotCenter } from "./bot_center";
 import { ProductSurfaceScreen } from "./screens/ProductScreens";
+import { SignInScreen } from "./screens/AccessScreens";
 
 describe("Simplicio Desktop product states", () => {
-  it("offers browser login when there is no identity", () => {
+  it("offers welcome then browser login when there is no identity", () => {
     const html = renderToStaticMarkup(
       <DesktopApp snapshot={createDemoSnapshot("signed_out")} />,
     );
-    expect(html).toContain("Continuar com Google");
-    expect(html).toContain("Nenhuma senha passa pelo app");
+    expect(html).toContain("Começar");
+    expect(html).not.toContain("Continuar com Google");
+    const login = renderToStaticMarkup(<SignInScreen initialStep="login" busy={false} error={null} onLogin={() => undefined} />);
+    expect(login).toContain("Continuar com Google");
+    expect(login).toContain("Nenhuma senha passa pelo app");
+    expect(login).not.toContain('type="password"');
+    expect(login).not.toContain('type="email"');
   });
 
   it("keeps the Runtime disabled when entitlement is inactive", () => {
@@ -41,24 +47,25 @@ describe("Simplicio Desktop product states", () => {
       <DesktopApp snapshot={createDemoSnapshot("active")} />,
     );
     expect(html).toContain("Runtime online");
-    expect(html).toContain("Providers");
+    expect(html).toContain("Agentes e IDEs");
     expect(html).toContain("Demonstração");
   });
 
-  it("exposes the canonical five-destination shell only after active access", () => {
+  it("opens the workbench with functional destinations and keeps unavailable product previews out of primary navigation", () => {
     const html = renderToStaticMarkup(
       <DesktopApp snapshot={createDemoSnapshot("active")} />,
     );
-    expect(html).toContain("Today");
-    expect(html).toContain("Chats");
-    expect(html).toContain("Teams");
-    expect(html).toContain("Automations");
-    expect(html).toContain("Apps");
+    expect(html).toContain("Início");
+    expect(html).toContain("Adicionar projeto");
+    expect(html).toContain("Agentes e IDEs");
+    expect(html).toContain("Atividade");
     expect(html).toContain("Configurações");
     expect(html).toContain("v3.8.39");
     expect(html).toContain("Integrações MCP");
     expect(html).toContain("Relatório de tokens");
-    expect((html.match(/class=\"nav-item/g) ?? []).length).toBe(8);
+    expect(html).not.toContain('aria-label="Chats"');
+    expect(html).not.toContain("window-controls");
+    expect(html).toContain('aria-label="Buscar projetos e páginas"');
   });
 
   it("keeps the five main surfaces projection-first and bounded", () => {
@@ -84,7 +91,7 @@ describe("Simplicio Desktop product states", () => {
     snapshot.savings.providerCache.hitPercent = null;
     snapshot.savings.providerCache.proofKind = "unavailable";
     const html = renderToStaticMarkup(<DesktopApp snapshot={snapshot} />);
-    expect(html).toContain("sem telemetria");
+    expect(html).toContain("Sem telemetria, sem números presumidos");
     expect(html).not.toContain("0% telemetria do provider");
   });
 

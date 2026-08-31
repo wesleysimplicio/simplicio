@@ -5,9 +5,9 @@ Covers verifiable packaging/distribution drift:
 - canonical branch install URLs (`master` in this repo)
 - release/version source-of-truth mismatches
 - stale or contradictory public-beta claims
-- the release workflow's closed-world, provenance-driven publish contract
+- the local publisher's ordered verification and immutable upload contract
 - target-triplet naming drift between distribution/targets.json (the
-  canonical table), the release workflow, the update manifest and the
+  canonical table), the local publisher, the update manifest and the
   installers (issue #5)
 
 Exit code:
@@ -18,6 +18,7 @@ Exit code:
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import re
 import sys
@@ -25,11 +26,12 @@ import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import date
 from pathlib import Path
+from textwrap import indent
 from typing import Iterable, Sequence
 
-import yaml
-
 ROOT = Path(__file__).resolve().parents[1]
+LOCAL_PUBLISHER = "scripts/publish_release_local.py"
+PUBLIC_REPOSITORY = "wesleysimplicio/simplicio"
 CANONICAL_BRANCH = "master"
 MAIN_INSTALL_RE = re.compile(
     r"https://raw\.githubusercontent\.com/wesleysimplicio/simplicio/main/install\.(?:sh|ps1)"
@@ -37,40 +39,65 @@ MAIN_INSTALL_RE = re.compile(
 BETA_NO_END_RE = re.compile(r"public beta with no end date", re.IGNORECASE)
 ECOSYSTEM_VERSION_RE = re.compile(r"## Versão atual\s+([^\n]+)", re.MULTILINE)
 CURRENT_VERSION_RE = re.compile(r"## Current Version:\s*v([^\s]+)")
-PUBLISH_BODY = (
-    "Free public beta. All features remain unlocked during the public-beta phase.\n\n"
-    "Windows: `irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex`\n"
-    "macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh`\n\n"
-    "Checksum-verified update manifest included (`simplicio update check`).\n"
-)
-CANONICAL_PUBLISH_WITH = {
-    "tag_name": "v${{ steps.state.outputs.version }}",
-    "target_commitish": "${{ github.sha }}",
-    "name": "v${{ steps.state.outputs.version }} — Public Beta",
-    "body": PUBLISH_BODY,
-    "prerelease": False,
-    "make_latest": "true",
-    "fail_on_unmatched_files": True,
-    "overwrite_files": False,
-    "files": "dist/*",
+# This is a source contract, not a publication receipt. Compare executable AST
+# nodes instead of comments/strings, without importing or running the publisher.
+# Helper implementations have their own executable tests; these ordered entry
+# points prevent skipping their gates, broad uploads, or automatic overwrite.
+LOCAL_CHECKS = '''verify_codex_hook_contract()
+run([sys.executable, str(ROOT / "scripts/verify_distribution_consistency.py")])
+run([sys.executable, "-m", "pytest", "-q",
+     "tests/test_codex_integration_cli.py", "tests/test_release_local_contract.py"])
+run([str(bundle / "simplicio-macos-arm64"), "version", "--json"])
+if (ROOT / "scripts/verify_mcp_tools.py").is_file():
+    run([sys.executable, str(ROOT / "scripts/verify_mcp_tools.py"),
+         str(bundle / "simplicio-macos-arm64")])
+'''
+LOCAL_INSTALL_CHECK = '''terminal = run([
+    sys.executable, str(ROOT / "scripts/release_install_smoke.py"),
+    "--version", version, "--terminal", "--json"], timeout=900)
+'''
+LOCAL_PYPI_UPLOAD = '''run([sys.executable, "-m", "twine", "upload", "--non-interactive", str(wheel)], timeout=900)
+'''
+LOCAL_POST_CHECKS = '''pypi = wait_for_pypi(version)
+package = run([sys.executable, str(ROOT / "scripts/release_install_smoke.py"),
+               "--version", version, "--pypi", "--json"], timeout=1200)
+remote = run([sys.executable, str(ROOT / "scripts/post_release_smoke.py"),
+              "--repo", PUBLIC_REPOSITORY, "--version", tag, "--execute", "--json"], timeout=1200)
+'''
+LOCAL_ENTRY_CONTRACTS = {
+    "publish": '''public_preflight(tag, version, require_clean=True)
+bundle_receipt = verify_bundle(bundle, tag, version, source_commit)
+changed = stage_bundle(bundle)
+changed.extend(stage_codex_hooks(bundle))
+changed.extend(update_public_metadata(tag, version, source_commit))
+changed.extend(prepare_package(version))
+''' + LOCAL_CHECKS + '''with tempfile.TemporaryDirectory(prefix="simplicio-public-wheel-") as raw:
+    wheel = build_wheel(Path(raw), version)
+    wheel_help_smoke(wheel)
+    public_commit = commit_public(changed, tag, source_commit)
+    create_public_release(tag, bundle)
+''' + indent(LOCAL_INSTALL_CHECK + LOCAL_PYPI_UPLOAD + LOCAL_POST_CHECKS, "    "),
+    "resume_publish": '''resume_state = resume_public_preflight(tag, version, source_commit)
+bundle_receipt = verify_bundle(bundle, tag, version, source_commit)
+verify_public_codex_hooks(bundle)
+''' + LOCAL_CHECKS + '''with tempfile.TemporaryDirectory(prefix="simplicio-public-resume-wheel-") as raw:
+    wheel = build_wheel(Path(raw), version)
+    wheel_help_smoke(wheel)
+''' + indent(LOCAL_INSTALL_CHECK + '''if not resume_state["already_published_to_pypi"]:
+''' + indent(LOCAL_PYPI_UPLOAD, "    ") + LOCAL_POST_CHECKS, "    "),
+    "required_release_assets": '''files = list(META_ASSETS)
+for asset in ASSETS:
+    files.extend((asset, asset + ".sig", asset + ".spdx.json", asset + ".provenance.json"))
+return files
+''',
+    "create_public_release": '''run([
+    "gh", "release", "create", tag,
+    *[str(bundle / name) for name in required_release_assets()],
+    "--repo", PUBLIC_REPOSITORY, "--verify-tag", "--title", "Simplicio Runtime " + tag,
+    "--notes", "Signed public Runtime release %s built and verified locally." % tag,
+], timeout=3600)
+''',
 }
-
-
-class UniqueKeyLoader(yaml.SafeLoader):
-    """Safe YAML loader that rejects ambiguous duplicate mapping keys."""
-
-
-def construct_unique_mapping(loader: UniqueKeyLoader, node: yaml.MappingNode, deep: bool = False) -> dict:
-    mapping = {}
-    for key_node, value_node in node.value:
-        key = loader.construct_object(key_node, deep=deep)
-        if key in mapping:
-            raise yaml.constructor.ConstructorError(None, None, f"duplicate YAML key: {key}", key_node.start_mark)
-        mapping[key] = loader.construct_object(value_node, deep=deep)
-    return mapping
-
-
-UniqueKeyLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, construct_unique_mapping)
 
 
 @dataclass(frozen=True)
@@ -104,130 +131,106 @@ def iter_install_reference_files(root: Path) -> Iterable[Path]:
         "INSTALL.md",
         "install.sh",
         "install.ps1",
-        ".github/workflows/release.yml",
         "pypi/simplicio/simplicio/__main__.py",
     )
     yield from (root / relative for relative in fixed)
     yield from sorted((root / "READMEs").glob("README*.md"))
 
 
-def release_workflow_errors(workflow: str) -> list[str]:
+def publisher_constant(document: ast.Module, name: str):
+    values = [
+        statement.value
+        for statement in document.body
+        if isinstance(statement, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == name for target in statement.targets)
+    ]
+    if len(values) != 1:
+        raise ValueError(f"local publisher must define {name} exactly once")
     try:
-        document = yaml.load(workflow, Loader=UniqueKeyLoader)
-    except yaml.YAMLError as exc:
-        return [f"release workflow YAML is invalid: {exc}"]
-    if not isinstance(document, dict):
-        return ["release workflow must be a YAML mapping"]
+        return ast.literal_eval(values[0])
+    except (ValueError, TypeError) as exc:
+        raise ValueError(f"local publisher {name} must be literal data") from exc
+
+
+def local_release_assets(root: Path) -> tuple[str, ...]:
+    path = root / LOCAL_PUBLISHER
+    if path.is_symlink() or not path.is_file():
+        raise ValueError(f"{LOCAL_PUBLISHER} must be a regular local file")
+    document = ast.parse(read_text(path))
+    assets = publisher_constant(document, "ASSETS")
+    if (
+        not isinstance(assets, tuple)
+        or not assets
+        or any(not isinstance(asset, str) or re.fullmatch(r"[A-Za-z0-9._-]+", asset) is None for asset in assets)
+        or len(set(assets)) != len(assets)
+    ):
+        raise ValueError("local publisher ASSETS must be unique safe filenames")
+    return assets
+
+
+def manual_release_errors(root: Path) -> list[str]:
     errors: list[str] = []
-    if set(document) != {"name", "on", "permissions", "jobs"}:
-        errors.append("release workflow has unexpected or missing top-level keys")
-    triggers = document.get("on")
-    if not isinstance(triggers, dict) or set(triggers) != {"workflow_dispatch"}:
-        errors.append("release workflow must have only workflow_dispatch trigger")
-        dispatch = {}
-    else:
-        dispatch = triggers.get("workflow_dispatch") or {}
-    inputs = dispatch.get("inputs") if isinstance(dispatch, dict) else None
-    base_input = inputs.get("artifact_base_url") if isinstance(inputs, dict) else None
-    if not isinstance(base_input, dict) or base_input.get("required") is not True or base_input.get("type") != "string":
-        errors.append("workflow_dispatch must require string input artifact_base_url")
-    if document.get("permissions") != {"contents": "read"}:
-        errors.append("workflow permissions must default to contents: read")
-    jobs = document.get("jobs")
-    if not isinstance(jobs, dict) or set(jobs) != {"release"}:
-        errors.append("release workflow must contain exactly one release job")
-        return errors
-    release = jobs.get("release")
-    if not isinstance(release, dict) or set(release) != {"permissions", "runs-on", "steps"}:
-        errors.append("release job has unexpected or missing keys")
-        return errors
-    if release.get("permissions") != {"contents": "write"}:
-        errors.append("only the release job may elevate contents: write")
-    if release.get("runs-on") != "windows-latest":
-        errors.append("release job must run on windows-latest")
-    steps = release.get("steps") if isinstance(release, dict) else None
-    expected_ids = (
-        "checkout",
-        "setup_python",
-        "install",
-        "state",
-        "provenance",
-        "download",
-        "verify_staged",
-        "metadata",
-        "publish",
-    )
-    if not isinstance(steps, list) or not all(isinstance(step, dict) for step in steps):
-        errors.append("jobs.release.steps must be a list of mappings")
-        return errors
-    actual_ids = tuple(step.get("id") for step in steps)
-    if actual_ids != expected_ids or len(set(actual_ids)) != len(actual_ids):
-        errors.append("release step IDs must match the exact ordered closed-world allowlist")
-        return errors
-    indexed = {step["id"]: step for step in steps}
-    expected_keys = {
-        "checkout": {"id", "uses", "with"},
-        "setup_python": {"id", "uses", "with"},
-        "install": {"id", "run"},
-        "state": {"id", "env", "run"},
-        "provenance": {"id", "env", "run"},
-        "download": {"id", "if", "env", "run"},
-        "verify_staged": {"id", "if", "run"},
-        "metadata": {"id", "if", "run"},
-        "publish": {"id", "if", "uses", "with"},
-    }
-    expected_uses = {
-        "checkout": "actions/checkout@v4",
-        "setup_python": "actions/setup-python@v5",
-        "publish": "softprops/action-gh-release@v2",
-    }
-    expected_runs = {
-        "install": "python -m pip install -r requirements-quality.txt",
-        "state": "python scripts/verify_release_provenance.py state",
-        "provenance": "python scripts/verify_release_provenance.py plan",
-        "download": "python scripts/verify_release_provenance.py download",
-        "verify_staged": "python scripts/verify_release_provenance.py verify-staged",
-        "metadata": "python scripts/verify_release_provenance.py metadata",
-    }
-    expected_env = {
-        "state": {"GITHUB_TOKEN": "${{ github.token }}"},
-        "provenance": {
-            "ARTIFACT_BASE_URL": "${{ inputs.artifact_base_url }}",
-            "TAG_EXISTS": "${{ steps.state.outputs.tag_exists }}",
-        },
-        "download": {"ARTIFACT_BASE_URL": "${{ inputs.artifact_base_url }}"},
-    }
-    for step_id in expected_ids:
-        step = indexed[step_id]
-        if set(step) != expected_keys[step_id]:
-            errors.append(f"{step_id} step has unexpected or missing keys")
-        if step_id in expected_uses and step.get("uses") != expected_uses[step_id]:
-            errors.append(f"{step_id} step uses an unapproved action")
-        if step_id in expected_runs and step.get("run") != expected_runs[step_id]:
-            errors.append(f"{step_id} step must equal its canonical single command")
-        if step_id in expected_env and step.get("env") != expected_env[step_id]:
-            errors.append(f"{step_id} step env must match the exact allowlist")
-    publish_condition = "steps.provenance.outputs.mode == 'publish'"
-    guarded_ids = ("download", "verify_staged", "metadata", "publish")
-    for step_id in guarded_ids:
-        if indexed[step_id].get("if") != publish_condition:
-            errors.append(f"{step_id} step must be guarded by publish mode")
-    if indexed["checkout"].get("with") != {"fetch-depth": 0}:
-        errors.append("checkout step inputs must match the exact allowlist")
-    if indexed["setup_python"].get("with") != {"python-version": "3.13"}:
-        errors.append("setup_python step inputs must match the exact allowlist")
-    publish = indexed["publish"]
-    publish_with = publish.get("with")
-    if not isinstance(publish_with, dict):
-        errors.append("publish step must define structured with inputs")
-    elif publish_with != CANONICAL_PUBLISH_WITH:
-        errors.append("publish with mapping must equal the complete canonical mapping")
+    workflow_root = root / ".github/workflows"
+    if workflow_root.exists():
+        workflows = sorted(path.relative_to(root).as_posix() for path in workflow_root.rglob("*") if path.is_file())
+        if workflows:
+            errors.append("public distribution must use local/manual publication, not workflow files: " + ", ".join(workflows))
+    try:
+        path = root / LOCAL_PUBLISHER
+        if path.is_symlink() or not path.is_file():
+            raise ValueError(f"{LOCAL_PUBLISHER} must be a regular local file")
+        document = ast.parse(read_text(path))
+        if publisher_constant(document, "PUBLIC_REPOSITORY") != PUBLIC_REPOSITORY:
+            errors.append("local publisher must target the public distribution repository")
+        if publisher_constant(document, "META_ASSETS") != ("SHA256SUMS", "simplicio-update-manifest.json"):
+            errors.append("local publisher must include checksums and the signed manifest")
+        local_release_assets(root)
+    except (OSError, UnicodeError, SyntaxError, ValueError) as exc:
+        return errors + [f"local publisher cannot be verified: {exc}"]
+
+    functions = [node for node in document.body if isinstance(node, ast.FunctionDef)]
+    names = [node.name for node in functions]
+    if len(names) != len(set(names)):
+        return errors + ["local publisher has duplicate function definitions"]
+    indexed = {node.name: node for node in functions}
+    for name, contract in LOCAL_ENTRY_CONTRACTS.items():
+        function = indexed.get(name)
+        if function is None:
+            errors.append(f"local publisher is missing {name}")
+            continue
+        body = function.body
+        if name in {"publish", "resume_publish"}:
+            # Receipt serialization is not an effect gate. The entire sequence
+            # before the final receipt must still equal the local contract.
+            if not body or not isinstance(body[-1], ast.Return):
+                errors.append(f"{name} must finish with a publication receipt")
+                continue
+            body = body[:-1]
+        expected = ast.parse(contract).body
+        if [ast.dump(node) for node in body] != [ast.dump(node) for node in expected]:
+            errors.append(f"{name} must match the ordered local verification/publication contract")
+
+    # No optional CI context, trigger, force-tag, or asset overwrite is an
+    # alternative to the local gates. Inspect arguments, not comments.
+    for node in ast.walk(document):
+        if not isinstance(node, ast.Call) or not node.args or not isinstance(node.args[0], ast.List):
+            continue
+        arguments = node.args[0].elts
+        literals = [item.value for item in arguments if isinstance(item, ast.Constant) and isinstance(item.value, str)]
+        if literals[:2] in (["gh", "workflow"], ["gh", "run"]):
+            errors.append("local publisher must not invoke remote workflows")
+        if literals[:3] in (["gh", "release", "upload"], ["gh", "release", "delete"]):
+            errors.append("local publisher must not overwrite or delete release assets")
+        if literals[:2] in (["git", "tag"], ["git", "push"]) and any(
+            flag in {"-f", "--force", "--force-with-lease", "--delete"} for flag in literals
+        ):
+            errors.append("local publisher must not move or delete published tags")
     return errors
 
 
 def check_target_triplet_consistency(root: Path, findings: list[Finding]) -> None:
     """Enforce that distribution/targets.json is the single source of truth
-    for asset naming across release.yml, the update manifest and both
+    for asset naming across the local publisher, the update manifest and both
     installers. This is the concrete regression guard for issue #5's
     "tabela canonica de target triplets" acceptance criterion.
     """
@@ -242,7 +245,6 @@ def check_target_triplet_consistency(root: Path, findings: list[Finding]) -> Non
         findings.append(Finding("ERROR", "distribution/targets.json has no targets defined."))
         return
 
-    release_yml = read_text(root / ".github/workflows/release.yml")
     install_ps1 = read_text(root / "install.ps1")
     install_sh = read_text(root / "install.sh")
     manifest = load_json(root / "simplicio-update-manifest.json")
@@ -250,20 +252,16 @@ def check_target_triplet_consistency(root: Path, findings: list[Finding]) -> Non
 
     offenders: list[str] = []
 
-    # Under the closed-world provenance release model, release.yml stages
-    # whatever verify_release_provenance.py verifies-and-downloads by
-    # publishing the whole dist/ directory (a generic glob), rather than
-    # hard-coding a `cp asset dist/asset` line per target triplet. So the
-    # per-asset name that matters lives in simplicio-update-manifest.json
-    # (checked per-target below), not in release.yml's text; here we only
-    # assert release.yml still publishes generically instead of silently
-    # reintroducing a target-specific allowlist that could drift from this
-    # table.
-    if "dist/*" not in release_yml:
-        offenders.append(
-            "release.yml no longer publishes the generic dist/* glob "
-            "(asset naming may have drifted from distribution/targets.json)"
-        )
+    try:
+        published_assets = set(local_release_assets(root))
+        if published_assets != {target["asset"] for target in targets}:
+            offenders.append("local publisher ASSETS differs from the canonical target table")
+    except (OSError, UnicodeError, SyntaxError, ValueError) as exc:
+        offenders.append(str(exc))
+
+    expected_targets = {target.get("manifest_target", target["id"]) for target in targets}
+    if set(manifest_by_target) != expected_targets or len(manifest_by_target) != len(manifest.get("artifacts", [])):
+        offenders.append("manifest must contain each canonical target exactly once")
 
     for t in targets:
         target_id = t["id"]
@@ -293,7 +291,7 @@ def check_target_triplet_consistency(root: Path, findings: list[Finding]) -> Non
         findings.append(
             Finding(
                 "OK",
-                "release.yml, installers and manifest all agree with "
+                "local publisher, installers and manifest all agree with "
                 f"distribution/targets.json ({len(targets)} targets).",
             )
         )
@@ -361,8 +359,10 @@ def run_audit(root: Path = ROOT, *, today: date | None = None) -> list[Finding]:
         findings.append(Finding("OK", "VERSION.md matches the release manifest."))
 
     artifacts = manifest.get("artifacts") or []
-    signature_required = bool(manifest.get("security", {}).get("signature_required"))
     manifest_errors: list[str] = []
+    security = manifest.get("security")
+    if not isinstance(security, dict) or security.get("signature_required") is not True:
+        manifest_errors.append("public release manifest must require Ed25519 signatures")
     for artifact in artifacts:
         name = str(artifact.get("artifact") or "")
         expected_url = (
@@ -373,7 +373,7 @@ def run_audit(root: Path = ROOT, *, today: date | None = None) -> list[Finding]:
             manifest_errors.append(f"manifest artifact URL is not version-bound: {name or 'missing-name'}")
         if not re.fullmatch(r"[0-9a-fA-F]{64}", str(artifact.get("sha256") or "")):
             manifest_errors.append(f"manifest artifact has invalid SHA256: {name or 'missing-name'}")
-        if signature_required and not str(artifact.get("signature") or "").startswith("ed25519:"):
+        if not str(artifact.get("signature") or "").startswith("ed25519:"):
             manifest_errors.append(f"manifest artifact lacks required Ed25519 signature: {name or 'missing-name'}")
     if not artifacts:
         manifest_errors.append("manifest contains no release artifacts")
@@ -399,11 +399,11 @@ def run_audit(root: Path = ROOT, *, today: date | None = None) -> list[Finding]:
     else:
         findings.append(Finding("OK", "wrapper/package versions match the release manifest."))
 
-    release_errors = release_workflow_errors(read_text(root / ".github/workflows/release.yml"))
+    release_errors = manual_release_errors(root)
     if release_errors:
-        findings.append(Finding("ERROR", "release workflow provenance is not fail-closed: " + ", ".join(release_errors)))
+        findings.append(Finding("ERROR", "local release contract is not fail-closed: " + ", ".join(release_errors)))
     else:
-        findings.append(Finding("OK", "structured manual release supports idempotent state or verified staging publish."))
+        findings.append(Finding("OK", "local/manual publisher preserves ordered verification and explicit immutable release assets (source contract only)."))
 
     ecosystem = read_text(root / "SIMPLICIO_ECOSYSTEM.md")
     ecosystem_match = ECOSYSTEM_VERSION_RE.search(ecosystem)

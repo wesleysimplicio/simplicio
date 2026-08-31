@@ -1,9 +1,9 @@
 """Shared fixtures for the `simplicio` distribution-repo unit test suite.
 
 These tests are fully isolated: every test builds its own throwaway repo
-tree under ``tmp_path`` (pytest's built-in fixture), so nothing here reads
-or writes real repository files, touches the network, or depends on wall
-clock time unless a test explicitly freezes it.
+tree under ``tmp_path`` (pytest's built-in fixture). The local publisher's
+source is copied as the code under test; fixtures never mutate repository
+files or touch the network and freeze time when needed.
 """
 from __future__ import annotations
 
@@ -19,6 +19,12 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 DEFAULT_VERSION = "3.5.2"
+ARTIFACTS = {
+    "macos-arm64": "simplicio-macos-arm64",
+    "macos-x64": "simplicio-macos-x64",
+    "linux-x64": "simplicio-linux-x64",
+    "windows-x64": "simplicio-windows-x64.exe",
+}
 
 
 def _write(path: Path, content: str) -> None:
@@ -62,13 +68,14 @@ class RepoBuilder:
                 "entitlement": {"beta_until": "2099-01-01"},
                 "artifacts": [
                     {
-                        "target": "macos-arm64",
-                        "artifact": "simplicio-macos-arm64",
-                        "url": artifact_url,
+                        "target": target,
+                        "artifact": asset,
+                        "url": f"https://github.com/wesleysimplicio/simplicio/releases/download/v{v}/{asset}",
                         "sha256": artifact_sha,
                         "signature": "ed25519:fixture",
                         "signed": True,
                     }
+                    for target, asset in ARTIFACTS.items()
                 ],
             },
         )
@@ -81,75 +88,7 @@ class RepoBuilder:
         _write(root / "INSTALL.md", install_body)
         _write(root / "install.sh", install_body)
         _write(root / "install.ps1", install_body.replace("install.sh", "install.ps1"))
-        _write(
-            root / ".github/workflows/release.yml",
-            '''name: publish-release
-"on":
-  workflow_dispatch:
-    inputs:
-      artifact_base_url:
-        description: Immutable HTTPS staging base containing the versioned artifacts
-        required: true
-        type: string
-permissions:
-  contents: read
-jobs:
-  release:
-    permissions:
-      contents: write
-    runs-on: windows-latest
-    steps:
-      - id: checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - id: setup_python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - id: install
-        run: python -m pip install -r requirements-quality.txt
-      - id: state
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: python scripts/verify_release_provenance.py state
-      - id: provenance
-        env:
-          ARTIFACT_BASE_URL: ${{ inputs.artifact_base_url }}
-          TAG_EXISTS: ${{ steps.state.outputs.tag_exists }}
-        run: python scripts/verify_release_provenance.py plan
-      - id: download
-        if: steps.provenance.outputs.mode == 'publish'
-        env:
-          ARTIFACT_BASE_URL: ${{ inputs.artifact_base_url }}
-        run: python scripts/verify_release_provenance.py download
-      - id: verify_staged
-        if: steps.provenance.outputs.mode == 'publish'
-        run: python scripts/verify_release_provenance.py verify-staged
-      - id: metadata
-        if: steps.provenance.outputs.mode == 'publish'
-        run: python scripts/verify_release_provenance.py metadata
-      - id: publish
-        if: steps.provenance.outputs.mode == 'publish'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.state.outputs.version }}
-          target_commitish: ${{ github.sha }}
-          name: "v${{ steps.state.outputs.version }} — Public Beta"
-          body: |
-            Free public beta. All features remain unlocked during the public-beta phase.
-
-            Windows: `irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex`
-            macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.sh | sh`
-
-            Checksum-verified update manifest included (`simplicio update check`).
-          prerelease: false
-          make_latest: "true"
-          fail_on_unmatched_files: true
-          overwrite_files: false
-          files: dist/*
-''',
-        )
+        _write(root / "scripts/publish_release_local.py", (SCRIPTS_DIR / "publish_release_local.py").read_text(encoding="utf-8"))
         _write(root / "pypi/simplicio/simplicio/__main__.py", "# entrypoint\n")
         (root / "READMEs").mkdir(parents=True, exist_ok=True)
 
@@ -158,13 +97,12 @@ jobs:
             {
                 "targets": [
                     {
-                        "id": "macos-arm64",
-                        "os": "macos",
-                        "arch": "arm64",
-                        "asset": "simplicio-macos-arm64",
+                        "id": target,
+                        "asset": asset,
                         "installer": None,
-                        "manifest_target": "macos-arm64",
+                        "manifest_target": target,
                     }
+                    for target, asset in ARTIFACTS.items()
                 ]
             },
         )
