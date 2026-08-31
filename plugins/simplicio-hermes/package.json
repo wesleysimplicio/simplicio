@@ -1,11 +1,15 @@
 {
   "name": "simplicio-hermes",
-  "version": "0.1.0",
-  "description": "Native Hermes middleware adapter for deterministic Simplicio Runtime preparation and receipts.",
+  "version": "0.3.0",
+  "description": "Authenticated Mapper-only context and provider cache telemetry for Hermes.",
   "type": "module",
   "main": "./index.mjs",
   "exports": "./index.mjs",
-  "engines": { "node": ">=18" },
-  "scripts": { "test": "node --test ./test.mjs" },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test ./test.mjs"
+  },
   "license": "MIT"
 }

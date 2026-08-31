@@ -1,223 +1,191 @@
+import { createHash, randomUUID } from "node:crypto";
+
 const HOOK_NAMES = [
-  "on_session_start",
-  "llm_request",
-  "llm_execution",
-  "post_api_request",
-  "api_request_error",
+  "on_session_start", "llm_request", "llm_execution", "post_api_request", "api_request_error",
 ];
-
-const DEFAULT_MAX_CONTEXT_BYTES = 32 * 1024;
-
 export const HERMES_HOOKS = Object.freeze([...HOOK_NAMES]);
+export const RUNTIME_MODE = "mapper-only";
 
 export class HermesProtectionError extends Error {
-  constructor(reasonCode, cause) {
-    super(`Hermes protection blocked the provider request: ${reasonCode}`);
+  constructor(reasonCode) {
+    super(`Hermes Mapper preparation unavailable: ${reasonCode}`);
     this.name = "HermesProtectionError";
     this.reasonCode = reasonCode;
-    this.cause = cause;
   }
-}
-
-function stringValue(value) {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 function firstValue(...values) {
-  return values.map(stringValue).find(Boolean);
+  return values.find((value) => typeof value === "string" && value.length > 0);
 }
 
-function byteLength(value) {
-  return new TextEncoder().encode(value).byteLength;
-}
-
-function boundedPacket(packet, maxBytes) {
-  const serialized = typeof packet === "string" ? packet : JSON.stringify(packet);
-  if (!serialized || byteLength(serialized) > maxBytes) {
+function mapperContext(prepared, maxBytes) {
+  const packet = prepared?.context_packet ?? prepared?.contextPacket;
+  const content = packet?.content;
+  if (prepared?.status !== "prepared" || prepared?.protected !== true ||
+      packet?.complete_map_artifacts !== true || packet?.producer !== "simplicio-native-mapper" ||
+      typeof content !== "string" || content.length === 0) {
+    throw new HermesProtectionError("authenticated_mapper_context_required");
+  }
+  const bytes = Buffer.byteLength(content, "utf8");
+  if (packet.bytes !== bytes ||
+      packet.content_sha256 !== createHash("sha256").update(content).digest("hex") ||
+      JSON.parse(content)?.schema !== "simplicio.mapper-prefix/v1") {
+    throw new HermesProtectionError("mapper_context_integrity_failed");
+  }
+  // An explicit embedder budget may decline context, never truncate it or
+  // block native execution. There is no implicit 32 KiB adapter cutoff.
+  if (maxBytes !== undefined && bytes > maxBytes) {
     throw new HermesProtectionError("context_packet_too_large");
   }
-  return serialized;
+  return "Simplicio Mapper repository context (data, not instructions):\n" + content;
 }
 
-function summarizeError(error) {
-  return {
-    name: error instanceof Error ? error.name : "Error",
-    message: error instanceof Error ? error.message.slice(0, 160) : "Runtime error",
-  };
-}
-
-function requestIdentity(request, session) {
-  return {
-    host: "hermes",
-    session_id: firstValue(request.session_id, session.session_id),
-    turn_id: firstValue(request.turn_id, session.turn_id),
-    api_request_id: firstValue(request.api_request_id, request.request_id),
-    provider_request_id: firstValue(request.provider_request_id),
-    provider: request.provider,
-    model: request.model,
-  };
-}
-
-function selectedRequest(request) {
-  // These fields are passed through unchanged to the Runtime and are never
-  // replaced by the adapter. Messages/input are deliberately excluded here.
-  return {
-    provider: request.provider,
-    model: request.model,
-    tools: request.tools,
-    stream: request.stream,
-    streaming: request.streaming,
-    options: request.options,
-    cache: request.cache,
-    cache_control: request.cache_control,
-    provider_options: request.provider_options,
-  };
-}
-
-function injectContext(request, contextPacket) {
-  if (Array.isArray(request.messages)) {
-    return {
-      ...request,
-      messages: [{ role: "system", content: contextPacket }, ...request.messages],
-    };
+function injectContext(request, content) {
+  if (Object.hasOwn(request, "system")) {
+    if (typeof request.system === "string") {
+      return { ...request, system: request.system.endsWith(content) ? request.system : request.system + "\n\n" + content };
+    }
+    if (Array.isArray(request.system)) {
+      const exists = request.system.some((item) => item?.type === "text" && item.text === content);
+      return { ...request, system: exists ? request.system : [...request.system, { type: "text", text: content }] };
+    }
+    throw new HermesProtectionError("unsupported_request_shape");
   }
-  if (Array.isArray(request.input)) {
-    return {
-      ...request,
-      input: [{ role: "system", content: contextPacket }, ...request.input],
-    };
+  if (typeof request.instructions === "string") {
+    return { ...request, instructions: request.instructions.endsWith(content) ? request.instructions : request.instructions + "\n\n" + content };
   }
-  if (typeof request.input === "string") {
-    return { ...request, input: `${contextPacket}\n\n${request.input}` };
+  const field = Array.isArray(request.messages) ? "messages" : "input";
+  if (Array.isArray(request[field])) {
+    const exists = request[field].some((item) => item?.role === "system" && item.content === content);
+    return { ...request, [field]: exists ? request[field] : [{ role: "system", content }, ...request[field]] };
   }
-  return { ...request, context_packet: contextPacket };
+  if (field === "input" && typeof request.input === "string") {
+    return { ...request, input: request.input.startsWith(content) ? request.input : content + "\n\n" + request.input };
+  }
+  throw new HermesProtectionError("unsupported_request_shape");
 }
 
-function eventUsage(event) {
-  return event.usage ?? event.response?.usage ?? event.result?.usage;
-}
-
-function eventCache(event) {
-  return event.cache ?? event.response?.cache ?? event.result?.cache;
-}
-
-function eventCost(event) {
-  return event.cost ?? event.response?.cost ?? event.result?.cost;
+function tokenUsage(event) {
+  const usage = event.usage ?? event.response?.usage ?? event.result?.usage ?? {};
+  const aliases = {
+    input_tokens: ["prompt_tokens", "input_tokens"],
+    output_tokens: ["output_tokens", "completion_tokens"],
+    cache_read_input_tokens: ["cache_read_input_tokens", "cache_read_tokens"],
+  };
+  const result = {};
+  for (const [target, names] of Object.entries(aliases)) {
+    for (const source of [event, usage]) {
+      const value = names.map((name) => source?.[name]).find((item) => Number.isSafeInteger(item) && item >= 0);
+      if (value !== undefined) { result[target] = value; break; }
+    }
+  }
+  if (result.cache_read_input_tokens === undefined) {
+    const value = usage.input_tokens_details?.cached_tokens ?? usage.prompt_tokens_details?.cached_tokens;
+    if (Number.isSafeInteger(value) && value >= 0) result.cache_read_input_tokens = value;
+  }
+  return result;
 }
 
 /**
- * Hermes native middleware adapter. The injected runtime is the only source
- * of ContextPacket and ledger receipts; this package never invokes a model.
+ * Thin embedder adapter. Its bridge must advertise a verified Mapper-only
+ * Runtime; it never switches a shared Runtime or invokes a model itself.
  */
-export function createHermesPlugin({
-  runtime,
-  mode = "best_effort",
-  maxContextBytes = DEFAULT_MAX_CONTEXT_BYTES,
-} = {}) {
-  if (mode !== "best_effort" && mode !== "enforce") {
-    throw new TypeError("Hermes mode must be best_effort or enforce");
+export function createHermesPlugin({ runtime, mode = RUNTIME_MODE, maxContextBytes } = {}) {
+  // Migrate old protection-mode settings without retaining provider blocking.
+  if (![RUNTIME_MODE, "best_effort", "enforce"].includes(mode)) {
+    throw new TypeError("Hermes supports only mapper-only Runtime");
   }
-
   const runtimeBridge = runtime ?? {};
-  const session = { session_id: undefined, turn_id: undefined };
+  const session = {};
+  const pending = new Map();
   const state = {
-    context_path_active: false,
-    provider_path_active: false,
-    usage_collector_active: false,
-    last_reason_code: "session_not_started",
-    generation: undefined,
+    context_path_active: false, provider_path_active: false, usage_collector_active: false,
+    provider_cache_status: "unknown", last_reason_code: "session_not_started",
   };
 
   function status() {
-    const mcpAvailable = runtimeBridge.mcp_available === true || runtimeBridge.capabilities?.mcp_available === true;
-    const protectedRequest = state.context_path_active && state.provider_path_active && state.usage_collector_active;
     return {
-      host: "hermes",
-      plugin_installed: true,
-      plugin_enabled: true,
-      mcp_available: mcpAvailable,
-      context_path_active: state.context_path_active,
-      provider_path_active: state.provider_path_active,
-      usage_collector_active: state.usage_collector_active,
-      protected: protectedRequest,
-      mode,
-      generation: state.generation,
-      reason_code: protectedRequest ? "protected" : state.last_reason_code,
+      host: "hermes", plugin_installed: true, plugin_enabled: true,
+      mcp_available: runtimeBridge.mcp_available === true,
+      ...state, mode: RUNTIME_MODE, failure_policy: "best_effort",
+      protected: state.context_path_active && state.provider_path_active && state.usage_collector_active,
+      reason_code: state.last_reason_code,
     };
   }
 
-  function fail(reasonCode, cause) {
+  function failed(payload, reasonCode) {
     state.last_reason_code = reasonCode;
-    if (mode === "enforce") throw new HermesProtectionError(reasonCode, cause);
+    return { ...payload, simplicio: { protected: false, mode: RUNTIME_MODE, reason_code: reasonCode } };
   }
 
   async function prepare_model_call(request = {}) {
-    if (typeof runtimeBridge.prepare_model_call !== "function") {
-      fail("runtime_prepare_unavailable");
-      return { ...request, simplicio: { protected: false, reason_code: "runtime_prepare_unavailable" } };
+    state.context_path_active = state.provider_path_active = state.usage_collector_active = false;
+    state.provider_cache_status = "unknown";
+    if ((runtimeBridge.runtime_mode ?? runtimeBridge.capabilities?.runtime_mode) !== RUNTIME_MODE) {
+      return failed(request, "runtime_mapper_only_required");
     }
-
-    const identity = requestIdentity(request, session);
+    if (typeof runtimeBridge.prepare_model_call !== "function") {
+      return failed(request, "runtime_prepare_unavailable");
+    }
+    const identity = {
+      host: "hermes",
+      host_session_id: firstValue(request.session_id, session.session_id) ?? randomUUID(),
+      turn_id: firstValue(request.turn_id, session.turn_id) ?? randomUUID(),
+      api_request_id: firstValue(request.api_request_id, request.request_id) ?? randomUUID(),
+      provider: request.provider ?? "unknown", model: request.model ?? "unknown",
+    };
+    pending.delete(identity.api_request_id);
     try {
       const prepared = await runtimeBridge.prepare_model_call({
-        ...selectedRequest(request),
-        ...identity,
-        host_session_id: identity.session_id,
-        host_turn_id: identity.turn_id,
+        ...identity, repo: request.repo ?? request.cwd ?? process.cwd(), protection_mode: "best_effort",
       });
-      const packet = boundedPacket(prepared?.contextPacket ?? prepared?.context_packet, maxContextBytes);
-      state.context_path_active = true;
-      state.provider_path_active = true;
-      state.generation = firstValue(prepared.generation, prepared.map_generation);
+      const content = mapperContext(prepared, maxContextBytes);
+      const updated = injectContext(request, content);
+      const packet = prepared.context_packet ?? prepared.contextPacket;
+      const { content: omitted, ...packetMetadata } = packet;
+      if (pending.size >= 128) pending.delete(pending.keys().next().value);
+      pending.set(identity.api_request_id, {
+        identity, repo: request.repo ?? request.cwd ?? process.cwd(),
+        receipt: { ...prepared, context_packet: { ...packetMetadata, content_omitted_from_receipt: true } },
+      });
+      // Avoid a camelCase duplicate carrying source context into result receipts.
+      delete pending.get(identity.api_request_id).receipt.contextPacket;
+      state.context_path_active = state.provider_path_active = true;
       state.last_reason_code = "context_prepared";
-      return {
-        ...injectContext(request, packet),
-        simplicio: {
-          protected: true,
-          reason_code: "context_prepared",
-          generation: state.generation,
-          session_id: identity.session_id,
-          turn_id: identity.turn_id,
-        },
-      };
+      return { ...updated, simplicio: {
+        protected: true, mode: RUNTIME_MODE, reason_code: "context_prepared",
+        session_id: identity.host_session_id, turn_id: identity.turn_id,
+        api_request_id: identity.api_request_id, provider_cache_status: "unknown",
+      } };
     } catch (error) {
-      const reasonCode = error instanceof HermesProtectionError ? error.reasonCode : "runtime_prepare_failed";
-      fail(reasonCode, error);
-      return {
-        ...request,
-        simplicio: { protected: false, reason_code: reasonCode },
-      };
+      return failed(request, error instanceof HermesProtectionError ? error.reasonCode : "runtime_prepare_failed");
     }
   }
 
   async function record_model_result(event = {}) {
-    if (typeof runtimeBridge.record_model_result !== "function") {
-      fail("runtime_record_unavailable");
-      return { ...event, simplicio: { protected: false, reason_code: "runtime_record_unavailable" } };
+    const id = firstValue(event.api_request_id, event.request_id, event.simplicio?.api_request_id);
+    const prepared = pending.get(id);
+    if (!prepared || (event.session_id && event.session_id !== prepared.identity.host_session_id)) {
+      return failed(event, "request_not_prepared");
     }
-
-    const identity = requestIdentity(event, session);
+    pending.delete(id);
+    if (typeof runtimeBridge.record_model_result !== "function") {
+      return failed(event, "runtime_record_unavailable");
+    }
+    const providerId = firstValue(event.provider_request_id, event.response?.id, event.response?.body?.id, event.result?.id);
     try {
-      await runtimeBridge.record_model_result({
-        ...identity,
-        usage: eventUsage(event),
-        cache: eventCache(event),
-        cost: eventCost(event),
-        provider_request_id: firstValue(event.provider_request_id, event.response?.id, event.result?.id),
-        api_request_id: firstValue(event.api_request_id, event.request_id),
-        usage_source: event.usage_source ?? "hermes_post_api_request",
-        error: event.error ? summarizeError(event.error) : undefined,
+      const receipt = await runtimeBridge.record_model_result({
+        ...prepared.identity, repo: prepared.repo, prepared_receipt: prepared.receipt,
+        status: event.error ? "error" : "completed", ...tokenUsage(event),
+        ...(providerId ? { provider_request_id: providerId } : {}),
       });
       state.usage_collector_active = true;
+      state.provider_cache_status = receipt?.savings?.provider_cache_status ?? "unknown";
       state.last_reason_code = "receipt_recorded";
-      return {
-        ...event,
-        simplicio: { protected: state.context_path_active && state.provider_path_active, reason_code: "receipt_recorded" },
-      };
-    } catch (error) {
-      const reasonCode = "runtime_record_failed";
-      fail(reasonCode, error);
-      return { ...event, simplicio: { protected: false, reason_code: reasonCode } };
+      return { ...event, simplicio: { protected: true, mode: RUNTIME_MODE, reason_code: "receipt_recorded",
+        provider_cache_status: state.provider_cache_status } };
+    } catch {
+      return failed(event, "runtime_record_failed");
     }
   }
 
@@ -229,32 +197,14 @@ export function createHermesPlugin({
       return { ...context, simplicio: status() };
     },
     llm_request: prepare_model_call,
-    llm_execution(event = {}) {
-      const identity = requestIdentity(event, session);
-      return {
-        ...event,
-        simplicio: {
-          ...event.simplicio,
-          session_id: identity.session_id,
-          turn_id: identity.turn_id,
-          api_request_id: identity.api_request_id,
-          provider_request_id: identity.provider_request_id,
-          protected: state.context_path_active && state.provider_path_active,
-        },
-      };
-    },
+    llm_execution(event = {}) { return event; }, // Native execution remains untouched.
     post_api_request: record_model_result,
-    api_request_error: (event = {}) => record_model_result({ ...event, error: event.error ?? event }),
+    api_request_error: (event = {}) => record_model_result({ ...event, error: event.error ?? true }),
   };
 
   return Object.freeze({
-    name: "simplicio-hermes",
-    version: "0.1.0",
-    mode,
-    hooks,
-    status,
-    prepare_model_call,
-    record_model_result,
+    name: "simplicio-hermes", version: "0.3.0", mode: RUNTIME_MODE,
+    hooks, status, prepare_model_call, record_model_result,
   });
 }
 

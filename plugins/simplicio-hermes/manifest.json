@@ -1,6 +1,6 @@
 {
   "name": "simplicio-hermes",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "host": "hermes",
   "entry": "./index.mjs",
   "hooks": [
@@ -10,9 +10,14 @@
     "post_api_request",
     "api_request_error"
   ],
-  "modes": ["best_effort", "enforce"],
+  "modes": [
+    "mapper-only"
+  ],
   "runtime": {
     "prepare": "prepare_model_call",
-    "record": "record_model_result"
-  }
+    "record": "record_model_result",
+    "mode": "mapper-only",
+    "login_required": true
+  },
+  "failure_policy": "best_effort"
 }
