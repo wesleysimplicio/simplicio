@@ -40,15 +40,33 @@ the signed SHA256/Ed25519 Runtime release, and installs the platform binary.
 If the Python script directory is not already on `PATH`, add it before running
 `simplicio install`.
 
-After the Runtime registers MCP/hooks for every detected client, both direct
-installers reconcile every compatible host package. Claude Code, GitHub Copilot
-CLI, and Qwen Code receive all published marketplace plugins (`simplicio`, Loop,
-Prompt, Sprint, and Hermes). Codex and Gemini receive their native package,
-Cursor and Kiro receive the portable Agent Plugin, and Hermes receives the
-enabled native Python plugin with `pre_llm_call` and `post_llm_call` hooks.
-Hosts without a package API remain on the verified Runtime MCP integration. Set
-`SIMPLICIO_INSTALL_HOST_PLUGINS=0` only in managed/bootstrap environments that
-already installed the packages.
+The direct installers install the verified Runtime, register MCP/hooks and then
+stop before changing any host plugin. They capability-check
+`simplicio host-plugins --help`: the structured receipt records
+`host_plugins.state=pending_consent` only when that Runtime command is available,
+and otherwise records `host_plugins.state=unavailable` with no apply command.
+Availability requires the versioned `simplicio.host-plugins/cli-v1` marker and
+the essential plan/apply/pending/reconcile commands; exit code zero, empty output
+or unrelated Runtime help never enables host-plugin installation.
+Review the separate host-plugin plan with
+`simplicio host-plugins plan --all`; only the Runtime may apply or reconcile
+that plan after explicit user consent. The installers never invoke Codex, Claude,
+Gemini, Copilot, Qwen, Hermes, Cursor or Kiro plugin commands, and never fetch a
+mutable source-branch archive for plugin installation.
+
+The durable receipt is written atomically to
+`~/.simplicio/install-receipt.json` (or the configured
+`SIMPLICIO_BUNDLE_DIR`). An exit code `1` after a possible effect records
+`status=partial`, the exact stage, failure code and failure reason so the next
+run can diagnose the original cause instead of collapsing it into a generic
+installer error. For Runtime commands, the installers prefer the structured
+JSON `failure.code`/`failure.reason` (with `code`, `message` and `error`
+fallbacks); non-JSON output is retained only as a bounded diagnostic.
+
+Binary rollback covers download verification and the atomic Runtime activation.
+Once the verified binary is activated, that rollback transaction is closed;
+later MCP, hook, report or receipt failures are recorded as `status=partial`
+with their concrete cause and do not claim a full installation rollback.
 
 Known installer incidents and regression sentinels are tracked in
 [docs/INSTALL_ERROR_REGISTRY.md](docs/INSTALL_ERROR_REGISTRY.md).
