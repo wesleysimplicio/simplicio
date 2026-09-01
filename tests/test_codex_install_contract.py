@@ -38,18 +38,22 @@ def test_installers_configure_direct_stdio_and_hooks():
         assert "--binary" in text
         assert "--json" in text
 
-def test_plain_install_registers_all_detected_hosts_without_codex_opt_in():
+def test_plain_install_registers_hosts_and_installs_codex_plugin_when_available():
     shell = (ROOT / "install.sh").read_text(encoding="utf-8")
     powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
 
-    assert "SIMPLICIO_INSTALL_CODEX" not in shell
+    assert "SIMPLICIO_SKIP_CODEX_PLUGIN" in shell
     assert "SIMPLICIO_CODEX_HOOK_REF" not in shell
-    assert "if require_active_login; then" not in shell
+    assert "command -v codex" in shell
+    assert 'plugin marketplace add "$CODEX_PLUGIN_SOURCE"' in shell
+    assert 'plugin add "simplicio@$CODEX_PLUGIN_MARKETPLACE"' in shell
     assert 'mcp register --binary "$binary_path" --json' in shell
 
-    assert "SIMPLICIO_INSTALL_CODEX" not in powershell
+    assert "SIMPLICIO_SKIP_CODEX_PLUGIN" in powershell
     assert "SIMPLICIO_CODEX_HOOK_REF" not in powershell
-    assert "if (Require-ActiveLogin)" not in powershell
+    assert "Get-Command codex" in powershell
+    assert "plugin marketplace add $CodexPluginSource" in powershell
+    assert 'plugin add "simplicio@$CodexPluginMarketplace"' in powershell
     assert "mcp register --binary $BinaryPath --json" in powershell
 
 

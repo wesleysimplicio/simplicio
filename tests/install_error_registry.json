@@ -100,7 +100,7 @@
       "root_cause": "The public installers required an opt-in environment variable and downloaded a second hook artifact.",
       "guard": "Every installer delegates automatic host and Runtime-owned hook registration to `simplicio mcp register --binary <installed> --json`; no Codex opt-in remains.",
       "regression_tests": [
-        "tests/test_codex_integration_cli.py::test_installers_are_opt_in_and_do_not_use_mutable_master_hook_ref"
+        "tests/test_codex_integration_cli.py::test_installers_auto_install_codex_plugin_when_cli_is_present"
       ],
       "fixed_commit": "7abc0f0428d65718cda709b57c51bcabb28b92ae"
     },
@@ -315,7 +315,7 @@
       "root_cause": "Host registration was split across installer-specific paths instead of the installed Runtime.",
       "guard": "SH, PS1, and PyPI all invoke the installed Runtime registrar and fail clearly when its JSON status is not passed.",
       "regression_tests": [
-        "tests/test_codex_install_contract.py::test_plain_install_registers_all_detected_hosts_without_codex_opt_in",
+        "tests/test_codex_install_contract.py::test_plain_install_registers_hosts_and_installs_codex_plugin_when_available",
         "tests/unit/test_pypi_installer.py::test_install_registers_detected_hosts_with_installed_binary"
       ],
       "fixed_commit": "7abc0f0428d65718cda709b57c51bcabb28b92ae"

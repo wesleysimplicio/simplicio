@@ -32,6 +32,11 @@ test("installer policy is pinned to immutable content", () => {
   assert.match(bootstrap.POLICY.installers.posix.sha256, /^[0-9a-f]{64}$/);
   assert.match(bootstrap.POLICY.installers.win32.sha256, /^[0-9a-f]{64}$/);
 });
+test("official installer bootstrap skips recursive Codex plugin installation", () => {
+  const source = fs.readFileSync(bootstrapPath, "utf8");
+  assert.match(source, /SIMPLICIO_SKIP_CODEX_PLUGIN: "1"/);
+  assert.doesNotMatch(source, /SIMPLICIO_INSTALL_CODEX/);
+});
 
 test("installer download follows redirects and fails closed on HTTP errors", async () => {
   await assert.rejects(

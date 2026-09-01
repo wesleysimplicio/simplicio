@@ -215,6 +215,10 @@ Use `simplicio deliver certify` before declaring done.
 ### OpenAI Codex / ChatGPT
 
 Same workflow — Simplicio commands work from any terminal-based AI agent.
+The shell and PowerShell installers detect the `codex` CLI and install or
+update the Simplicio Codex plugin automatically. When Codex is absent, the
+installer leaves the plugin step untouched; set `SIMPLICIO_SKIP_CODEX_PLUGIN=1`
+only to opt out explicitly.
 
 ## Fontes Python no Runtime
 

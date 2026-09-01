@@ -250,7 +250,7 @@ function runOfficialInstaller(installerPath, home, logPath) {
     USERPROFILE: isolatedHome,
     SIMPLICIO_BIN_DIR: managedBinDir,
     SIMPLICIO_BUNDLE_DIR: path.join(isolatedHome, ".simplicio"),
-    SIMPLICIO_INSTALL_CODEX: "0",
+    SIMPLICIO_SKIP_CODEX_PLUGIN: "1",
     SIMPLICIO_VERSION: POLICY.runtimeVersion
   };
   delete env.SIMPLICIO_ALLOW_UNVERIFIED;

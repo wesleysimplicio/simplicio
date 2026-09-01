@@ -19,6 +19,7 @@
 #   SIMPLICIO_ALLOW_UNVERIFIED  - "1" to proceed even if no checksum is
 #                                 published for this target (default: refuse)
 #   SIMPLICIO_BUNDLE_DIR       - bundle report directory (default: ~/.simplicio)
+#   SIMPLICIO_SKIP_CODEX_PLUGIN - "1" to skip automatic Codex plugin installation
 #
 # Asset naming follows distribution/targets.json (the canonical target
 # triplet table for the whole ecosystem): id "macos-arm64" -> asset
@@ -222,6 +223,39 @@ verify_mcp_tools() {
   binary_path="$1"
   [ -x "$binary_path" ] || return 1
   SIMPLICIO_MCP_URL="$SIMPLICIO_MCP_URL" "$binary_path" mcp register --binary "$binary_path" --json >/dev/null 2>&1
+}
+
+CODEX_PLUGIN_MARKETPLACE="${SIMPLICIO_CODEX_MARKETPLACE:-simplicio-codex}"
+CODEX_PLUGIN_SOURCE="${SIMPLICIO_CODEX_PLUGIN_SOURCE:-wesleysimplicio/simplicio}"
+CODEX_PLUGIN_REF="${SIMPLICIO_CODEX_PLUGIN_REF:-master}"
+
+install_codex_plugin() {
+  if [ "${SIMPLICIO_SKIP_CODEX_PLUGIN:-}" = "1" ]; then
+    return 0
+  fi
+  if ! command -v codex >/dev/null 2>&1; then
+    info "Codex não detectado; plugin Simplicio não será instalado"
+    return 0
+  fi
+
+  info "Codex detectado; instalando o plugin Simplicio..."
+  if ! codex plugin marketplace add "$CODEX_PLUGIN_SOURCE" --ref "$CODEX_PLUGIN_REF" --json >/dev/null 2>&1; then
+    warn "não foi possível atualizar o marketplace Codex; tentando o marketplace já configurado"
+  fi
+
+  if codex plugin add "simplicio@$CODEX_PLUGIN_MARKETPLACE" --json >/dev/null 2>&1; then
+    ok "plugin Simplicio instalado no Codex"
+    return 0
+  fi
+
+  if [ "$CODEX_PLUGIN_MARKETPLACE" != "simplicio" ] && codex plugin add "simplicio@simplicio" --json >/dev/null 2>&1; then
+    ok "plugin Simplicio instalado no Codex (marketplace já configurado)"
+    return 0
+  fi
+
+  warn "Codex detectado, mas o plugin Simplicio não pôde ser instalado automaticamente"
+  warn "instale manualmente: codex plugin marketplace add $CODEX_PLUGIN_SOURCE --ref $CODEX_PLUGIN_REF && codex plugin add simplicio@$CODEX_PLUGIN_MARKETPLACE"
+  return 0
 }
 
 # ─── --doctor: idempotent, read-only health check ──────────────────────────
@@ -531,6 +565,7 @@ if verify_mcp_tools "$DEST_PATH"; then
 else
   err "o Runtime foi instalado, mas o registro automático de MCP/hooks falhou: $DEST_PATH mcp register --binary $DEST_PATH --json"
 fi
+install_codex_plugin
 report_login_state
 ok "MCP direto: $DEST_PATH serve --mcp --stdio; SIMPLICIO_MCP_URL=${SIMPLICIO_MCP_URL}"
 

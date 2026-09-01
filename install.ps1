@@ -16,6 +16,7 @@
 #   SIMPLICIO_ALLOW_UNVERIFIED  - "1" to proceed even if no checksum is
 #                                 published for this target (default: refuse)
 #   SIMPLICIO_BUNDLE_DIR       - Runtime report directory (default: ~/.simplicio)
+#   SIMPLICIO_SKIP_CODEX_PLUGIN - "1" to skip automatic Codex plugin installation
 #
 # Asset naming follows distribution/targets.json (the canonical target
 # triplet table for the whole ecosystem) — target "windows-x64", asset
@@ -44,6 +45,9 @@ $PinnedPublicKey = ([string]$Ed25519PublicKey).Trim()
 $script:Ed25519VerifyError = ""
 $SimplicioMcpUrl = if ($env:SIMPLICIO_MCP_URL) { $env:SIMPLICIO_MCP_URL } else { "http://127.0.0.1:8787/mcp" }
 
+$CodexPluginMarketplace = if ($env:SIMPLICIO_CODEX_MARKETPLACE) { $env:SIMPLICIO_CODEX_MARKETPLACE } else { "simplicio-codex" }
+$CodexPluginSource = if ($env:SIMPLICIO_CODEX_PLUGIN_SOURCE) { $env:SIMPLICIO_CODEX_PLUGIN_SOURCE } else { "wesleysimplicio/simplicio" }
+$CodexPluginRef = if ($env:SIMPLICIO_CODEX_PLUGIN_REF) { $env:SIMPLICIO_CODEX_PLUGIN_REF } else { "master" }
 if ($env:SIMPLICIO_BIN_DIR) {
   $InstallDir = $env:SIMPLICIO_BIN_DIR
 } else {
@@ -197,6 +201,37 @@ function Test-McpToolSurface([string]$BinaryPath) {
   }
 }
 
+function Install-CodexPlugin {
+  if ($env:SIMPLICIO_SKIP_CODEX_PLUGIN -eq "1") { return }
+  $codex = Get-Command codex -ErrorAction SilentlyContinue
+  if ($null -eq $codex) {
+    Write-Host "  - Codex not detected; Simplicio plugin was not installed"
+    return
+  }
+
+  Write-Host "==> Codex detected; installing Simplicio plugin..."
+  & $codex.Source plugin marketplace add $CodexPluginSource --ref $CodexPluginRef --json | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    Write-Warning "Could not update the Codex marketplace; trying the configured marketplace"
+  }
+
+  & $codex.Source plugin add "simplicio@$CodexPluginMarketplace" --json | Out-Null
+  if ($LASTEXITCODE -eq 0) {
+    Write-Host "  ✓ Simplicio plugin installed in Codex"
+    return
+  }
+
+  if ($CodexPluginMarketplace -ne "simplicio") {
+    & $codex.Source plugin add "simplicio@simplicio" --json | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+      Write-Host "  ✓ Simplicio plugin installed in Codex (existing marketplace)"
+      return
+    }
+  }
+
+  Write-Warning "Codex detected, but the Simplicio plugin could not be installed automatically"
+  Write-Warning "Install manually: codex plugin marketplace add $CodexPluginSource --ref $CodexPluginRef; codex plugin add simplicio@$CodexPluginMarketplace"
+}
 # ─── -Doctor: idempotent, read-only health check ───────────────────────────
 if ($Doctor) {
   Write-Host "==> simplicio doctor"
@@ -462,6 +497,7 @@ if (Test-McpToolSurface $DestPath) {
   Write-Error "Runtime installed, but automatic MCP/hooks registration failed: $DestPath mcp register --binary $DestPath --json"
   exit 1
 }
+Install-CodexPlugin
 Report-LoginState
 Write-Host "  ✓ Direct MCP: $DestPath serve --mcp --stdio; SIMPLICIO_MCP_URL=$SimplicioMcpUrl"
 

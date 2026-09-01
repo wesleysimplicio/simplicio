@@ -50,11 +50,17 @@ def test_windows_binary_path_is_toml_safe_and_uses_forward_slashes():
         assert tomllib.loads(config)["mcp_servers"]["simplicio"]["command"] == expected
 
 
-def test_installers_are_opt_in_and_do_not_use_mutable_master_hook_ref():
+def test_installers_auto_install_codex_plugin_when_cli_is_present():
     shell = (ROOT / "install.sh").read_text(encoding="utf-8")
     powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
-    assert "SIMPLICIO_INSTALL_CODEX" not in shell
-    assert "SIMPLICIO_INSTALL_CODEX" not in powershell
+    assert "SIMPLICIO_SKIP_CODEX_PLUGIN" in shell
+    assert "SIMPLICIO_SKIP_CODEX_PLUGIN" in powershell
+    assert "command -v codex" in shell
+    assert "Get-Command codex" in powershell
+    assert 'plugin marketplace add "$CODEX_PLUGIN_SOURCE"' in shell
+    assert 'plugin add "simplicio@$CODEX_PLUGIN_MARKETPLACE"' in shell
+    assert "plugin marketplace add $CodexPluginSource" in powershell
+    assert 'plugin add "simplicio@$CodexPluginMarketplace"' in powershell
     assert "SIMPLICIO_CODEX_HOOK_REF" not in shell
     assert "SIMPLICIO_CODEX_HOOK_REF" not in powershell
     assert 'mcp register --binary "$binary_path" --json' in shell

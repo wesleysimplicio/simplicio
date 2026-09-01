@@ -65,6 +65,11 @@ codex plugin marketplace add wesleysimplicio/simplicio --ref master
 codex plugin add simplicio@simplicio-codex
 ```
 
+The shell and PowerShell installers also detect the `codex` CLI and install
+or update this plugin automatically. If Codex is not present, that step is
+skipped. Set `SIMPLICIO_SKIP_CODEX_PLUGIN=1` only when you explicitly want
+to disable the automatic plugin installation.
+
 The official installers download one canonical asset from the latest
 Runtime release, verify its SHA256 checksum and Ed25519 signature, validate the
 Runtime release contract, and register MCP hosts to launch the installed binary
