@@ -59,7 +59,7 @@ def _reject_unsafe(value: Any) -> None:
                 raise GateInputError("gate_key_invalid")
             if key.lower() == "preview" and child is not False:
                 raise GateInputError("gate_preview_forbidden")
-            if SENSITIVE_KEY.search(key):
+            if key not in {"paths_redacted", "argv_redacted"} and SENSITIVE_KEY.search(key):
                 raise GateInputError("gate_sensitive_field")
             _reject_unsafe(child)
     elif isinstance(value, list):
