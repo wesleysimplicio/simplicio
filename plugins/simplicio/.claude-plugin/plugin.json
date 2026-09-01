@@ -1,12 +1,19 @@
 {
   "name": "simplicio",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Verified Simplicio Runtime MCP bootstrap and governed coding skills for Claude Code.",
-  "author": {"name": "Wesley Simplicio"},
+  "author": {
+    "name": "Wesley Simplicio"
+  },
   "homepage": "https://simpleti.com.br/simplicio/",
   "repository": "https://github.com/wesleysimplicio/simplicio",
   "license": "MIT",
-  "keywords": ["simplicio", "mcp", "local-first", "validation"],
+  "keywords": [
+    "simplicio",
+    "mcp",
+    "local-first",
+    "validation"
+  ],
   "skills": "./skills/",
   "mcpServers": "./.mcp.json"
 }
