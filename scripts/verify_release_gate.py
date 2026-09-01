@@ -116,14 +116,16 @@ def _require_nonnegative_int(item: Mapping[str, Any], key: str, reasons: list[st
 
 def _validate_track(track: Mapping[str, Any], reasons: list[str]) -> None:
     track_id = _safe_id(track.get("id"))
+    local_reasons: list[str] = []
     status, _, evidence_ids = _common_evidence(track, track_id)
     if status == "verified" and not evidence_ids:
-        reasons.append(f"{track_id}:evidence_ids=nonempty")
+        local_reasons.append("evidence_ids=nonempty")
     if status != "verified":
-        reasons.append(f"{track_id}:status=verified")
+        local_reasons.append("status=verified")
+        reasons.extend(f"{track_id}:{reason}" for reason in local_reasons)
         return
 
-    requirements: dict[str, tuple[str, Any]] = {
+    requirements: dict[str, dict[str, Any]] = {
         "install": {
             "all_platforms": True,
             "native_install": True,
@@ -163,31 +165,32 @@ def _validate_track(track: Mapping[str, Any], reasons: list[str]) -> None:
     }.get(track_id, {})
     for key, expected in requirements.items():
         if expected is True:
-            _require_true(track, key, reasons)
+            _require_true(track, key, local_reasons)
         else:
-            _require_value(track, key, expected, reasons)
+            _require_value(track, key, expected, local_reasons)
 
     if track_id == "usage":
-        _require_value(track, "coverage", "complete", reasons)
-        _require_value(track, "unknown_providers", 0, reasons)
-        _require_true(track, "usage_total_known", reasons)
-        _require_true(track, "renderer_recomputed", reasons) if False else None
+        _require_value(track, "coverage", "complete", local_reasons)
+        _require_value(track, "unknown_providers", 0, local_reasons)
+        _require_true(track, "usage_total_known", local_reasons)
         if track.get("renderer_recomputed") is not False:
-            reasons.append("renderer_recomputed=false")
-        usage_total = _require_nonnegative_int(track, "usage_total_tokens", reasons)
+            local_reasons.append("renderer_recomputed=false")
+        usage_total = _require_nonnegative_int(track, "usage_total_tokens", local_reasons)
         if usage_total == 0:
-            _require_true(track, "zero_usage_proven", reasons)
+            _require_true(track, "zero_usage_proven", local_reasons)
     if track_id == "cost":
-        _require_value(track, "coverage", "complete", reasons)
-        _require_value(track, "pricing_unknown", False, reasons)
-        _require_true(track, "cost_total_known", reasons)
+        _require_value(track, "coverage", "complete", local_reasons)
+        _require_value(track, "pricing_unknown", False, local_reasons)
+        _require_true(track, "cost_total_known", local_reasons)
         if track.get("renderer_recomputed") is not False:
-            reasons.append("renderer_recomputed=false")
+            local_reasons.append("renderer_recomputed=false")
         cost_total = track.get("cost_total_usd")
         if not isinstance(cost_total, (int, float)) or isinstance(cost_total, bool) or cost_total < 0:
-            reasons.append("cost_total_usd=nonnegative_number")
+            local_reasons.append("cost_total_usd=nonnegative_number")
         elif cost_total == 0:
-            _require_true(track, "zero_cost_proven", reasons)
+            _require_true(track, "zero_cost_proven", local_reasons)
+
+    reasons.extend(f"{track_id}:{reason}" for reason in local_reasons)
 
 
 def _dependency_map(value: Any, reasons: list[str]) -> dict[str, Mapping[str, Any]]:
