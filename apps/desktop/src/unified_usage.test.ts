@@ -101,7 +101,7 @@ describe('unified usage Runtime contract', () => {
     expect(() => parseUnifiedUsageProjection({
       ...fixture,
       totals: { ...fixture.totals, total_tokens: 999 },
-    })).toThrow('usage_projection_totals_mismatch');
+    })).toThrow('usage_projection_invalid');
   });
 
   it('exports bounded JSON and CSV without raw IDs or sensitive fields', () => {
