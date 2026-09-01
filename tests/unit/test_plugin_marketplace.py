@@ -89,7 +89,7 @@ def test_simplicio_plugin_manifests_share_one_version() -> None:
         _load_json("plugins/simplicio/gemini-extension.json"),
     ]
 
-    assert {manifest["version"] for manifest in manifests} == {"0.2.4"}
+    assert {manifest["version"] for manifest in manifests} == {"0.2.5"}
 
 
 def test_host_surface_registry_is_complete_and_honest() -> None:
