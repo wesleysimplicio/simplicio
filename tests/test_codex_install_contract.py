@@ -3,9 +3,8 @@
 import hashlib
 import json
 import os
-from pathlib import Path
 import subprocess
-
+from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 
@@ -35,7 +34,10 @@ def test_installers_configure_direct_stdio_and_hooks():
         text = (ROOT / name).read_text(encoding="utf-8")
         assert "SIMPLICIO_MCP_URL" in text
         assert "serve" in text and "--mcp" in text and "--stdio" in text
-        assert "mcp register" in text
+        if name == "install.sh":
+            assert "mcp register" in text
+        else:
+            assert '@("mcp", "register", "--binary", $BinaryPath, "--json")' in text
         assert "--binary" in text
         assert "--json" in text
 
@@ -51,15 +53,16 @@ def test_plain_install_registers_all_detected_hosts_without_codex_opt_in():
     assert "SIMPLICIO_INSTALL_CODEX" not in powershell
     assert "SIMPLICIO_CODEX_HOOK_REF" not in powershell
     assert "if (Require-ActiveLogin)" not in powershell
-    assert "mcp register --binary $BinaryPath --json" in powershell
+    assert '@("mcp", "register", "--binary", $BinaryPath, "--json")' in powershell
 
 
 def test_installers_preserve_existing_codex_state():
     shell = (ROOT / "install.sh").read_text(encoding="utf-8")
     powershell = (ROOT / "install.ps1").read_text(encoding="utf-8")
     assert "mcp register" in shell
-    assert "mcp register" in powershell
-    assert "automatic MCP/hooks registration failed" in powershell
+    assert '@("mcp", "register", "--binary", $BinaryPath, "--json")' in powershell
+    assert "Resolve-RuntimeFailure" in powershell
+    assert "$script:McpFailureReason" in powershell
 
 
 def test_installers_preserve_stable_login_state_during_upgrades():
@@ -76,8 +79,8 @@ def test_windows_installer_reconciles_the_pinned_public_hook_after_runtime_regis
     hook_digest = hashlib.sha256((ROOT / "codex" / "mcp-route.ps1").read_bytes()).hexdigest()
     assert "Install-CodexRouteHook" not in powershell
     assert "SIMPLICIO_CODEX_HOOK_REF" not in powershell
-    assert "mcp register --binary $BinaryPath --json" in powershell
-    assert '$PublicRouteRef = "cc9950025baf823cdecc657228ff1e89d7701e7e"' in powershell
+    assert '@("mcp", "register", "--binary", $BinaryPath, "--json")' in powershell
+    assert '$PublicRouteRef = "68b4c7f7ac27d07624ffa4ddf0673a43e180c3e5"' in powershell
     assert f'$PublicRouteSha256 = "{hook_digest}"' in powershell
     assert "Sync-PublicRouteOverlay" in powershell
     assert powershell.index("Test-McpToolSurface $DestPath") < powershell.index("if (Sync-PublicRouteOverlay)")
@@ -90,7 +93,7 @@ def test_unix_installer_reconciles_the_pinned_public_hook_after_runtime_registra
     assert "install_codex_route_hook" not in shell
     assert "SIMPLICIO_CODEX_HOOK_REF" not in shell
     assert 'mcp register --binary "$binary_path" --json' in shell
-    assert 'PUBLIC_ROUTE_REF="cc9950025baf823cdecc657228ff1e89d7701e7e"' in shell
+    assert 'PUBLIC_ROUTE_REF="68b4c7f7ac27d07624ffa4ddf0673a43e180c3e5"' in shell
     assert f'PUBLIC_ROUTE_SHA256="{hook_digest}"' in shell
     assert "reconcile_public_route_overlay" in shell
     assert shell.index('if verify_mcp_tools "$DEST_PATH"') < shell.index("if reconcile_public_route_overlay")
@@ -115,8 +118,8 @@ def test_codex_hooks_have_all_required_lifecycle_events():
     assert "permissionDecision = 'deny'" in powershell_hook
     assert "hookEventName" in shell_hook
     assert "hookEventName" in powershell_hook
-    assert "simplicio-hook-version: 3240-v11" in shell_hook
-    assert "simplicio-hook-version: 3240-v11" in powershell_hook
+    assert "simplicio-hook-version: 3240-v12" in shell_hook
+    assert "simplicio-hook-version: 3240-v12" in powershell_hook
     assert "Empty stdout is the portable allow-unchanged contract" in shell_hook
     assert "No decision means allow unchanged" in powershell_hook
     assert "Allow-Unchanged" in powershell_hook
@@ -126,7 +129,9 @@ def test_codex_hooks_have_all_required_lifecycle_events():
         assert event in shell_hook
         assert event in powershell_hook
     assert "mcp register" in (ROOT / "install.sh").read_text(encoding="utf-8")
-    assert "mcp register" in (ROOT / "install.ps1").read_text(encoding="utf-8")
+    assert '@("mcp", "register", "--binary", $BinaryPath, "--json")' in (
+        ROOT / "install.ps1"
+    ).read_text(encoding="utf-8")
     assert "result=subprocess.run([binary,'map','--repo'" in shell_hook
     assert "simplicio_context" in shell_hook
     assert 'SIMPLICIO_BIN="${SIMPLICIO_BIN:-${SIMPLICIO_BIN_DIR:-${HOME}/.simplicio/bin}/simplicio}"' in shell_hook

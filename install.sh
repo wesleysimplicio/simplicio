@@ -19,8 +19,10 @@
 #   SIMPLICIO_ALLOW_UNVERIFIED  - "1" to proceed even if no checksum is
 #                                 published for this target (default: refuse)
 #   SIMPLICIO_BUNDLE_DIR       - bundle report directory (default: ~/.simplicio)
-#   SIMPLICIO_INSTALL_HOST_PLUGINS - "0" skips detected host plugins
-#                                    (default: install every compatible package)
+#
+# Host plugins are deliberately outside this installer transaction. The
+# Runtime/MCP/hook install completes first; a separate explicit consent flow
+# owned by `simplicio host-plugins` may be started afterwards.
 #
 # Asset naming follows distribution/targets.json (the canonical target
 # triplet table for the whole ecosystem): id "macos-arm64" -> asset
@@ -36,22 +38,16 @@ GITHUB="https://github.com/$REPO"
 ED25519_PUBLIC_KEY="2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok="
 ED25519_HELPER_URL="https://raw.githubusercontent.com/$REPO/master/scripts/verify_ed25519.py"
 ED25519_HELPER_SHA256="f03a0719dd557ddea27dc4cf1456d6f06a47b9056505e4d4b8453090697600d0"
-PUBLIC_ROUTE_REF="cc9950025baf823cdecc657228ff1e89d7701e7e"
+PUBLIC_ROUTE_REF="68b4c7f7ac27d07624ffa4ddf0673a43e180c3e5"
 PUBLIC_ROUTE_URL="https://raw.githubusercontent.com/$REPO/$PUBLIC_ROUTE_REF/codex/mcp-route.sh"
-PUBLIC_ROUTE_SHA256="0f3a6a32c6f224fb3aedea5336f60c5c63917b134113d4c4e524e8ae7b4a31a4"
+PUBLIC_ROUTE_SHA256="d91200cae4816c79fe0c903fc6eedc01835a557827e8d3d0480304f3bdce5118"
 BIN_NAME="simplicio"
-MARKETPLACE_PLUGINS="simplicio simplicio-loop simplicio-prompt simplicio-sprint simplicio-hermes"
 
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
-
-info()  { printf "${CYAN}==>${NC} %s\n" "$*"; }
-ok()    { printf "${GREEN}  ✓${NC} %s\n" "$*"; }
-warn()  { printf "${YELLOW}  ⚠${NC} %s\n" "$*"; }
-err()   { printf "${RED}  ✗${NC} %s\n" "$*"; exit 1; }
 
 SIMPLICIO_MCP_URL="${SIMPLICIO_MCP_URL:-http://127.0.0.1:8787/mcp}"
 BIN_DIR="${SIMPLICIO_BIN_DIR:-$HOME/.simplicio/bin}"
@@ -60,10 +56,164 @@ INSTALL_TRANSACTION_ACTIVE="false"
 PREVIOUS_PATH=""
 PURGE_DIR="${SIMPLICIO_BUNDLE_DIR:-$HOME/.simplicio}"
 AUTH_FILE="$PURGE_DIR/login.json"
+INSTALL_RECEIPT="$PURGE_DIR/install-receipt.json"
+INSTALL_STAGE="preflight"
+INSTALL_EFFECT_STARTED="false"
+RUNTIME_INSTALLED="false"
+MCP_REGISTERED="false"
+HOOK_INSTALLED="false"
+HOST_PLUGINS_STATE="unavailable"
+HOST_PLUGINS_COMMAND=""
+HOST_PLUGINS_REASON="Runtime host-plugins capability was not checked"
 AUTH_FILE_WAS_PRESENT="false"
 if [ -e "$AUTH_FILE" ]; then
   AUTH_FILE_WAS_PRESENT="true"
 fi
+
+info()  { printf "${CYAN}==>${NC} %s\n" "$*"; }
+ok()    { printf "${GREEN}  ✓${NC} %s\n" "$*"; }
+warn()  { printf "${YELLOW}  ⚠${NC} %s\n" "$*"; }
+
+json_escape() {
+  # POSIX od is available before Python and lets the fallback produce valid
+  # JSON even when a user-controlled path contains a newline or control byte.
+  for json_byte in $(printf '%s' "$1" | od -An -tu1 -v); do
+    case "$json_byte" in
+      8) printf '%s' '\b' ;;
+      9) printf '%s' '\t' ;;
+      10) printf '%s' '\n' ;;
+      12) printf '%s' '\f' ;;
+      13) printf '%s' '\r' ;;
+      34) printf '%s' '\"' ;;
+      92) printf '%s' "\\\\" ;;
+      [0-9]|[12][0-9]|3[01]) printf '\\u%04x' "$json_byte" ;;
+      *)
+        json_octal="$(printf '%03o' "$json_byte")"
+        printf '%b' "\\$json_octal"
+        ;;
+    esac
+  done
+}
+
+render_install_receipt() {
+  receipt_status="$1"
+  receipt_exit_code="$2"
+  receipt_failure_code="$3"
+  receipt_failure_reason="$4"
+  if command -v python3 >/dev/null 2>&1; then
+    if RECEIPT_STATUS="$receipt_status" \
+      RECEIPT_EXIT_CODE="$receipt_exit_code" \
+      RECEIPT_STAGE="$INSTALL_STAGE" \
+      RECEIPT_FAILURE_CODE="$receipt_failure_code" \
+      RECEIPT_FAILURE_REASON="$receipt_failure_reason" \
+      RECEIPT_RUNTIME_INSTALLED="$RUNTIME_INSTALLED" \
+      RECEIPT_MCP_REGISTERED="$MCP_REGISTERED" \
+      RECEIPT_HOOK_INSTALLED="$HOOK_INSTALLED" \
+      RECEIPT_HOST_PLUGINS_STATE="$HOST_PLUGINS_STATE" \
+      RECEIPT_HOST_PLUGINS_COMMAND="$HOST_PLUGINS_COMMAND" \
+      RECEIPT_HOST_PLUGINS_REASON="$HOST_PLUGINS_REASON" \
+      python3 - <<'PY'
+import json
+import os
+
+
+def env_bool(name):
+    return os.environ.get(name) == "true"
+
+
+failure_code = os.environ.get("RECEIPT_FAILURE_CODE", "")
+failure = None
+if failure_code:
+    failure = {
+        "code": failure_code,
+        "reason": os.environ.get("RECEIPT_FAILURE_REASON", ""),
+    }
+
+receipt = {
+    "schema": "simplicio-install-receipt/v1",
+    "status": os.environ["RECEIPT_STATUS"],
+    "exit_code": int(os.environ["RECEIPT_EXIT_CODE"]),
+    "stage": os.environ["RECEIPT_STAGE"],
+    "failure": failure,
+    "runtime": {"installed": env_bool("RECEIPT_RUNTIME_INSTALLED")},
+    "mcp": {"registered": env_bool("RECEIPT_MCP_REGISTERED")},
+    "hook": {"installed": env_bool("RECEIPT_HOOK_INSTALLED")},
+    "host_plugins": {
+        "state": os.environ["RECEIPT_HOST_PLUGINS_STATE"],
+        "owner": "simplicio-runtime",
+        "command": os.environ.get("RECEIPT_HOST_PLUGINS_COMMAND") or None,
+        "mutated": False,
+        "reason": os.environ["RECEIPT_HOST_PLUGINS_REASON"],
+    },
+}
+print(json.dumps(receipt, ensure_ascii=False, separators=(",", ":")))
+PY
+    then
+      return 0
+    fi
+  fi
+
+  # Pre-Python failures still get valid JSON through the byte-safe POSIX
+  # fallback above, without relying on the missing prerequisite.
+  if [ -n "$receipt_failure_code" ]; then
+    receipt_failure="{\"code\":\"$(json_escape "$receipt_failure_code")\",\"reason\":\"$(json_escape "$receipt_failure_reason")\"}"
+  else
+    receipt_failure="null"
+  fi
+  if [ -n "$HOST_PLUGINS_COMMAND" ]; then
+    receipt_host_command="\"$(json_escape "$HOST_PLUGINS_COMMAND")\""
+  else
+    receipt_host_command="null"
+  fi
+  printf '{"schema":"simplicio-install-receipt/v1","status":"%s","exit_code":%s,"stage":"%s","failure":%s,"runtime":{"installed":%s},"mcp":{"registered":%s},"hook":{"installed":%s},"host_plugins":{"state":"%s","owner":"simplicio-runtime","command":%s,"mutated":false,"reason":"%s"}}\n' \
+    "$(json_escape "$receipt_status")" \
+    "$receipt_exit_code" \
+    "$(json_escape "$INSTALL_STAGE")" \
+    "$receipt_failure" \
+    "$RUNTIME_INSTALLED" \
+    "$MCP_REGISTERED" \
+    "$HOOK_INSTALLED" \
+    "$(json_escape "$HOST_PLUGINS_STATE")" \
+    "$receipt_host_command" \
+    "$(json_escape "$HOST_PLUGINS_REASON")"
+}
+
+persist_install_receipt() {
+  receipt_status="$1"
+  receipt_exit_code="$2"
+  receipt_failure_code="$3"
+  receipt_failure_reason="$4"
+  if ! mkdir -p "$PURGE_DIR"; then
+    return 1
+  fi
+  receipt_tmp="$INSTALL_RECEIPT.tmp.$$"
+  if ! (umask 077; render_install_receipt "$receipt_status" "$receipt_exit_code" "$receipt_failure_code" "$receipt_failure_reason" >"$receipt_tmp"); then
+    rm -f "$receipt_tmp"
+    return 1
+  fi
+  if ! chmod 0600 "$receipt_tmp" || ! mv -f "$receipt_tmp" "$INSTALL_RECEIPT"; then
+    rm -f "$receipt_tmp"
+    return 1
+  fi
+}
+
+fail_install() {
+  failure_code="$1"
+  shift
+  failure_reason="$*"
+  failure_status="failed"
+  if [ "$INSTALL_EFFECT_STARTED" = "true" ]; then
+    failure_status="partial"
+  fi
+  if ! persist_install_receipt "$failure_status" 1 "$failure_code" "$failure_reason"; then
+    render_install_receipt "$failure_status" 1 "$failure_code" "$failure_reason" >&2
+  fi
+  printf "${RED}  ✗${NC} %s\n" "$failure_reason" >&2
+  exit 1
+}
+err() {
+  fail_install "${INSTALL_STAGE}_failed" "$*"
+}
 
 rollback_install() {
   if [ "$INSTALL_TRANSACTION_ACTIVE" = "true" ]; then
@@ -101,31 +251,183 @@ sha256_of() {
   fi
 }
 
-reconcile_public_route_overlay() {
-  hook_dir="$PURGE_DIR/hooks"
-  hook_path="$hook_dir/mcp-route.sh"
-
-  if [ -f "$hook_path" ] && [ "$(sha256_of "$hook_path")" = "$PUBLIC_ROUTE_SHA256" ]; then
-    return 0
-  fi
-
-  mkdir -p "$hook_dir" || return 1
-  hook_tmp="$hook_dir/.mcp-route.sh.download-$$"
-  if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$PUBLIC_ROUTE_URL" -o "$hook_tmp" || { rm -f "$hook_tmp"; return 1; }
-  elif command -v wget >/dev/null 2>&1; then
-    wget -q "$PUBLIC_ROUTE_URL" -O "$hook_tmp" || { rm -f "$hook_tmp"; return 1; }
+HOOK_FAILURE_CODE=""
+HOOK_FAILURE_REASON=""
+hook_sha256() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{print $1}'
   else
     return 1
   fi
+}
 
-  if [ "$(sha256_of "$hook_tmp")" != "$PUBLIC_ROUTE_SHA256" ] ||
-     ! grep -q 'simplicio-hook-version: 3240-v11' "$hook_tmp"; then
-    rm -f "$hook_tmp"
+reconcile_public_route_overlay() {
+  HOOK_FAILURE_CODE=""
+  HOOK_FAILURE_REASON=""
+  hook_dir="$PURGE_DIR/hooks"
+  hook_path="$hook_dir/mcp-route.sh"
+
+  if [ -f "$hook_path" ]; then
+    if ! hook_current_sha="$(hook_sha256 "$hook_path")"; then
+      HOOK_FAILURE_CODE="hook_checksum_tool_missing"
+      HOOK_FAILURE_REASON="Could not calculate SHA256 for existing hook: $hook_path"
+      return 1
+    fi
+    if [ "$hook_current_sha" = "$PUBLIC_ROUTE_SHA256" ]; then
+      return 0
+    fi
+  fi
+
+  if ! mkdir -p "$hook_dir"; then
+    HOOK_FAILURE_CODE="hook_directory_create_failed"
+    HOOK_FAILURE_REASON="Could not create hook directory: $hook_dir"
     return 1
   fi
-  chmod 0755 "$hook_tmp" || { rm -f "$hook_tmp"; return 1; }
-  mv -f "$hook_tmp" "$hook_path"
+  hook_tmp="$hook_dir/.mcp-route.sh.download-$$"
+  hook_capture_dir="$(mktemp -d "${TMPDIR:-/tmp}/simplicio-hook.XXXXXX")" || {
+    HOOK_FAILURE_CODE="hook_output_capture_failed"
+    HOOK_FAILURE_REASON="Could not create bounded hook download capture"
+    return 1
+  }
+  hook_stdout="$hook_capture_dir/stdout"
+  hook_stderr="$hook_capture_dir/stderr"
+  hook_stdout_fifo="$hook_capture_dir/stdout.fifo"
+  hook_stderr_fifo="$hook_capture_dir/stderr.fifo"
+  hook_code_path="$hook_capture_dir/code"
+  hook_reason_path="$hook_capture_dir/reason"
+  if ! mkfifo "$hook_stdout_fifo" "$hook_stderr_fifo"; then
+    rm -f "$hook_tmp" "$hook_stdout_fifo" "$hook_stderr_fifo" || true
+    rmdir "$hook_capture_dir" 2>/dev/null || true
+    HOOK_FAILURE_CODE="hook_output_capture_failed"
+    HOOK_FAILURE_REASON="Could not create bounded hook download streams"
+    return 1
+  fi
+  if command -v curl >/dev/null 2>&1; then
+    hook_downloader="curl"
+  elif command -v wget >/dev/null 2>&1; then
+    hook_downloader="wget"
+  else
+    rm -f "$hook_tmp" "$hook_stdout_fifo" "$hook_stderr_fifo" || true
+    rmdir "$hook_capture_dir" 2>/dev/null || true
+    HOOK_FAILURE_CODE="hook_downloader_missing"
+    HOOK_FAILURE_REASON="Neither curl nor wget is available to download the public hook"
+    return 1
+  fi
+  capture_stream_bounded "$hook_stdout" "$hook_stdout.truncated" 8192 <"$hook_stdout_fifo" &
+  hook_stdout_pid=$!
+  capture_stream_bounded "$hook_stderr" "$hook_stderr.truncated" 8192 <"$hook_stderr_fifo" &
+  hook_stderr_pid=$!
+  if [ "$hook_downloader" = "curl" ]; then
+    if curl -fsSL "$PUBLIC_ROUTE_URL" -o "$hook_tmp" >"$hook_stdout_fifo" 2>"$hook_stderr_fifo"; then
+      hook_download_exit=0
+    else
+      hook_download_exit=$?
+    fi
+  else
+    if wget -q "$PUBLIC_ROUTE_URL" -O "$hook_tmp" >"$hook_stdout_fifo" 2>"$hook_stderr_fifo"; then
+      hook_download_exit=0
+    else
+      hook_download_exit=$?
+    fi
+  fi
+  if wait "$hook_stdout_pid"; then hook_stdout_ok=true; else hook_stdout_ok=false; fi
+  if wait "$hook_stderr_pid"; then hook_stderr_ok=true; else hook_stderr_ok=false; fi
+  rm -f "$hook_stdout_fifo" "$hook_stderr_fifo" || true
+
+  if [ "$hook_stdout_ok" != "true" ] || [ "$hook_stderr_ok" != "true" ]; then
+    HOOK_FAILURE_CODE="hook_output_capture_failed"
+    HOOK_FAILURE_REASON="Hook download output could not be drained safely"
+    hook_download_exit=125
+  elif [ "$hook_download_exit" -ne 0 ]; then
+    if python3 - "$hook_stdout" "$hook_stderr" "$hook_code_path" "$hook_reason_path" "$hook_download_exit" <<'PY'
+import json
+import os
+import sys
+
+marker = "\n...[output truncated at 8192 bytes]"
+
+
+def captured(path):
+    with open(path, "rb") as handle:
+        text = handle.read(8192).decode("utf-8", errors="replace")
+    return text + (marker if os.path.exists(path + ".truncated") else "")
+
+
+stdout = captured(sys.argv[1])
+stderr = captured(sys.argv[2])
+payload = None
+for candidate in [stdout.strip(), *reversed([line.strip() for line in stdout.splitlines() if line.strip()])]:
+    try:
+        decoded = json.loads(candidate)
+    except (TypeError, ValueError):
+        continue
+    if isinstance(decoded, dict):
+        payload = decoded
+        break
+failure = payload.get("failure") if isinstance(payload, dict) else None
+error = payload.get("error") if isinstance(payload, dict) else None
+failure = failure if isinstance(failure, dict) else {}
+error_object = error if isinstance(error, dict) else {}
+code = failure.get("code") or (payload.get("code") if payload else None) or (payload.get("error_code") if payload else None) or error_object.get("code") or "hook_download_failed"
+reason = failure.get("reason") or (payload.get("reason") if payload else None) or (payload.get("message") if payload else None) or error_object.get("reason") or error_object.get("message") or (error if isinstance(error, str) else None)
+if not isinstance(reason, str) or not reason:
+    reason = stderr.strip() or stdout.strip() or f"Hook download failed with exit code {sys.argv[5]}"
+with open(sys.argv[3], "w", encoding="utf-8", newline="") as handle:
+    handle.write(str(code))
+with open(sys.argv[4], "w", encoding="utf-8", newline="") as handle:
+    handle.write(reason[:8192])
+PY
+    then
+      capture_sentinel="__SIMPLICIO_CAPTURE_EOF__"
+      HOOK_FAILURE_CODE="$(cat "$hook_code_path"; printf '%s' "$capture_sentinel")"
+      HOOK_FAILURE_CODE="${HOOK_FAILURE_CODE%"$capture_sentinel"}"
+      HOOK_FAILURE_REASON="$(cat "$hook_reason_path"; printf '%s' "$capture_sentinel")"
+      HOOK_FAILURE_REASON="${HOOK_FAILURE_REASON%"$capture_sentinel"}"
+    else
+      HOOK_FAILURE_CODE="hook_download_failed"
+      HOOK_FAILURE_REASON="Hook download failed with exit code $hook_download_exit"
+    fi
+  fi
+
+  rm -f "$hook_stdout" "$hook_stderr" "$hook_stdout.truncated" "$hook_stderr.truncated" "$hook_code_path" "$hook_reason_path" || true
+  rmdir "$hook_capture_dir" 2>/dev/null || true
+  if [ "$hook_download_exit" -ne 0 ]; then
+    rm -f "$hook_tmp" || true
+    return 1
+  fi
+  if ! hook_download_sha="$(hook_sha256 "$hook_tmp")"; then
+    rm -f "$hook_tmp" || true
+    HOOK_FAILURE_CODE="hook_checksum_failed"
+    HOOK_FAILURE_REASON="Could not calculate SHA256 for downloaded hook"
+    return 1
+  fi
+  if [ "$hook_download_sha" != "$PUBLIC_ROUTE_SHA256" ]; then
+    rm -f "$hook_tmp" || true
+    HOOK_FAILURE_CODE="hook_checksum_mismatch"
+    HOOK_FAILURE_REASON="Downloaded hook SHA256 mismatch: expected $PUBLIC_ROUTE_SHA256, got $hook_download_sha"
+    return 1
+  fi
+  if ! grep -q 'simplicio-hook-version: 3240-v12' "$hook_tmp"; then
+    rm -f "$hook_tmp" || true
+    HOOK_FAILURE_CODE="hook_marker_missing"
+    HOOK_FAILURE_REASON="Downloaded hook is missing simplicio-hook-version: 3240-v12"
+    return 1
+  fi
+  if ! chmod 0755 "$hook_tmp"; then
+    rm -f "$hook_tmp" || true
+    HOOK_FAILURE_CODE="hook_permission_failed"
+    HOOK_FAILURE_REASON="Could not make downloaded hook executable: $hook_tmp"
+    return 1
+  fi
+  if ! mv -f "$hook_tmp" "$hook_path"; then
+    rm -f "$hook_tmp" || true
+    HOOK_FAILURE_CODE="hook_activation_failed"
+    HOOK_FAILURE_REASON="Could not activate verified hook at $hook_path"
+    return 1
+  fi
+  return 0
 }
 
 verify_ed25519_signature() {
@@ -229,238 +531,316 @@ except Exception:
     raise SystemExit(1)
 identity = payload.get("identity") or {}
 entitlement = payload.get("entitlement") or {}
+session_verification = payload.get("session_verification") or {}
 identity_email = identity.get("email") or (payload.get("user") or {}).get("email")
 active = (
     identity.get("enabled") is True
     and identity.get("login_enabled") is True
-    and identity.get("status") not in {"disabled", "logged_out", "revoked"}
+    and identity.get("status") == "active"
     and bool(identity_email)
+    and entitlement.get("updates_allowed") is True
+    and session_verification.get("verified") is True
+    and session_verification.get("cached") is False
 )
-if "updates_allowed" in entitlement:
-    active = active and entitlement.get("updates_allowed") is True
 raise SystemExit(0 if active else 1)
 '
 }
 
 report_login_state() {
   if verify_active_login; then
-    ok "login Google ativo e entitlement válido"
+    ok "sessão Google verificada de forma fresh e entitlement válido"
     return 0
   fi
-  warn "login Google ausente ou sem entitlement ativo; rode: ${DEST_PATH} auth login"
+  warn "sessão Google não verificada de forma fresh (ausente, cacheada ou sem entitlement); rode: ${DEST_PATH} auth login"
   return 0
 }
 
+capture_stream_bounded() {
+  capture_output_path="$1"
+  capture_truncated_path="$2"
+  capture_limit="$3"
+  python3 -c '
+import os
+import sys
+
+output_path, truncated_path, raw_limit = sys.argv[1:]
+limit = int(raw_limit)
+remaining = limit
+truncated = False
+with open(output_path, "wb") as output:
+    while True:
+        chunk = sys.stdin.buffer.read(65536)
+        if not chunk:
+            break
+        kept_length = 0
+        if remaining:
+            kept = chunk[:remaining]
+            output.write(kept)
+            remaining -= len(kept)
+            kept_length = len(kept)
+        if len(chunk) > kept_length:
+            truncated = True
+if truncated:
+    with open(truncated_path, "wb"):
+        pass
+' "$capture_output_path" "$capture_truncated_path" "$capture_limit"
+}
+
+MCP_FAILURE_CODE=""
+MCP_FAILURE_REASON=""
 verify_mcp_tools() {
   binary_path="$1"
-  [ -x "$binary_path" ] || return 1
-  SIMPLICIO_MCP_URL="$SIMPLICIO_MCP_URL" "$binary_path" mcp register --binary "$binary_path" --json >/dev/null 2>&1
-}
-
-
-install_gemini_extension() {
-  installed_manifest="$HOME/.gemini/extensions/simplicio/gemini-extension.json"
-  if [ -f "$installed_manifest" ]; then
-    ok "extensão nativa do Gemini CLI já instalada"
-    return 0
-  fi
-  if ! command -v python3 >/dev/null 2>&1; then
-    warn "Gemini CLI detectado, mas Python 3 é necessário para preparar a extensão"
+  MCP_FAILURE_CODE=""
+  MCP_FAILURE_REASON=""
+  if [ ! -x "$binary_path" ]; then
+    MCP_FAILURE_CODE="mcp_binary_missing"
+    MCP_FAILURE_REASON="Runtime binary is missing or not executable: $binary_path"
     return 1
   fi
 
-  plugin_tmp="$(mktemp -d)"
-  plugin_zip="$plugin_tmp/simplicio-master.zip"
-  plugin_url="$GITHUB/archive/refs/heads/master.zip"
-  if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$plugin_url" -o "$plugin_zip" || { rm -rf "$plugin_tmp"; return 1; }
-  elif command -v wget >/dev/null 2>&1; then
-    wget -q "$plugin_url" -O "$plugin_zip" || { rm -rf "$plugin_tmp"; return 1; }
+  capture_dir="$(mktemp -d "${TMPDIR:-/tmp}/simplicio-mcp-register.XXXXXX")" || {
+    MCP_FAILURE_CODE="mcp_output_capture_failed"
+    MCP_FAILURE_REASON="Could not create a bounded capture directory for Runtime MCP registration output"
+    return 1
+  }
+  stdout_path="$capture_dir/stdout"
+  stderr_path="$capture_dir/stderr"
+  stdout_fifo="$capture_dir/stdout.fifo"
+  stderr_fifo="$capture_dir/stderr.fifo"
+  code_path="$capture_dir/code"
+  reason_path="$capture_dir/reason"
+  if ! mkfifo "$stdout_fifo" "$stderr_fifo"; then
+    rm -f "$stdout_fifo" "$stderr_fifo"
+    rmdir "$capture_dir" 2>/dev/null || true
+    MCP_FAILURE_CODE="mcp_output_capture_failed"
+    MCP_FAILURE_REASON="Could not create bounded Runtime MCP output streams"
+    return 1
+  fi
+
+  capture_stream_bounded "$stdout_path" "$stdout_path.truncated" 8192 <"$stdout_fifo" &
+  stdout_drain_pid=$!
+  capture_stream_bounded "$stderr_path" "$stderr_path.truncated" 8192 <"$stderr_fifo" &
+  stderr_drain_pid=$!
+
+  if SIMPLICIO_MCP_URL="$SIMPLICIO_MCP_URL" "$binary_path" mcp register --binary "$binary_path" --json >"$stdout_fifo" 2>"$stderr_fifo"; then
+    mcp_exit_code=0
   else
-    rm -rf "$plugin_tmp"
+    mcp_exit_code=$?
+  fi
+  if wait "$stdout_drain_pid"; then stdout_drain_ok=true; else stdout_drain_ok=false; fi
+  if wait "$stderr_drain_pid"; then stderr_drain_ok=true; else stderr_drain_ok=false; fi
+  rm -f "$stdout_fifo" "$stderr_fifo"
+  if [ "$stdout_drain_ok" != "true" ] || [ "$stderr_drain_ok" != "true" ]; then
+    rm -f "$stdout_path" "$stderr_path" "$stdout_path.truncated" "$stderr_path.truncated" "$code_path" "$reason_path"
+    rmdir "$capture_dir" 2>/dev/null || true
+    MCP_FAILURE_CODE="mcp_output_capture_failed"
+    MCP_FAILURE_REASON="Runtime MCP output could not be drained safely"
     return 1
   fi
-
-  plugin_dir="$(python3 - "$plugin_zip" "$plugin_tmp/unpacked" <<'PY'
-import pathlib, sys, zipfile
-archive, destination = sys.argv[1:]
-root = pathlib.Path(destination).resolve()
-root.mkdir(parents=True, exist_ok=True)
-with zipfile.ZipFile(archive) as bundle:
-    for member in bundle.infolist():
-        target = (root / member.filename).resolve()
-        if target != root and root not in target.parents:
-            raise SystemExit("unsafe plugin archive path")
-    bundle.extractall(root)
-matches = list(root.glob("*/plugins/simplicio/gemini-extension.json"))
-if len(matches) != 1:
-    raise SystemExit("Gemini extension manifest not found exactly once")
-print(matches[0].parent)
-PY
-)" || { rm -rf "$plugin_tmp"; return 1; }
-
-  if gemini extensions install "$plugin_dir" --consent >/dev/null 2>&1; then
-    rm -rf "$plugin_tmp"
-    ok "extensão nativa do Gemini CLI instalada"
+  if [ "$mcp_exit_code" -eq 0 ]; then
+    rm -f "$stdout_path" "$stderr_path" "$stdout_path.truncated" "$stderr_path.truncated" "$code_path" "$reason_path"
+    rmdir "$capture_dir" 2>/dev/null || true
     return 0
   fi
-  rm -rf "$plugin_tmp"
+
+  if python3 - "$stdout_path" "$stderr_path" "$code_path" "$reason_path" "$mcp_exit_code" <<'PY'
+import json
+import os
+import sys
+
+
+LIMIT = 8192
+TRUNCATED = "\n...[output truncated at 8192 bytes]"
+
+
+def read_bounded(path):
+    with open(path, "rb") as handle:
+        payload = handle.read(LIMIT)
+    truncated = os.path.exists(path + ".truncated")
+    text = payload.decode("utf-8", errors="replace")
+    return text + (TRUNCATED if truncated else "")
+
+
+def text_value(value):
+    if isinstance(value, str) and value:
+        return value
+    if value is not None and not isinstance(value, (dict, list)):
+        return str(value)
+    return ""
+
+
+stdout = read_bounded(sys.argv[1])
+stderr = read_bounded(sys.argv[2])
+payload = None
+candidates = [stdout.strip()]
+candidates.extend(line.strip() for line in reversed(stdout.splitlines()) if line.strip())
+for candidate in candidates:
+    try:
+        decoded = json.loads(candidate)
+    except (TypeError, ValueError):
+        continue
+    if isinstance(decoded, dict):
+        payload = decoded
+        break
+
+failure = payload.get("failure") if isinstance(payload, dict) else None
+error = payload.get("error") if isinstance(payload, dict) else None
+failure = failure if isinstance(failure, dict) else {}
+error_object = error if isinstance(error, dict) else {}
+
+code = (
+    text_value(failure.get("code"))
+    or (text_value(payload.get("code")) if payload else "")
+    or (text_value(payload.get("error_code")) if payload else "")
+    or text_value(error_object.get("code"))
+    or "mcp_registration_failed"
+)
+reason = (
+    text_value(failure.get("reason"))
+    or (text_value(payload.get("reason")) if payload else "")
+    or (text_value(payload.get("message")) if payload else "")
+    or text_value(error_object.get("reason"))
+    or text_value(error_object.get("message"))
+    or (text_value(error) if not isinstance(error, dict) else "")
+)
+if not reason:
+    fallback = []
+    if stderr.strip():
+        fallback.append(stderr.strip())
+    if stdout.strip() and stdout.strip() not in fallback:
+        fallback.append(stdout.strip())
+    reason = "\n".join(fallback)
+if not reason:
+    reason = f"Runtime MCP registration failed with exit code {sys.argv[5]}"
+
+reason_bytes = reason.encode("utf-8")
+if len(reason_bytes) > LIMIT:
+    reason = reason_bytes[:LIMIT].decode("utf-8", errors="ignore") + TRUNCATED
+
+with open(sys.argv[3], "w", encoding="utf-8", newline="") as handle:
+    handle.write(code)
+with open(sys.argv[4], "w", encoding="utf-8", newline="") as handle:
+    handle.write(reason)
+PY
+  then
+    capture_sentinel="__SIMPLICIO_CAPTURE_EOF__"
+    MCP_FAILURE_CODE="$(cat "$code_path"; printf '%s' "$capture_sentinel")"
+    MCP_FAILURE_CODE="${MCP_FAILURE_CODE%"$capture_sentinel"}"
+    MCP_FAILURE_REASON="$(cat "$reason_path"; printf '%s' "$capture_sentinel")"
+    MCP_FAILURE_REASON="${MCP_FAILURE_REASON%"$capture_sentinel"}"
+  else
+    MCP_FAILURE_CODE="mcp_registration_failed"
+    capture_sentinel="__SIMPLICIO_CAPTURE_EOF__"
+    MCP_FAILURE_REASON="$(head -c 8192 "$stderr_path"; printf '%s' "$capture_sentinel")"
+    MCP_FAILURE_REASON="${MCP_FAILURE_REASON%"$capture_sentinel"}"
+    if [ -z "$MCP_FAILURE_REASON" ]; then
+      MCP_FAILURE_REASON="$(head -c 8192 "$stdout_path"; printf '%s' "$capture_sentinel")"
+      MCP_FAILURE_REASON="${MCP_FAILURE_REASON%"$capture_sentinel"}"
+    fi
+    if [ -z "$MCP_FAILURE_REASON" ]; then
+      MCP_FAILURE_REASON="Runtime MCP registration failed with exit code $mcp_exit_code"
+    fi
+  fi
+
+  rm -f "$stdout_path" "$stderr_path" "$stdout_path.truncated" "$stderr_path.truncated" "$code_path" "$reason_path"
+  rmdir "$capture_dir" 2>/dev/null || true
   return 1
 }
 
-install_portable_agent_plugin() {
-  target_dir="$1"
-  host_name="$2"
-  if ! command -v python3 >/dev/null 2>&1; then
-    warn "$host_name detectado, mas Python 3 é necessário para preparar o Agent Plugin"
+
+probe_host_plugins_capability() {
+  HOST_PLUGINS_STATE="unavailable"
+  HOST_PLUGINS_COMMAND=""
+  HOST_PLUGINS_REASON="Runtime host-plugins capability is unavailable"
+  if [ ! -x "$DEST_PATH" ]; then
+    HOST_PLUGINS_REASON="Runtime binary is missing; host-plugins capability was not checked"
     return 1
   fi
-
-  plugin_tmp="$(mktemp -d)"
-  plugin_zip="$plugin_tmp/simplicio-master.zip"
-  plugin_url="$GITHUB/archive/refs/heads/master.zip"
-  if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$plugin_url" -o "$plugin_zip" || { rm -rf "$plugin_tmp"; return 1; }
-  elif command -v wget >/dev/null 2>&1; then
-    wget -q "$plugin_url" -O "$plugin_zip" || { rm -rf "$plugin_tmp"; return 1; }
+  host_capture_dir="$(mktemp -d "${TMPDIR:-/tmp}/simplicio-host-plugins.XXXXXX")" || {
+    HOST_PLUGINS_REASON="Could not create bounded host-plugins capability capture"
+    return 1
+  }
+  host_stdout="$host_capture_dir/stdout"
+  host_stderr="$host_capture_dir/stderr"
+  host_stdout_fifo="$host_capture_dir/stdout.fifo"
+  host_stderr_fifo="$host_capture_dir/stderr.fifo"
+  if ! mkfifo "$host_stdout_fifo" "$host_stderr_fifo"; then
+    rm -f "$host_stdout_fifo" "$host_stderr_fifo"
+    rmdir "$host_capture_dir" 2>/dev/null || true
+    HOST_PLUGINS_REASON="Could not create bounded host-plugins capability streams"
+    return 1
+  fi
+  capture_stream_bounded "$host_stdout" "$host_stdout.truncated" 8192 <"$host_stdout_fifo" &
+  host_stdout_pid=$!
+  capture_stream_bounded "$host_stderr" "$host_stderr.truncated" 8192 <"$host_stderr_fifo" &
+  host_stderr_pid=$!
+  if "$DEST_PATH" host-plugins --help >"$host_stdout_fifo" 2>"$host_stderr_fifo"; then
+    host_exit_code=0
   else
-    rm -rf "$plugin_tmp"
-    return 1
+    host_exit_code=$?
   fi
+  if wait "$host_stdout_pid"; then host_stdout_ok=true; else host_stdout_ok=false; fi
+  if wait "$host_stderr_pid"; then host_stderr_ok=true; else host_stderr_ok=false; fi
+  rm -f "$host_stdout_fifo" "$host_stderr_fifo"
 
-  plugin_dir="$(python3 - "$plugin_zip" "$plugin_tmp/unpacked" <<'PY'
-import pathlib, sys, zipfile
-archive, destination = sys.argv[1:]
-root = pathlib.Path(destination).resolve()
-root.mkdir(parents=True, exist_ok=True)
-with zipfile.ZipFile(archive) as bundle:
-    for member in bundle.infolist():
-        target = (root / member.filename).resolve()
-        if target != root and root not in target.parents:
-            raise SystemExit("unsafe plugin archive path")
-    bundle.extractall(root)
-matches = list(root.glob("*/plugins/simplicio/plugin.json"))
-if len(matches) != 1:
-    raise SystemExit("Agent Plugin manifest not found exactly once")
-print(matches[0].parent)
+  host_contract_valid=false
+  if [ "$host_exit_code" -eq 0 ] && [ "$host_stdout_ok" = "true" ] && [ "$host_stderr_ok" = "true" ]; then
+    if python3 - "$host_stdout" "$host_stderr" <<'PY'
+import sys
+
+help_text = "\n".join(
+    open(path, "rb").read(8192).decode("utf-8", errors="replace")
+    for path in sys.argv[1:]
+)
+required = (
+    "simplicio.host-plugins/cli-v1",
+    "simplicio host-plugins plan",
+    "simplicio host-plugins apply",
+    "simplicio host-plugins pending",
+    "simplicio host-plugins reconcile",
+)
+raise SystemExit(0 if all(marker in help_text for marker in required) else 1)
 PY
-)" || { rm -rf "$plugin_tmp"; return 1; }
-
-  mkdir -p "$target_dir" || { rm -rf "$plugin_tmp"; return 1; }
-  if cp -R "$plugin_dir/." "$target_dir/"; then
-    rm -rf "$plugin_tmp"
-    ok "Agent Plugin do Simplicio instalado para $host_name"
-    return 0
+    then
+      host_contract_valid=true
+    fi
   fi
-  rm -rf "$plugin_tmp"
-  return 1
+
+  if [ "$host_contract_valid" = "true" ]; then
+    HOST_PLUGINS_STATE="pending_consent"
+    HOST_PLUGINS_COMMAND="simplicio host-plugins plan --all"
+    HOST_PLUGINS_REASON="Host plugins require separate explicit user consent."
+    host_supported=true
+  else
+    if [ "$host_exit_code" -eq 0 ] && [ "$host_stdout_ok" = "true" ] && [ "$host_stderr_ok" = "true" ]; then
+      host_diagnostic="Runtime returned exit code 0 without the required simplicio.host-plugins/cli-v1 contract marker and commands"
+    else
+      capture_sentinel="__SIMPLICIO_CAPTURE_EOF__"
+      host_diagnostic="$(cat "$host_stderr"; printf '%s' "$capture_sentinel")"
+      host_diagnostic="${host_diagnostic%"$capture_sentinel"}"
+      if [ -z "$host_diagnostic" ]; then
+        host_diagnostic="$(cat "$host_stdout"; printf '%s' "$capture_sentinel")"
+        host_diagnostic="${host_diagnostic%"$capture_sentinel"}"
+      fi
+      if [ -z "$host_diagnostic" ]; then
+        host_diagnostic="Runtime exited with code $host_exit_code"
+      fi
+    fi
+    HOST_PLUGINS_REASON="Runtime host-plugins capability unavailable: $host_diagnostic"
+    host_supported=false
+  fi
+  rm -f "$host_stdout" "$host_stderr" "$host_stdout.truncated" "$host_stderr.truncated"
+  rmdir "$host_capture_dir" 2>/dev/null || true
+  [ "$host_supported" = "true" ]
 }
 
-install_detected_host_plugins() {
-  if [ "${SIMPLICIO_INSTALL_HOST_PLUGINS:-1}" = "0" ]; then
-    info "instalação de plugins nativos ignorada por SIMPLICIO_INSTALL_HOST_PLUGINS=0"
-    return 0
+report_host_plugin_consent() {
+  if [ "$HOST_PLUGINS_STATE" = "pending_consent" ]; then
+    info "plugins de hosts aguardam consentimento separado; nenhum plugin de host foi alterado"
+    info "revise o plano somente pelo Runtime: $DEST_PATH host-plugins plan --all"
+  else
+    warn "capacidade host-plugins indisponível neste Runtime; nenhum plugin de host foi alterado"
   fi
-
-  detected=0
-  failures=0
-  if command -v codex >/dev/null 2>&1; then
-    detected=$((detected + 1))
-    codex plugin marketplace add "$REPO" --ref master \
-      --sparse .agents/plugins --sparse plugins/simplicio >/dev/null 2>&1 || true
-    if codex plugin add simplicio@simplicio-codex >/dev/null 2>&1; then
-      ok "plugin nativo do Codex instalado"
-    else
-      warn "Codex detectado, mas o plugin simplicio@simplicio-codex não pôde ser instalado"
-      failures=$((failures + 1))
-    fi
-  fi
-
-  if command -v claude >/dev/null 2>&1; then
-    detected=$((detected + 1))
-    claude plugin marketplace add "$REPO" >/dev/null 2>&1 || true
-    for plugin_name in $MARKETPLACE_PLUGINS; do
-      if claude plugin install "$plugin_name@simplicio" --scope user >/dev/null 2>&1; then
-        ok "plugin $plugin_name instalado no Claude Code"
-      else
-        warn "Claude Code detectado, mas $plugin_name@simplicio não pôde ser instalado"
-        failures=$((failures + 1))
-      fi
-    done
-  fi
-
-  if command -v gemini >/dev/null 2>&1; then
-    detected=$((detected + 1))
-    if ! install_gemini_extension; then
-      warn "Gemini CLI detectado, mas a extensão nativa do Simplicio não pôde ser instalada"
-      failures=$((failures + 1))
-    fi
-  fi
-
-  if command -v copilot >/dev/null 2>&1; then
-    detected=$((detected + 1))
-    copilot plugin marketplace add "$REPO" >/dev/null 2>&1 || true
-    for plugin_name in $MARKETPLACE_PLUGINS; do
-      if copilot plugin install "$plugin_name@simplicio" >/dev/null 2>&1; then
-        ok "plugin $plugin_name instalado no GitHub Copilot CLI"
-      else
-        warn "GitHub Copilot CLI detectado, mas $plugin_name@simplicio não pôde ser instalado"
-        failures=$((failures + 1))
-      fi
-    done
-  fi
-
-  if command -v qwen >/dev/null 2>&1; then
-    detected=$((detected + 1))
-    for plugin_name in $MARKETPLACE_PLUGINS; do
-      if qwen extensions install "$REPO:$plugin_name" >/dev/null 2>&1; then
-        ok "extensão $plugin_name instalada no Qwen Code"
-      else
-        warn "Qwen Code detectado, mas $plugin_name não pôde ser instalado"
-        failures=$((failures + 1))
-      fi
-    done
-  fi
-
-  if command -v hermes >/dev/null 2>&1; then
-    detected=$((detected + 1))
-    if hermes plugins install "$REPO/plugins/simplicio-hermes" --force --enable >/dev/null 2>&1 &&
-       hermes plugins doctor simplicio-hermes --ci >/dev/null 2>&1; then
-      ok "plugin simplicio-hermes instalado, habilitado e validado"
-    else
-      warn "Hermes detectado, mas o plugin simplicio-hermes não pôde ser instalado e habilitado"
-      failures=$((failures + 1))
-    fi
-  fi
-
-  cursor_detected=0
-  if command -v cursor >/dev/null 2>&1 || command -v cursor-agent >/dev/null 2>&1 ||
-     [ -d "$HOME/.cursor" ] || [ -d "$HOME/Library/Application Support/Cursor" ]; then
-    cursor_detected=1
-  fi
-  if [ "$cursor_detected" -eq 1 ]; then
-    detected=$((detected + 1))
-    if ! install_portable_agent_plugin "$HOME/.cursor/plugins/local/simplicio" "Cursor"; then
-      failures=$((failures + 1))
-    fi
-  fi
-
-  kiro_detected=0
-  if command -v kiro >/dev/null 2>&1 || command -v kiro-cli >/dev/null 2>&1 ||
-     [ -d "$HOME/.kiro" ] || [ -d "/Applications/Kiro.app" ]; then
-    kiro_detected=1
-  fi
-  if [ "$kiro_detected" -eq 1 ]; then
-    detected=$((detected + 1))
-    if ! install_portable_agent_plugin "$HOME/.kiro/powers/simplicio" "Kiro"; then
-      failures=$((failures + 1))
-    fi
-  fi
-
-  if [ "$detected" -eq 0 ]; then
-    info "nenhum host com pacote de plugin compatível detectado; o registro MCP cobre os demais clientes"
-  fi
-  [ "$failures" -eq 0 ]
 }
 
 # ─── --doctor: idempotent, read-only health check ──────────────────────────
@@ -497,9 +877,9 @@ run_doctor() {
     fi
 
     if verify_active_login; then
-      ok "sessão Google ativa e entitlement válido"
+      ok "sessão Google verificada de forma fresh e entitlement válido"
     else
-      warn "sessão Google ausente, expirada, revogada ou sem entitlement ativo"
+      warn "sessão Google não verificada de forma fresh (ausente, cacheada, expirada, revogada ou sem entitlement)"
       status=1
     fi
   fi
@@ -507,7 +887,7 @@ run_doctor() {
   if [ "$status" -eq 0 ]; then
     ok "simplicio está saudável"
   else
-    err "simplicio tem problemas — rode o instalador novamente"
+    warn "simplicio tem problemas — rode o instalador novamente"
   fi
   exit "$status"
 }
@@ -546,7 +926,7 @@ run_uninstall() {
 }
 
 case "${1:-}" in
-  --doctor) detect_platform; run_doctor ;;
+  --doctor) run_doctor ;;
   --uninstall)
     case "${2:-}" in
       ""|--keep-data) UNINSTALL_MODE="keep-data" ;;
@@ -567,12 +947,14 @@ printf '%b' "${NC}"
 echo ""
 
 # ─── 1. Detect platform ──────────────────────────────────────────────────────
+INSTALL_STAGE="platform_detection"
 detect_platform
 info "Plataforma detectada: $OS-$ARCH"
 
 # ─── 2. Instalar simplicio binary (staged download + SHA256 + atomic swap) ──
+INSTALL_STAGE="runtime_install"
 info "Instalando Simplicio Runtime..."
-mkdir -p "$BIN_DIR"
+mkdir -p "$BIN_DIR" || err "não foi possível criar o diretório do Runtime: $BIN_DIR"
 
 # A plain re-run means "update to latest". Only skip the download when the
 # caller explicitly pins the version already installed; otherwise an older
@@ -620,7 +1002,7 @@ if [ "$SKIP_EXISTING" != "true" ]; then
   SIGNATURE=""
   SIGNING_PUBKEY=""
   SIGNATURE_REQUIRED="false"
-  MANIFEST_TMP="$(mktemp)"
+  MANIFEST_TMP="$(mktemp)" || err "não foi possível criar o arquivo temporário do manifest de release"
   trap 'rm -f "$MANIFEST_TMP"' EXIT
   if fetch "$MANIFEST_URL" "$MANIFEST_TMP" 2>/dev/null; then
     if ! command -v python3 >/dev/null 2>&1; then
@@ -720,7 +1102,7 @@ except Exception:
   fi
 
   if [ "$SIGNED" = "true" ]; then
-    SIGNATURE_HELPER_TMP="$(mktemp)"
+    SIGNATURE_HELPER_TMP="$(mktemp)" || err "não foi possível criar o arquivo temporário do verificador Ed25519"
     if [ "$SIGNING_PUBKEY" != "$ED25519_PUBLIC_KEY" ] || ! verify_ed25519_signature "$STAGING_PATH" "$SIGNATURE" "$ED25519_PUBLIC_KEY" "$EXPECTED_SHA256" "$SIGNATURE_HELPER_TMP"; then
       rm -f "$STAGING_PATH" "$SIGNATURE_HELPER_TMP"
       err "assinatura Ed25519 inválida ou não verificável; instalação recusada"
@@ -729,7 +1111,7 @@ except Exception:
     ok "assinatura Ed25519 verificada sobre o digest SHA256"
   fi
 
-  chmod +x "$STAGING_PATH"
+  chmod +x "$STAGING_PATH" || { rm -f "$STAGING_PATH"; err "não foi possível tornar o Runtime baixado executável"; }
   # Validate the staged executable before the atomic swap. A release that lacks
   # embedded sources, Google login activation, or the signed-update key must
   # not replace a working installation and then fail its post-install checks.
@@ -752,39 +1134,48 @@ except Exception:
     rm -f "$STAGING_PATH" "$PREVIOUS_PATH"
     err "não foi possível ativar o Runtime verificado"
   fi
+  INSTALL_EFFECT_STARTED="true"
+  RUNTIME_INSTALLED="true"
   INSTALL_TRANSACTION_ACTIVE="false"
-  rm -f "$PREVIOUS_PATH"
+  if ! rm -f "$PREVIOUS_PATH"; then
+    err "o Runtime foi ativado, mas o backup temporário não pôde ser removido: $PREVIOUS_PATH"
+  fi
   ok "Simplicio Runtime instalado em $DEST_PATH"
 fi
 
 # ─── 2.1 Verificar o contrato de release antes de anunciar sucesso ──────────
+INSTALL_STAGE="runtime_contract"
 if ! verify_runtime_contract "$DEST_PATH"; then
   report_runtime_contract "$DEST_PATH"
   err "este Runtime não atende ao contrato de distribuição (fontes embutidas, login Google e chave pública de updates); instalação interrompida"
 fi
+RUNTIME_INSTALLED="true"
 ok "contrato de release do Runtime verificado"
 
 # ─── 2.2 Register MCP and native hooks for every detected client ───────────
-if verify_mcp_tools "$DEST_PATH"; then
-  ok "MCP e hooks registrados automaticamente para os clientes detectados"
-else
-  err "o Runtime foi instalado, mas o registro automático de MCP/hooks falhou: $DEST_PATH mcp register --binary $DEST_PATH --json"
-fi
+INSTALL_STAGE="mcp_registration"
+# Registration may update several client configs before returning a failure.
+# From this point an error is conservatively recorded as a partial effect.
+INSTALL_EFFECT_STARTED="true"
+  if verify_mcp_tools "$DEST_PATH"; then
+    MCP_REGISTERED="true"
+    ok "MCP e hooks registrados automaticamente para os clientes detectados"
+  else
+    fail_install "${MCP_FAILURE_CODE:-mcp_registration_failed}" "${MCP_FAILURE_REASON:-Runtime MCP registration failed without a diagnostic}"
+  fi
+INSTALL_STAGE="hook_registration"
 if reconcile_public_route_overlay; then
-  ok "hook público v11 verificado e reconciliado após o registro do Runtime"
+  HOOK_INSTALLED="true"
+  ok "hook público v12 verificado e reconciliado após o registro do Runtime"
 else
-  err "o Runtime registrou o MCP, mas o hook público v11 não pôde ser verificado e ativado"
+  fail_install "${HOOK_FAILURE_CODE:-hook_registration_failed}" "${HOOK_FAILURE_REASON:-Public hook registration failed without a diagnostic}"
 fi
 
-# Host packages add skills, commands and host-specific lifecycle behavior on
-# top of Runtime MCP registration. Every detected host with a documented
-# package surface is installed automatically; MCP remains the compatibility
-# path for clients without a package API.
-if install_detected_host_plugins; then
-  ok "plugins nativos reconciliados para os hosts detectados"
-else
-  err "Runtime/MCP estão prontos, mas a instalação automática de um ou mais plugins detectados falhou; consulte PLUGIN.md"
-fi
+# Host-specific plugin changes require a second, explicit consent transaction.
+# This installer never invokes host CLIs and never downloads a mutable plugin
+# archive. The Runtime owns planning, application, receipts and reconciliation.
+probe_host_plugins_capability || true
+report_host_plugin_consent
 report_login_state
 ok "MCP direto: $DEST_PATH serve --mcp --stdio; SIMPLICIO_MCP_URL=${SIMPLICIO_MCP_URL}"
 
@@ -797,15 +1188,25 @@ case ":$PATH:" in
 esac
 
 # ─── 3. Registrar e anunciar o contrato do Runtime ──────────────────────────
+INSTALL_STAGE="runtime_report"
 BUNDLE_DIR="${SIMPLICIO_BUNDLE_DIR:-$HOME/.simplicio}"
 RUNTIME_REPORT="$BUNDLE_DIR/runtime-release.json"
-mkdir -p "$BUNDLE_DIR"
+mkdir -p "$BUNDLE_DIR" || err "não foi possível criar o diretório do relatório do Runtime: $BUNDLE_DIR"
 if "$DEST_PATH" version --json >"$RUNTIME_REPORT" 2>/dev/null; then
   ok "contrato de release registrado em $RUNTIME_REPORT"
 else
-  rm -f "$RUNTIME_REPORT"
+  if ! rm -f "$RUNTIME_REPORT"; then
+    err "o Runtime falhou ao gerar o relatório e o arquivo parcial não pôde ser removido: $RUNTIME_REPORT"
+  fi
   err "não foi possível persistir o contrato de release; instalação interrompida"
 fi
+
+INSTALL_STAGE="complete"
+if ! persist_install_receipt "succeeded" 0 "" ""; then
+  INSTALL_STAGE="receipt_persistence"
+  err "Runtime/MCP/hook foram instalados, mas o recibo estruturado da instalação não pôde ser persistido"
+fi
+ok "recibo estruturado da instalação registrado em $INSTALL_RECEIPT"
 
 # ─── 4. Mensagem final ───────────────────────────────────────────────────────
 echo ""
@@ -815,8 +1216,17 @@ printf '%b\n' "${GREEN}║   Simplicio Runtime instalado com sucesso!           
 printf '%b\n' "${GREEN}║                                                          ║${NC}"
 printf '%b\n' "${GREEN}║   ✓ Contrato de release verificado                       ║${NC}"
 printf '%b\n' "${GREEN}║   ✓ Sem pip ou clones durante a instalação               ║${NC}"
-printf '%b\n' "${GREEN}║   ✓ Login Google verificável após auth login             ║${NC}"
+if verify_active_login; then
+  printf '%b\n' "${GREEN}║   ✓ Sessão Google fresh verificada                       ║${NC}"
+else
+  printf '%b\n' "${YELLOW}║   ⚠ Login Google pendente: execute auth login            ║${NC}"
+fi
 printf '%b\n' "${GREEN}║   ✓ MCP direto para o binário gerenciado                 ║${NC}"
+if [ "$HOST_PLUGINS_STATE" = "pending_consent" ]; then
+  printf '%b\n' "${GREEN}║   ⏳ Plugins aguardam consentimento separado             ║${NC}"
+else
+  printf '%b\n' "${YELLOW}║   ⚠ Plugins indisponíveis neste Runtime                  ║${NC}"
+fi
 printf '%b\n' "${GREEN}║   🩺 Doctor: sh install.sh --doctor                     ║${NC}"
 printf '%b\n' "${GREEN}║                                                          ║${NC}"
 printf '%b\n' "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}"
