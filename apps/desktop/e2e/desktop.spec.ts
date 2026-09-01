@@ -5,9 +5,8 @@ test("login and conservative access states remain actionable", async ({ page }) 
   await page.getByRole("button", { name: "Começar", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Entre no Simplicio" })).toBeVisible();
   await page.getByRole("button", { name: /Continuar com Google/ }).click();
-  await expect(page.getByRole("heading", { name: "Um bom começo." })).toBeVisible();
-  await page.getByRole("button", { name: "Agora não", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Simplicio", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Um bom começo." })).toHaveCount(0);
 
   await page.goto("/?state=unknown");
   await expect(page.getByRole("heading", { name: "Tente novamente" })).toBeVisible();
@@ -78,6 +77,9 @@ test("Bot Center exposes the canonical roster, timeline, rooms, and honest compu
 });
 
 test("primary layouts fit desktop and compact widths", async ({ page }) => {
+  // This intentionally performs 48 full navigations and competes with three
+  // other browser workers in the full suite; keep its budget above that load.
+  test.setTimeout(60_000);
   for (const width of [1280, 768, 390]) {
     await page.setViewportSize({ width, height: 900 });
     for (const view of ["today", "chats", "teams", "automations", "apps", "home", "agents", "providers", "tokens", "activity", "memory", "settings", "general", "shortcuts", "models", "setup"]) {

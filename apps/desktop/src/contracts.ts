@@ -1,3 +1,5 @@
+import type { DesktopHostPlugins } from "./integration_setup";
+
 export type AccessState = "signed_out" | "inactive" | "active" | "unknown";
 
 export type ProviderState =
@@ -231,6 +233,8 @@ export interface DesktopSnapshot {
   runtime: RuntimeStatus;
   savings: SavingsSummary;
   providers: ProviderConnection[];
+  /** Latest Runtime-owned host-plugin receipt projection; reading it never verifies or reconciles. */
+  hostPlugins?: DesktopHostPlugins;
   activity: ActivityItem[];
   botCenter?: BotCenterSnapshot;
   actions: Array<{

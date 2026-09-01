@@ -2834,6 +2834,7 @@ checksum = "3a219298ac11a56ea9a6d2120044824d6f01aeb034955e7af7bc16858527deea"
 name = "simplicio-desktop"
 version = "3.8.39"
 dependencies = [
+ "serde",
  "serde_json",
  "sha2",
  "tauri",

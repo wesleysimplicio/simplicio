@@ -1,108 +1,164 @@
 import { describe, expect, it } from "vitest";
-import { integrationChangeLabel, integrationTargetsVerified, parseIntegrationPlan, type IntegrationPlan } from "./integration_setup";
+import {
+  HOST_PLUGIN_IDS,
+  createPreviewIntegrationPlan,
+  hostPluginOutcomeLabel,
+  integrationChangeLabel,
+  parseHostPluginOperationResult,
+  parseIntegrationPlan,
+} from "./integration_setup";
 
-describe("Desktop installation review", () => {
-  const plan = { schema: "simplicio.desktop-integration-plan/v1", source: "runtime", planDigest: `sha256:${"a".repeat(64)}`, changes: [{ label: "codex", changed: true, exists: true, path: "/private", diff: "secret" }] };
-  it("exposes only the bounded plan summary and confirmation digest", () => {
-    const result = parseIntegrationPlan(plan);
-    expect(result.changes[0]).toEqual({ label: "codex", changed: true, exists: true });
-    expect(JSON.stringify(result)).not.toContain("secret");
+const digest = (value: string) => `sha256:${value.repeat(64)}`;
+
+function runtimePlan() {
+  return {
+    schema: "simplicio.host-plugin-command-result/v1",
+    result: "plan",
+    plan: {
+      schema: "simplicio.host-plugin-plan-summary/v1",
+      plan_digest: digest("a"),
+      selection: { scope: "all" },
+      manifest_digest: digest("b"),
+      plugin_version: "3.8.41",
+      component_versions: { simplicio: "3.8.41", secret: "/private/component" },
+      hosts: HOST_PLUGIN_IDS.map((host, index) => ({
+        host,
+        mode: index < 6 ? "manager" : "portable",
+        disposition: index === 7 ? "blocked" : index === 6 ? "unknown" : "ready",
+        reason_code: index === 7 ? "local_install_capability_unverified" : index === 6 ? "unknown" : "ready",
+        manager_path: "/private/bin",
+        raw_config: "DO_NOT_LEAK",
+      })),
+    },
+  };
+}
+
+function runtimeSnapshot(state: "complete" | "partial" | "requires_reconcile" = "complete") {
+  return {
+    schema: "simplicio.host-plugin-snapshot/v1",
+    receipt_schema: "simplicio.host-plugin-receipt/v1",
+    receipt_digest: digest("c"),
+    operation: "apply",
+    state,
+    attempt_id: "private-attempt",
+    revision: 2,
+    durable_id: digest("d"),
+    plan_digest: digest("a"),
+    manifest_digest: digest("b"),
+    hosts: HOST_PLUGIN_IDS.map((host, index) => ({
+      host,
+      status: index === 0 ? "applied_unverified" : index === 1 ? "blocked" : "verified",
+      reason_code: index === 0 ? "manager_readback_unknown" : index === 1 ? "precondition_blocked" : "exact_readback",
+      failure_code: index === 1 ? "manager_unavailable" : undefined,
+      verification: index < 2 ? "none" : "installed_tree_and_manager",
+      reconcile: null,
+      backup_id: "/private/backup",
+      stdout: "DO_NOT_LEAK",
+    })),
+  };
+}
+
+describe("Runtime host-plugin plan review", () => {
+  it("requires and shows exactly the eight canonical native/plugin hosts", () => {
+    const result = parseIntegrationPlan(runtimePlan());
+    expect(result.hosts.map(({ host }) => host)).toEqual(HOST_PLUGIN_IDS);
+    expect(result.source).toBe("runtime");
+    expect(result.planDigest).toBe(digest("a"));
   });
-  it("rejects an absent digest and arbitrary config labels", () => {
-    expect(() => parseIntegrationPlan({ ...plan, planDigest: "" })).toThrow();
-    expect(() => parseIntegrationPlan({ ...plan, changes: [{ label: "/private", changed: true, exists: true }] })).toThrow();
+
+  it("projects only review-safe fields", () => {
+    const result = parseIntegrationPlan(runtimePlan());
+    const encoded = JSON.stringify(result);
+    expect(encoded).not.toContain("private");
+    expect(encoded).not.toContain("DO_NOT_LEAK");
+    expect(encoded).not.toContain("component_versions");
+    expect(result.hosts[0]).toEqual({ host: "codex", mode: "manager", disposition: "ready", reasonCode: "ready" });
   });
-  it("rejects duplicate target labels before a plan can be reviewed or applied", () => {
-    for (const duplicate of [plan.changes[0], { label: "codex", changed: false, exists: false }]) {
-      expect(() => parseIntegrationPlan({ ...plan, changes: [...plan.changes, duplicate] })).toThrow("integration_plan_ambiguous_targets");
-    }
+
+  it("rejects missing, duplicated or invented hosts and a non-all selection", () => {
+    const missing = runtimePlan();
+    missing.plan.hosts.pop();
+    expect(() => parseIntegrationPlan(missing)).toThrow("host_plugin_hosts_invalid");
+    const duplicate = runtimePlan();
+    duplicate.plan.hosts[7] = { ...duplicate.plan.hosts[0] };
+    expect(() => parseIntegrationPlan(duplicate)).toThrow("host_plugin_hosts_invalid");
+    const invented = runtimePlan();
+    invented.plan.hosts[0].host = "fake" as "codex";
+    expect(() => parseIntegrationPlan(invented)).toThrow("host_plugin_contract_invalid");
+    const one = runtimePlan();
+    one.plan.selection = { scope: "one", host: "codex" } as unknown as { scope: string };
+    expect(() => parseIntegrationPlan(one)).toThrow("integration_plan_selection_invalid");
   });
-  it.each([
-    { exists: true, changed: true, expected: "Atualizar" },
-    { exists: false, changed: true, expected: "Criar" },
-    { exists: true, changed: false, expected: "Já configurado" },
-    { exists: false, changed: false, expected: "Configuração ausente" },
-  ])("labels exists=$exists changed=$changed without assuming configuration", ({ exists, changed, expected }) => {
-    expect(integrationChangeLabel({ label: "codex", exists, changed })).toBe(expected);
+
+  it("uses honest labels for unsupported and unverified native installs", () => {
+    const plan = parseIntegrationPlan(runtimePlan());
+    expect(integrationChangeLabel(plan.hosts[0])).toBe("Pronto para configurar");
+    expect(integrationChangeLabel(plan.hosts[6])).toBe("Estado não confirmado");
+    expect(integrationChangeLabel(plan.hosts[7])).toBe("Instalação manual");
+  });
+
+  it("provides the same eight-host shape in browser preview without effects", () => {
+    const preview = createPreviewIntegrationPlan();
+    expect(preview.source).toBe("preview");
+    expect(preview.hosts.map(({ host }) => host)).toEqual(HOST_PLUGIN_IDS);
   });
 });
 
-describe("post-apply configuration verification", () => {
-  const reviewed: IntegrationPlan = {
-    schema: "simplicio.desktop-integration-plan/v1", source: "runtime", planDigest: `sha256:${"a".repeat(64)}`,
-    changes: [{ label: "codex", changed: true, exists: true }, { label: "hermes", changed: true, exists: false }, { label: "stable", changed: false, exists: true }],
-  };
-  function observed(overrides: Partial<IntegrationPlan> = {}): IntegrationPlan {
-    return { ...reviewed, planDigest: `sha256:${"b".repeat(64)}`, changes: reviewed.changes.map((row) => ({ ...row, exists: true, changed: false })), ...overrides };
-  }
-
-  it("requires changed targets to exist with no pending changes after application", () => {
-    expect(integrationTargetsVerified(reviewed, observed())).toBe(true);
-    expect(integrationTargetsVerified(reviewed, reviewed)).toBe(false);
+describe("canonical apply and reconcile result", () => {
+  it("uses the returned snapshot directly and removes receipt internals", () => {
+    const result = parseHostPluginOperationResult({
+      schema: "simplicio.host-plugin-command-result/v1",
+      result: "receipt",
+      receipt: { backup_id: "/private/backup", stdout: "DO_NOT_LEAK" },
+      snapshot: runtimeSnapshot(),
+    });
+    expect(result.snapshot.hosts).toHaveLength(8);
+    expect(result.snapshot.hosts[0].status).toBe("applied_unverified");
+    expect(result.snapshot.hosts[1].status).toBe("blocked");
+    expect(hostPluginOutcomeLabel(result.snapshot)).toBe("Concluído com ações manuais");
+    const encoded = JSON.stringify(result);
+    expect(encoded).not.toContain("backup");
+    expect(encoded).not.toContain("private");
+    expect(encoded).not.toContain("DO_NOT_LEAK");
+    expect(encoded).not.toContain("attempt");
   });
 
-  it("matches exact labels rather than order or the old plan digest", () => {
-    const current = observed();
-    current.changes.reverse();
-    expect(current.planDigest).not.toBe(reviewed.planDigest);
-    expect(integrationTargetsVerified(reviewed, current)).toBe(true);
+  it.each(["partial", "requires_reconcile"] as const)("preserves %s and its opaque reconcile id", (state) => {
+    const result = parseHostPluginOperationResult({
+      schema: "simplicio.host-plugin-command-result/v1", result: "receipt", receipt: {}, snapshot: runtimeSnapshot(state),
+    });
+    expect(result.snapshot.state).toBe(state);
+    expect(result.snapshot.receiptId).toBe(digest("d"));
+    expect(hostPluginOutcomeLabel(result.snapshot)).toMatch(/parcial|Reconciliação/);
   });
 
-  it("does not expand the reviewed scope to newly discovered targets", () => {
-    const current = observed();
-    current.changes.push({ label: "new-client", changed: true, exists: false });
-    expect(integrationTargetsVerified(reviewed, current)).toBe(true);
+  it("fails closed when a partial result has no durable id", () => {
+    const snapshot = runtimeSnapshot("partial");
+    (snapshot as Record<string, unknown>).durable_id = undefined;
+    expect(() => parseHostPluginOperationResult({
+      schema: "simplicio.host-plugin-command-result/v1", result: "receipt", receipt: {}, snapshot,
+    })).toThrow("host_plugin_receipt_id_missing");
   });
 
-  it("rejects disappeared, absent and still-changing reviewed targets", () => {
-    for (const changes of [
-      observed().changes.filter((row) => row.label !== "codex"),
-      observed().changes.map((row) => row.label === "codex" ? { ...row, exists: false } : row),
-      observed().changes.map((row) => row.label === "codex" ? { ...row, changed: true } : row),
-    ]) expect(integrationTargetsVerified(reviewed, observed({ changes }))).toBe(false);
+  it("binds a terminal receipt to the command that requested it", () => {
+    const envelope = {
+      schema: "simplicio.host-plugin-command-result/v1", result: "receipt", receipt: {}, snapshot: runtimeSnapshot(),
+    };
+    expect(parseHostPluginOperationResult(envelope, "apply").snapshot.operation).toBe("apply");
+    expect(() => parseHostPluginOperationResult(envelope, "reconcile")).toThrow("host_plugin_operation_mismatch");
+    const applying = runtimeSnapshot();
+    applying.state = "applying" as "complete";
+    expect(() => parseHostPluginOperationResult({ ...envelope, snapshot: applying }, "apply"))
+      .toThrow("host_plugin_operation_incomplete");
   });
 
-  it("rejects duplicated labels in either plan instead of selecting a convenient match", () => {
-    const duplicateReview = { ...reviewed, changes: [...reviewed.changes, { label: "codex", changed: false, exists: true }] };
-    const duplicateObservation = observed();
-    duplicateObservation.changes.push({ label: "codex", changed: true, exists: true });
-    expect(integrationTargetsVerified(duplicateReview, observed())).toBe(false);
-    expect(integrationTargetsVerified(reviewed, duplicateObservation)).toBe(false);
-  });
-
-  it("rejects drift in a plan made entirely of already configured targets", () => {
-    const unchanged = { ...reviewed, changes: [{ label: "stable", exists: true, changed: false }] };
-    for (const changes of [[], [{ label: "stable", exists: false, changed: false }], [{ label: "stable", exists: true, changed: true }]]) {
-      expect(integrationTargetsVerified(unchanged, observed({ changes }))).toBe(false);
+  it("rejects arbitrary status and failure strings instead of reflecting them", () => {
+    for (const field of ["status", "failure_code"] as const) {
+      const snapshot = runtimeSnapshot();
+      (snapshot.hosts[0] as Record<string, unknown>)[field] = "/private/DO_NOT_LEAK";
+      expect(() => parseHostPluginOperationResult({
+        schema: "simplicio.host-plugin-command-result/v1", result: "receipt", receipt: {}, snapshot,
+      })).toThrow("host_plugin_contract_invalid");
     }
-    expect(integrationTargetsVerified(unchanged, observed({ changes: unchanged.changes }))).toBe(true);
-  });
-
-  it("rejects drift in a preexisting target even when every modified target is clean", () => {
-    for (const changes of [
-      observed().changes.filter((row) => row.label !== "stable"),
-      observed().changes.map((row) => row.label === "stable" ? { ...row, exists: false } : row),
-      observed().changes.map((row) => row.label === "stable" ? { ...row, changed: true } : row),
-    ]) expect(integrationTargetsVerified(reviewed, observed({ changes }))).toBe(false);
-  });
-
-  it("never uses a preview plan to confirm runtime configuration", () => {
-    expect(integrationTargetsVerified(reviewed, observed({ source: "preview" }))).toBe(false);
-    const previewReview = { ...reviewed, source: "preview" as const };
-    expect(integrationTargetsVerified(previewReview, previewReview)).toBe(false);
-    expect(integrationTargetsVerified(previewReview, observed({ source: "preview" }))).toBe(true);
-  });
-
-  it("allows an empty reviewed change set without making handshake claims", () => {
-    const unchanged = { ...reviewed, changes: reviewed.changes.map((row) => ({ ...row, changed: false })) };
-    expect(integrationTargetsVerified(unchanged, observed())).toBe(true);
-    expect(integrationTargetsVerified({ ...reviewed, changes: [] }, observed({ changes: [] }))).toBe(true);
-  });
-
-  it("does not mutate either plan while checking configuration evidence", () => {
-    const current = observed();
-    const before = JSON.stringify([reviewed, current]);
-    integrationTargetsVerified(reviewed, current);
-    expect(JSON.stringify([reviewed, current])).toBe(before);
   });
 });

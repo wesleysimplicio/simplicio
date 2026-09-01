@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { AccessState } from "../contracts";
 import { Brand, Glyph } from "../components/Brand";
+import type { RuntimeInstallResult } from "../runtime_install";
 
 export function LoadingScreen() {
   return (
@@ -12,6 +13,86 @@ export function LoadingScreen() {
       <p>Conectando ao Runtime local…</p>
     </div>
   );
+}
+
+export type RuntimeInstallPhase = "idle" | "installing" | "validating" | "failed";
+
+const runtimeInstallSteps = [
+  ["Validar componente empacotado", "Conferir o Runtime que acompanha este instalador."],
+  ["Instalar o Runtime", "Publicar o binário localmente de forma atômica e privada."],
+  ["Validar o Runtime instalado", "Executar o binário ativo e validar seu contrato."],
+  ["Concluir a preparação", "Ler um snapshot novo antes de seguir para o login."],
+] as const;
+
+function runtimeInstallStepStates(phase: RuntimeInstallPhase, receipt?: RuntimeInstallResult) {
+  if (phase === "installing") return ["running", "pending", "pending", "pending"] as const;
+  if (phase === "validating") return ["complete", "complete", "complete", "running"] as const;
+  if (phase === "failed") {
+    return receipt
+      ? (["complete", "complete", "complete", "failed"] as const)
+      : (["failed", "pending", "pending", "pending"] as const);
+  }
+  return ["pending", "pending", "pending", "pending"] as const;
+}
+
+export function RuntimeInstallScreen({ phase, receipt, error, onInstall }: {
+  phase: RuntimeInstallPhase;
+  receipt?: RuntimeInstallResult;
+  error: string | null;
+  onInstall: () => void;
+}) {
+  const states = runtimeInstallStepStates(phase, receipt);
+  const busy = phase === "installing" || phase === "validating";
+  const progress = phase === "validating" || (phase === "failed" && receipt) ? 75 : phase === "installing" ? 25 : 0;
+  const status = phase === "installing"
+    ? "Validando e instalando o Runtime…"
+    : phase === "validating"
+      ? "Runtime instalado. Confirmando o estado atual…"
+      : phase === "failed"
+        ? "A preparação não foi concluída."
+        : "Pronto para preparar o Runtime local.";
+
+  return <div className="setup-layout runtime-install-layout">
+    <header className="entry-header"><Brand /></header>
+    <div className="runtime-install-progress">
+      <progress className="setup-progress" max={100} value={progress} aria-label="Progresso da preparação do Runtime" />
+    </div>
+    <main className="setup-main">
+      <section className="setup-body runtime-install-body" aria-labelledby="runtime-install-title">
+        <div className={`setup-heading${phase === "failed" ? " is-failed" : ""}`}>
+          <span className="eyebrow">PRIMEIRA ABERTURA</span>
+          <h1 id="runtime-install-title">Prepare o Simplicio Runtime</h1>
+          <p>O Desktop instalará e validará somente o Runtime empacotado. Plugins, IDEs e configurações continuam intocados até sua revisão e consentimento separados.</p>
+        </div>
+        <p className="runtime-install-status" role="status">{status}</p>
+        <ol className="setup-steps">
+          {runtimeInstallSteps.map(([label, detail], index) => {
+            const state = states[index];
+            return <li key={label} data-state={state}>
+              <span className="setup-step-icon">
+                {state === "complete" ? <Glyph name="check" size={15} />
+                  : state === "running" ? <span className="setup-spinner" aria-hidden="true" />
+                    : state === "failed" ? <Glyph name="attention" size={15} /> : index + 1}
+              </span>
+              <span><strong>{label}</strong><p>{detail}</p></span>
+              <span className="setup-step-status">{state === "complete" ? "Concluído" : state === "running" ? "Em andamento" : state === "failed" ? "Falhou" : "Pendente"}</span>
+            </li>;
+          })}
+        </ol>
+        {receipt && <p className="runtime-install-receipt"><Glyph name="shield" size={16} />Runtime {receipt.runtime.version} validado · plugins não alterados</p>}
+        {error && <p className="action-error" role="alert">{error}</p>}
+      </section>
+    </main>
+    <div className="setup-actionbar">
+      <div className="setup-footer-inner">
+        <button className="button button-primary" type="button" onClick={onInstall} disabled={busy} aria-busy={busy}>
+          {busy ? "Preparando…" : phase === "failed" ? "Tentar novamente" : "Instalar e validar Runtime"}
+          {!busy && <Glyph name="arrow" size={17} />}
+        </button>
+      </div>
+    </div>
+    <footer className="entry-footer"><Glyph name="shield" size={14} />Instalação local · Sem plugins antes do consentimento</footer>
+  </div>;
 }
 
 export function SignInScreen({ busy, error, onLogin, initialStep = "welcome" }:
