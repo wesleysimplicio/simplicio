@@ -136,6 +136,14 @@ function nullableInteger(value: unknown): number | null {
   return integer(value);
 }
 
+function signedInteger(value: unknown): number | null {
+  if (value === null) return null;
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || Math.abs(value) > 1_000_000_000) {
+    throw new Error('cost_projection_invalid');
+  }
+  return value;
+}
+
 function money(value: unknown): number | null {
   if (value === null) return null;
   if (typeof value !== 'number' || !Number.isFinite(value) || Math.abs(value) > 1_000_000_000) {
@@ -164,15 +172,14 @@ function validateSavings(
   baselineCost: number | null,
   savedCost: number | null,
 ): void {
-  if ((baselineTokens === null) !== (savedTokens === null)
-    || (actualCost === null || baselineCost === null) !== (savedCost === null)) {
-    throw new Error('cost_projection_invalid');
-  }
-  if (baselineTokens !== null && savedTokens !== baselineTokens - (actualTokens ?? 0)) {
+  const tokensKnown = actualTokens !== null && baselineTokens !== null;
+  if ((savedTokens !== null) !== tokensKnown) throw new Error('cost_projection_invalid');
+  const costsKnown = actualCost !== null && baselineCost !== null;
+  if ((savedCost !== null) !== costsKnown) throw new Error('cost_projection_invalid');
+  if (tokensKnown && savedTokens !== baselineTokens! - actualTokens!) {
     throw new Error('cost_projection_savings_mismatch');
   }
-  if (savedCost !== null && actualCost !== null && baselineCost !== null
-    && Math.abs(savedCost - (baselineCost - actualCost)) > 0.00000001) {
+  if (costsKnown && savedCost !== null && Math.abs(savedCost - (baselineCost! - actualCost!)) > 0.00000001) {
     throw new Error('cost_projection_savings_mismatch');
   }
 }
@@ -183,7 +190,7 @@ function parseTotals(value: unknown): CostTotals {
     event_count: integer(raw.event_count),
     actual_tokens: nullableInteger(raw.actual_tokens),
     baseline_tokens: nullableInteger(raw.baseline_tokens),
-    saved_tokens: money(raw.saved_tokens),
+    saved_tokens: signedInteger(raw.saved_tokens),
     actual_cost_usd: money(raw.actual_cost_usd),
     baseline_cost_usd: money(raw.baseline_cost_usd),
     saved_cost_usd: money(raw.saved_cost_usd),
@@ -269,7 +276,8 @@ function sameNullableNumber(left: number | null, right: number | null): boolean 
 }
 
 function sumNullable(values: Array<number | null>): number | null {
-  return values.some((value) => value === null) ? null : values.reduce((sum, value) => sum + (value ?? 0), 0);
+  if (values.some((value) => value === null)) return null;
+  return values.reduce((sum, value) => sum + (value as number), 0);
 }
 
 function sumBreakdown(rows: CostBreakdownRow[]): CostTotals {
