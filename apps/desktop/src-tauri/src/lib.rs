@@ -1,5 +1,4 @@
 use serde_json::Value;
-use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use tauri::Manager;
@@ -9,20 +8,17 @@ mod auth_login;
 mod consolidated_tokens;
 mod context_report;
 mod desktop_queries;
-mod install_result;
-mod legacy_snapshot;
+mod host_plugins;
 mod local_projects;
 #[cfg(desktop)]
 mod native_menu;
 mod project_discovery_process;
 mod project_usage;
+mod runtime_install;
 mod runtime_process;
 mod snapshot_exports;
 mod supervisor;
 mod token_exports;
-
-static INSTALL_LOCK: std::sync::Mutex<install_result::InstallAttempt> =
-    std::sync::Mutex::new(install_result::InstallAttempt::new());
 
 #[tauri::command]
 async fn desktop_validate_project(path: String) -> Result<Value, String> {
@@ -68,66 +64,12 @@ const SNAPSHOT_ARGS: &[&str] = &["desktop", "snapshot", "--json"];
 const LOGIN_ARGS: &[&str] = auth_login::LOGIN_ARGS;
 const LOGOUT_ARGS: &[&str] = &["logout", "--json"];
 const STATUS_ARGS: &[&str] = auth_login::STATUS_ARGS;
-const LEGACY_AUTH_ARGS: &[&str] = &["auth", "status", "--json"];
-const LEGACY_STATUS_ARGS: &[&str] = &["status", "--json"];
-const LEGACY_SAVINGS_ARGS: &[&str] = &["savings", "report", "--json"];
-const LEGACY_INSTALL_ARGS: &[&str] = &["install", "--global", "--dry-run", "--json"];
-// Only dispatched after the reviewed plan digest and explicit UI consent match.
-const INSTALL_ARGS: &[&str] = &["install", "--global", "--yes", "--json"];
+const HOST_PLUGIN_PLAN_ARGS: &[&str] = &["host-plugins", "plan", "--all"];
 const SUBSCRIPTION_URL: &str = "https://simpleti.com.br/simplicio";
 const RELEASES_URL: &str = "https://github.com/wesleysimplicio/simplicio/releases";
 
-fn install_attempt_path(app: &tauri::AppHandle) -> Result<PathBuf, install_result::InstallError> {
-    app.path()
-        .app_data_dir()
-        .map(|directory| directory.join("install-attempt.json"))
-        .map_err(|_| install_result::InstallFailure::NotStarted.public_error())
-}
-
-fn runtime_candidates_with(
-    override_binary: Option<OsString>,
-    simplicio_home: Option<OsString>,
-    user_home: Option<OsString>,
-    current_executable: Option<OsString>,
-) -> Vec<OsString> {
-    if let Some(binary) = override_binary {
-        return vec![binary];
-    }
-
-    let install_root = simplicio_home
-        .map(PathBuf::from)
-        .or_else(|| user_home.map(|home| PathBuf::from(home).join(".simplicio")));
-    let executable = if cfg!(windows) {
-        "simplicio.exe"
-    } else {
-        "simplicio"
-    };
-
-    let mut candidates = Vec::with_capacity(3);
-    if let Some(parent) = current_executable
-        .map(PathBuf::from)
-        .and_then(|path| path.parent().map(Path::to_path_buf))
-    {
-        candidates.push(parent.join(executable).into_os_string());
-    }
-    if let Some(root) = install_root {
-        candidates.push(root.join("bin").join(executable).into_os_string());
-    }
-    candidates.push(OsString::from(executable));
-    candidates
-}
-
-fn runtime_candidates() -> Vec<OsString> {
-    runtime_candidates_with(
-        std::env::var_os("SIMPLICIO_RUNTIME_BIN"),
-        std::env::var_os("SIMPLICIO_HOME"),
-        std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")),
-        std::env::current_exe().ok().map(PathBuf::into_os_string),
-    )
-}
-
 fn runtime_capture_limits(args: &[&str]) -> runtime_process::CaptureLimits {
-    if args == INSTALL_ARGS {
+    if matches!(args, ["host-plugins", "apply" | "reconcile", ..]) {
         runtime_process::CaptureLimits::INSTALL
     } else if args == LOGIN_ARGS {
         runtime_process::CaptureLimits::OAUTH
@@ -136,13 +78,12 @@ fn runtime_capture_limits(args: &[&str]) -> runtime_process::CaptureLimits {
     }
 }
 
-fn run_runtime_capture(args: &[&str]) -> Result<Output, runtime_process::ProcessFailure> {
-    let commands = runtime_candidates().into_iter().map(|binary| {
-        let mut command = Command::new(binary);
-        command.args(args).env("SIMPLICIO_DESKTOP_BRIDGE", "1");
-        command
-    });
-    runtime_process::capture_candidates(commands, runtime_capture_limits(args))
+fn run_runtime_capture(args: &[&str]) -> Result<Output, String> {
+    let binary = packaged_runtime_authority()?;
+    let mut command = Command::new(binary);
+    command.args(args).env("SIMPLICIO_DESKTOP_BRIDGE", "1");
+    runtime_process::capture(&mut command, runtime_capture_limits(args))
+        .map_err(|failure| runtime_failure_code(args, failure))
 }
 
 fn runtime_failure_code(args: &[&str], failure: runtime_process::ProcessFailure) -> String {
@@ -153,7 +94,9 @@ fn runtime_failure_code(args: &[&str], failure: runtime_process::ProcessFailure)
     match failure.kind {
         FailureKind::Spawn => "runtime_not_started",
         FailureKind::Deadline if args == LOGIN_ARGS => "runtime_oauth_timeout",
-        FailureKind::Deadline if args == INSTALL_ARGS => "runtime_install_timeout",
+        FailureKind::Deadline if matches!(args, ["host-plugins", "apply" | "reconcile", ..]) => {
+            "runtime_install_timeout"
+        }
         FailureKind::Deadline => "runtime_query_timeout",
         FailureKind::StdoutLimit => "runtime_stdout_limit",
         FailureKind::StderrLimit => "runtime_stderr_limit",
@@ -164,7 +107,7 @@ fn runtime_failure_code(args: &[&str], failure: runtime_process::ProcessFailure)
 }
 
 fn run_runtime_output(args: &[&str]) -> Result<Output, String> {
-    run_runtime_capture(args).map_err(|failure| runtime_failure_code(args, failure))
+    run_runtime_capture(args)
 }
 
 fn successful_output(args: &[&str]) -> Result<Output, String> {
@@ -186,27 +129,38 @@ fn run_runtime_json(args: &[&str]) -> Result<Value, String> {
         .map_err(|_| "Simplicio Runtime devolveu JSON inválido".to_string())
 }
 
+fn run_runtime_binary_json(binary: &Path, args: &[&str]) -> Result<Value, String> {
+    let mut command = Command::new(binary);
+    command.args(args).env("SIMPLICIO_DESKTOP_BRIDGE", "1");
+    let output = runtime_process::capture(&mut command, runtime_capture_limits(args))
+        .map_err(|failure| runtime_failure_code(args, failure))?;
+    if !output.status.success() {
+        return Err("runtime_install_verification_failed".to_string());
+    }
+    serde_json::from_slice(&output.stdout)
+        .map_err(|_| "runtime_install_verification_failed".to_string())
+}
+
+fn runtime_user_home() -> Result<PathBuf, String> {
+    std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map(PathBuf::from)
+        .ok_or_else(|| "runtime_install_home_unavailable".to_string())
+}
+
 fn run_runtime_action(args: &[&str]) -> Result<(), String> {
     successful_output(args).map(|_| ())
 }
 
-fn repair_provider_integrations() -> Result<(), install_result::InstallFailure> {
-    use install_result::InstallFailure;
-    use runtime_process::{ChildState, FailureKind};
-    let output = run_runtime_capture(INSTALL_ARGS).map_err(|failure| {
-        if failure.child_state == ChildState::Retained {
-            return InstallFailure::CleanupUnconfirmed;
-        }
-        match failure.kind {
-            FailureKind::Spawn => InstallFailure::NotStarted,
-            FailureKind::Deadline => InstallFailure::TimedOut,
-            FailureKind::StdoutLimit => InstallFailure::ResponseTooLarge,
-            FailureKind::StderrLimit => InstallFailure::StderrTooLarge,
-            FailureKind::Capture => InstallFailure::OutputUnavailable,
-            FailureKind::CleanupPending => InstallFailure::CleanupUnconfirmed,
-        }
-    })?;
-    install_result::validate_install_output(output.status.code(), &output.stdout)
+fn run_host_plugin_json(args: &[&str]) -> Result<Value, String> {
+    let output = run_runtime_capture(args)?;
+    let value = serde_json::from_slice::<Value>(&output.stdout)
+        .map_err(|_| "host_plugin_response_invalid".to_string())?;
+    if output.status.success() {
+        return Ok(value);
+    }
+    let code = host_plugins::cli_error_code(&value).ok_or("host_plugin_failure_invalid")?;
+    Err(format!("host_plugin_{code}"))
 }
 
 fn require_active_access() -> Result<(), String> {
@@ -222,7 +176,34 @@ fn require_active_access() -> Result<(), String> {
 
 fn integration_plan_from_runtime() -> Result<Value, String> {
     require_active_access()?;
-    desktop_queries::project_install_plan(run_runtime_json(LEGACY_INSTALL_ARGS)?)
+    host_plugins::project_plan(run_host_plugin_json(HOST_PLUGIN_PLAN_ARGS)?)
+}
+
+fn host_plugin_apply_args(plan_digest: &str) -> Result<Vec<String>, String> {
+    if !host_plugins::valid_digest(plan_digest) {
+        return Err("host_plugin_plan_digest_invalid".to_string());
+    }
+    Ok([
+        "host-plugins",
+        "apply",
+        "--all",
+        "--plan-digest",
+        plan_digest,
+        "--yes",
+    ]
+    .into_iter()
+    .map(str::to_string)
+    .collect())
+}
+
+fn host_plugin_reconcile_args(receipt_id: &str) -> Result<Vec<String>, String> {
+    if !host_plugins::valid_digest(receipt_id) {
+        return Err("host_plugin_receipt_id_invalid".to_string());
+    }
+    Ok(["host-plugins", "reconcile", "--receipt-id", receipt_id]
+        .into_iter()
+        .map(str::to_string)
+        .collect())
 }
 
 fn require_read_access() -> Result<(), String> {
@@ -300,7 +281,7 @@ async fn desktop_consolidated_token_report(request: Value) -> Result<Value, Stri
         consolidated_tokens::report(
             &request,
             &executable,
-            runtime_candidates(),
+            vec![packaged_runtime_authority()?.into_os_string()],
             require_read_access,
         )
     })
@@ -425,6 +406,7 @@ fn validate_snapshot(value: Value) -> Result<Value, String> {
             .get("activity")
             .and_then(Value::as_array)
             .is_some_and(|items| items.len() <= 5)
+        && host_plugins::validate_desktop_projection(value.get("hostPlugins")).is_ok()
         && value
             .pointer("/redaction/credentials")
             .and_then(Value::as_bool)
@@ -451,29 +433,25 @@ fn validate_snapshot(value: Value) -> Result<Value, String> {
     }
 }
 
+fn snapshot_from_binary(binary: &Path) -> Result<Value, String> {
+    validate_snapshot(run_runtime_binary_json(binary, SNAPSHOT_ARGS)?)
+}
+
+fn packaged_runtime_authority() -> Result<PathBuf, String> {
+    let current_executable =
+        std::env::current_exe().map_err(|_| "runtime_install_package_unavailable".to_string())?;
+    runtime_install::bundled_authority(&current_executable, snapshot_from_binary)
+}
+
 fn snapshot_from_runtime() -> Result<Value, String> {
-    let output = run_runtime_output(SNAPSHOT_ARGS)?;
-    if output.status.success() {
-        let value = serde_json::from_slice(&output.stdout)
-            .map_err(|_| "Simplicio Runtime devolveu JSON inválido".to_string())?;
-        return validate_snapshot(value);
-    }
-
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    if !stderr.contains("unknown desktop sub: snapshot") {
-        return Err(format!(
-            "Simplicio Runtime encerrou com código {}",
-            output.status.code().unwrap_or(-1)
-        ));
-    }
-
-    let auth = run_runtime_json(LEGACY_AUTH_ARGS)?;
-    let status = run_runtime_json(LEGACY_STATUS_ARGS)?;
-    let savings = run_runtime_json(LEGACY_SAVINGS_ARGS)?;
-    let install = run_runtime_json(LEGACY_INSTALL_ARGS)?;
-    validate_snapshot(legacy_snapshot::build_legacy_snapshot(
-        &auth, &status, &savings, &install,
-    )?)
+    let current_executable =
+        std::env::current_exe().map_err(|_| "runtime_install_package_unavailable".to_string())?;
+    runtime_install::current_snapshot(
+        &current_executable,
+        &runtime_user_home()?,
+        snapshot_from_binary,
+    )?
+    .ok_or_else(|| "runtime_install_required".to_string())
 }
 
 #[tauri::command]
@@ -489,9 +467,25 @@ async fn refresh_desktop_snapshot() -> Result<Value, String> {
 }
 
 #[tauri::command]
+async fn desktop_install_runtime() -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let current_executable = std::env::current_exe()
+            .map_err(|_| "runtime_install_package_unavailable".to_string())?;
+        runtime_install::install(
+            &current_executable,
+            &runtime_user_home()?,
+            snapshot_from_binary,
+        )
+    })
+    .await
+    .map_err(|_| "runtime_install_unavailable".to_string())?
+}
+
+#[tauri::command]
 async fn desktop_login() -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(|| {
-        auth_login::authenticate(runtime_candidates(), |binary, args| {
+        let authority = packaged_runtime_authority()?;
+        auth_login::authenticate([authority.into_os_string()], |binary, args| {
             let mut command = Command::new(binary);
             command.args(args).env("SIMPLICIO_DESKTOP_BRIDGE", "1");
             runtime_process::capture(&mut command, runtime_capture_limits(args))
@@ -513,59 +507,31 @@ async fn desktop_logout() -> Result<Value, String> {
 }
 
 #[tauri::command]
-async fn desktop_repair_providers(
-    app: tauri::AppHandle,
-    plan_digest: String,
-) -> Result<Value, install_result::InstallError> {
-    use install_result::InstallFailure;
-    let journal = install_attempt_path(&app)?;
+async fn desktop_apply_host_plugins(plan_digest: String) -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let mut attempt = INSTALL_LOCK.try_lock().map_err(|error| match error {
-            std::sync::TryLockError::WouldBlock => InstallFailure::Busy.public_error(),
-            std::sync::TryLockError::Poisoned(_) => {
-                InstallFailure::ReconciliationRequired.public_error()
-            }
-        })?;
-        *attempt = install_result::InstallAttempt::load(&journal);
-        if let Some(error) = attempt.pending_error() {
-            return Err(error);
-        }
-        attempt
-            .check_ready()
-            .map_err(|failure| failure.public_error())?;
-        // Preflight is read-only: no installer has started before attempt.begin().
-        let plan = integration_plan_from_runtime()
-            .map_err(|_| InstallFailure::PreflightUnavailable.public_error())?;
-        if plan["planDigest"].as_str() != Some(plan_digest.as_str()) {
-            return Err(InstallFailure::PlanChanged.public_error());
-        }
-        attempt
-            .begin_persisted(&journal)
-            .map_err(|failure| failure.public_error())?;
-        let result = repair_provider_integrations();
-        attempt
-            .finish_persisted(&journal, &result)
-            .map_err(|failure| failure.public_error())?;
-        result.map_err(|failure| failure.public_error())?;
-        snapshot_from_runtime()
-            .map_err(|_| InstallFailure::AppliedSnapshotUnavailable.public_error())
+        require_active_access()?;
+        // Consent is bound to the reviewed digest. Runtime owns locking, the
+        // durable receipt, precondition recheck and all host side effects.
+        let args = host_plugin_apply_args(&plan_digest)?;
+        let borrowed = args.iter().map(String::as_str).collect::<Vec<_>>();
+        host_plugins::project_operation(run_host_plugin_json(&borrowed)?, "apply")
     })
     .await
-    .map_err(|_| InstallFailure::OutputUnavailable.public_error())?
+    .map_err(|_| "host_plugin_apply_unavailable".to_string())?
 }
 
 #[tauri::command]
-async fn desktop_install_diagnostic(
-    app: tauri::AppHandle,
-) -> Result<Value, install_result::InstallError> {
-    let journal = install_attempt_path(&app)?;
+async fn desktop_reconcile_host_plugins(receipt_id: String) -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        Ok::<_, install_result::InstallError>(
-            install_result::InstallAttempt::load(&journal).diagnostic(),
-        )
+        require_active_access()?;
+        // Reconciliation is explicit and targets exactly the opaque identifier
+        // selected by the Runtime snapshot. It never repeats apply.
+        let args = host_plugin_reconcile_args(&receipt_id)?;
+        let borrowed = args.iter().map(String::as_str).collect::<Vec<_>>();
+        host_plugins::project_operation(run_host_plugin_json(&borrowed)?, "reconcile")
     })
     .await
-    .map_err(|_| install_result::InstallFailure::OutputUnavailable.public_error())?
+    .map_err(|_| "host_plugin_reconcile_unavailable".to_string())?
 }
 
 #[tauri::command]
@@ -603,14 +569,15 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             desktop_snapshot,
+            desktop_install_runtime,
             desktop_validate_project,
             desktop_open_project,
             desktop_export_snapshot,
             refresh_desktop_snapshot,
             desktop_login,
             desktop_logout,
-            desktop_repair_providers,
-            desktop_install_diagnostic,
+            desktop_apply_host_plugins,
+            desktop_reconcile_host_plugins,
             desktop_plan_integrations,
             desktop_usage_projects,
             desktop_context_report,
@@ -642,6 +609,10 @@ pub fn try_consolidated_token_preflight_worker() -> Option<Result<Value, String>
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::fs;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static NEXT_SIDECAR_FIXTURE: AtomicU64 = AtomicU64::new(1);
 
     fn valid_snapshot() -> Value {
         json!({
@@ -650,6 +621,7 @@ mod tests {
             "access": { "state": "active" },
             "runtime": {
                 "state": "healthy",
+                "version": "3.8.40",
                 "optionalFast": { "required": false, "hookInjected": false }
             },
             "savings": {
@@ -694,14 +666,25 @@ mod tests {
         );
         assert_eq!(LOGOUT_ARGS, ["logout", "--json"]);
         assert_eq!(STATUS_ARGS, ["desktop", "status", "--json"]);
-        assert_eq!(LEGACY_AUTH_ARGS, ["auth", "status", "--json"]);
-        assert_eq!(LEGACY_STATUS_ARGS, ["status", "--json"]);
-        assert_eq!(LEGACY_SAVINGS_ARGS, ["savings", "report", "--json"]);
+        assert_eq!(HOST_PLUGIN_PLAN_ARGS, ["host-plugins", "plan", "--all"]);
+        let digest = format!("sha256:{}", "a".repeat(64));
         assert_eq!(
-            LEGACY_INSTALL_ARGS,
-            ["install", "--global", "--dry-run", "--json"]
+            host_plugin_apply_args(&digest).unwrap(),
+            [
+                "host-plugins",
+                "apply",
+                "--all",
+                "--plan-digest",
+                digest.as_str(),
+                "--yes"
+            ]
         );
-        assert_eq!(INSTALL_ARGS, ["install", "--global", "--yes", "--json"]);
+        assert_eq!(
+            host_plugin_reconcile_args(&digest).unwrap(),
+            ["host-plugins", "reconcile", "--receipt-id", digest.as_str()]
+        );
+        assert!(host_plugin_apply_args("sha256:bad").is_err());
+        assert!(host_plugin_reconcile_args("/private/receipt").is_err());
         assert_eq!(SUBSCRIPTION_URL, "https://simpleti.com.br/simplicio");
         assert_eq!(
             RELEASES_URL,
@@ -717,18 +700,21 @@ mod tests {
             Duration::from_secs(20)
         );
         assert_eq!(
-            runtime_capture_limits(LEGACY_INSTALL_ARGS).deadline,
+            runtime_capture_limits(HOST_PLUGIN_PLAN_ARGS).deadline,
             Duration::from_secs(20)
         );
         assert_eq!(
             runtime_capture_limits(LOGIN_ARGS).deadline,
             Duration::from_secs(180)
         );
+        let digest = format!("sha256:{}", "a".repeat(64));
+        let apply = host_plugin_apply_args(&digest).unwrap();
+        let apply = apply.iter().map(String::as_str).collect::<Vec<_>>();
         assert_eq!(
-            runtime_capture_limits(INSTALL_ARGS).deadline,
+            runtime_capture_limits(&apply).deadline,
             Duration::from_secs(300)
         );
-        assert_eq!(runtime_capture_limits(INSTALL_ARGS).stdout_bytes, 65_536);
+        assert_eq!(runtime_capture_limits(&apply).stdout_bytes, 65_536);
     }
 
     #[test]
@@ -746,13 +732,16 @@ mod tests {
             runtime_failure_code(SNAPSHOT_ARGS, timeout),
             "runtime_query_timeout"
         );
+        let digest = format!("sha256:{}", "a".repeat(64));
+        let apply = host_plugin_apply_args(&digest).unwrap();
+        let apply = apply.iter().map(String::as_str).collect::<Vec<_>>();
         assert_eq!(
-            runtime_failure_code(INSTALL_ARGS, timeout),
+            runtime_failure_code(&apply, timeout),
             "runtime_install_timeout"
         );
         assert_eq!(
             runtime_failure_code(
-                INSTALL_ARGS,
+                &apply,
                 ProcessFailure {
                     child_state: ChildState::Retained,
                     ..timeout
@@ -785,47 +774,103 @@ mod tests {
     }
 
     #[test]
-    fn bridge_prefers_the_bundled_runtime_then_managed_install_and_honors_an_explicit_override() {
-        let managed = runtime_candidates_with(
-            None,
-            Some(OsString::from("/managed/simplicio")),
-            Some(OsString::from("/ignored/home")),
-            Some(OsString::from("/bundle/simplicio-desktop")),
-        );
+    fn sensitive_commands_resolve_only_the_packaged_sibling_sidecar() {
+        let bundle = std::env::temp_dir()
+            .canonicalize()
+            .unwrap_or_else(|_| std::env::temp_dir());
+        let app = bundle.join(if cfg!(windows) {
+            "simplicio-desktop.exe"
+        } else {
+            "simplicio-desktop"
+        });
         assert_eq!(
-            managed,
-            [
-                PathBuf::from("/bundle")
-                    .join(if cfg!(windows) {
-                        "simplicio.exe"
-                    } else {
-                        "simplicio"
-                    })
-                    .into_os_string(),
-                PathBuf::from("/managed/simplicio")
-                    .join("bin")
-                    .join(if cfg!(windows) {
-                        "simplicio.exe"
-                    } else {
-                        "simplicio"
-                    })
-                    .into_os_string(),
-                OsString::from(if cfg!(windows) {
-                    "simplicio.exe"
-                } else {
-                    "simplicio"
-                }),
-            ]
+            runtime_install::bundled_runtime_path(&app).unwrap(),
+            bundle.join(if cfg!(windows) {
+                "simplicio.exe"
+            } else {
+                "simplicio"
+            })
         );
+    }
 
-        assert_eq!(
-            runtime_candidates_with(
-                Some(OsString::from("/explicit/runtime")),
-                Some(OsString::from("/managed/simplicio")),
-                None,
-                Some(OsString::from("/bundle/simplicio-desktop")),
-            ),
-            [OsString::from("/explicit/runtime")]
+    fn sidecar_fixture() -> (PathBuf, PathBuf, PathBuf) {
+        let temporary_root = std::env::temp_dir()
+            .canonicalize()
+            .unwrap_or_else(|_| std::env::temp_dir());
+        let root = temporary_root.join(format!(
+            "simplicio-desktop-real-sidecar-{}-{}",
+            std::process::id(),
+            NEXT_SIDECAR_FIXTURE.fetch_add(1, Ordering::Relaxed)
+        ));
+        let bundle = root.join("bundle");
+        let home = root.join("home");
+        fs::create_dir_all(&bundle).unwrap();
+        fs::create_dir_all(&home).unwrap();
+        let app = bundle.join(if cfg!(windows) {
+            "simplicio-desktop.exe"
+        } else {
+            "simplicio-desktop"
+        });
+        (root, app, home)
+    }
+
+    #[cfg(unix)]
+    fn write_real_snapshot_sidecar(app: &Path) {
+        use std::os::unix::fs::PermissionsExt;
+
+        let sidecar = runtime_install::bundled_runtime_path(app).unwrap();
+        let payload = serde_json::to_string(&valid_snapshot()).unwrap();
+        let script = format!(
+            "#!/bin/sh\nif [ \"$1\" = desktop ] && [ \"$2\" = snapshot ] && [ \"$3\" = --json ]; then\n  printf '%s\\n' '{}'\n  exit 0\nfi\nexit 64\n",
+            payload
         );
+        fs::write(&sidecar, script).unwrap();
+        fs::set_permissions(&sidecar, fs::Permissions::from_mode(0o700)).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn real_executable_sidecar_round_trips_through_install_and_fresh_snapshot() {
+        let (root, app, home) = sidecar_fixture();
+        write_real_snapshot_sidecar(&app);
+        let receipt = runtime_install::install(&app, &home, snapshot_from_binary).unwrap();
+        assert_eq!(receipt["status"], "installed");
+        assert_eq!(receipt["pluginsMutated"], false);
+        let snapshot = runtime_install::current_snapshot(&app, &home, snapshot_from_binary)
+            .unwrap()
+            .unwrap();
+        assert_eq!(snapshot["runtime"]["state"], "healthy");
+        assert_eq!(snapshot["runtime"]["version"], "3.8.40");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    #[ignore = "release gate: requires SIMPLICIO_DESKTOP_RELEASE_SIDECAR pointing to a signature-verified target binary"]
+    fn packaged_release_sidecar_smoke() {
+        let source = std::env::var_os("SIMPLICIO_DESKTOP_RELEASE_SIDECAR")
+            .map(PathBuf::from)
+            .expect("SIMPLICIO_DESKTOP_RELEASE_SIDECAR is required");
+        assert!(
+            source.is_absolute(),
+            "release sidecar path must be absolute"
+        );
+        assert!(source.is_file(), "release sidecar must be a regular file");
+        let (root, app, home) = sidecar_fixture();
+        let bundled = runtime_install::bundled_runtime_path(&app).unwrap();
+        fs::copy(&source, &bundled).expect("copy verified release sidecar into fixture bundle");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&bundled, fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        let receipt = runtime_install::install(&app, &home, snapshot_from_binary)
+            .expect("verified release sidecar must install and validate");
+        assert_eq!(receipt["validated"], true);
+        assert_eq!(receipt["pluginsMutated"], false);
+        let snapshot = runtime_install::current_snapshot(&app, &home, snapshot_from_binary)
+            .expect("release sidecar snapshot query")
+            .expect("managed installation is current");
+        assert_eq!(snapshot["runtime"]["state"], "healthy");
+        fs::remove_dir_all(root).unwrap();
     }
 }

@@ -23,7 +23,12 @@ async function mockAccountRecovery(page: Page, state: LockedState, options: {
   signedOut.source = "runtime";
   const active = createDemoSnapshot("active");
   active.source = "runtime";
-  await page.addInitScript(({ snapshot, signedOut, active, options }) => {
+  const installResult = {
+    schema: "simplicio.desktop-runtime-install/v1", status: "installed", scope: "runtime_core", source: "packaged_sidecar",
+    installed: true, current: true, validated: true, backupAvailable: false, pluginsMutated: false,
+    runtime: { state: "healthy", version: "3.8.40" },
+  };
+  await page.addInitScript(({ snapshot, signedOut, active, installResult, options }) => {
     const calls: string[] = [];
     Object.assign(window, {
       __accessRecoveryCalls: calls,
@@ -34,9 +39,7 @@ async function mockAccountRecovery(page: Page, state: LockedState, options: {
             if (options.failSnapshot) throw "snapshot_unavailable";
             return snapshot;
           }
-          if (command === "desktop_install_diagnostic") return {
-            schema: "simplicio.desktop-install-attempt/v1", status: "clear", error: null,
-          };
+          if (command === "desktop_install_runtime") return installResult;
           if (command === "desktop_logout") {
             await new Promise<void>((resolve) => Object.assign(window, { __accessFinishLogout: resolve }));
             if (options.failLogout) throw "logout_unconfirmed";
@@ -47,7 +50,7 @@ async function mockAccountRecovery(page: Page, state: LockedState, options: {
             if (options.failLogin) throw "runtime_oauth_timeout";
             return options.loginRemainsUnknown ? snapshot : active;
           }
-          if (command === "refresh_desktop_snapshot") return snapshot;
+          if (command === "refresh_desktop_snapshot") return options.failSnapshot ? signedOut : snapshot;
           // Native menu subscriptions have no account or installation effects.
           if (command === "plugin:event|listen") return 1;
           if (command === "plugin:event|unlisten") return;
@@ -55,7 +58,7 @@ async function mockAccountRecovery(page: Page, state: LockedState, options: {
         },
       },
     });
-  }, { snapshot, signedOut, active, options });
+  }, { snapshot, signedOut, active, installResult, options });
 }
 
 async function logoutCalls(page: Page) {
@@ -67,7 +70,7 @@ async function expectNoImplicitEffects(page: Page) {
   expect(calls).not.toContain("desktop_login");
   expect(calls).not.toContain("desktop_open_subscription");
   expect(calls).not.toContain("desktop_plan_integrations");
-  expect(calls).not.toContain("desktop_repair_providers");
+  expect(calls).not.toContain("desktop_apply_host_plugins");
 }
 
 for (const state of ["inactive", "unknown"] as const) {
@@ -113,51 +116,69 @@ for (const state of ["inactive", "unknown"] as const) {
   });
 }
 
-test("a failed initial snapshot can recover through confirmed logout (mocked IPC)", async ({ page }) => {
+test("a failed initial snapshot requires Runtime installation before account actions (mocked IPC)", async ({ page }) => {
   await mockAccountRecovery(page, "unknown", { failSnapshot: true });
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Tente novamente", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Sair da conta", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Saindo…", exact: true })).toBeDisabled();
-  await page.evaluate(() => (window as RecoveryTestWindow).__accessFinishLogout?.());
-
+  await expect(page.getByRole("heading", { name: "Prepare o Simplicio Runtime", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sair da conta", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Instalar e validar Runtime", exact: true }).click();
   await expect(page.getByRole("button", { name: "Começar", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Tente novamente", exact: true })).toHaveCount(0);
-  expect(await logoutCalls(page)).toHaveLength(1);
-  await expectNoImplicitEffects(page);
+  const calls = await page.evaluate(() => (window as RecoveryTestWindow).__accessRecoveryCalls);
+  expect(calls.filter((command) => command === "desktop_install_runtime")).toHaveLength(1);
+  expect(calls.filter((command) => command === "refresh_desktop_snapshot")).toHaveLength(1);
+  expect(calls).not.toContain("desktop_logout");
+  expect(calls).not.toContain("desktop_plan_integrations");
+  expect(calls).not.toContain("desktop_apply_host_plugins");
 });
 
 for (const failSnapshot of [false, true]) {
-  test(`${failSnapshot ? "failed snapshot" : "unknown access without identity"} can explicitly log in and reach active setup (mocked IPC)`, async ({ page }) => {
+  test(`${failSnapshot ? "missing Runtime" : "unknown access without identity"} reaches login explicitly and then opens the normal app (mocked IPC)`, async ({ page }) => {
     await mockAccountRecovery(page, "unknown", { anonymous: true, failSnapshot });
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Tente novamente", exact: true })).toBeVisible();
+    if (failSnapshot) {
+      await expect(page.getByRole("heading", { name: "Prepare o Simplicio Runtime", exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "Instalar e validar Runtime", exact: true }).click();
+      await expect(page.getByRole("button", { name: "Começar", exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "Começar", exact: true }).click();
+    } else {
+      await expect(page.getByRole("heading", { name: "Tente novamente", exact: true })).toBeVisible();
+    }
     await expect(page.getByRole("heading", { name: "Ative o Simplicio", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Começar", exact: true })).toHaveCount(0);
-    await expectNoImplicitEffects(page);
+    if (!failSnapshot) {
+      await expect(page.getByRole("button", { name: "Começar", exact: true })).toHaveCount(0);
+      await expectNoImplicitEffects(page);
+    }
 
-    await page.getByRole("button", { name: "Entrar ou reconectar", exact: true }).dblclick();
+    const login = failSnapshot
+      ? page.getByRole("button", { name: "Continuar com Google", exact: true })
+      : page.getByRole("button", { name: "Entrar ou reconectar", exact: true });
+    await login.dblclick();
     const pending = page.getByRole("button", { name: "Aguardando navegador…", exact: true });
     await expect(pending).toBeDisabled();
     await expect(pending).toHaveAttribute("aria-busy", "true");
-    await expect(page.getByRole("status")).toContainText("O acesso permanece desconhecido");
-    await expect(page.getByRole("button", { name: "Aguarde…", exact: true })).toBeDisabled();
-    await expect(page.getByRole("button", { name: "Sair da conta", exact: true })).toBeDisabled();
-    await page.getByRole("button", { name: "Abrir diagnóstico", exact: true }).click();
-    await expect(page.getByText("Estado de acesso desconhecido", { exact: true })).toBeVisible();
+    if (failSnapshot) {
+      await expect(page.getByRole("status")).toContainText("Conclua o login no navegador");
+      await expect(page.getByRole("navigation", { name: "Navegação principal" })).toHaveCount(0);
+    } else {
+      await expect(page.getByRole("status")).toContainText("O acesso permanece desconhecido");
+      await expect(page.getByRole("button", { name: "Aguarde…", exact: true })).toBeDisabled();
+      await expect(page.getByRole("button", { name: "Sair da conta", exact: true })).toBeDisabled();
+      await page.getByRole("button", { name: "Abrir diagnóstico", exact: true }).click();
+      await expect(page.getByText("Estado de acesso desconhecido", { exact: true })).toBeVisible();
+    }
     const pendingCalls = await page.evaluate(() => (window as RecoveryTestWindow).__accessRecoveryCalls);
     expect(pendingCalls.filter((command) => command === "desktop_login")).toHaveLength(1);
-    expect(pendingCalls).not.toContain("refresh_desktop_snapshot");
+    expect(pendingCalls.filter((command) => command === "refresh_desktop_snapshot")).toHaveLength(failSnapshot ? 1 : 0);
     expect(pendingCalls).not.toContain("desktop_logout");
 
     await page.evaluate(() => (window as RecoveryTestWindow).__accessFinishLogin?.());
-    await expect(page.getByRole("heading", { name: "Um bom começo.", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Configurar Simplicio", exact: true })).toBeEnabled();
+    await expect(page.getByRole("heading", { name: "Simplicio", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Um bom começo.", exact: true })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Tente novamente", exact: true })).toHaveCount(0);
     await expect(page.getByRole("alert")).toHaveCount(0);
     const calls = await page.evaluate(() => (window as RecoveryTestWindow).__accessRecoveryCalls);
     expect(calls.filter((command) => command === "desktop_login")).toHaveLength(1);
-    for (const command of ["desktop_logout", "desktop_open_subscription", "desktop_plan_integrations", "desktop_repair_providers"]) {
+    for (const command of ["desktop_logout", "desktop_open_subscription", "desktop_plan_integrations", "desktop_apply_host_plugins"]) {
       expect(calls).not.toContain(command);
     }
   });
@@ -185,7 +206,7 @@ for (const failLogin of [false, true]) {
     expect(calls.filter((command) => command === "desktop_login")).toHaveLength(1);
     expect(calls.filter((command) => command === "refresh_desktop_snapshot")).toHaveLength(1);
     expect(calls).not.toContain("desktop_logout");
-    expect(calls).not.toContain("desktop_repair_providers");
+    expect(calls).not.toContain("desktop_apply_host_plugins");
   });
 }
 
@@ -202,10 +223,10 @@ test("legacy logout returning unknown still permits a later explicit login (mock
   await page.keyboard.press("Enter");
   await expect(page.getByRole("button", { name: "Aguardando navegador…", exact: true })).toBeDisabled();
   await page.evaluate(() => (window as RecoveryTestWindow).__accessFinishLogin?.());
-  await expect(page.getByRole("heading", { name: "Um bom começo.", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Simplicio", exact: true })).toBeVisible();
   const calls = await page.evaluate(() => (window as RecoveryTestWindow).__accessRecoveryCalls);
   expect(calls.filter((command) => command === "desktop_logout")).toHaveLength(1);
   expect(calls.filter((command) => command === "desktop_login")).toHaveLength(1);
   expect(calls.indexOf("desktop_logout")).toBeLessThan(calls.indexOf("desktop_login"));
-  expect(calls).not.toContain("desktop_repair_providers");
+  expect(calls).not.toContain("desktop_apply_host_plugins");
 });

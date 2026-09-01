@@ -4,16 +4,17 @@ import type { BotActionRequest } from "./bot_center";
 import { snapshotWithDemoBots } from "./bot_center";
 import {
   beginDesktopLogin,
+  installDesktopRuntime,
   loadDesktopSnapshot,
-  loadDesktopInstallDiagnostic,
   logoutDesktop,
   openDesktopSubscription,
   refreshDesktopSnapshot,
-  repairDesktopProviders,
+  applyDesktopHostPlugins,
+  reconcileDesktopHostPlugins,
   dispatchDesktopBotAction,
 } from "./bridge";
 import { Shell, type View } from "./components/Shell";
-import { AccessGate, LoadingScreen, SignInScreen } from "./screens/AccessScreens";
+import { AccessGate, LoadingScreen, RuntimeInstallScreen, SignInScreen, type RuntimeInstallPhase } from "./screens/AccessScreens";
 import { WorkbenchHome } from "./screens/WorkbenchHome";
 import { PreferencesScreen } from "./screens/PreferencesScreen";
 import { SetupScreen } from "./screens/SetupScreen";
@@ -33,6 +34,9 @@ import { TokensScreen } from "./screens/TokensScreen";
 import { ReferenceSettingsScreen } from "./screens/ReferenceSettingsScreen";
 import { isReferenceSettingsView } from "./reference_screens";
 import "./runtime_panels.css";
+import type { HostPluginOperationResult } from "./integration_setup";
+import type { RuntimeInstallResult } from "./runtime_install";
+import { runtimeIsValid } from "./setup_flow";
 
 function initialView(fallback: View): View {
   if (typeof window === "undefined") return "home";
@@ -42,10 +46,13 @@ function initialView(fallback: View): View {
 
 export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSnapshot }) {
   const [snapshot, setSnapshot] = useState<DesktopSnapshot | undefined>(initialSnapshot);
+  const [hostPluginOutcome, setHostPluginOutcome] = useState<HostPluginOperationResult | undefined>();
   const [botCenter, setBotCenter] = useState(initialSnapshot?.botCenter);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [action, setAction] = useState<"login" | "logout" | "refresh" | "repair" | "subscribe" | "bot" | null>(null);
+  const [action, setAction] = useState<"install" | "login" | "logout" | "refresh" | "repair" | "reconcile" | "subscribe" | "bot" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [runtimeInstallPhase, setRuntimeInstallPhase] = useState<RuntimeInstallPhase>("idle");
+  const [runtimeInstallReceipt, setRuntimeInstallReceipt] = useState<RuntimeInstallResult | undefined>();
   const [applicationRecovery, setApplicationRecovery] = useState<InstallFailureRecovery | undefined>();
   const [workbench, setWorkbench] = useState(loadWorkbench);
   const [history, setHistory] = useState<NavigationState>(() => ({ entries: [{
@@ -114,30 +121,14 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       .catch((error: unknown) => {
         if (current) {
           setLoadFailed(true);
-          setActionError(runtimeFailureMessage(error, "query"));
+          const code = typeof error === "string" ? error : error instanceof Error ? error.message : "";
+          setActionError(code === "runtime_install_required" ? null : runtimeFailureMessage(error, "query"));
         }
       });
     return () => {
       current = false;
     };
   }, [initialSnapshot]);
-
-  useEffect(() => {
-    if (view !== "setup") return;
-    let current = true;
-    loadDesktopInstallDiagnostic()
-      .then((diagnostic) => {
-        if (!current || diagnostic.status === "clear") return;
-        setActionError(installFailureMessage(diagnostic.error));
-        setApplicationRecovery(installFailureRecovery(diagnostic.error));
-      })
-      .catch(() => {
-        if (!current) return;
-        setActionError("Não foi possível consultar o recibo persistente da instalação. Uma nova aplicação permanece bloqueada até o diagnóstico ser esclarecido.");
-        setApplicationRecovery("reconcile");
-      });
-    return () => { current = false; };
-  }, [view]);
 
   async function refresh() {
     if (actionLock.current) return;
@@ -148,6 +139,8 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       const next = await refreshDesktopSnapshot();
       setSnapshot(next);
       setBotCenter(next.botCenter);
+      setHostPluginOutcome(undefined);
+      setApplicationRecovery(undefined);
       setLoadFailed(false);
     } catch (error) {
       setActionError(runtimeFailureMessage(error, "query"));
@@ -157,22 +150,78 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
     }
   }
 
-  async function repairProviders(planDigest: string): Promise<boolean> {
-    if (actionLock.current || (applicationRecovery && applicationRecovery !== "review")) return false;
+  async function installRuntime() {
+    if (actionLock.current) return;
+    actionLock.current = true;
+    setAction("install");
+    setActionError(null);
+    setRuntimeInstallReceipt(undefined);
+    setRuntimeInstallPhase("installing");
+    let receipt: RuntimeInstallResult | undefined;
+    try {
+      // One explicit native install followed by one fresh read. The frontend
+      // never retries either effect and never invokes host-plugin operations.
+      receipt = await installDesktopRuntime();
+      setRuntimeInstallReceipt(receipt);
+      setRuntimeInstallPhase("validating");
+      const next = await refreshDesktopSnapshot();
+      if (!runtimeIsValid(next)) throw new Error("runtime_install_snapshot_invalid");
+      setSnapshot(next);
+      setBotCenter(next.botCenter);
+      setHostPluginOutcome(undefined);
+      setApplicationRecovery(undefined);
+      setLoadFailed(false);
+      setRuntimeInstallPhase("idle");
+      setView("home");
+    } catch (error) {
+      if (receipt) setRuntimeInstallReceipt(receipt);
+      setLoadFailed(true);
+      setRuntimeInstallPhase("failed");
+      setActionError(runtimeFailureMessage(error, "install"));
+    } finally {
+      setAction(null);
+      actionLock.current = false;
+    }
+  }
+
+  function acceptHostPluginResult(result: HostPluginOperationResult) {
+    setHostPluginOutcome(result);
+    setApplicationRecovery(["partial", "requires_reconcile"].includes(result.snapshot.state) ? "reconcile" : undefined);
+    setLoadFailed(false);
+  }
+
+  async function repairProviders(planDigest: string): Promise<HostPluginOperationResult> {
+    if (actionLock.current || (applicationRecovery && applicationRecovery !== "review")) throw new Error("host_plugin_operation_blocked");
     actionLock.current = true;
     setAction("repair");
     setActionError(null);
     try {
-      const next = await repairDesktopProviders(planDigest);
-      setSnapshot(next);
-      setBotCenter(next.botCenter);
-      setLoadFailed(false);
-      setApplicationRecovery(undefined);
-      return true;
+      const result = await applyDesktopHostPlugins(planDigest);
+      acceptHostPluginResult(result);
+      return result;
     } catch (error) {
       setActionError(installFailureMessage(error));
       setApplicationRecovery(installFailureRecovery(error));
-      return false;
+      throw error;
+    } finally {
+      setAction(null);
+      actionLock.current = false;
+    }
+  }
+
+  async function reconcileProviders(receiptId: string): Promise<HostPluginOperationResult> {
+    if (actionLock.current) throw new Error("host_plugin_operation_busy");
+    actionLock.current = true;
+    setAction("reconcile");
+    setActionError(null);
+    try {
+      const result = await reconcileDesktopHostPlugins(receiptId);
+      acceptHostPluginResult(result);
+      return result;
+    } catch (error) {
+      setActionError(installFailureMessage(error));
+      setApplicationRecovery("reconcile");
+      throw error;
     } finally {
       setAction(null);
       actionLock.current = false;
@@ -184,14 +233,17 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
     actionLock.current = true;
     setAction("login");
     setActionError(null);
-    // Keep the intended next screen while access is gated. A later successful
-    // account verification must resume first-login setup, not skip to the home.
-    setView("setup");
+    // Account entry always targets the normal application. If the following
+    // snapshot is ambiguous, this route remains hidden behind the access gate.
+    setView("home");
     try {
       const next = await beginDesktopLogin();
       setSnapshot(next);
       setBotCenter(next.botCenter);
+      setHostPluginOutcome(undefined);
+      setApplicationRecovery(undefined);
       setLoadFailed(false);
+      setView("home");
     } catch (error) {
       // The account action may have completed before its snapshot query failed.
       // Never reuse the pre-action signed-out or active state as current proof.
@@ -227,6 +279,8 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       const next = await logoutDesktop();
       setSnapshot(next);
       setBotCenter(next.botCenter);
+      setHostPluginOutcome(undefined);
+      setApplicationRecovery(undefined);
       setLoadFailed(false);
       setView("home");
     } catch (error) {
@@ -257,6 +311,15 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
 
   if (!snapshot && !loadFailed) return <LoadingScreen />;
 
+  if ((!snapshot && loadFailed) || (snapshot && !runtimeIsValid(snapshot))) {
+    return <RuntimeInstallScreen
+      phase={runtimeInstallPhase}
+      receipt={runtimeInstallReceipt}
+      error={actionError}
+      onInstall={installRuntime}
+    />;
+  }
+
   if (loadFailed) {
     return <AccessGate state="unknown" busy={action !== null} error={actionError} onRefresh={refresh} onLogin={login} loginBusy={action === "login"} onLogout={logout} logoutBusy={action === "logout"} />;
   }
@@ -282,8 +345,10 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
   }
 
   if (view === "setup") return <SetupScreen snapshot={snapshot} busy={action !== null} applicationError={actionError} applicationRecovery={applicationRecovery}
-    onSnapshot={(next) => { setSnapshot(next); setBotCenter(next.botCenter); }} onApply={repairProviders}
-    onVerificationFailure={() => setApplicationRecovery("refresh")}
+    initialOutcome={hostPluginOutcome} onSnapshot={(next) => {
+      setSnapshot(next); setBotCenter(next.botCenter); setHostPluginOutcome(undefined); setApplicationRecovery(undefined); setActionError(null);
+    }} onApply={repairProviders}
+    onReconcile={reconcileProviders}
     onFinish={() => setView("home")} onDiagnostics={() => { setView("diagnostics"); void refresh(); }} />;
 
   return (
@@ -311,9 +376,11 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
           inventoryOnly={view === "agents"}
           snapshot={snapshot}
           busy={action !== null}
-          repairing={action === "repair"}
+          repairing={action === "repair" || action === "reconcile"}
           onRefresh={refresh}
           onRepair={repairProviders}
+          onReconcile={reconcileProviders}
+          hostPluginOutcome={hostPluginOutcome}
           applicationRecovery={applicationRecovery}
           onDiagnostics={() => { setView("diagnostics"); void refresh(); }}
         />

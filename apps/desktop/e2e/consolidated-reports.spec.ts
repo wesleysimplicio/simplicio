@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { createDemoSnapshot } from "../src/demo";
 
-async function mockReports(page: Page, mode: "ready" | "missing" | "invalid" | "partial" | "stale" | "unreported" = "ready", delay = 0) {
+async function mockReports(page: Page, mode: "ready" | "missing" | "invalid" | "partial" | "stale" | "unreported" = "ready", delay: number | "manual" = 0) {
   await page.addInitScript(({ snapshot, mode, delay }) => {
     const calls: Array<{ command: string; args: Record<string, any> }> = [];
     const projects = ["aulas", "runtime"].map((name, i) => ({ id: `project-${String(i).repeat(64)}`, name, path: `/tmp/${name}`, evidenceType: "usage", lastModifiedEpoch: 1788180000 }));
@@ -13,7 +13,11 @@ async function mockReports(page: Page, mode: "ready" | "missing" | "invalid" | "
       if (command === "desktop_token_report") throw "token_ledger_unavailable";
       if (command === "desktop_context_report") throw "context_ledger_unavailable";
       if (command === "desktop_consolidated_token_report") {
-        await new Promise(resolve => setTimeout(resolve, delay));
+        if (delay === "manual") {
+          await new Promise<void>(resolve => { (window as any).__releaseConsolidatedReport = resolve; });
+        } else {
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
         const request = args.request;
         const hash = `sha256:${"a".repeat(64)}`;
         const totals = { sample_count: 2, input_tokens: 100, cached_input_tokens: 20, output_tokens: 40, reasoning_tokens: 10, paid_remote_tokens: 150, total_tokens: 150, missing_usage_events: 0, receipt_count: 2 };
@@ -85,10 +89,11 @@ test("rejects malformed reports without showing their totals", async ({ page }) 
 });
 
 test("blocks duplicate refresh and filter changes while a batch is pending", async ({ page }) => {
-  await mockReports(page, "ready", 600); await page.goto("/?view=tokens");
+  await mockReports(page, "ready", "manual"); await page.goto("/?view=tokens");
   const report = page.getByRole("region", { name: "Relatório consolidado", exact: true });
   await expect(report.getByRole("button", { name: "7 dias", exact: true })).toBeDisabled();
   await expect(report.getByRole("button", { name: "Atualizar consolidado" })).toBeDisabled();
+  await page.evaluate(() => (window as any).__releaseConsolidatedReport());
   await expect(report.getByLabel("Totais consolidados")).toBeVisible();
   const count = await page.evaluate(() => (window as any).__reportCalls.filter((c: any) => c.command === "desktop_consolidated_token_report").length);
   expect(count).toBe(1);

@@ -41,9 +41,6 @@ async function mockAccessUpdates(page: Page, state: "signed_out" | "unknown" | "
           }
           if (command === "plugin:event|unlisten") return;
           if (command === "desktop_snapshot") return snapshots[state];
-          if (command === "desktop_install_diagnostic") return {
-            schema: "simplicio.desktop-install-attempt/v1", status: "clear", error: null,
-          };
           if (command === "refresh_desktop_snapshot") return authOnlyUnsupported ? snapshots.unknown : snapshots[state];
           if (command === "desktop_login" && authOnlyUnsupported) throw "runtime_auth_only_unsupported";
           if (command === "desktop_logout" && authOnlyUnsupported) return snapshots.signed_out;
@@ -82,7 +79,7 @@ async function accountAndInstallCalls(page: Page) {
   const calls = await page.evaluate(() => (window as AccessUpdateWindow).__accessUpdateCalls);
   return calls.filter((command) => [
     "desktop_login", "desktop_logout", "desktop_open_subscription",
-    "desktop_plan_integrations", "desktop_repair_providers", "desktop_open_releases",
+    "desktop_plan_integrations", "desktop_apply_host_plugins", "desktop_open_releases",
   ].includes(command));
 }
 

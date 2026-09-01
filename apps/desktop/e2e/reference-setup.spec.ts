@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { createDemoSnapshot } from "../src/demo";
+import { hostPluginPlan, hostPluginReceipt } from "./host-plugin-fixtures";
 
 type ReferenceSetupWindow = Window & {
   __referenceApplyCount: number;
@@ -9,34 +10,26 @@ type ReferenceSetupWindow = Window & {
 test("guided setup keeps progress and consent-controlled actions visible in a short window (mocked IPC)", async ({ page }, testInfo) => {
   const snapshot = createDemoSnapshot("active");
   snapshot.source = "runtime";
-  await page.addInitScript(({ snapshot }) => {
-    let applied = false;
+  delete snapshot.hostPlugins;
+  const plan = hostPluginPlan();
+  const operation = hostPluginReceipt();
+  await page.addInitScript(({ snapshot, plan, operation }) => {
     Object.assign(window, { __referenceApplyCount: 0, __TAURI_INTERNALS__: {
       invoke: async (command: string) => {
         if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
-        if (command === "desktop_install_diagnostic") return {
-          schema: "simplicio.desktop-install-attempt/v1", status: "clear", error: null,
-        };
-        if (command === "desktop_plan_integrations") return {
-          schema: "simplicio.desktop-integration-plan/v1", source: "runtime",
-          planDigest: "sha256:" + (applied ? "b" : "a").repeat(64),
-          changes: Array.from({ length: 32 }, (_, index) => ({
-            label: "client-" + String(index + 1).padStart(2, "0"), exists: applied, changed: !applied,
-          })),
-        };
-        if (command === "desktop_repair_providers") {
+        if (command === "desktop_plan_integrations") return plan;
+        if (command === "desktop_apply_host_plugins") {
           const current = window as ReferenceSetupWindow;
           current.__referenceApplyCount++;
           await new Promise<void>((resolve) => { current.__completeReferenceApply = resolve; });
-          applied = true;
-          return snapshot;
+          return operation;
         }
         if (command === "plugin:event|listen") return 1;
         if (command === "plugin:event|unlisten") return;
         throw "unexpected_reference_setup_command";
       },
     } });
-  }, { snapshot });
+  }, { snapshot, plan, operation });
   await page.setViewportSize({ width: 960, height: 600 });
   await page.goto("/?view=setup");
   await page.getByRole("button", { name: "Configurar Simplicio", exact: true }).click();
@@ -72,7 +65,7 @@ test("guided setup keeps progress and consent-controlled actions visible in a sh
   await page.screenshot({ path: testInfo.outputPath("setup-running.png") });
 
   await page.evaluate(() => (window as ReferenceSetupWindow).__completeReferenceApply?.());
-  await expect(page.getByRole("heading", { name: "Configuração concluída." })).toBeFocused();
+  await expect(page.getByRole("heading", { name: "Configuração concluída" })).toBeFocused();
   await expect(progress).toHaveAttribute("value", "4");
   await expect(page.getByRole("button", { name: "Abrir Simplicio", exact: true })).toBeInViewport();
   expect(await page.evaluate(() => (window as ReferenceSetupWindow).__referenceApplyCount)).toBe(1);

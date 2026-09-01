@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createDemoSnapshot } from "./demo";
-import { canConfigureRuntime, setupStages, type SetupPhase } from "./setup_flow";
+import { canConfigureRuntime, runtimeIsValid, setupStages, type SetupPhase } from "./setup_flow";
 
 describe("guided setup evidence", () => {
   it("counts only operations that returned, never time-based progress", () => {
-    const expected = { welcome: 0, checking: 0, planning: 1, review: 2, installing: 2, verifying: 3, complete: 4 };
+    const expected = { welcome: 0, checking: 0, planning: 1, review: 2, installing: 2, reconciling: 3, complete: 4 };
     for (const [phase, completed] of Object.entries(expected)) {
       expect(setupStages(phase as SetupPhase).filter((step) => step.state === "complete")).toHaveLength(completed);
     }
@@ -24,5 +24,14 @@ describe("guided setup evidence", () => {
     expect(canConfigureRuntime({ ...snapshot, access: { ...snapshot.access, entitlementKnown: false } })).toBe(false);
     expect(canConfigureRuntime({ ...snapshot, runtime: { ...snapshot.runtime, state: "offline" } })).toBe(false);
     expect(canConfigureRuntime({ ...snapshot, runtime: { ...snapshot.runtime, transport: "unavailable" } })).toBe(false);
+  });
+
+  it("uses only a reachable healthy Runtime to skip core installation", () => {
+    const snapshot = createDemoSnapshot("signed_out");
+    expect(runtimeIsValid(snapshot)).toBe(true);
+    expect(runtimeIsValid({ ...snapshot, runtime: { ...snapshot.runtime, state: "degraded" } })).toBe(false);
+    expect(runtimeIsValid({ ...snapshot, runtime: { ...snapshot.runtime, state: "starting" } })).toBe(false);
+    expect(runtimeIsValid({ ...snapshot, runtime: { ...snapshot.runtime, state: "offline" } })).toBe(false);
+    expect(runtimeIsValid({ ...snapshot, runtime: { ...snapshot.runtime, transport: "unavailable" } })).toBe(false);
   });
 });

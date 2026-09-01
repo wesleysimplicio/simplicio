@@ -1,111 +1,88 @@
 import { expect, test, type Page } from "@playwright/test";
 import { createDemoSnapshot } from "../src/demo";
+import { desktopHostPluginProjection, hostPluginPlan, hostPluginReceipt } from "./host-plugin-fixtures";
 
-type RecoveryWindow = Window & { __referenceRecoveryCalls: string[] };
+type RecoveryWindow = Window & {
+  __referenceRecoveryCalls: Array<{ command: string; args: Record<string, unknown> }>;
+};
 
-async function prepareRecovery(page: Page, failure: string) {
+async function calls(page: Page, command: string) {
+  return page.evaluate((command) => (window as RecoveryWindow).__referenceRecoveryCalls.filter((call) => call.command === command), command);
+}
+
+test("a Runtime-owned pending receipt blocks another plan and reconciles exactly once on explicit consent (mocked IPC)", async ({ page }) => {
   const snapshot = createDemoSnapshot("active");
   snapshot.source = "runtime";
-  await page.addInitScript(({ snapshot, failure }) => {
-    const calls: string[] = [];
+  snapshot.hostPlugins = desktopHostPluginProjection({ pending: true });
+  const reconciled = hostPluginReceipt({ operation: "reconcile", receiptByte: "e", durableByte: "e" });
+  await page.addInitScript(({ snapshot, reconciled }) => {
+    const calls: Array<{ command: string; args: Record<string, unknown> }> = [];
     Object.assign(window, { __referenceRecoveryCalls: calls, __TAURI_INTERNALS__: {
-      invoke: async (command: string) => {
-        calls.push(command);
+      invoke: async (command: string, args: Record<string, unknown> = {}) => {
+        calls.push({ command, args });
         if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
-        if (command === "desktop_install_diagnostic") return {
-          schema: "simplicio.desktop-install-attempt/v1", status: "clear", error: null,
-        };
-        if (command === "desktop_plan_integrations") return {
-          schema: "simplicio.desktop-integration-plan/v1", source: "runtime",
-          planDigest: "sha256:" + "a".repeat(64),
-          changes: [{ label: "codex", exists: false, changed: true }],
-        };
-        if (command === "desktop_repair_providers") {
-          if (failure === "verification_failed") return snapshot;
-          throw failure;
-        }
+        if (command === "desktop_reconcile_host_plugins") return reconciled;
         if (command === "plugin:event|listen") return 1;
         if (command === "plugin:event|unlisten") return;
         throw "unexpected_reference_recovery_command";
       },
     } });
-  }, { snapshot, failure });
+  }, { snapshot, reconciled });
+
+  await page.goto("/?view=setup");
+  await expect(page.getByRole("button", { name: "Configurar Simplicio", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Reconciliar recibo", exact: true })).toBeEnabled();
+  expect(await calls(page, "desktop_plan_integrations")).toHaveLength(0);
+  expect(await calls(page, "desktop_apply_host_plugins")).toHaveLength(0);
+
+  await page.getByRole("button", { name: "Reconciliar recibo", exact: true }).dblclick();
+  await expect(page.getByRole("heading", { name: "Configuração concluída", exact: true })).toBeVisible();
+  expect(await calls(page, "desktop_reconcile_host_plugins")).toEqual([{
+    command: "desktop_reconcile_host_plugins",
+    args: { receiptId: `sha256:${"e".repeat(64)}` },
+  }]);
+  expect(await calls(page, "desktop_apply_host_plugins")).toHaveLength(0);
+  expect(await calls(page, "desktop_plan_integrations")).toHaveLength(0);
+});
+
+test("a canonical partial apply exposes one explicit reconcile without replaying apply (mocked IPC)", async ({ page }) => {
+  const snapshot = createDemoSnapshot("active");
+  snapshot.source = "runtime";
+  delete snapshot.hostPlugins;
+  const plan = hostPluginPlan();
+  const partial = hostPluginReceipt({ state: "partial", receiptByte: "d", durableByte: "e" });
+  const reconciled = hostPluginReceipt({ operation: "reconcile", receiptByte: "e", durableByte: "e" });
+  await page.addInitScript(({ snapshot, plan, partial, reconciled }) => {
+    const calls: Array<{ command: string; args: Record<string, unknown> }> = [];
+    Object.assign(window, { __referenceRecoveryCalls: calls, __TAURI_INTERNALS__: {
+      invoke: async (command: string, args: Record<string, unknown> = {}) => {
+        calls.push({ command, args });
+        if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
+        if (command === "desktop_plan_integrations") return plan;
+        if (command === "desktop_apply_host_plugins") return partial;
+        if (command === "desktop_reconcile_host_plugins") return reconciled;
+        if (command === "plugin:event|listen") return 1;
+        if (command === "plugin:event|unlisten") return;
+        throw "unexpected_reference_recovery_command";
+      },
+    } });
+  }, { snapshot, plan, partial, reconciled });
+
   await page.goto("/?view=setup");
   await page.getByRole("button", { name: "Configurar Simplicio", exact: true }).click();
   await page.getByRole("checkbox", { name: /Autorizo o Runtime/ }).check();
   await page.getByRole("button", { name: "Instalar e conectar", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Não foi possível concluir.", exact: true })).toBeVisible();
-}
+  await expect(page.getByRole("alert")).toContainText("resultado parcial");
+  expect(await calls(page, "desktop_apply_host_plugins")).toHaveLength(1);
 
-async function count(page: Page, command: string) {
-  return page.evaluate((command) => (window as RecoveryWindow).__referenceRecoveryCalls.filter((call) => call === command).length, command);
-}
-
-for (const failure of ["integration_install_timeout", "integration_install_busy", "integration_install_applied_snapshot_unavailable", "verification_failed"]) {
-  test(`${failure} stays read-only across Setup, Providers and diagnostic refresh (mocked IPC)`, async ({ page }) => {
-    await prepareRecovery(page, failure);
-    await expect(page.getByRole("button", { name: "Revisar novamente", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Instalar e conectar", exact: true })).toHaveCount(0);
-    const confirmedReceipt = failure === "integration_install_applied_snapshot_unavailable" || failure === "verification_failed";
-    await expect(page.getByRole("progressbar")).toHaveAttribute("value", confirmedReceipt ? "3" : "2");
-    const diagnostic = page.getByRole("button", { name: confirmedReceipt ? "Atualizar diagnóstico" : "Abrir diagnóstico", exact: true });
-    await expect(diagnostic).toBeEnabled();
-    expect(await count(page, "desktop_repair_providers")).toBe(1);
-    const plans = await count(page, "desktop_plan_integrations");
-    await page.getByRole("button", { name: "Voltar ao app", exact: true }).click();
-    await page.getByRole("button", { name: "Integrações MCP", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Integrações MCP", exact: true })).toBeVisible();
-    const integration = page.getByRole("region", { name: "Configuração do MCP", exact: true });
-    await expect(integration.getByRole("button", { name: "Revisar configuração MCP", exact: true })).toBeDisabled();
-    await expect(integration.getByRole("button", { name: "Aplicar configuração MCP", exact: true })).toHaveCount(0);
-    await expect(integration.getByRole("checkbox", { name: /Autorizo o Runtime/ })).toHaveCount(0);
-    const refreshes = await count(page, "refresh_desktop_snapshot");
-    await page.getByRole("button", { name: "Verificar", exact: true }).click();
-    await expect.poll(() => count(page, "refresh_desktop_snapshot")).toBeGreaterThan(refreshes);
-    await expect(page.getByRole("button", { name: "Verificar", exact: true })).toBeEnabled();
-    await expect(integration.getByRole("button", { name: "Revisar configuração MCP", exact: true })).toBeDisabled();
-    const diagnosticRefreshes = await count(page, "refresh_desktop_snapshot");
-    await integration.getByRole("button", { name: "Atualizar diagnóstico", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Runtime e diagnóstico", exact: true })).toBeVisible();
-    await expect.poll(() => count(page, "refresh_desktop_snapshot")).toBeGreaterThan(diagnosticRefreshes);
-    await page.getByRole("button", { name: "Integrações MCP", exact: true }).click();
-    await expect(integration.getByRole("button", { name: "Revisar configuração MCP", exact: true })).toBeDisabled();
-    await expect(integration.getByRole("button", { name: "Aplicar configuração MCP", exact: true })).toHaveCount(0);
-    expect(await count(page, "desktop_plan_integrations")).toBe(plans);
-    await page.getByRole("button", { name: "Instalação guiada", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Configurar Simplicio", exact: true })).toBeDisabled();
-    await expect(page.getByRole("button", { name: confirmedReceipt ? "Atualizar diagnóstico" : "Abrir diagnóstico", exact: true })).toBeEnabled();
-    await expect(page.getByRole("button", { name: "Agora não", exact: true })).toBeEnabled();
-    await expect(page.getByRole("alert")).toBeVisible();
-    expect(await count(page, "desktop_plan_integrations")).toBe(plans);
-    expect(await count(page, "desktop_repair_providers")).toBe(1);
-  });
-}
-
-for (const failure of ["integration_plan_changed_review_again", "integration_install_not_started"]) {
-  test(`${failure} requires fresh plans and new consent across Setup and Providers (mocked IPC)`, async ({ page }) => {
-    await prepareRecovery(page, failure);
-    await page.getByRole("button", { name: "Revisar novamente", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Tudo pronto para revisar.", exact: true })).toBeVisible();
-    await expect(page.getByRole("checkbox", { name: /Autorizo o Runtime/ })).not.toBeChecked();
-    await expect(page.getByRole("button", { name: "Instalar e conectar", exact: true })).toBeDisabled();
-    expect(await count(page, "desktop_repair_providers")).toBe(1);
-    expect(await count(page, "desktop_plan_integrations")).toBe(2);
-    await page.getByRole("button", { name: "Voltar ao app", exact: true }).click();
-    await page.getByRole("button", { name: "Integrações MCP", exact: true }).click();
-    const integration = page.getByRole("region", { name: "Configuração do MCP", exact: true });
-    await expect(integration.getByRole("button", { name: "Revisar configuração MCP", exact: true })).toBeEnabled();
-    await integration.getByRole("button", { name: "Revisar configuração MCP", exact: true }).click();
-    await expect(integration.getByRole("checkbox", { name: /Autorizo o Runtime/ })).not.toBeChecked();
-    await expect(integration.getByRole("button", { name: "Aplicar configuração MCP", exact: true })).toBeDisabled();
-    expect(await count(page, "desktop_plan_integrations")).toBe(3);
-    expect(await count(page, "desktop_repair_providers")).toBe(1);
-    await page.getByRole("button", { name: "Instalação guiada", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Configurar Simplicio", exact: true })).toBeEnabled();
-    await page.getByRole("button", { name: "Configurar Simplicio", exact: true }).click();
-    await expect(page.getByRole("checkbox", { name: /Autorizo o Runtime/ })).not.toBeChecked();
-    await expect(page.getByRole("button", { name: "Instalar e conectar", exact: true })).toBeDisabled();
-    expect(await count(page, "desktop_plan_integrations")).toBe(4);
-    expect(await count(page, "desktop_repair_providers")).toBe(1);
-  });
-}
+  await page.getByRole("button", { name: "Reconciliar recibo", exact: true }).dblclick();
+  await expect(page.getByRole("heading", { name: "Configuração concluída", exact: true })).toBeVisible();
+  expect(await calls(page, "desktop_apply_host_plugins")).toHaveLength(1);
+  expect(await calls(page, "desktop_reconcile_host_plugins")).toEqual([{
+    command: "desktop_reconcile_host_plugins",
+    args: { receiptId: `sha256:${"e".repeat(64)}` },
+  }]);
+  expect(await calls(page, "refresh_desktop_snapshot")).toHaveLength(1);
+  expect(await calls(page, "desktop_plan_integrations")).toHaveLength(1);
+});
