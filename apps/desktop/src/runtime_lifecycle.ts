@@ -68,7 +68,7 @@ function nullableDigest(value: unknown): string | null {
   return value === null ? null : digest(value);
 }
 
-function boolean(value: unknown, expected: boolean): boolean {
+function boolean<T extends boolean>(value: unknown, expected: T): T {
   if (value !== expected) throw new Error('runtime_lifecycle_invalid');
   return expected;
 }
