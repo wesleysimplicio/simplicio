@@ -13,16 +13,18 @@ The Rust Runtime source lives in the private [`simplicio-runtime`](https://githu
 ## Current Version: v3.8.40
 
 - **Source:** `simplicio-runtime` main at commit
-  `d2ceddade37fa965fd00cb6d9ddb9800368b0f7b` (Runtime v3.8.39).
+  `d2ceddade37fa965fd00cb6d9ddb9800368b0f7b` (Runtime v3.8.40).
 - **Runtime targets:** macOS ARM64, macOS x64, Linux x64, and Windows x64.
   The canonical target table and release manifest define the asset, checksum,
   Ed25519 signature, SBOM, and provenance for each Runtime platform.
-- **Desktop assets:** `Simplicio-3.8.39-arm64.dmg` and `.zip` are published
-  alongside the Runtime release, built from public commit
+- **Desktop status:** Desktop remains at v3.8.39. Its
+  `Simplicio-3.8.39-arm64.dmg` and `.zip` assets were published with v3.8.39,
+  built from public commit
   `dd7dd0665630fcdd6c9a76d07956d840f80fc0a9`. Exact filenames, SHA-256,
   sizes, verification evidence, and signing status are recorded in
   [the release runbook](docs/RELEASE_RUNBOOK.md#published-desktop-v3839).
-- **Release status:** GitHub Release v3.8.39 and `simplicio-installer 3.8.39`
+  Desktop is not part of the v3.8.40 release artifacts.
+- **Release status:** GitHub Release v3.8.40 and `simplicio-installer 3.8.40`
   on PyPI are published manually, without GitHub Actions. Installers and the
   update command resolve the release metadata, verify the required Ed25519
   artifact signatures, and fail closed on an invalid signature or checksum.
