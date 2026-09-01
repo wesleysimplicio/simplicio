@@ -1,6 +1,6 @@
 {
   "name": "simplicio-installer",
-  "version": "3.8.39",
+  "version": "3.8.40",
   "description": "Simplicio installer wrapper for npm.",
   "bin": {
     "simplicio-installer": "./install.js"
