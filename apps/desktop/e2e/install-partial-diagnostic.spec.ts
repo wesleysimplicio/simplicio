@@ -5,20 +5,26 @@ test("a typed partial receipt shows sanitized steps without enabling another ins
   const snapshot = createDemoSnapshot("active");
   snapshot.source = "runtime";
   await page.addInitScript(({ snapshot }) => {
-    let applications = 0;
-    Object.assign(window, { __installDiagnosticApplications: () => applications, __TAURI_INTERNALS__: {
+    const persistedError = {
+      schema: "simplicio.desktop-install-error/v1", code: "integration_install_exit_code:1",
+      diagnostic: { schema: "simplicio.desktop-install-diagnostic/v1", status: "partial", failedSteps: ["hermes"], unknownFailedSteps: 0 },
+    };
+    Object.assign(window, { __installDiagnosticApplications: () => Number(localStorage.getItem("install-applications") || "0"), __TAURI_INTERNALS__: {
       invoke: async (command: string) => {
         if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
+        if (command === "desktop_install_diagnostic") return localStorage.getItem("install-pending") === "1"
+          ? { schema: "simplicio.desktop-install-attempt/v1", status: "reconciliation_required", error: persistedError }
+          : { schema: "simplicio.desktop-install-attempt/v1", status: "clear", error: null };
         if (command === "desktop_plan_integrations") return {
           schema: "simplicio.desktop-integration-plan/v1", source: "runtime",
           planDigest: "sha256:" + "a".repeat(64),
           changes: [{ label: "hermes", exists: true, changed: true }],
         };
         if (command === "desktop_repair_providers") {
-          applications += 1;
+          localStorage.setItem("install-applications", String(Number(localStorage.getItem("install-applications") || "0") + 1));
+          localStorage.setItem("install-pending", "1");
           throw {
-            schema: "simplicio.desktop-install-error/v1", code: "integration_install_exit_code:1",
-            diagnostic: { schema: "simplicio.desktop-install-diagnostic/v1", status: "partial", failedSteps: ["hermes"], unknownFailedSteps: 0 },
+            ...persistedError,
             detail: "DO_NOT_LEAK /private/test-user",
           };
         }
@@ -45,5 +51,12 @@ test("a typed partial receipt shows sanitized steps without enabling another ins
   await expect(integration.getByRole("button", { name: "Revisar configuração MCP", exact: true })).toBeDisabled();
   await integration.getByRole("button", { name: "Atualizar diagnóstico", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Runtime e diagnóstico", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (window as Window & { __installDiagnosticApplications: () => number }).__installDiagnosticApplications())).toBe(1);
+
+  await page.goto("/?view=setup");
+  await expect(page.getByRole("alert")).toContainText("Etapas com falha: Hermes.");
+  await expect(page.getByRole("alert")).toContainText("código 1.");
+  await expect(page.getByRole("button", { name: "Configurar Simplicio", exact: true })).toBeDisabled();
+  await expect(page.locator("body")).not.toContainText("DO_NOT_LEAK");
   expect(await page.evaluate(() => (window as Window & { __installDiagnosticApplications: () => number }).__installDiagnosticApplications())).toBe(1);
 });

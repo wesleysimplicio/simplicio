@@ -5,6 +5,7 @@ import { snapshotWithDemoBots } from "./bot_center";
 import {
   beginDesktopLogin,
   loadDesktopSnapshot,
+  loadDesktopInstallDiagnostic,
   logoutDesktop,
   openDesktopSubscription,
   refreshDesktopSnapshot,
@@ -120,6 +121,23 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       current = false;
     };
   }, [initialSnapshot]);
+
+  useEffect(() => {
+    if (view !== "setup") return;
+    let current = true;
+    loadDesktopInstallDiagnostic()
+      .then((diagnostic) => {
+        if (!current || diagnostic.status === "clear") return;
+        setActionError(installFailureMessage(diagnostic.error));
+        setApplicationRecovery(installFailureRecovery(diagnostic.error));
+      })
+      .catch(() => {
+        if (!current) return;
+        setActionError("Não foi possível consultar o recibo persistente da instalação. Uma nova aplicação permanece bloqueada até o diagnóstico ser esclarecido.");
+        setApplicationRecovery("reconcile");
+      });
+    return () => { current = false; };
+  }, [view]);
 
   async function refresh() {
     if (actionLock.current) return;

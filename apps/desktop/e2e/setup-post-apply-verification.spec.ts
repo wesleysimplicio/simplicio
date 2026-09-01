@@ -17,6 +17,9 @@ async function mockSetupVerification(page: Page, options: { state?: Verification
       invoke: async (command: string, args: Record<string, unknown> = {}) => {
         calls.push(command);
         if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
+        if (command === "desktop_install_diagnostic") return {
+          schema: "simplicio.desktop-install-attempt/v1", status: "clear", error: null,
+        };
         if (command === "desktop_plan_integrations") {
           if (!applied) return {
             schema: "simplicio.desktop-integration-plan/v1", source: "runtime", planDigest: `sha256:${"a".repeat(64)}`,

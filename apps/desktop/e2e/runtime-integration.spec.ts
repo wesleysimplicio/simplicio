@@ -23,6 +23,9 @@ async function mockNativeBridge(page: Page, options: { signedOut?: boolean; fail
         if (command === "desktop_logout") signedOut = true;
         if (command === "refresh_desktop_snapshot" && installed && options.failVerification) throw "test_final_snapshot_failed";
         if (["desktop_snapshot", "refresh_desktop_snapshot", "desktop_logout"].includes(command)) return { ...snapshot, access: { ...snapshot.access, state: signedOut ? "signed_out" : accessState } };
+        if (command === "desktop_install_diagnostic") return {
+          schema: "simplicio.desktop-install-attempt/v1", status: "clear", error: null,
+        };
         if (command === "desktop_plan_integrations") return { schema: "simplicio.desktop-integration-plan/v1", source: "runtime", planDigest: `sha256:${(installed ? "b" : "a").repeat(64)}`, changes: [{ label: "codex", changed: !installed, exists: true }] };
         if (command === "desktop_repair_providers") {
           if (options.pauseSetup) await new Promise((resolve) => Object.assign(window, { __desktopCompleteSetup: resolve }));

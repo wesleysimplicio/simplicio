@@ -41,6 +41,9 @@ async function mockAccessUpdates(page: Page, state: "signed_out" | "unknown" | "
           }
           if (command === "plugin:event|unlisten") return;
           if (command === "desktop_snapshot") return snapshots[state];
+          if (command === "desktop_install_diagnostic") return {
+            schema: "simplicio.desktop-install-attempt/v1", status: "clear", error: null,
+          };
           if (command === "refresh_desktop_snapshot") return authOnlyUnsupported ? snapshots.unknown : snapshots[state];
           if (command === "desktop_login" && authOnlyUnsupported) throw "runtime_auth_only_unsupported";
           if (command === "desktop_logout" && authOnlyUnsupported) return snapshots.signed_out;

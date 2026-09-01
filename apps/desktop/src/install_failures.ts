@@ -84,6 +84,9 @@ const STEP_LABELS: Readonly<Record<string, string>> = {
 
 type PartialDiagnostic = { failedSteps: string[]; unknownFailedSteps: number };
 type NativeInstallError = { code: string; diagnostic?: PartialDiagnostic };
+export type InstallAttemptDiagnostic =
+  | { status: "clear"; error: null }
+  | { status: "reconciliation_required"; error: unknown };
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -115,6 +118,17 @@ function typedError(error: unknown): NativeInstallError | undefined {
   if (steps.length !== value.failedSteps.length || new Set(steps).size !== steps.length ||
       steps.length + value.unknownFailedSteps < 1 || steps.length + value.unknownFailedSteps > 128) return;
   return { code, diagnostic: { failedSteps: steps, unknownFailedSteps: value.unknownFailedSteps } };
+}
+
+/** Parse the native durable journal without accepting arbitrary stored content. */
+export function parseInstallAttemptDiagnostic(value: unknown): InstallAttemptDiagnostic {
+  if (!record(value) || Object.keys(value).length !== 3 ||
+      value.schema !== "simplicio.desktop-install-attempt/v1") throw new Error("integration_install_diagnostic_invalid");
+  if (value.status === "clear" && value.error === null) return { status: "clear", error: null };
+  if (value.status === "reconciliation_required" && typedError(value.error)) {
+    return { status: "reconciliation_required", error: value.error };
+  }
+  throw new Error("integration_install_diagnostic_invalid");
 }
 
 /** Fixed labels only: diagnostic payload details never reach the UI. */

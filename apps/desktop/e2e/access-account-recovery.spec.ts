@@ -34,6 +34,9 @@ async function mockAccountRecovery(page: Page, state: LockedState, options: {
             if (options.failSnapshot) throw "snapshot_unavailable";
             return snapshot;
           }
+          if (command === "desktop_install_diagnostic") return {
+            schema: "simplicio.desktop-install-attempt/v1", status: "clear", error: null,
+          };
           if (command === "desktop_logout") {
             await new Promise<void>((resolve) => Object.assign(window, { __accessFinishLogout: resolve }));
             if (options.failLogout) throw "logout_unconfirmed";

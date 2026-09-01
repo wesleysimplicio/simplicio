@@ -77,6 +77,13 @@ const INSTALL_ARGS: &[&str] = &["install", "--global", "--yes", "--json"];
 const SUBSCRIPTION_URL: &str = "https://simpleti.com.br/simplicio";
 const RELEASES_URL: &str = "https://github.com/wesleysimplicio/simplicio/releases";
 
+fn install_attempt_path(app: &tauri::AppHandle) -> Result<PathBuf, install_result::InstallError> {
+    app.path()
+        .app_data_dir()
+        .map(|directory| directory.join("install-attempt.json"))
+        .map_err(|_| install_result::InstallFailure::NotStarted.public_error())
+}
+
 fn runtime_candidates_with(
     override_binary: Option<OsString>,
     simplicio_home: Option<OsString>,
@@ -507,9 +514,11 @@ async fn desktop_logout() -> Result<Value, String> {
 
 #[tauri::command]
 async fn desktop_repair_providers(
+    app: tauri::AppHandle,
     plan_digest: String,
 ) -> Result<Value, install_result::InstallError> {
     use install_result::InstallFailure;
+    let journal = install_attempt_path(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
         let mut attempt = INSTALL_LOCK.try_lock().map_err(|error| match error {
             std::sync::TryLockError::WouldBlock => InstallFailure::Busy.public_error(),
@@ -517,6 +526,10 @@ async fn desktop_repair_providers(
                 InstallFailure::ReconciliationRequired.public_error()
             }
         })?;
+        *attempt = install_result::InstallAttempt::load(&journal);
+        if let Some(error) = attempt.pending_error() {
+            return Err(error);
+        }
         attempt
             .check_ready()
             .map_err(|failure| failure.public_error())?;
@@ -526,15 +539,33 @@ async fn desktop_repair_providers(
         if plan["planDigest"].as_str() != Some(plan_digest.as_str()) {
             return Err(InstallFailure::PlanChanged.public_error());
         }
-        attempt.begin().map_err(|failure| failure.public_error())?;
+        attempt
+            .begin_persisted(&journal)
+            .map_err(|failure| failure.public_error())?;
         let result = repair_provider_integrations();
-        attempt.finish(&result);
+        attempt
+            .finish_persisted(&journal, &result)
+            .map_err(|failure| failure.public_error())?;
         result.map_err(|failure| failure.public_error())?;
         snapshot_from_runtime()
             .map_err(|_| InstallFailure::AppliedSnapshotUnavailable.public_error())
     })
     .await
     .map_err(|_| InstallFailure::OutputUnavailable.public_error())?
+}
+
+#[tauri::command]
+async fn desktop_install_diagnostic(
+    app: tauri::AppHandle,
+) -> Result<Value, install_result::InstallError> {
+    let journal = install_attempt_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        Ok::<_, install_result::InstallError>(
+            install_result::InstallAttempt::load(&journal).diagnostic(),
+        )
+    })
+    .await
+    .map_err(|_| install_result::InstallFailure::OutputUnavailable.public_error())?
 }
 
 #[tauri::command]
@@ -579,6 +610,7 @@ pub fn run() {
             desktop_login,
             desktop_logout,
             desktop_repair_providers,
+            desktop_install_diagnostic,
             desktop_plan_integrations,
             desktop_usage_projects,
             desktop_context_report,

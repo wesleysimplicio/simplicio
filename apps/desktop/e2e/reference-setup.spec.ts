@@ -14,6 +14,9 @@ test("guided setup keeps progress and consent-controlled actions visible in a sh
     Object.assign(window, { __referenceApplyCount: 0, __TAURI_INTERNALS__: {
       invoke: async (command: string) => {
         if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
+        if (command === "desktop_install_diagnostic") return {
+          schema: "simplicio.desktop-install-attempt/v1", status: "clear", error: null,
+        };
         if (command === "desktop_plan_integrations") return {
           schema: "simplicio.desktop-integration-plan/v1", source: "runtime",
           planDigest: "sha256:" + (applied ? "b" : "a").repeat(64),

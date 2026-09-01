@@ -12,6 +12,7 @@ import { createReadonlyRequest } from "./readonly_request";
 import { createContextReader } from "./context_report";
 import { parseUsageProjects } from "./project_usage";
 import { createConsolidatedReader, type ConsolidatedQuery, type ConsolidatedReport } from "./consolidated_tokens";
+import { parseInstallAttemptDiagnostic, type InstallAttemptDiagnostic } from "./install_failures";
 
 const readSnapshot = createReadonlyRequest<DesktopSnapshot>(30_000, "desktop_snapshot_timeout");
 const readContext = createContextReader((repoPath) => invoke<unknown>("desktop_context_report", { repoPath: repoPath || null }));
@@ -105,6 +106,11 @@ export async function logoutDesktop(): Promise<DesktopSnapshot> {
 export async function refreshDesktopSnapshot(): Promise<DesktopSnapshot> {
   if (!isTauri()) return createDemoSnapshot(previewState());
   return readSnapshot(() => invoke<DesktopSnapshot>("refresh_desktop_snapshot"));
+}
+
+export async function loadDesktopInstallDiagnostic(): Promise<InstallAttemptDiagnostic> {
+  if (!isTauri()) return { status: "clear", error: null };
+  return parseInstallAttemptDiagnostic(await invoke<unknown>("desktop_install_diagnostic"));
 }
 
 export async function planDesktopIntegrations(): Promise<IntegrationPlan> {

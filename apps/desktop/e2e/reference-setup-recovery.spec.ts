@@ -12,6 +12,9 @@ async function prepareRecovery(page: Page, failure: string) {
       invoke: async (command: string) => {
         calls.push(command);
         if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
+        if (command === "desktop_install_diagnostic") return {
+          schema: "simplicio.desktop-install-attempt/v1", status: "clear", error: null,
+        };
         if (command === "desktop_plan_integrations") return {
           schema: "simplicio.desktop-integration-plan/v1", source: "runtime",
           planDigest: "sha256:" + "a".repeat(64),

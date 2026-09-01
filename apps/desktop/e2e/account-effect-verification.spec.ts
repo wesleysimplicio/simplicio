@@ -21,6 +21,9 @@ async function mockAccountEffects(page: Page, options: {
       invoke: async (command: string) => {
         calls.push(command);
         if (command === "desktop_snapshot") return states[current];
+        if (command === "desktop_install_diagnostic") return {
+          schema: "simplicio.desktop-install-attempt/v1", status: "clear", error: null,
+        };
         if (command === "desktop_login") {
           // OAuth completed, but its following snapshot was not confirmed.
           current = "active";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { installFailureMessage, installFailureRecovery } from "./install_failures";
+import { installFailureMessage, installFailureRecovery, parseInstallAttemptDiagnostic } from "./install_failures";
 
 describe("safe installer failure messages", () => {
   it("shows only a bounded nonzero OS exit code and warns about partial effects", () => {
@@ -165,5 +165,41 @@ describe("typed partial install diagnostics", () => {
     } });
     expect(installFailureMessage(error)).toContain("2 etapa(s) não identificada(s)");
     expect(installFailureRecovery(error)).toBe("reconcile");
+  });
+});
+
+describe("durable install-attempt diagnostics", () => {
+  it("restores a sanitized partial failure after an app restart", () => {
+    const error = {
+      schema: "simplicio.desktop-install-error/v1",
+      code: "integration_install_exit_code:1",
+      diagnostic: {
+        schema: "simplicio.desktop-install-diagnostic/v1",
+        status: "partial",
+        failedSteps: ["hermes"],
+        unknownFailedSteps: 1,
+      },
+    };
+    const result = parseInstallAttemptDiagnostic({
+      schema: "simplicio.desktop-install-attempt/v1",
+      status: "reconciliation_required",
+      error,
+    });
+    expect(result.status).toBe("reconciliation_required");
+    expect(installFailureMessage(result.error)).toContain("Hermes");
+    expect(installFailureMessage(result.error)).toContain("código 1");
+    expect(installFailureRecovery(result.error)).toBe("reconcile");
+  });
+
+  it("accepts only a closed clear state and rejects injected persisted details", () => {
+    expect(parseInstallAttemptDiagnostic({
+      schema: "simplicio.desktop-install-attempt/v1", status: "clear", error: null,
+    })).toEqual({ status: "clear", error: null });
+    for (const value of [
+      { schema: "wrong", status: "clear", error: null },
+      { schema: "simplicio.desktop-install-attempt/v1", status: "clear", error: { token: "DO_NOT_LEAK" } },
+      { schema: "simplicio.desktop-install-attempt/v1", status: "reconciliation_required", error: { schema: "simplicio.desktop-install-error/v1", code: "DO_NOT_LEAK" } },
+      { schema: "simplicio.desktop-install-attempt/v1", status: "clear", error: null, extra: "DO_NOT_LEAK" },
+    ]) expect(() => parseInstallAttemptDiagnostic(value)).toThrow("integration_install_diagnostic_invalid");
   });
 });

@@ -1,8 +1,13 @@
 use serde_json::Value;
+use std::fs::{self, File};
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
 
 const MAX_INSTALL_OUTPUT_BYTES: usize = 64 * 1024;
 
 const MAX_INSTALL_ACTIONS: usize = 128;
+
+const INSTALL_ATTEMPT_SCHEMA: &str = "simplicio.desktop-install-attempt/v1";
 
 /// A closed projection: no raw action name, path, detail, stdout or stderr.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -14,6 +19,164 @@ pub struct InstallDiagnostic {
 }
 
 pub type InstallError = Value;
+
+fn journal_sibling(path: &Path, suffix: &str) -> PathBuf {
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+    path.with_extension(format!("{extension}.{suffix}"))
+}
+
+fn write_journal(path: &Path, state: &str, error: Option<Value>) -> io::Result<()> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "missing journal parent"))?;
+    fs::create_dir_all(parent)?;
+    let temporary = journal_sibling(path, "tmp");
+    let backup = journal_sibling(path, "bak");
+    let _ = fs::remove_file(&temporary);
+    let mut file = File::create(&temporary)?;
+    let record = serde_json::json!({
+        "schema": INSTALL_ATTEMPT_SCHEMA,
+        "state": state,
+        "error": error,
+    });
+    serde_json::to_writer(&mut file, &record).map_err(io::Error::other)?;
+    file.write_all(b"\n")?;
+    file.sync_all()?;
+
+    if path.exists() {
+        let _ = fs::remove_file(&backup);
+        fs::rename(path, &backup)?;
+    }
+    if let Err(error) = fs::rename(&temporary, path) {
+        if !path.exists() && backup.exists() {
+            let _ = fs::rename(&backup, path);
+        }
+        return Err(error);
+    }
+    if let Ok(directory) = File::open(parent) {
+        let _ = directory.sync_all();
+    }
+    Ok(())
+}
+
+fn valid_exit_code(code: &str) -> bool {
+    let Some(raw) = code.strip_prefix("integration_install_exit_code:") else {
+        return false;
+    };
+    raw.len() <= 11 && raw.parse::<i32>().is_ok_and(|value| value != 0)
+}
+
+fn valid_public_code(code: &str) -> bool {
+    matches!(
+        code,
+        "integration_install_busy"
+            | "integration_preflight_unavailable"
+            | "integration_plan_changed_review_again"
+            | "integration_install_output_unavailable"
+            | "integration_install_not_started"
+            | "integration_install_timeout"
+            | "integration_install_stderr_too_large"
+            | "integration_install_cleanup_unconfirmed"
+            | "integration_install_reconciliation_required"
+            | "integration_install_no_exit_code"
+            | "integration_install_invalid_json"
+            | "integration_install_response_too_large"
+            | "integration_install_receipt_unconfirmed"
+            | "integration_install_applied_snapshot_unavailable"
+    ) || valid_exit_code(code)
+}
+
+fn valid_step_label(step: &str) -> bool {
+    matches!(
+        step,
+        "binary-copy"
+            | "path-registration"
+            | "install-manifest"
+            | "codex"
+            | "codex-hooks"
+            | "mcp-route-hook"
+            | "hermes"
+            | "claude-code"
+            | "claude-code-hooks"
+            | "claude-desktop"
+            | "cursor"
+            | "windsurf"
+            | "windsurf-next"
+            | "kiro"
+            | "gemini"
+            | "trae"
+            | "antigravity"
+            | "jetbrains-junie"
+            | "vscode-cline"
+            | "vscode"
+            | "zed"
+            | "opencode"
+            | "grok-mcp-route"
+    )
+}
+
+fn sanitized_public_error(value: &Value) -> Option<Value> {
+    let object = value.as_object()?;
+    if object.len() < 2
+        || object.len() > 3
+        || value.get("schema")?.as_str()? != "simplicio.desktop-install-error/v1"
+    {
+        return None;
+    }
+    let code = value.get("code")?.as_str()?;
+    if code.len() > 100 || !valid_public_code(code) {
+        return None;
+    }
+    let Some(diagnostic) = value.get("diagnostic") else {
+        return (object.len() == 2).then(|| {
+            serde_json::json!({
+                "schema": "simplicio.desktop-install-error/v1",
+                "code": code,
+            })
+        });
+    };
+    if !valid_exit_code(code) || object.len() != 3 {
+        return None;
+    }
+    let diagnostic_object = diagnostic.as_object()?;
+    if diagnostic_object.len() != 4
+        || diagnostic.get("schema")?.as_str()? != "simplicio.desktop-install-diagnostic/v1"
+        || diagnostic.get("status")?.as_str()? != "partial"
+    {
+        return None;
+    }
+    let failed_steps = diagnostic.get("failedSteps")?.as_array()?;
+    let unknown = diagnostic.get("unknownFailedSteps")?.as_u64()?;
+    if failed_steps.len() > MAX_INSTALL_ACTIONS
+        || unknown > MAX_INSTALL_ACTIONS as u64
+        || failed_steps.len() as u64 + unknown == 0
+        || failed_steps.len() as u64 + unknown > MAX_INSTALL_ACTIONS as u64
+    {
+        return None;
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut steps = Vec::with_capacity(failed_steps.len());
+    for value in failed_steps {
+        let step = value.as_str()?;
+        if !valid_step_label(step) || !seen.insert(step) {
+            return None;
+        }
+        steps.push(step);
+    }
+    Some(serde_json::json!({
+        "schema": "simplicio.desktop-install-error/v1",
+        "code": code,
+        "diagnostic": {
+            "schema": "simplicio.desktop-install-diagnostic/v1",
+            "status": "partial",
+            "failedSteps": steps,
+            "unknownFailedSteps": unknown,
+        }
+    }))
+}
 
 fn known_step(name: &str) -> Option<&'static str> {
     match name {
@@ -157,16 +320,95 @@ impl InstallFailure {
     }
 }
 
-/// This state survives closing/reopening the dialog, not application restart.
-/// It is not a substitute for a durable Runtime effect-reconciliation receipt.
+/// Process-local mirror of the durable Desktop installation journal.
 pub struct InstallAttempt {
     reconciliation_required: bool,
+    last_error: Option<InstallError>,
 }
 
 impl InstallAttempt {
     pub const fn new() -> Self {
         Self {
             reconciliation_required: false,
+            last_error: None,
+        }
+    }
+
+    fn blocked(error: Option<InstallError>) -> Self {
+        Self {
+            reconciliation_required: true,
+            last_error: error,
+        }
+    }
+
+    /// Restore only the closed, sanitized projection. Missing evidence is clear;
+    /// interrupted, malformed, or unreadable evidence fails closed.
+    pub fn load(path: &Path) -> Self {
+        let backup = journal_sibling(path, "bak");
+        let temporary = journal_sibling(path, "tmp");
+        let selected = if path.exists() {
+            Some(path.to_path_buf())
+        } else if backup.exists() {
+            Some(backup)
+        } else if temporary.exists() {
+            Some(temporary)
+        } else {
+            None
+        };
+        let Some(selected) = selected else {
+            return Self::new();
+        };
+        let Ok(bytes) = fs::read(selected) else {
+            return Self::blocked(None);
+        };
+        if bytes.len() > 4096 {
+            return Self::blocked(None);
+        }
+        let Ok(record) = serde_json::from_slice::<Value>(&bytes) else {
+            return Self::blocked(None);
+        };
+        let Some(object) = record.as_object() else {
+            return Self::blocked(None);
+        };
+        if object.len() != 3
+            || record.get("schema").and_then(Value::as_str) != Some(INSTALL_ATTEMPT_SCHEMA)
+        {
+            return Self::blocked(None);
+        }
+        match record.get("state").and_then(Value::as_str) {
+            Some("settled") if record.get("error").is_some_and(Value::is_null) => Self::new(),
+            Some("in_progress") if record.get("error").is_some_and(Value::is_null) => {
+                Self::blocked(None)
+            }
+            Some("reconciliation_required") => record
+                .get("error")
+                .and_then(sanitized_public_error)
+                .map(|error| Self::blocked(Some(error)))
+                .unwrap_or_else(|| Self::blocked(None)),
+            _ => Self::blocked(None),
+        }
+    }
+
+    pub fn pending_error(&self) -> Option<InstallError> {
+        self.reconciliation_required.then(|| {
+            self.last_error
+                .clone()
+                .unwrap_or_else(|| InstallFailure::ReconciliationRequired.public_error())
+        })
+    }
+
+    pub fn diagnostic(&self) -> Value {
+        match self.pending_error() {
+            Some(error) => serde_json::json!({
+                "schema": INSTALL_ATTEMPT_SCHEMA,
+                "status": "reconciliation_required",
+                "error": error,
+            }),
+            None => serde_json::json!({
+                "schema": INSTALL_ATTEMPT_SCHEMA,
+                "status": "clear",
+                "error": null,
+            }),
         }
     }
 
@@ -181,6 +423,15 @@ impl InstallAttempt {
     pub fn begin(&mut self) -> Result<(), InstallFailure> {
         self.check_ready()?;
         self.reconciliation_required = true;
+        self.last_error = None;
+        Ok(())
+    }
+
+    pub fn begin_persisted(&mut self, path: &Path) -> Result<(), InstallFailure> {
+        self.check_ready()?;
+        write_journal(path, "in_progress", None).map_err(|_| InstallFailure::NotStarted)?;
+        self.reconciliation_required = true;
+        self.last_error = None;
         Ok(())
     }
 
@@ -189,7 +440,29 @@ impl InstallAttempt {
         // settles this attempt. Exit failure can still mean partially applied.
         if matches!(result, Ok(()) | Err(InstallFailure::NotStarted)) {
             self.reconciliation_required = false;
+            self.last_error = None;
+        } else if let Err(failure) = result {
+            self.last_error = Some(failure.public_error());
         }
+    }
+
+    pub fn finish_persisted(
+        &mut self,
+        path: &Path,
+        result: &Result<(), InstallFailure>,
+    ) -> Result<(), InstallFailure> {
+        self.finish(result);
+        let (state, error) = if self.reconciliation_required {
+            ("reconciliation_required", self.pending_error())
+        } else {
+            ("settled", None)
+        };
+        if write_journal(path, state, error).is_err() {
+            self.reconciliation_required = true;
+            self.last_error = Some(InstallFailure::ReconciliationRequired.public_error());
+            return Err(InstallFailure::ReconciliationRequired);
+        }
+        Ok(())
     }
 }
 
@@ -532,5 +805,82 @@ mod diagnostic_tests {
             validate_install_output(Some(1), &partial(json!(actions))),
             Err(InstallFailure::ExitCode(1))
         );
+    }
+
+    fn journal_path(name: &str) -> std::path::PathBuf {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        let id = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        std::env::temp_dir().join(format!(
+            "simplicio-desktop-install-{name}-{}-{id}.json",
+            std::process::id()
+        ))
+    }
+
+    fn remove_journal(path: &std::path::Path) {
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_file(path.with_extension("json.bak"));
+        let _ = std::fs::remove_file(path.with_extension("json.tmp"));
+    }
+
+    #[test]
+    fn durable_journal_preserves_the_sanitized_code_one_diagnostic_after_restart() {
+        let path = journal_path("partial");
+        remove_journal(&path);
+        let stdout = partial(json!([
+            {"name":"assistant-config:hermes","status":"failed","detail":"DO_NOT_LEAK /private/test-user"},
+            {"name":"private-step","status":"failed","token":"DO_NOT_LEAK"}
+        ]));
+        let failure = validate_install_output(Some(1), &stdout).unwrap_err();
+        let mut attempt = InstallAttempt::new();
+        attempt.begin_persisted(&path).unwrap();
+        attempt.finish_persisted(&path, &Err(failure)).unwrap();
+
+        let restored = InstallAttempt::load(&path);
+        let diagnostic = restored
+            .pending_error()
+            .expect("durable pending diagnostic");
+        assert_eq!(diagnostic["code"], "integration_install_exit_code:1");
+        assert_eq!(diagnostic["diagnostic"]["failedSteps"], json!(["hermes"]));
+        assert_eq!(diagnostic["diagnostic"]["unknownFailedSteps"], 1);
+        let rendered = diagnostic.to_string();
+        for secret in ["DO_NOT_LEAK", "/private/test-user", "private-step"] {
+            assert!(!rendered.contains(secret));
+        }
+        remove_journal(&path);
+    }
+
+    #[test]
+    fn an_interrupted_or_malformed_journal_fails_closed_after_restart() {
+        for contents in [
+            r#"{"schema":"simplicio.desktop-install-attempt/v1","state":"in_progress"}"#,
+            r#"{"schema":"wrong","state":"failed","error":{"token":"DO_NOT_LEAK"}}"#,
+        ] {
+            let path = journal_path("uncertain");
+            remove_journal(&path);
+            std::fs::write(&path, contents).unwrap();
+            let restored = InstallAttempt::load(&path);
+            let diagnostic = restored
+                .pending_error()
+                .expect("uncertain attempts stay blocked");
+            assert_eq!(
+                diagnostic["code"],
+                "integration_install_reconciliation_required"
+            );
+            assert!(!diagnostic.to_string().contains("DO_NOT_LEAK"));
+            remove_journal(&path);
+        }
+    }
+
+    #[test]
+    fn a_settled_attempt_is_clear_after_restart() {
+        let path = journal_path("settled");
+        remove_journal(&path);
+        let mut attempt = InstallAttempt::new();
+        attempt.begin_persisted(&path).unwrap();
+        attempt.finish_persisted(&path, &Ok(())).unwrap();
+        let restored = InstallAttempt::load(&path);
+        assert!(restored.pending_error().is_none());
+        assert!(restored.check_ready().is_ok());
+        remove_journal(&path);
     }
 }
