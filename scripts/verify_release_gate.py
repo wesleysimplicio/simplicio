@@ -14,7 +14,7 @@ REQUIRED_TRACKS = ("install", "oauth", "e2e", "usage", "cost", "privacy", "relea
 REQUIRED_DEPENDENCIES = ("#282", "#283", "#286", "#287", "#288", "#289")
 STATUSES = ("verified", "unavailable", "blocked")
 SOURCES = ("installed", "runtime")
-SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:#-]{0,127}$")
+SAFE_ID = re.compile(r"^[A-Za-z0-9#][A-Za-z0-9_.:#-]{0,127}$")
 SENSITIVE_KEY = re.compile(
     r"(^|_)(path|cwd|home|argv|prompt|secret|password|credential|"
     r"authorization|api_key|access_token|refresh_token|raw_payload|raw_output)(_|$)",
