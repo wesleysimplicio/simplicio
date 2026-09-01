@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { createDemoSnapshot } from "../src/demo";
+import { hostPluginPlan, hostPluginReceipt } from "./host-plugin-fixtures";
 
 // Surface browser exceptions as failures, including asynchronous Tauri event cleanup.
 const browserErrors = new WeakMap<Page, string[]>();
@@ -20,11 +21,14 @@ type PreflightWindow = Window & {
 async function preparePreflightFailure(page: Page) {
   const snapshot = createDemoSnapshot("active");
   snapshot.source = "runtime";
-  await page.addInitScript(({ snapshot }) => {
+  delete snapshot.hostPlugins;
+  const firstPlan = hostPluginPlan("a");
+  const secondPlan = hostPluginPlan("b");
+  const operation = hostPluginReceipt({ planDigestByte: "b" });
+  await page.addInitScript(({ snapshot, firstPlan, secondPlan, operation }) => {
     const calls: string[] = [];
     const digests: unknown[] = [];
     let reviews = 0;
-    let applied = false;
     const eventListeners = new Set<number>();
     let callbackId = 0;
     Object.assign(window, {
@@ -41,19 +45,13 @@ async function preparePreflightFailure(page: Page) {
           if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
           if (command === "desktop_plan_integrations") {
             reviews += 1;
-            return {
-              schema: "simplicio.desktop-integration-plan/v1", source: "runtime",
-              planDigest: "sha256:" + (reviews === 1 ? "a" : "b").repeat(64),
-              changes: [{ label: "codex", exists: applied, changed: !applied }],
-            };
+            return reviews === 1 ? firstPlan : secondPlan;
           }
-          if (command === "desktop_repair_providers") {
+          if (command === "desktop_apply_host_plugins") {
             digests.push(args.planDigest);
-            // Native preflight failed before starting the installer, for example on a query timeout.
-            if (digests.length === 1) throw "integration_preflight_unavailable";
-            if (args.planDigest !== "sha256:" + "b".repeat(64)) throw "integration_plan_changed_review_again";
-            applied = true;
-            return snapshot;
+            if (digests.length === 1) throw "host_plugin_plan_precondition_changed";
+            if (args.planDigest !== "sha256:" + "b".repeat(64)) throw "host_plugin_plan_digest_mismatch";
+            return operation;
           }
           if (command === "plugin:event|listen") { const id = ++callbackId; eventListeners.add(id); return id; }
           if (command === "plugin:event|unlisten") return;
@@ -61,7 +59,7 @@ async function preparePreflightFailure(page: Page) {
         },
       },
     });
-  }, { snapshot });
+  }, { snapshot, firstPlan, secondPlan, operation });
 }
 
 async function calls(page: Page, command: string) {
@@ -87,8 +85,7 @@ for (const view of ["setup", "providers"] as const) {
     await expect(apply).toBeDisabled();
     await consent.check();
     await apply.click();
-    await expect(page.getByRole("alert")).toContainText("O instalador não foi iniciado");
-    await expect(page.getByRole("alert")).not.toContainText("alterações parciais");
+    await expect(page.getByRole("alert")).toContainText("O plano mudou");
     if (setup) await expect(page.getByRole("heading", { name: "Não foi possível concluir.", exact: true })).toBeVisible();
     await expect(consent).toHaveCount(0);
     await expect(apply).toHaveCount(0);
@@ -114,9 +111,9 @@ for (const view of ["setup", "providers"] as const) {
     await consent.check();
     await apply.click();
     if (setup) {
-      await expect(page.getByRole("heading", { name: "Configuração concluída.", exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Configuração concluída", exact: true })).toBeVisible();
     } else {
-      await expect(surface.getByRole("status")).toContainText("Configuração concluída pelo Runtime");
+      await expect(surface.getByRole("status")).toContainText("Configuração concluída");
     }
     expect(await digests(page)).toEqual(["sha256:" + "a".repeat(64), "sha256:" + "b".repeat(64)]);
   });

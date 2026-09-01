@@ -19,7 +19,7 @@ export const REFERENCE_QUICK_COMMANDS = {
   version: { label: "Versão do Runtime", command: "simplicio version", description: "Consulta a versão do executável encontrado no seu terminal." },
   access: { label: "Estado da conta", command: "simplicio auth status --json", description: "Consulta a autenticação do Runtime. Não inicia um novo login." },
   plugins: { label: "Registry de plugins", command: "simplicio plugin list --json", description: "Lista o registry do Runtime; não comprova os pacotes nativos de cada IDE." },
-  plan: { label: "Prévia de integração", command: "simplicio install --global --dry-run --json", description: "Mostra o plano MCP/hooks sem aplicar alterações." },
+  plan: { label: "Plano dos plugins suportados", command: "simplicio host-plugins plan --all", description: "Mostra os oito hosts nativos suportados sem aplicar alterações." },
 } as const;
 type CommandId = keyof typeof REFERENCE_QUICK_COMMANDS;
 type CopyOutcome = "copied" | "unavailable" | "uncertain" | "cancelled";

@@ -1,9 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
 import { createDemoSnapshot } from "../src/demo";
+import { hostPluginPlan, hostPluginReceipt } from "./host-plugin-fixtures";
 
-async function mockNativeBridge(page: Page, options: { signedOut?: boolean; failSetup?: boolean; failExport?: boolean; pauseSetup?: boolean; failVerification?: boolean; loginState?: "inactive" | "unknown" } = {}) {
+async function mockNativeBridge(page: Page, options: { signedOut?: boolean; failSetup?: boolean; failExport?: boolean; pauseSetup?: boolean; loginState?: "inactive" | "unknown" } = {}) {
   const snapshot = createDemoSnapshot("active");
   snapshot.source = "runtime";
+  delete snapshot.hostPlugins;
+  const plan = hostPluginPlan("a");
+  const operation = hostPluginReceipt();
   const report = {
     schema: "workspace.token-analytics-report/v1", generated_by: "sqlite_ledger", now_epoch: 1788123153,
     session_id: null, timezone_offset_seconds: 0, report_hash: `sha256:${"a".repeat(64)}`,
@@ -11,9 +15,8 @@ async function mockNativeBridge(page: Page, options: { signedOut?: boolean; fail
       totals: { sample_count: 2, input_tokens: 100, cached_input_tokens: 20, output_tokens: 30, reasoning_tokens: 7, paid_remote_tokens: 137, total_tokens: 137, missing_usage_events: 1, receipt_count: 2 },
     })),
   };
-  await page.addInitScript(({ snapshot, report, options }) => {
+  await page.addInitScript(({ snapshot, report, options, plan, operation }) => {
     let signedOut = Boolean(options.signedOut);
-    let installed = false;
     let accessState = snapshot.access.state;
     const calls: Array<{ command: string; args: Record<string, unknown> }> = [];
     Object.assign(window, { __desktopTestCalls: calls, __TAURI_INTERNALS__: {
@@ -21,14 +24,12 @@ async function mockNativeBridge(page: Page, options: { signedOut?: boolean; fail
         calls.push({ command, args });
         if (command === "desktop_login") { await new Promise((resolve) => setTimeout(resolve, 50)); signedOut = false; accessState = options.loginState ?? "active"; return { ...snapshot, access: { ...snapshot.access, state: accessState } }; }
         if (command === "desktop_logout") signedOut = true;
-        if (command === "refresh_desktop_snapshot" && installed && options.failVerification) throw "test_final_snapshot_failed";
         if (["desktop_snapshot", "refresh_desktop_snapshot", "desktop_logout"].includes(command)) return { ...snapshot, access: { ...snapshot.access, state: signedOut ? "signed_out" : accessState } };
-        if (command === "desktop_plan_integrations") return { schema: "simplicio.desktop-integration-plan/v1", source: "runtime", planDigest: `sha256:${(installed ? "b" : "a").repeat(64)}`, changes: [{ label: "codex", changed: !installed, exists: true }] };
-        if (command === "desktop_repair_providers") {
+        if (command === "desktop_plan_integrations") return plan;
+        if (command === "desktop_apply_host_plugins") {
           if (options.pauseSetup) await new Promise((resolve) => Object.assign(window, { __desktopCompleteSetup: resolve }));
-          if (options.failSetup) throw "integration_plan_changed_review_again";
-          installed = true;
-          return snapshot;
+          if (options.failSetup) throw "host_plugin_plan_precondition_changed";
+          return operation;
         }
         if (command === "desktop_validate_project") {
           if (args.path === "/missing") throw "project_path_invalid";
@@ -55,7 +56,7 @@ async function mockNativeBridge(page: Page, options: { signedOut?: boolean; fail
         throw `Unexpected test IPC command: ${command}`;
       },
     } });
-  }, { snapshot, report, options });
+  }, { snapshot, report, options, plan, operation });
 }
 
 async function calls(page: Page, command: string) {
@@ -67,14 +68,14 @@ test("normal navigation reaches MCP setup and never installs without review and 
   await page.goto("/");
   await page.getByRole("button", { name: "Integrações MCP", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Integrações MCP", exact: true })).toBeVisible();
-  expect(await calls(page, "desktop_repair_providers")).toHaveLength(0);
+  expect(await calls(page, "desktop_apply_host_plugins")).toHaveLength(0);
   await page.getByRole("button", { name: "Revisar configuração MCP" }).click();
   const apply = page.getByRole("button", { name: "Aplicar configuração MCP" });
   await expect(apply).toBeDisabled();
   await page.getByRole("checkbox", { name: /Autorizo o Runtime/ }).check();
   await apply.click();
-  await expect(page.getByText(/Configuração concluída pelo Runtime/)).toBeVisible();
-  expect(await calls(page, "desktop_repair_providers")).toEqual([{ command: "desktop_repair_providers", args: { planDigest: `sha256:${"a".repeat(64)}` } }]);
+  await expect(page.getByRole("region", { name: "Configuração do MCP", exact: true }).getByRole("status")).toHaveText("Configuração concluída");
+  expect(await calls(page, "desktop_apply_host_plugins")).toEqual([{ command: "desktop_apply_host_plugins", args: { planDigest: `sha256:${"a".repeat(64)}` } }]);
 });
 
 test("changed setup plans surface an actionable error without false success", async ({ page }) => {
@@ -127,16 +128,15 @@ test("native export failures remain visible and never claim a download succeeded
   await expect(button).toBeEnabled();
 });
 
-test("active login opens guided setup and duplicate account effects stay serialized", async ({ page }) => {
+test("active login opens the normal app and duplicate account effects stay serialized", async ({ page }) => {
   await mockNativeBridge(page, { signedOut: true });
   await page.goto("/?view=settings");
   await page.getByRole("button", { name: "Começar", exact: true }).click();
   await page.getByRole("button", { name: /Continuar com Google/ }).dblclick();
-  await expect(page.getByRole("heading", { name: "Um bom começo." })).toBeVisible();
-  expect(await calls(page, "desktop_plan_integrations")).toHaveLength(0);
-  expect(await calls(page, "desktop_repair_providers")).toHaveLength(0);
-  await page.getByRole("button", { name: "Agora não" }).click();
   await expect(page.getByRole("heading", { name: "Simplicio", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Um bom começo." })).toHaveCount(0);
+  expect(await calls(page, "desktop_plan_integrations")).toHaveLength(0);
+  expect(await calls(page, "desktop_apply_host_plugins")).toHaveLength(0);
   expect(await calls(page, "desktop_login")).toHaveLength(1);
   await page.getByRole("button", { name: "Configurações", exact: true }).click();
   await expect(page.getByRole("button", { name: "Modelos e skills", exact: true })).toHaveCount(0);
@@ -157,7 +157,7 @@ test("guided setup follows reviewed Runtime operations without fake progress or 
   await page.screenshot({ path: testInfo.outputPath("setup-welcome.png"), fullPage: true });
   await page.getByRole("button", { name: "Configurar Simplicio" }).click();
   await expect(page.getByRole("heading", { name: "Tudo pronto para revisar." })).toBeVisible();
-  expect(await calls(page, "desktop_repair_providers")).toHaveLength(0);
+  expect(await calls(page, "desktop_apply_host_plugins")).toHaveLength(0);
   await expect(page.getByRole("progressbar")).toHaveAttribute("value", "2");
   const install = page.getByRole("button", { name: "Instalar e conectar" });
   await expect(install).toBeDisabled();
@@ -168,17 +168,17 @@ test("guided setup follows reviewed Runtime operations without fake progress or 
   await expect(page.getByRole("progressbar")).toHaveAttribute("value", "2");
   await expect(page.getByRole("button", { name: "Voltar ao app" })).toBeDisabled();
   await expect(page.getByRole("status")).toContainText("Instalar e registrar o MCP");
-  await expect(page.getByText(/Esta operação não oferece cancelamento seguro depois de iniciada/)).toBeVisible();
+  await expect(page.getByText(/A ação não será repetida automaticamente/)).toBeVisible();
   await page.getByRole("button", { name: "Mostrar detalhes" }).click();
   await expect(page.getByRole("region", { name: "Detalhes da configuração" })).toContainText(`sha256:${"a".repeat(64)}`);
   await page.screenshot({ path: testInfo.outputPath("setup-progress.png"), fullPage: true });
-  expect(await calls(page, "desktop_repair_providers")).toHaveLength(1);
+  expect(await calls(page, "desktop_apply_host_plugins")).toHaveLength(1);
   await page.evaluate(() => (window as unknown as { __desktopCompleteSetup: () => void }).__desktopCompleteSetup());
-  await expect(page.getByRole("heading", { name: "Configuração concluída." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Configuração concluída" })).toBeVisible();
   await expect(page.getByRole("progressbar")).toHaveAttribute("value", "4");
-  await expect(page.getByText(/Registro não significa conexão ativa/)).toBeVisible();
-  expect(await calls(page, "refresh_desktop_snapshot")).toHaveLength(2);
-  expect(await calls(page, "desktop_plan_integrations")).toHaveLength(2);
+  await expect(page.getByText(/não executou uma segunda leitura, verificação ou aplicação/)).toBeVisible();
+  expect(await calls(page, "refresh_desktop_snapshot")).toHaveLength(1);
+  expect(await calls(page, "desktop_plan_integrations")).toHaveLength(1);
   await page.getByRole("button", { name: "Abrir Simplicio" }).click();
   await expect(page.getByRole("heading", { name: "Simplicio", exact: true })).toBeVisible();
 });
@@ -188,7 +188,7 @@ test("guided setup can be abandoned before consent and failure only offers a new
   await page.goto("/?view=setup");
   await page.getByRole("button", { name: "Configurar Simplicio" }).click();
   await page.getByRole("button", { name: "Voltar ao app" }).click();
-  expect(await calls(page, "desktop_repair_providers")).toHaveLength(0);
+  expect(await calls(page, "desktop_apply_host_plugins")).toHaveLength(0);
   await page.getByRole("button", { name: "Configurações", exact: true }).click();
   await page.getByRole("button", { name: "Instalação guiada", exact: true }).click();
   await page.getByRole("button", { name: "Configurar Simplicio" }).click();
@@ -197,26 +197,24 @@ test("guided setup can be abandoned before consent and failure only offers a new
   await expect(page.getByRole("heading", { name: "Não foi possível concluir." })).toBeVisible();
   await expect(page.getByRole("alert")).toContainText("O plano mudou");
   await expect(page.getByRole("progressbar")).toHaveAttribute("value", "2");
-  await expect(page.getByRole("heading", { name: "Configuração concluída." })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Configuração concluída" })).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath("setup-failure.png"), fullPage: true });
   await page.getByRole("button", { name: "Revisar novamente" }).click();
   await expect(page.getByRole("button", { name: "Instalar e conectar" })).toBeDisabled();
   await expect(page.getByRole("checkbox", { name: /Autorizo o Runtime/ })).not.toBeChecked();
-  expect(await calls(page, "desktop_repair_providers")).toHaveLength(1);
+  expect(await calls(page, "desktop_apply_host_plugins")).toHaveLength(1);
 });
 
-test("a failed final verification cannot turn an applied plan into a success screen (mocked IPC)", async ({ page }) => {
-  await mockNativeBridge(page, { failVerification: true });
+test("the canonical apply result completes without an automatic snapshot, plan or verification call (mocked IPC)", async ({ page }) => {
+  await mockNativeBridge(page);
   await page.goto("/?view=setup");
   await page.getByRole("button", { name: "Configurar Simplicio" }).click();
   await page.getByRole("checkbox", { name: /Autorizo o Runtime/ }).check();
   await page.getByRole("button", { name: "Instalar e conectar" }).click();
-  await expect(page.getByRole("alert")).toContainText("o plano foi aplicado, mas a verificação final falhou", { ignoreCase: true });
-  await expect(page.getByRole("progressbar")).toHaveAttribute("value", "3");
-  await expect(page.getByRole("button", { name: "Revisar novamente" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Atualizar diagnóstico" }).click();
-  await expect(page.getByRole("heading", { name: "Runtime e diagnóstico", exact: true })).toBeVisible();
-  expect(await calls(page, "desktop_repair_providers")).toHaveLength(1);
+  await expect(page.getByRole("heading", { name: "Configuração concluída", exact: true })).toBeVisible();
+  expect(await calls(page, "desktop_apply_host_plugins")).toHaveLength(1);
+  expect(await calls(page, "refresh_desktop_snapshot")).toHaveLength(1);
+  expect(await calls(page, "desktop_plan_integrations")).toHaveLength(1);
 });
 
 test("login never bypasses inactive or unknown entitlement into guided installation (mocked IPC)", async ({ browser, baseURL }) => {
@@ -229,7 +227,8 @@ test("login never bypasses inactive or unknown entitlement into guided installat
     await page.getByRole("button", { name: /Continuar com Google/ }).click();
     await expect(page.getByRole("heading", { name: state === "inactive" ? "Ative o Simplicio" : "Tente novamente" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Configurar Simplicio" })).toHaveCount(0);
-    expect(await calls(page, "desktop_repair_providers")).toHaveLength(0);
+    expect(await calls(page, "desktop_apply_host_plugins")).toHaveLength(0);
+    expect(await calls(page, "desktop_reconcile_host_plugins")).toHaveLength(0);
     await context.close();
   }
 });

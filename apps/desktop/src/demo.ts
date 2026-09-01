@@ -1,5 +1,6 @@
 import type { AccessState, DesktopSnapshot, ProviderConnection } from "./contracts";
 import { createDemoBotCenter } from "./bot_center";
+import { createPreviewDesktopHostPlugins } from "./integration_setup";
 
 type DemoProvider = Pick<ProviderConnection, "id" | "name" | "kind" | "protocol" | "tier" | "state" | "detail">;
 
@@ -123,6 +124,7 @@ export function createDemoSnapshot(state: AccessState = "active"): DesktopSnapsh
       },
     },
     providers,
+    hostPlugins: createPreviewDesktopHostPlugins(),
     botCenter: createDemoBotCenter(generatedAt),
     activity: [
       {

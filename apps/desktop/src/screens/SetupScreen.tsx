@@ -2,63 +2,85 @@ import { useEffect, useRef, useState } from "react";
 import { planDesktopIntegrations, refreshDesktopSnapshot } from "../bridge";
 import { Brand, Glyph } from "../components/Brand";
 import type { DesktopSnapshot } from "../contracts";
-import { integrationChangeLabel, integrationTargetsVerified, type IntegrationPlan } from "../integration_setup";
+import {
+  hostPluginOutcomeLabel,
+  integrationChangeLabel,
+  type HostPluginOperationResult,
+  type HostPluginId,
+  type HostPluginResultStatus,
+  type IntegrationPlan,
+} from "../integration_setup";
 import type { InstallFailureRecovery } from "../install_failures";
 import { canConfigureRuntime, setupStages, type SetupPhase, type SetupStep } from "../setup_flow";
 
-export function SetupScreen({ snapshot, busy, applicationError, applicationRecovery, onSnapshot, onApply, onVerificationFailure, onFinish, onDiagnostics }: {
+const HOST_LABELS: Readonly<Record<HostPluginId, string>> = {
+  codex: "Codex",
+  claude: "Claude Code",
+  gemini: "Gemini CLI",
+  copilot: "GitHub Copilot",
+  qwen: "Qwen Code",
+  hermes: "Hermes",
+  cursor: "Cursor",
+  kiro: "Kiro",
+};
+
+function resultLabel(host: { status: HostPluginResultStatus }): string {
+  switch (host.status) {
+    case "verified": return "Verificado";
+    case "applied_unverified": return "Aplicado; verificação indisponível";
+    case "not_detected": return "Não detectado";
+    case "failed": return "Falhou";
+    case "drifted": return "Divergente";
+    case "blocked": return "Ação manual necessária";
+    case "pending": return "Pendente";
+    case "applying": return "Aplicando";
+    case "unknown": return "Estado desconhecido";
+  }
+}
+
+export function SetupScreen({ snapshot, busy, applicationError, applicationRecovery, initialOutcome, onSnapshot, onApply, onReconcile, onFinish, onDiagnostics }: {
   snapshot: DesktopSnapshot;
   busy: boolean;
   applicationError: string | null;
   applicationRecovery?: InstallFailureRecovery;
+  initialOutcome?: HostPluginOperationResult;
   onSnapshot: (snapshot: DesktopSnapshot) => void;
-  onApply: (digest: string) => Promise<boolean>;
-  onVerificationFailure?: () => void;
+  onApply: (digest: string) => Promise<HostPluginOperationResult>;
+  onReconcile: (receiptId: string) => Promise<HostPluginOperationResult>;
   onFinish: () => void;
   onDiagnostics: () => void;
 }) {
   const [phase, setPhase] = useState<SetupPhase>("welcome");
   const [failedStep, setFailedStep] = useState<SetupStep>(1);
   const [plan, setPlan] = useState<IntegrationPlan | null>(null);
-  const [applicationConfirmed, setApplicationConfirmed] = useState(false);
-  const [verifiedPlan, setVerifiedPlan] = useState<IntegrationPlan | null>(null);
+  const [outcome, setOutcome] = useState<HostPluginOperationResult | null>(initialOutcome ?? null);
   const [confirmed, setConfirmed] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [failure, setFailure] = useState("");
   const operationLock = useRef(false);
+  const submittedPlanDigest = useRef<string | null>(null);
+  const submittedReconcileId = useRef<string | null>(null);
   const content = useRef<HTMLElement>(null);
   const headingElement = useRef<HTMLHeadingElement>(null);
   const detailsElement = useRef<HTMLElement>(null);
   const reviewHeading = useRef<HTMLHeadingElement>(null);
-  const pending = ["checking", "planning", "installing", "verifying"].includes(phase);
+  const pending = ["checking", "planning", "installing", "reconciling"].includes(phase);
   const locked = busy || pending;
   const preview = snapshot.source === "preview";
-  const recovery = phase === "failed" && failedStep === 4 && !preview ? "refresh"
-    : applicationRecovery ?? (phase === "failed" && failedStep === 3 && !preview ? "reconcile" : undefined);
-  const reviewBlocked = recovery !== undefined && recovery !== "review";
-  const recoveryGuidance = recovery === "wait"
-    ? "Não inicie outra aplicação enquanto a instalação estiver em andamento. Consulte o diagnóstico para acompanhar o estado."
-    : recovery === "refresh"
-      ? "Atualize somente o diagnóstico para conferir o resultado. Uma consulta de estado não reinstala o Simplicio nem autoriza outra aplicação."
-      : "Novas aplicações estão bloqueadas nesta sessão. Consulte o diagnóstico para esclarecer o resultado; atualizar ou reiniciar o app não confirma a conclusão.";
+  const receipt = outcome?.snapshot;
+  const projected = snapshot.hostPlugins;
+  const reconcileReceiptId = (receipt && ["partial", "requires_reconcile"].includes(receipt.state) ? receipt.receiptId : null)
+    ?? (!outcome && projected?.reconcileRequired ? projected.reconcileReceiptId ?? null : null);
+  const runtimePending = !outcome && projected?.reconcileRequired === true;
+  const blockedWithoutReceipt = Boolean((applicationRecovery && applicationRecovery !== "review" || runtimePending) && !reconcileReceiptId);
+  const reconcileConsumed = Boolean(reconcileReceiptId && submittedReconcileId.current === reconcileReceiptId);
   const steps = setupStages(phase, failedStep);
   const completed = steps.filter((step) => step.state === "complete").length;
   const currentStage = steps.find((step) => step.state === "running" || step.state === "failed");
 
   useEffect(() => {
-    if (applicationRecovery === "refresh" && phase === "failed" && failedStep === 3) {
-      setApplicationConfirmed(true);
-      setFailedStep(4);
-    }
-  }, [applicationRecovery, phase, failedStep]);
-
-  useEffect(() => { if (reviewBlocked) setConfirmed(false); }, [reviewBlocked]);
-
-  useEffect(() => {
     content.current?.scrollTo({ top: 0 });
-    if (phase === "review" || phase === "complete" || phase === "failed") {
-      headingElement.current?.focus({ preventScroll: true });
-    }
+    if (["review", "complete", "failed"].includes(phase)) headingElement.current?.focus({ preventScroll: true });
   }, [phase]);
 
   useEffect(() => {
@@ -66,10 +88,11 @@ export function SetupScreen({ snapshot, busy, applicationError, applicationRecov
   }, [showDetails]);
 
   async function prepare() {
-    if (operationLock.current || busy || reviewBlocked) return;
+    if (operationLock.current || busy || blockedWithoutReceipt || runtimePending) return;
     operationLock.current = true;
-    setPlan(null); setConfirmed(false); setFailure(""); setPhase("checking");
-    setApplicationConfirmed(false); setVerifiedPlan(null);
+    submittedPlanDigest.current = null;
+    submittedReconcileId.current = null;
+    setPlan(null); setOutcome(null); setConfirmed(false); setFailure(""); setPhase("checking");
     let currentStep: SetupStep = 1;
     try {
       const next = await refreshDesktopSnapshot();
@@ -77,84 +100,96 @@ export function SetupScreen({ snapshot, busy, applicationError, applicationRecov
       if (!canConfigureRuntime(next)) throw new Error("runtime_not_ready");
       currentStep = 2; setPhase("planning");
       const candidate = await planDesktopIntegrations();
-      if (candidate.source !== next.source) throw new Error("integration_plan_source_mismatch");
-      if (new Set(candidate.changes.map((row) => row.label)).size !== candidate.changes.length) throw new Error("integration_plan_ambiguous_targets");
+      if (candidate.source !== next.source || candidate.hosts.length !== 8) throw new Error("integration_plan_source_mismatch");
       setPlan(candidate); setPhase("review");
     } catch {
       setFailedStep(currentStep); setPhase("failed");
-      setFailure(currentStep === 1 ? "Não foi possível confirmar o Runtime e o acesso. Verifique a conexão e o diagnóstico antes de continuar. Nenhuma configuração foi alterada."
-        : "O Runtime não entregou um plano válido. Nenhuma configuração foi alterada; você pode revisar novamente.");
-    } finally { operationLock.current = false; }
+      setFailure(currentStep === 1
+        ? "Não foi possível confirmar o Runtime e o acesso. Nenhuma configuração de plugin foi alterada."
+        : "O Runtime não entregou um plano válido para os oito hosts. Nenhuma configuração foi alterada.");
+    } finally {
+      operationLock.current = false;
+    }
+  }
+
+  function acceptResult(result: HostPluginOperationResult) {
+    setOutcome(result);
+    if (result.snapshot.state === "partial" || result.snapshot.state === "requires_reconcile") {
+      setFailedStep(4);
+      setFailure("O Runtime registrou um resultado parcial. Use a reconciliação explícita deste recibo antes de uma nova aplicação.");
+      setPhase("failed");
+    } else {
+      setPhase("complete");
+    }
   }
 
   async function apply() {
-    if (operationLock.current || busy || reviewBlocked || phase !== "review" || !plan || !confirmed) return;
+    if (operationLock.current || busy || blockedWithoutReceipt || phase !== "review" || !plan || !confirmed
+      || submittedPlanDigest.current === plan.planDigest) return;
     operationLock.current = true;
-    const reviewed = plan;
-    const digest = reviewed.planDigest;
-    setConfirmed(false); setFailure(""); setPhase("installing");
-    setApplicationConfirmed(false); setVerifiedPlan(null);
-    let currentStep: SetupStep = 3;
+    const digest = plan.planDigest;
+    submittedPlanDigest.current = digest;
+    setConfirmed(false); setFailure(""); setOutcome(null); setPhase("installing");
     try {
-      if (!await onApply(digest)) throw new Error("installation_not_confirmed");
-      setApplicationConfirmed(true);
-      currentStep = 4; setPhase("verifying");
-      const next = await refreshDesktopSnapshot();
-      onSnapshot(next);
-      if (!canConfigureRuntime(next)) throw new Error("runtime_verification_failed");
-      const observed = await planDesktopIntegrations();
-      if (observed.source !== next.source || !integrationTargetsVerified(reviewed, observed)) throw new Error("integration_targets_unconfirmed");
-      setVerifiedPlan(observed);
-      setPhase("complete");
+      acceptResult(await onApply(digest));
     } catch {
-      setFailedStep(currentStep); setPhase("failed");
-      if (currentStep === 4 && !preview) onVerificationFailure?.();
-      setFailure(currentStep === 3 ? "A instalação não foi confirmada. Pode haver alterações parciais. Revise um novo plano antes de tentar novamente."
-        : preview ? "A demonstração não confirmou os destinos do plano revisado. Nenhum arquivo foi alterado."
-          : "O plano foi aplicado, mas a verificação final falhou. Os destinos do plano revisado não foram confirmados sem mudanças pendentes. Consulte o diagnóstico; nenhuma reinstalação foi iniciada.");
-    } finally { operationLock.current = false; }
+      setFailedStep(3); setPhase("failed");
+      setFailure("O Runtime não devolveu um recibo canônico. Consulte o estado antes de repetir qualquer aplicação.");
+    } finally {
+      operationLock.current = false;
+    }
+  }
+
+  async function reconcile() {
+    if (operationLock.current || busy || !reconcileReceiptId || submittedReconcileId.current === reconcileReceiptId) return;
+    operationLock.current = true;
+    submittedReconcileId.current = reconcileReceiptId;
+    setFailure(""); setPhase("reconciling");
+    try {
+      acceptResult(await onReconcile(reconcileReceiptId));
+    } catch {
+      setFailedStep(4); setPhase("failed");
+      setFailure("A reconciliação não devolveu um recibo canônico. Nenhuma nova aplicação foi iniciada.");
+    } finally {
+      operationLock.current = false;
+    }
   }
 
   const heading = phase === "welcome" ? "Um bom começo."
     : phase === "review" ? "Tudo pronto para revisar."
-      : phase === "complete" ? preview ? "Prévia concluída." : "Configuração concluída."
+      : phase === "complete" ? preview ? "Prévia concluída." : hostPluginOutcomeLabel(outcome!.snapshot)
         : phase === "failed" ? "Não foi possível concluir."
           : phase === "checking" ? "Conferindo o Runtime…" : phase === "planning" ? "Preparando suas integrações…"
-            : phase === "installing" ? "Configurando o Simplicio…" : "Verificando o resultado…";
+            : phase === "installing" ? "Configurando o Simplicio…" : "Reconciliando o recibo…";
 
   return <div className={`setup-layout ${phase === "welcome" ? "setup-intro" : ""}`}>
     <header className="entry-header"><Brand /><span className="setup-context">{preview ? "Demonstração · sem instalação real" : "Instalação guiada"}</span></header>
-    {phase !== "welcome" && <div className="setup-status-header">
-      <div className="setup-status-inner">
-        <div className="setup-progress-caption" role="status" aria-atomic="true">
-          <span className={"setup-current-stage" + (phase === "failed" ? " is-failed" : "")}>{pending ? <span className="setup-spinner" aria-hidden="true" /> : <Glyph name={phase === "failed" ? "attention" : phase === "complete" ? "check" : "shield"} size={17} />}
-            {currentStage?.label ?? (phase === "review" ? "Aguardando sua confirmação" : "Configuração verificada")}
-          </span>
-          <span>{completed} de 4 etapas concluídas</span>
-        </div>
-        <progress className="setup-progress" value={completed} max={4} aria-label="Etapas da configuração concluídas" />
+    {phase !== "welcome" && <div className="setup-status-header"><div className="setup-status-inner">
+      <div className="setup-progress-caption" role="status" aria-atomic="true">
+        <span className={"setup-current-stage" + (phase === "failed" ? " is-failed" : "")}>{pending ? <span className="setup-spinner" aria-hidden="true" /> : <Glyph name={phase === "failed" ? "attention" : phase === "complete" ? "check" : "shield"} size={17} />}{currentStage?.label ?? (phase === "review" ? "Aguardando sua confirmação" : "Recibo recebido do Runtime")}</span>
+        <span>{completed} de 4 etapas concluídas</span>
       </div>
-    </div>}
+      <progress className="setup-progress" value={completed} max={4} aria-label="Etapas da configuração concluídas" />
+    </div></div>}
     <main className="setup-main" ref={content}>
       {phase === "welcome" ? <div className="setup-welcome">
         <img src="/icon.png" width="72" height="72" alt="" />
         <span className="setup-wordmark">SIMPLICIO</span>
         <h1>{heading}</h1>
         <p>Seu Runtime e seus apps,<br />trabalhando juntos.</p>
-        <button className="button entry-primary" type="button" disabled={busy || reviewBlocked} onClick={() => void prepare()}>Configurar Simplicio<Glyph name="arrow" size={18} /></button>
-        {reviewBlocked && <>
-          <div className="setup-failure setup-recovery-note" role="alert"><strong>{applicationError || (recovery === "refresh" ? "A aplicação já foi confirmada pelo Runtime." : recovery === "wait" ? "Aguarde a instalação em andamento." : "O resultado da instalação ainda precisa ser esclarecido.")}</strong><p>{recoveryGuidance}</p></div>
-          <button className="button button-secondary" type="button" disabled={busy} onClick={onDiagnostics}>{recovery === "refresh" ? "Atualizar diagnóstico" : "Abrir diagnóstico"}</button>
-        </>}
+        <button className="button entry-primary" type="button" disabled={busy || blockedWithoutReceipt || runtimePending} onClick={() => void prepare()}>Configurar Simplicio<Glyph name="arrow" size={18} /></button>
+        {(blockedWithoutReceipt || runtimePending) && <><div className="setup-failure setup-recovery-note" role="alert"><strong>{applicationError || "O Runtime possui uma operação de plugin pendente."}</strong><p>Uma leitura de estado não instala, verifica nem reconcilia plugins. A reconciliação abaixo usa somente o identificador escolhido pelo Runtime.</p></div>{reconcileReceiptId
+          ? <button className="button button-primary" type="button" disabled={busy} onClick={() => void reconcile()}>Reconciliar recibo</button>
+          : <button className="button button-secondary" type="button" disabled={busy} onClick={onDiagnostics}>Abrir diagnóstico</button>}</>}
         <button className="text-button" type="button" disabled={busy} onClick={onFinish}>Agora não</button>
-        <span className="entry-caption">Primeiro, vamos conferir o que já existe. Nenhum arquivo será alterado sem sua confirmação.</span>
+        <span className="entry-caption">Primeiro, vamos conferir o que já existe. Login e consultas não instalam plugins.</span>
       </div> : <div className="setup-body">
         <div className={`setup-heading ${phase === "failed" ? "is-failed" : ""}`}>
           <span className="eyebrow">{phase === "complete" ? "Próximo passo: abrir seus clientes" : "Configure uma vez. Use nos seus apps."}</span>
           <h1 ref={headingElement} tabIndex={-1}>{heading}</h1>
-          <p>{phase === "review" ? `${plan?.changes.filter((row) => row.changed).length ?? 0} alterações propostas. Revise os destinos abaixo antes de aplicar.`
-            : phase === "complete" ? "Abra uma nova sessão nos clientes para confirmar o handshake MCP. Registro não significa conexão ativa."
-              : "O Runtime que acompanha o app gerencia a instalação local e o registro nos clientes detectados."}</p>
+          <p>{phase === "review" ? `O Runtime incluiu ${plan?.hosts.length ?? 0} hosts no plano. Revise cada resultado antes de autorizar.`
+            : phase === "complete" ? "O painel usa diretamente o recibo devolvido pelo Runtime. Um host aplicado sem leitura confiável permanece não verificado."
+              : "Somente o Runtime mantém recibos, estado pendente e autoridade de reconciliação."}</p>
         </div>
         <ol className="setup-steps" aria-label="Etapas da instalação">{steps.map((step, index) => <li key={step.label} data-state={step.state} aria-current={step.state === "running" ? "step" : undefined}>
           <span className="setup-step-icon" aria-hidden="true">{step.state === "running" ? <span className="setup-spinner" /> : step.state === "complete" ? <Glyph name="check" size={16} /> : step.state === "failed" ? <Glyph name="close" size={16} /> : index + 1}</span>
@@ -163,39 +198,45 @@ export function SetupScreen({ snapshot, busy, applicationError, applicationRecov
         </li>)}</ol>
         {phase === "review" && plan && <section className="setup-review" aria-label="Plano de instalação">
           <h2 ref={reviewHeading} tabIndex={-1}>O que será configurado</h2>
-          <ul>{plan.changes.map((row, index) => <li key={`${row.label}-${index}`}><span>{row.label}</span><strong>{integrationChangeLabel(row)}</strong></li>)}</ul>
-          {plan.changes.length === 0 && <p>Nenhuma mudança foi proposta pelo Runtime.</p>}
-          <p>MCP e hooks dos clientes detectados, com backups. Plugins de marketplace e permissões dependem de cada host. Este fluxo não altera o PATH nem inicia um serviço global.</p>
-          <label className="setup-consent"><input type="checkbox" checked={confirmed} disabled={locked || reviewBlocked} onChange={(event) => setConfirmed(event.target.checked)} />Autorizo o Runtime a aplicar este plano de instalação e registro.</label>
+          <ul>{plan.hosts.map((host) => <li key={host.host}><span>{HOST_LABELS[host.host]}</span><strong>{integrationChangeLabel(host)}</strong></li>)}</ul>
+          <p>Estes são os oito hosts com instalação nativa ou plugin suportado. Os demais clientes continuam como integrações MCP ou guiadas e não são apresentados como plugins nativos.</p>
+          <label className="setup-consent"><input type="checkbox" checked={confirmed} disabled={locked || blockedWithoutReceipt} onChange={(event) => setConfirmed(event.target.checked)} />Autorizo o Runtime a aplicar exatamente o plano identificado por este resumo.</label>
         </section>}
-        {phase === "review" && reviewBlocked && <div className="setup-failure" role="alert"><strong>{applicationError || "A aplicação não está disponível neste estado."}</strong><p>{recoveryGuidance}</p></div>}
-        {phase === "failed" && <div className="setup-failure" role="alert"><strong>{applicationError && (failedStep === 3 || applicationRecovery === "refresh") ? applicationError : failure}</strong><p>{reviewBlocked ? recoveryGuidance : "Revisar novamente apenas prepara um novo plano. Nenhuma instalação será repetida automaticamente."}</p></div>}
-        {phase === "complete" && <div className="setup-success" role="status"><Glyph name="check" size={20} /><p>{preview ? "Esta é uma demonstração. Nenhum arquivo foi alterado." : "O Runtime confirmou a aplicação, e uma nova leitura confirmou os destinos preexistentes ou alterados do plano revisado sem mudanças pendentes. A conexão de cada cliente ainda depende do handshake."}</p></div>}
+        {receipt && <section className="setup-review" aria-label="Resultado dos plugins">
+          <h2>Resultado do Runtime</h2>
+          <ul>{receipt.hosts.map((host) => <li key={host.host}><span>{HOST_LABELS[host.host]}</span><strong>{resultLabel(host)}</strong></li>)}</ul>
+        </section>}
+        {!receipt && projected && projected.hosts.length > 0 && <section className="setup-review" aria-label="Estado dos plugins">
+          <h2>Último estado do Runtime</h2>
+          <ul>{projected.hosts.map((host) => <li key={host.host}><span>{HOST_LABELS[host.host]}</span><strong>{resultLabel(host)}</strong></li>)}</ul>
+        </section>}
+        {phase === "failed" && <div className="setup-failure" role="alert"><strong>{applicationError || failure}</strong><p>{reconcileReceiptId ? "A reconciliação consulta e atualiza somente o recibo selecionado; ela não repete a aplicação." : "Consulte o estado do Runtime antes de preparar outro plano."}</p></div>}
+        {phase === "complete" && receipt && <div className="setup-success" role="status"><Glyph name="check" size={20} /><p>{preview ? "Esta é uma demonstração. Nenhum arquivo foi alterado." : `${hostPluginOutcomeLabel(receipt)}. O Desktop não executou uma segunda leitura, verificação ou aplicação.`}</p></div>}
         {showDetails && <section ref={detailsElement} className="setup-details" id="setup-details" aria-label="Detalhes da configuração">
           <p>Origem: {preview ? "prévia no navegador" : "Runtime local"} · Versão {snapshot.runtime.version}</p>
-          <p>Estado do Runtime: {snapshot.runtime.state}. Cada etapa só é concluída após a resposta correspondente; este painel não estima tempos ou downloads.</p>
-          {plan && <p className="setup-digest">Plano revisado: <code>{plan.planDigest}</code></p>}
-          {applicationConfirmed && <p>{preview ? "Aplicação simulada." : "Aplicação confirmada pelo Runtime."} Conferência dos destinos: {verifiedPlan ? "confirmada por nova leitura do plano." : "ainda não confirmada."}</p>}
-          {verifiedPlan && <p className="setup-digest">Plano após a aplicação: <code>{verifiedPlan.planDigest}</code></p>}
-          <p>Senhas, tokens de autenticação, caminhos pessoais e conteúdo de arquivos não são exibidos neste painel.</p>
+          {plan && <><p>Versão do plugin: {plan.pluginVersion}</p><p className="setup-digest">Plano autorizado: <code>{plan.planDigest}</code></p></>}
+          {receipt && <p className="setup-digest">Recibo canônico: <code>{receipt.receiptDigest}</code></p>}
+          <p>Senhas, tokens, caminhos pessoais, backups, comandos e saídas brutas não são exibidos.</p>
         </section>}
       </div>}
     </main>
     {phase !== "welcome" && <div className="setup-actionbar"><div className="setup-footer-inner">
-        {pending && <p className="setup-pending-note">{phase === "installing" ? "Aguarde a resposta do Runtime. Esta operação não oferece cancelamento seguro depois de iniciada." : "Aguardando a resposta do Runtime local…"}</p>}
-        <div className="setup-controls">
-          <button className="text-button" type="button" aria-expanded={showDetails} aria-controls="setup-details" onClick={() => setShowDetails((value) => !value)}><Glyph name="chevron" size={14} />{showDetails ? "Ocultar detalhes" : "Mostrar detalhes"}</button>
-          <div>{phase === "review" && <>
-            <button className="button button-secondary" type="button" onClick={() => { reviewHeading.current?.scrollIntoView({ block: "start" }); reviewHeading.current?.focus({ preventScroll: true }); }}>Revisar destinos</button>
-            <button className="button button-primary" type="button" disabled={locked || reviewBlocked || !confirmed} onClick={() => void apply()}>{preview ? "Simular configuração" : "Instalar e conectar"}<Glyph name="arrow" size={16} /></button>
-          </>}
-            {phase === "failed" && !reviewBlocked && <button className="button button-primary" type="button" disabled={locked} onClick={() => void prepare()}>Revisar novamente</button>}
-            {phase === "complete" && <button className="button button-primary" type="button" onClick={onFinish}>Abrir Simplicio<Glyph name="arrow" size={16} /></button>}
-            {(phase === "failed" || reviewBlocked) && <button className="button button-secondary" type="button" disabled={locked} onClick={onDiagnostics}>{recovery === "refresh" ? "Atualizar diagnóstico" : "Abrir diagnóstico"}</button>}
-            {phase !== "complete" && <button className="button button-secondary" type="button" disabled={locked} onClick={onFinish}>Voltar ao app</button>}
-          </div>
+      {pending && <p className="setup-pending-note">{phase === "installing" ? "Aguardando um único resultado do Runtime. A ação não será repetida automaticamente." : phase === "reconciling" ? "Reconciliando explicitamente o recibo selecionado…" : "Aguardando a resposta do Runtime local…"}</p>}
+      <div className="setup-controls">
+        <button className="text-button" type="button" aria-expanded={showDetails} aria-controls="setup-details" onClick={() => setShowDetails((value) => !value)}><Glyph name="chevron" size={14} />{showDetails ? "Ocultar detalhes" : "Mostrar detalhes"}</button>
+        <div>{phase === "review" && <>
+          <button className="button button-secondary" type="button" onClick={() => { reviewHeading.current?.scrollIntoView({ block: "start" }); reviewHeading.current?.focus({ preventScroll: true }); }}>Revisar destinos</button>
+          <button className="button button-primary" type="button" disabled={locked || blockedWithoutReceipt || !confirmed} onClick={() => void apply()}>{preview ? "Simular configuração" : "Instalar e conectar"}<Glyph name="arrow" size={16} /></button>
+        </>}
+        {phase === "failed" && reconcileReceiptId && !reconcileConsumed && <button className="button button-primary" type="button" disabled={locked} onClick={() => void reconcile()}>Reconciliar recibo</button>}
+        {phase === "failed" && reconcileConsumed && <button className="button button-secondary" type="button" disabled={locked} onClick={onDiagnostics}>Consultar estado no diagnóstico</button>}
+        {phase === "failed" && !blockedWithoutReceipt && !reconcileReceiptId && applicationRecovery === "review" && <button className="button button-primary" type="button" disabled={locked} onClick={() => void prepare()}>Revisar novamente</button>}
+        {phase === "complete" && <button className="button button-primary" type="button" onClick={onFinish}>Abrir Simplicio<Glyph name="arrow" size={16} /></button>}
+        {phase === "failed" && !reconcileReceiptId && <button className="button button-secondary" type="button" disabled={locked} onClick={onDiagnostics}>Abrir diagnóstico</button>}
+        {phase !== "complete" && <button className="button button-secondary" type="button" disabled={locked} onClick={onFinish}>Voltar ao app</button>}
         </div>
+      </div>
     </div></div>}
-    <footer className="entry-footer"><Glyph name="shield" size={14} />Runtime local · Configuração revisada · Evidência verificável</footer>
+    <footer className="entry-footer"><Glyph name="shield" size={14} />Runtime local · Consentimento por digest · Recibo canônico</footer>
   </div>;
 }

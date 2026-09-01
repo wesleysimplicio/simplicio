@@ -79,7 +79,7 @@ async function accountAndInstallCalls(page: Page) {
   const calls = await page.evaluate(() => (window as AccessUpdateWindow).__accessUpdateCalls);
   return calls.filter((command) => [
     "desktop_login", "desktop_logout", "desktop_open_subscription",
-    "desktop_plan_integrations", "desktop_repair_providers", "desktop_open_releases",
+    "desktop_plan_integrations", "desktop_apply_host_plugins", "desktop_open_releases",
   ].includes(command));
 }
 

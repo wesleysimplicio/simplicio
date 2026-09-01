@@ -49,7 +49,7 @@ async function accountCalls(page: Page) {
 }
 
 for (const loginResult of ["failed", "unknown"] as const) {
-  test(`${loginResult} first Google login can verify the account and resume guided installation without a second login`, async ({ page }) => {
+  test(`${loginResult} first Google login can verify the account and open the normal app without a second login`, async ({ page }) => {
     await mockAccountEffects(page, { initial: "signed_out", loginResult });
     await page.goto("/?view=settings");
     await page.getByRole("button", { name: "Começar", exact: true }).click();
@@ -60,14 +60,14 @@ for (const loginResult of ["failed", "unknown"] as const) {
     await expect(page.getByRole("navigation", { name: "Navegação principal" })).toHaveCount(0);
     if (loginResult === "failed") await expect(page.getByRole("alert")).toContainText("O resultado final do login não foi confirmado");
     await page.getByRole("button", { name: "Tentar novamente", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Um bom começo.", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Configurar Simplicio", exact: true })).toBeEnabled();
+    await expect(page.getByRole("heading", { name: "Simplicio", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Um bom começo.", exact: true })).toHaveCount(0);
     const calls = await accountCalls(page);
     expect(calls.filter(command => command === "desktop_login")).toHaveLength(1);
     expect(calls.filter(command => command === "refresh_desktop_snapshot")).toHaveLength(1);
     expect(calls).not.toContain("desktop_logout");
     expect(calls).not.toContain("desktop_plan_integrations");
-    expect(calls).not.toContain("desktop_repair_providers");
+    expect(calls).not.toContain("desktop_apply_host_plugins");
   });
 }
 
@@ -85,7 +85,7 @@ test("an unconfirmed logout leaves active screens and can verify signed-out stat
   expect(calls.filter(command => command === "desktop_logout")).toHaveLength(1);
   expect(calls.filter(command => command === "refresh_desktop_snapshot")).toHaveLength(1);
   expect(calls).not.toContain("desktop_login");
-  expect(calls).not.toContain("desktop_repair_providers");
+  expect(calls).not.toContain("desktop_apply_host_plugins");
 });
 
 test("failed verification after ambiguous login stays unknown and never grants access or installs", async ({ page }) => {
@@ -100,5 +100,5 @@ test("failed verification after ambiguous login stays unknown and never grants a
   await expect(page.getByRole("heading", { name: "Um bom começo.", exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Ative o Simplicio", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Começar", exact: true })).toHaveCount(0);
-  expect(await accountCalls(page)).not.toContain("desktop_repair_providers");
+  expect(await accountCalls(page)).not.toContain("desktop_apply_host_plugins");
 });

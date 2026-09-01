@@ -389,6 +389,15 @@
 .entry-wait .setup-spinner { margin-top: 2px; }
 .entry-footer { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 32px; font-size: 10px; line-height: 1.7; color: var(--muted); text-align: center; padding-top: 12px; }
 .entry-footer .glyph { flex: 0 0 auto; }
+.runtime-install-layout > .entry-header { min-height: 68px; padding: 14px 32px; }
+.runtime-install-progress { flex: 0 0 auto; width: 100%; }
+.runtime-install-progress .setup-progress { height: 3px; border-radius: 0; }
+.runtime-install-body { width: min(760px, 100%); padding-top: clamp(38px, 7vh, 78px); }
+.runtime-install-status { color: var(--muted); font-size: 12px; line-height: 1.7; margin: 12px 0 0; }
+.runtime-install-receipt { display: flex; align-items: center; gap: 9px; color: var(--green-dark); font-size: 11px; line-height: 1.7; margin: 0 14px 18px; }
+.runtime-install-receipt .glyph { flex: 0 0 auto; }
+.runtime-install-layout .setup-footer-inner { display: flex; justify-content: flex-end; }
+.runtime-install-layout .setup-footer-inner > .button { min-width: 220px; }
 .setup-context { color: var(--muted); font-size: 11px; text-align: right; line-height: 1.6; }
 .setup-layout { padding: 0; overflow: hidden; }
 .setup-layout > .entry-header { min-height: 72px; padding: 16px 32px; border-bottom: 1px solid var(--line-soft); }

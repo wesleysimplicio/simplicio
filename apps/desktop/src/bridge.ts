@@ -6,12 +6,24 @@ import type { BotCenterSnapshot } from "./contracts";
 import type { BotActionRequest } from "./bot_center";
 import { applyDemoBotAction } from "./bot_center";
 import { parseTokenExportReceipt, parseTokenUsageReport, type TokenQuery, type TokenUsageReport } from "./token_usage";
-import { parseIntegrationPlan, type IntegrationPlan } from "./integration_setup";
+import {
+  createPreviewHostPluginResult,
+  createPreviewIntegrationPlan,
+  parseHostPluginOperationResult,
+  parseIntegrationPlan,
+  type HostPluginOperationResult,
+  type IntegrationPlan,
+} from "./integration_setup";
 import { parseLocalProject, type LocalProject } from "./workbench";
 import { createReadonlyRequest } from "./readonly_request";
 import { createContextReader } from "./context_report";
 import { parseUsageProjects } from "./project_usage";
 import { createConsolidatedReader, type ConsolidatedQuery, type ConsolidatedReport } from "./consolidated_tokens";
+import {
+  createPreviewRuntimeInstallResult,
+  parseRuntimeInstallResult,
+  type RuntimeInstallResult,
+} from "./runtime_install";
 
 const readSnapshot = createReadonlyRequest<DesktopSnapshot>(30_000, "desktop_snapshot_timeout");
 const readContext = createContextReader((repoPath) => invoke<unknown>("desktop_context_report", { repoPath: repoPath || null }));
@@ -91,6 +103,13 @@ export async function loadDesktopSnapshot(): Promise<DesktopSnapshot> {
   return readSnapshot(() => invoke<DesktopSnapshot>("desktop_snapshot"));
 }
 
+export async function installDesktopRuntime(): Promise<RuntimeInstallResult> {
+  if (!isTauri()) return createPreviewRuntimeInstallResult();
+  // This is a native, atomic side effect. The frontend never times it out or
+  // retries it; the command itself owns locking, rollback, and verification.
+  return parseRuntimeInstallResult(await invoke<unknown>("desktop_install_runtime"));
+}
+
 export async function beginDesktopLogin(): Promise<DesktopSnapshot> {
   if (!isTauri()) return createDemoSnapshot("active");
   // Runtime owns OAuth expiry; a frontend timeout must not authorize a duplicate login.
@@ -108,7 +127,7 @@ export async function refreshDesktopSnapshot(): Promise<DesktopSnapshot> {
 }
 
 export async function planDesktopIntegrations(): Promise<IntegrationPlan> {
-  if (!isTauri()) return { schema: "simplicio.desktop-integration-plan/v1", source: "preview", planDigest: `sha256:${"0".repeat(64)}`, changes: [{ label: "codex", exists: true, changed: false }, { label: "grok", exists: true, changed: true }] };
+  if (!isTauri()) return createPreviewIntegrationPlan();
   return parseIntegrationPlan(await withTimeout(invoke<unknown>("desktop_plan_integrations"), 60_000, "integration_plan_timeout"));
 }
 
@@ -123,10 +142,16 @@ export async function exportDesktopTokenReport(reportHash: string, format: "json
   return parseTokenExportReceipt(await invoke<unknown>("desktop_export_token_report", { reportHash, format }));
 }
 
-export async function repairDesktopProviders(planDigest: string): Promise<DesktopSnapshot> {
-  if (!isTauri()) return createDemoSnapshot(previewState());
-  // Do not release the UI mutation lock on a timer while the native installer may still run.
-  return invoke<DesktopSnapshot>("desktop_repair_providers", { planDigest });
+export async function applyDesktopHostPlugins(planDigest: string): Promise<HostPluginOperationResult> {
+  if (!isTauri()) return createPreviewHostPluginResult(planDigest);
+  // A side effect is never timed out or replayed by the frontend.
+  return parseHostPluginOperationResult(await invoke<unknown>("desktop_apply_host_plugins", { planDigest }), "apply");
+}
+
+export async function reconcileDesktopHostPlugins(receiptId: string): Promise<HostPluginOperationResult> {
+  if (!isTauri()) return createPreviewHostPluginResult(receiptId, "reconcile");
+  // Reconciliation is an explicit Runtime operation, never part of snapshot refresh.
+  return parseHostPluginOperationResult(await invoke<unknown>("desktop_reconcile_host_plugins", { receiptId }), "reconcile");
 }
 
 export async function dispatchDesktopBotAction(
