@@ -277,7 +277,7 @@ function sameNullableNumber(left: number | null, right: number | null): boolean 
 
 function sumNullable(values: Array<number | null>): number | null {
   if (values.some((value) => value === null)) return null;
-  return values.reduce((sum, value) => sum + (value as number), 0);
+  return values.filter((value): value is number => value !== null).reduce((sum, value) => sum + value, 0);
 }
 
 function sumBreakdown(rows: CostBreakdownRow[]): CostTotals {
