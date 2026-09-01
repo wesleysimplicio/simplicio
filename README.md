@@ -435,6 +435,33 @@ Every measured run should report its proof type and its baseline:
 `saved = baseline_tokens - actual_tokens` and
 `saving_percent = saved / baseline_tokens * 100`.
 
+### Measured OpenRouter proof — CRUD creation + edit (2026-09-01)
+
+A controlled two-stage run used OpenRouter and
+`deepseek/deepseek-v4-flash-0731` in both arms (`seed=42`,
+`temperature=0`, reasoning disabled). Creation was the control. Editing was the
+treatment: the baseline resent and regenerated the complete HTML, while
+Simplicio sent a compact plan and applied it through MCP.
+
+| Editing stage | Without Simplicio | With Simplicio MCP | Reduction |
+|---|---:|---:|---:|
+| Input tokens | 5,430 | 415 | 92.36% |
+| Output tokens | 5,144 | 58 | 98.87% |
+| Total tokens | 10,574 | 473 | **95.53%** |
+| OpenRouter cost | $0.00078559 | $0.00002654 | **96.62%** |
+| Latency | 17,615.78 ms | 1,296.79 ms | 92.64% |
+| Quality checks | Failed | Passed | — |
+
+Across both stages, usage fell from 16,043 to 6,175 tokens (**61.51% less**)
+and from $0.00132192 to $0.00058617 (**55.66% less**). The creation control
+used 4.26% more tokens with Simplicio, so the editing treatment—not the
+control—is the main evidence.
+
+This is one measured workflow pair, not a universal guarantee or an
+identical-output benchmark. Usage and cost came from OpenRouter responses;
+cache and reasoning tokens were zero. Repeat the run before making statistical
+claims. See the [machine-readable evidence](docs/evidence/openrouter-deepseek-v4-crud-2026-09-01.json).
+
 ### Run the Runtime benchmark
 
 All Runtime benchmark commands require an active login because they execute

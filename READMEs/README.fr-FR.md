@@ -122,6 +122,31 @@ Terminé. Une seule commande. Pas de gestionnaire de paquets, pas de configurati
 
 ## 💰 Économies de Tokens — 96 % C'est Réel
 
+### Preuve mesurée sur OpenRouter — création + édition d'un CRUD (2026-09-01)
+
+Une exécution contrôlée en deux étapes a utilisé OpenRouter et
+`deepseek/deepseek-v4-flash-0731` dans les deux flux (`seed=42`,
+`temperature=0`, raisonnement désactivé). La création servait de contrôle. Pour
+l'édition, le flux normal a renvoyé et régénéré tout le HTML ; Simplicio a envoyé
+un plan compact puis l'a appliqué via MCP.
+
+| Étape d'édition | Sans Simplicio | Avec Simplicio MCP | Réduction |
+|---|---:|---:|---:|
+| Tokens d'entrée | 5 430 | 415 | 92,36 % |
+| Tokens de sortie | 5 144 | 58 | 98,87 % |
+| Total des tokens | 10 574 | 473 | **95,53 %** |
+| Coût OpenRouter | 0,00078559 $US | 0,00002654 $US | **96,62 %** |
+| Latence | 17 615,78 ms | 1 296,79 ms | 92,64 % |
+| Contrôles qualité | Échec | Réussite | — |
+
+Sur les deux étapes, le total passe de 16 043 à 6 175 tokens (**61,51 % de
+moins**) et de 0,00132192 $US à 0,00058617 $US (**55,66 % de moins**). Le
+contrôle de création a consommé 4,26 % de tokens en plus avec Simplicio ;
+l'édition, et non le contrôle, constitue donc la preuve principale. Il s'agit
+d'une seule paire de flux mesurée, sans garantie universelle ni sorties
+identiques. Cache et raisonnement étaient à zéro. Répétez le test avant toute
+conclusion statistique. [Preuve lisible par machine](../docs/evidence/openrouter-deepseek-v4-crud-2026-09-01.json).
+
 **Sans Simplicio :** chaque session IA redécouvre votre dépôt, charge trop de
 contexte, répète les invites, brûle des tokens payants.
 

@@ -122,6 +122,30 @@ Gotowe. Jedno polecenie. Żaden menedżer pakietów, żadna konfiguracja modelu.
 
 ## 💰 Oszczędność tokenów — 96% to rzeczywistość
 
+### Zmierzony dowód OpenRouter — tworzenie i edycja CRUD (2026-09-01)
+
+Kontrolowany, dwuetapowy test używał OpenRouter oraz
+`deepseek/deepseek-v4-flash-0731` w obu przepływach (`seed=42`,
+`temperature=0`, rozumowanie wyłączone). Tworzenie było próbą kontrolną. Przy
+edycji zwykły przepływ ponownie przesłał i wygenerował cały HTML; Simplicio
+wysłał zwarty plan i zastosował go przez MCP.
+
+| Etap edycji | Bez Simplicio | Z Simplicio MCP | Redukcja |
+|---|---:|---:|---:|
+| Tokeny wejściowe | 5 430 | 415 | 92,36% |
+| Tokeny wyjściowe | 5 144 | 58 | 98,87% |
+| Łącznie tokenów | 10 574 | 473 | **95,53%** |
+| Koszt OpenRouter | 0,00078559 USD | 0,00002654 USD | **96,62%** |
+| Opóźnienie | 17 615,78 ms | 1 296,79 ms | 92,64% |
+| Kontrole jakości | Niepowodzenie | Powodzenie | — |
+
+W obu etapach zużycie spadło z 16 043 do 6 175 tokenów (**o 61,51%**) oraz z
+0,00132192 do 0,00058617 USD (**o 55,66%**). Próba kontrolna tworzenia zużyła z
+Simplicio o 4,26% więcej tokenów, dlatego głównym dowodem jest edycja, nie
+kontrola. To jedna zmierzona para przepływów, a nie uniwersalna gwarancja ani
+porównanie identycznych odpowiedzi. Cache i tokeny rozumowania wyniosły zero.
+Przed wnioskami statystycznymi powtórz test. [Dowód maszynowy](../docs/evidence/openrouter-deepseek-v4-crud-2026-09-01.json).
+
 **Bez Simplicio:** każda sesja AI odkrywa twoje repozytorium na nowo, ładuje zbyt dużo
 kontekstu, powtarza prompty, spala płatne tokeny.
 

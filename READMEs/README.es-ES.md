@@ -122,6 +122,30 @@ Listo. Un solo comando. Sin gestor de paquetes, sin configuración de modelos.
 
 ## 💰 Ahorro de Tokens — El 96% es Real
 
+### Prueba medida en OpenRouter — creación + edición de CRUD (2026-09-01)
+
+Una ejecución controlada de dos etapas usó OpenRouter y
+`deepseek/deepseek-v4-flash-0731` en ambos flujos (`seed=42`, `temperature=0`,
+razonamiento desactivado). La creación fue el control. En la edición, el flujo
+normal volvió a enviar y generar todo el HTML; Simplicio envió un plan compacto
+y lo aplicó mediante MCP.
+
+| Etapa de edición | Sin Simplicio | Con Simplicio MCP | Reducción |
+|---|---:|---:|---:|
+| Tokens de entrada | 5.430 | 415 | 92,36% |
+| Tokens de salida | 5.144 | 58 | 98,87% |
+| Tokens totales | 10.574 | 473 | **95,53%** |
+| Coste en OpenRouter | US$ 0,00078559 | US$ 0,00002654 | **96,62%** |
+| Latencia | 17.615,78 ms | 1.296,79 ms | 92,64% |
+| Controles de calidad | Falló | Aprobó | — |
+
+En ambas etapas, el total bajó de 16.043 a 6.175 tokens (**61,51% menos**) y de
+US$ 0,00132192 a US$ 0,00058617 (**55,66% menos**). El control de creación usó
+un 4,26% más de tokens con Simplicio; por eso la edición, no el control, es la
+evidencia principal. Es un solo par de flujos medido, no una garantía universal
+ni una comparación de salidas idénticas. Caché y razonamiento fueron cero.
+Repita el test antes de afirmaciones estadísticas. [Evidencia legible por máquina](../docs/evidence/openrouter-deepseek-v4-crud-2026-09-01.json).
+
 **Sin Simplicio:** cada sesión de IA redescubre tu repositorio, carga demasiado
 contexto, repite indicaciones, quema tokens de pago.
 

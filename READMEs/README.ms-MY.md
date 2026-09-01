@@ -122,6 +122,30 @@ Selesai. Satu arahan. Tiada pengurus pakej, tiada konfigurasi model.
 
 ## 💰 Penjimatan Token — 96% Adalah Nyata
 
+### Bukti terukur OpenRouter — penciptaan + suntingan CRUD (2026-09-01)
+
+Kedua-dua aliran menggunakan OpenRouter dan `deepseek/deepseek-v4-flash-0731`
+dengan `seed=42`, `temperature=0` dan penaakulan dimatikan. Penciptaan ialah
+kawalan. Semasa suntingan, aliran biasa menghantar dan menjana semula seluruh
+HTML; Simplicio menghantar pelan padat lalu menerapkannya melalui MCP.
+
+| Peringkat suntingan | Tanpa Simplicio | Dengan Simplicio MCP | Pengurangan |
+|---|---:|---:|---:|
+| Token input | 5,430 | 415 | 92.36% |
+| Token output | 5,144 | 58 | 98.87% |
+| Jumlah token | 10,574 | 473 | **95.53%** |
+| Kos OpenRouter | US$0.00078559 | US$0.00002654 | **96.62%** |
+| Kependaman | 17,615.78 ms | 1,296.79 ms | 92.64% |
+| Semakan kualiti | Gagal | Lulus | — |
+
+Untuk kedua-dua peringkat, penggunaan turun daripada 16,043 kepada 6,175 token
+(**61.51% kurang**) dan kos daripada US$0.00132192 kepada US$0.00058617
+(**55.66% kurang**). Kawalan penciptaan menggunakan 4.26% lebih token dengan
+Simplicio, jadi bukti utama ialah suntingan, bukan kawalan. Ini satu pasangan
+aliran kerja terukur, bukan jaminan universal atau perbandingan output serupa.
+Token cache dan penaakulan ialah sifar. Ulang ujian sebelum tuntutan statistik.
+[Bukti boleh dibaca mesin](../docs/evidence/openrouter-deepseek-v4-crud-2026-09-01.json).
+
 **Tanpa Simplicio:** setiap sesi AI menemui semula repositori anda, memuatkan terlalu
 banyak konteks, mengulang gesaan, membakar token berbayar.
 

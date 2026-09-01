@@ -1,0 +1,157 @@
+{
+  "schema": "simplicio.openrouter.workflow-proof/v1",
+  "proof_kind": "measured",
+  "measured_at": "2026-09-01",
+  "app": "Simplicio",
+  "provider": "OpenRouter",
+  "model": "deepseek/deepseek-v4-flash-0731",
+  "configuration": {
+    "seed": 42,
+    "temperature": 0.0,
+    "max_tokens_per_call": 12000,
+    "reasoning": "disabled"
+  },
+  "task": {
+    "stage_1": "Create a complete single-file HTML user CRUD.",
+    "stage_2": "Edit the CRUD by renaming columns, changing the palette and hiding the phone field while preserving its data."
+  },
+  "method": {
+    "creation": "Control: both arms request the same complete HTML.",
+    "editing": "Treatment: the baseline resends and regenerates the complete HTML; the Simplicio arm sends a compact inventory and edit plan, then applies it through Simplicio MCP.",
+    "comparison_scope": "Workflow-level comparison, not an identical-output benchmark."
+  },
+  "provider_request_ids": {
+    "without_simplicio_creation": "gen-1788300099-eELHph9NJBZkERydb0qk",
+    "without_simplicio_editing": "gen-1788300118-KzX98xBXy0qtpLvOSGkX",
+    "with_simplicio_creation": "gen-1788300169-9cqeXFgyBQVXNMfjM5MV",
+    "with_simplicio_editing": "gen-1788300189-0OAiSVqzOrNs3r0hqvCA"
+  },
+  "stages": {
+    "creation_control": {
+      "without_simplicio": {
+        "input_tokens": 207,
+        "output_tokens": 5262,
+        "total_tokens": 5469,
+        "cost_usd": 0.00053633538,
+        "latency_ms": 19678.97,
+        "quality_passed": true
+      },
+      "with_simplicio_mcp": {
+        "input_tokens": 207,
+        "output_tokens": 5495,
+        "total_tokens": 5702,
+        "cost_usd": 0.00055962606,
+        "latency_ms": 20066.76,
+        "quality_passed": true
+      },
+      "reduction_percent": {
+        "total_tokens": -4.26,
+        "cost_usd": -4.34,
+        "latency_ms": -1.97
+      }
+    },
+    "editing_treatment": {
+      "without_simplicio": {
+        "input_tokens": 5430,
+        "output_tokens": 5144,
+        "total_tokens": 10574,
+        "cost_usd": 0.00078558564,
+        "request_bytes": 24217,
+        "response_bytes": 23962,
+        "latency_ms": 17615.78,
+        "quality_passed": false
+      },
+      "with_simplicio_mcp": {
+        "input_tokens": 415,
+        "output_tokens": 58,
+        "total_tokens": 473,
+        "cost_usd": 0.00002653938,
+        "request_bytes": 1581,
+        "response_bytes": 1048,
+        "latency_ms": 1296.79,
+        "quality_passed": true
+      },
+      "reduction_percent": {
+        "input_tokens": 92.36,
+        "output_tokens": 98.87,
+        "total_tokens": 95.53,
+        "cost_usd": 96.62,
+        "request_bytes": 93.47,
+        "response_bytes": 95.63,
+        "latency_ms": 92.64
+      }
+    }
+  },
+  "overall": {
+    "without_simplicio": {
+      "input_tokens": 5637,
+      "output_tokens": 10406,
+      "total_tokens": 16043,
+      "cost_usd": 0.00132192102
+    },
+    "with_simplicio_mcp": {
+      "input_tokens": 622,
+      "output_tokens": 5553,
+      "total_tokens": 6175,
+      "cost_usd": 0.00058616544
+    },
+    "saved": {
+      "input_tokens": 5015,
+      "output_tokens": 4853,
+      "total_tokens": 9868,
+      "cost_usd": 0.00073575558
+    },
+    "reduction_percent": {
+      "input_tokens": 88.97,
+      "output_tokens": 46.64,
+      "total_tokens": 61.51,
+      "cost_usd": 55.66
+    }
+  },
+  "quality_evidence": {
+    "without_simplicio_edit": {
+      "passed": false,
+      "failed_checks": [
+        "stable_columns",
+        "phone_field_marker"
+      ]
+    },
+    "with_simplicio_edit": {
+      "passed": true,
+      "passed_checks": [
+        "complete_html",
+        "crud_behaviors",
+        "stable_columns",
+        "phone_field_marker",
+        "renamed_columns",
+        "exact_palette",
+        "phone_data_preserved",
+        "simplicio_edit_marker"
+      ]
+    }
+  },
+  "runtime_evidence": {
+    "simplicio_version": "3.8.40",
+    "mcp_protocol_version": "2025-06-18",
+    "mcp_tool_calls": 4,
+    "savings_event_id": "1dc36fb273cab3fb4a80371a",
+    "savings_run_id": "savings-1788300223986-39106"
+  },
+  "projected_savings_usd_if_repeated": {
+    "100_operations": 0.07357556,
+    "1000_operations": 0.73575558,
+    "10000_operations": 7.3575558
+  },
+  "telemetry": {
+    "usage_and_cost_source": "Copied from the OpenRouter API responses.",
+    "reasoning_tokens": 0,
+    "cached_tokens": 0,
+    "cache_write_tokens": 0,
+    "comparison_source_sha256": "df9edb218487ac2285ed40e6ce5c09bb56ffb854c1b63d7dbbd48b7bf77b8a6b"
+  },
+  "limitations": [
+    "This is one measured workflow pair and is not a universal guarantee.",
+    "Creation is the control and was 4.26% higher in total tokens with Simplicio; editing is the main treatment evidence.",
+    "Repeat the benchmark before making statistical claims."
+  ]
+}

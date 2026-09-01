@@ -122,6 +122,28 @@ irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.p
 
 ## 💰 Token 节省——96% 是真实可得的
 
+### OpenRouter 实测证据——CRUD 创建与编辑（2026-09-01）
+
+两条流程均使用 OpenRouter 和 `deepseek/deepseek-v4-flash-0731`，并保持
+`seed=42`、`temperature=0`、关闭推理。创建阶段是对照组。编辑阶段中，
+普通流程重新发送并生成完整 HTML；Simplicio 发送紧凑计划并通过 MCP 应用。
+
+| 编辑阶段 | 不使用 Simplicio | 使用 Simplicio MCP | 降幅 |
+|---|---:|---:|---:|
+| 输入 token | 5,430 | 415 | 92.36% |
+| 输出 token | 5,144 | 58 | 98.87% |
+| token 总量 | 10,574 | 473 | **95.53%** |
+| OpenRouter 成本 | US$0.00078559 | US$0.00002654 | **96.62%** |
+| 延迟 | 17,615.78 ms | 1,296.79 ms | 92.64% |
+| 质量检查 | 未通过 | 通过 | — |
+
+两个阶段合计从 16,043 降至 6,175 token（**减少 61.51%**），成本从
+US$0.00132192 降至 US$0.00058617（**减少 55.66%**）。创建对照组中，
+Simplicio 多用了 4.26% 的 token，因此主要证据是编辑阶段，而不是对照组。
+这只是一次实测工作流配对，不是普遍保证，也不是完全相同输出的比较。
+缓存与推理 token 均为零。做统计结论前应重复测试。
+[机器可读证据](../docs/evidence/openrouter-deepseek-v4-crud-2026-09-01.json)。
+
 **没有 Simplicio：** 每次 AI 会话都重新探索你的仓库，加载过多
 上下文，重复提示，消耗付费 Token。
 
