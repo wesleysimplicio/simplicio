@@ -3,6 +3,7 @@ import { exportDesktopSnapshot } from "../bridge";
 import type { ActivityItem, DesktopSnapshot } from "../contracts";
 import { Glyph } from "../components/Brand";
 import { createActivityProjection } from "../activity_projection";
+import type { DesktopUsageState } from "../usage_store";
 
 type StatusFilter = "all" | ActivityItem["status"];
 
@@ -27,7 +28,7 @@ function statusLabel(status: ActivityItem["status"]): string {
   return status === "verified" ? "verificado" : status === "running" ? "em execução" : "atenção";
 }
 
-export function ActivityScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
+export function ActivityScreen({ snapshot, usage }: { snapshot: DesktopSnapshot; usage?: DesktopUsageState }) {
   const projection = createActivityProjection(snapshot);
   const savingsProven = snapshot.savings.proofKind === "measured" || snapshot.savings.proofKind === "replayed" || snapshot.savings.proofKind === "mixed";
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -63,6 +64,7 @@ export function ActivityScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
           <span className="eyebrow">Recibos</span>
           <h1>Atividade</h1>
           <p>Execuções, cache e economia com evidência limitada ao snapshot.</p>\n          <p className="token-proof-note">Economia: <code>{snapshot.savings.proofKind}</code>{!savingsProven && " · indisponível neste recorte"}</p>
+          <p className="token-proof-note">Changefeed da sessão: <code>{usage?.changefeed.connection ?? "offline"}</code> · {usage?.changefeed.projection ? "último snapshot do Runtime disponível" : "sem snapshot; economia não é inferida"}</p>
         </div>
         <button className="button button-secondary" type="button" disabled={exporting} onClick={() => void exportReceipts()}>{exporting ? "Exportando…" : "Exportar recibos"}</button>
       </section>

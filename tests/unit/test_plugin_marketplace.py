@@ -99,7 +99,7 @@ def test_hermes_plugin_manifests_share_one_version() -> None:
         _load_json("plugins/simplicio-hermes/package.json"),
     ]
 
-    assert {manifest["version"] for manifest in manifests} == {"0.3.1"}
+    assert {manifest["version"] for manifest in manifests} == {"0.4.0"}
 
 
 def test_public_install_docs_do_not_expose_fallback_provisioning() -> None:

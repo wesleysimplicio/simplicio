@@ -124,8 +124,7 @@ impl InstallAttempt {
             return Self { blocked: true };
         };
         let mut bytes = Vec::new();
-        if file
-            .by_ref()
+        if std::io::Read::by_ref(&mut file)
             .take((MAX_BYTES + 1) as u64)
             .read_to_end(&mut bytes)
             .is_err()

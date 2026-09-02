@@ -89,9 +89,9 @@ def test_policy_moves_to_persistent_login_and_hashes_immutable_installer_bytes(r
     assert result["acceptsMinimum"] is True
     for installer in policy["installers"].values():
         assert installer["sha256"] == hashlib.sha256(blobs[installer["filename"]]).hexdigest()
-    assert {body["version"] for _, body in module.plugin_manifests()} == {"0.2.6"}
+    assert {body["version"] for _, body in module.plugin_manifests()} == {"0.2.5"}
     assert module.prepare_plugin_release_policy("3.8.40") == []
-    assert {body["version"] for _, body in module.plugin_manifests()} == {"0.2.6"}
+    assert {body["version"] for _, body in module.plugin_manifests()} == {"0.2.5"}
 
     module.prepare_plugin_release_policy("3.8.41")
     next_policy = module.read_plugin_policy()["policy"]

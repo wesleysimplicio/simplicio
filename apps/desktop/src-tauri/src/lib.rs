@@ -20,6 +20,7 @@ mod runtime_process;
 mod snapshot_exports;
 mod supervisor;
 mod token_exports;
+mod usage_changefeed;
 
 static INSTALL_PROCESS_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
@@ -261,6 +262,23 @@ async fn desktop_context_report(repo_path: Option<String>) -> Result<Value, Stri
     })
     .await
     .map_err(|_| "context_report_unavailable".to_string())?
+}
+
+#[tauri::command]
+async fn desktop_usage_changefeed(
+    after_sequence: u64,
+    after_revision: u64,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        require_active_access()?;
+        let args = usage_changefeed::query_args(after_sequence, after_revision)?;
+        let borrowed = args.iter().map(String::as_str).collect::<Vec<_>>();
+        let value =
+            run_runtime_json(&borrowed).map_err(|_| "usage_changefeed_unavailable".to_string())?;
+        usage_changefeed::validate_event(value, after_sequence, after_revision)
+    })
+    .await
+    .map_err(|_| "usage_changefeed_unavailable".to_string())?
 }
 
 #[tauri::command]
@@ -538,8 +556,12 @@ async fn desktop_reconcile_runtime_install(app: tauri::AppHandle) -> Result<Valu
         let current_executable = std::env::current_exe()
             .map_err(|_| "runtime_install_package_unavailable".to_string())?;
         let home = runtime_user_home()?;
-        let snapshot = runtime_install::current_snapshot(&current_executable, &home, snapshot_from_binary)?;
-        attempt.finish_persisted(&journal_path, &Ok(serde_json::json!({"status":"reconciled"})))?;
+        let snapshot =
+            runtime_install::current_snapshot(&current_executable, &home, snapshot_from_binary)?;
+        attempt.finish_persisted(
+            &journal_path,
+            &Ok(serde_json::json!({"status":"reconciled"})),
+        )?;
         Ok(serde_json::json!({
             "schema": "simplicio.desktop-install-reconciliation/v1",
             "status": "reconciled",
@@ -652,6 +674,7 @@ pub fn run() {
             desktop_reconcile_host_plugins,
             desktop_plan_integrations,
             desktop_usage_projects,
+            desktop_usage_changefeed,
             desktop_context_report,
             desktop_token_report,
             desktop_consolidated_token_report,

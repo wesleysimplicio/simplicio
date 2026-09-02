@@ -6,10 +6,11 @@ import { ConsolidatedTokens } from "../components/ConsolidatedTokens";
 import type { UsageProjects } from "../project_usage";
 import type { UnifiedUsageProjection } from "../unified_usage";
 import type { CostProjection } from "../cost_projection";
+import type { DesktopUsageState } from "../usage_store";
 import { exportDesktopTokenReport, loadDesktopTokenReport, loadDesktopUnifiedUsage, loadDesktopCostProjection } from "../bridge";
 import { TOKEN_PERIODS, tokenErrorMessage, tokenExportErrorMessage, type TokenPeriod, type TokenQuery, type TokenUsageReport } from "../token_usage";
 
-export function TokensScreen({ initialRepoPath = "", projectPaths = [] }: { initialRepoPath?: string; projectPaths?: string[] }) {
+export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }: { initialRepoPath?: string; projectPaths?: string[]; usage?: DesktopUsageState }) {
   const [discovery, setDiscovery] = useState<UsageProjects | null>(null);
   const [discoveryReady, setDiscoveryReady] = useState(false);
   const [extraPaths, setExtraPaths] = useState<string[]>(initialRepoPath ? [initialRepoPath] : []);
@@ -143,6 +144,11 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [] }: { init
     <div className="page secondary-page token-usage-page">
       <section className="page-heading">
         <div><span className="eyebrow">Recibos do Runtime</span><h1>Relatório de tokens</h1><p>Uso registrado por período e sessão. Economia de contexto não é consumo faturado.</p></div>
+      </section>
+      <section className="panel session-feed-summary" aria-label="Changefeed da sessão">
+        <strong>Sessão atual</strong>
+        <span>{usage?.changefeed.connection === "live" ? "ao vivo" : usage?.changefeed.connection === "reconnecting" ? "reconectando" : usage?.changefeed.connection === "stale" ? "último dado conhecido" : "offline"}</span>
+        <p>{usage?.changefeed.projection ? usage.changefeed.projection.totals.event_count + " evento(s) · " + usage.changefeed.projection.totals.total_tokens.toLocaleString("pt-BR") + " tokens registrados · cobertura " + usage.changefeed.projection.metadata.coverage.status : "Aguardando changefeed comprovado pelo Runtime; nenhum zero foi inferido."}</p>
       </section>
       <ConsolidatedTokens paths={[...projectPaths, ...extraPaths, ...(discovery?.projects.map(project => project.path) ?? [])]} discoveryReady={discoveryReady} discoveryPartial={!discovery || discovery.partial} />
       <section className="individual-token-report" aria-label="Relatório individual">
