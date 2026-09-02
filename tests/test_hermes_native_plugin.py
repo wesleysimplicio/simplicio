@@ -181,8 +181,15 @@ def test_runtime_outage_uses_python_mapper_fallback_and_reuses_cache(tmp_path, m
     log = tmp_path / "mapper.log"
     mapper.write_text(
         "#!" + sys.executable + "\n"
-        "import os, pathlib, sys\n"
-        "pathlib.Path(os.environ['PYTHON_MAPPER_LOG']).open('a').write(repr(sys.argv[1:]) + '\\n')\n"
+        "import hashlib, json, os, pathlib, sys\n"
+        "if sys.argv[1:3] == ['version', '--json']:\n"
+        "    print(json.dumps({'producer': 'simplicio-mapper', 'version': '0.26.25',\n"
+        "        'protocol': 'simplicio.mapper/v1', 'schema': 'simplicio.mapper-prefix/v1',\n"
+        "        'capabilities': ['map', 'docs'],\n"
+        "        'sha256': hashlib.sha256(pathlib.Path(sys.argv[0]).read_bytes()).hexdigest(),\n"
+        "        'compatibility': {'min_version': '0.26.25', 'max_version': '0.99.99'}}))\n"
+        "    raise SystemExit(0)\n"
+        f"pathlib.Path({str(log)!r}).open('a').write(repr(sys.argv[1:]) + '\\n')\n"
         "docs = pathlib.Path.cwd() / '.simplicio' / 'docs'\n"
         "docs.mkdir(parents=True, exist_ok=True)\n"
         "(docs / 'architecture.md').write_text('# Python Hermes fallback\\n', encoding='utf-8')\n",
@@ -190,7 +197,6 @@ def test_runtime_outage_uses_python_mapper_fallback_and_reuses_cache(tmp_path, m
     )
     mapper.chmod(0o755)
     monkeypatch.setenv("SIMPLICIO_MAPPER_BIN", str(mapper))
-    monkeypatch.setenv("PYTHON_MAPPER_LOG", str(log))
     adapter._BRIDGE = FakeBridge()
     adapter._BRIDGE.failure = RuntimeError("runtime unavailable")
     context = FakeContext()
@@ -267,6 +273,7 @@ def test_session_start_warms_authenticated_mapper_without_waiting():
     context.hooks["on_session_start"](session_id="s", cwd=str(ROOT))
     try:
         assert entered.wait(1)
+        assert not adapter._PREPARED
     finally:
         release.set()
 
@@ -370,6 +377,78 @@ def test_canonical_hermes_usage_keeps_total_prompt_and_cache_buckets():
     assert adapter._token_usage({"usage": {"cache_read_tokens": True}}) == {}
 
 
+def test_hermes_ids_are_preserved_and_missing_ids_are_marked_synthetic(tmp_path):
+    adapter = load_adapter()
+    real = adapter._arguments(
+        "session-real", turn_id="turn-real", api_request_id="api-real",
+        logical_request_id="logical-real", attempt_id="attempt-real",
+        provider="provider/name", model="model/name", cwd=str(tmp_path),
+        hermes_capabilities={"middleware": True, "version": "0.20.4"},
+    )
+    assert real["synthetic"] is False
+    assert real["synthetic_ids"] == []
+    assert real["provider"] == "provider/name" and real["model"] == "model/name"
+    assert real["hermes_capabilities"] == {"middleware": True, "version": "0.20.4"}
+
+    synthetic = adapter._arguments(cwd=str(tmp_path))
+    assert synthetic["synthetic"] is True
+    assert set(synthetic["synthetic_ids"]) == {
+        "host_session_id", "turn_id", "api_request_id", "logical_request_id", "attempt_id",
+    }
+
+
+def test_effective_project_generation_changes_when_bytes_change(tmp_path):
+    adapter = load_adapter()
+    source = tmp_path / "module.py"
+    source.write_text("value = 1\n", encoding="utf-8")
+    first = adapter._project_generation(tmp_path)
+    source.write_text("value = 2\n", encoding="utf-8")
+    second = adapter._project_generation(tmp_path)
+    assert first != second
+
+
+def test_missing_ambiguous_and_duplicate_results_emit_redacted_receipts():
+    adapter, bridge, context = setup_plugin()
+    context.middleware["llm_request"](
+        request={"messages": []}, session_id="s", turn_id="t", api_request_id="a",
+        logical_request_id="l-a", attempt_id="attempt-a", model="m", provider="p", cwd=str(ROOT),
+    )
+    context.hooks["post_api_request"](session_id="s", api_request_id="missing")
+    assert adapter.correlation_receipts()[-1]["reason_code"] == "correlation_missing"
+    context.hooks["post_api_request"](session_id="s", turn_id="t", api_request_id="a")
+    assert bridge.calls[-1][0] == "simplicio_record_model_result"
+    context.hooks["post_api_request"](session_id="s", turn_id="t", api_request_id="a")
+    assert adapter.correlation_receipts()[-1]["reason_code"] == "duplicate_result"
+
+    for request in ("b", "c"):
+        context.middleware["llm_request"](
+            request={"messages": []}, session_id="s2", turn_id="t2", api_request_id=request,
+            model="m", provider="p", cwd=str(ROOT),
+        )
+    context.hooks["post_api_request"](session_id="s2", turn_id="t2")
+    assert adapter.correlation_receipts()[-1]["reason_code"] == "correlation_ambiguous"
+    assert all("complete_map_tail" not in json.dumps(item) for item in adapter.correlation_receipts())
+
+
+def test_real_ids_prove_provider_path_but_synthetic_ids_do_not():
+    adapter, bridge, context = setup_plugin()
+    context.middleware["llm_request"](
+        request={"messages": []}, session_id="s", turn_id="t", api_request_id="a",
+        logical_request_id="l", attempt_id="attempt", model="m", provider="p", cwd=str(ROOT),
+    )
+    context.hooks["post_api_request"](session_id="s", turn_id="t", api_request_id="a")
+    args = bridge.calls[-1][1]
+    assert args["coverage_proven"] is True
+    assert args["logical_request_id"] == "l" and args["attempt_id"] == "attempt"
+
+    context.middleware["llm_request"](
+        request={"messages": []}, session_id="s2", api_request_id="synthetic",
+        model="m", provider="p", cwd=str(ROOT),
+    )
+    context.hooks["post_api_request"](session_id="s2", api_request_id="synthetic")
+    assert bridge.calls[-1][1]["coverage_proven"] is False
+
+
 def test_stdio_transport_enforces_mode_and_rejects_login_errors(tmp_path, monkeypatch):
     import os
     import sys
@@ -381,6 +460,7 @@ def test_stdio_transport_enforces_mode_and_rejects_login_errors(tmp_path, monkey
         "#!" + sys.executable + "\n"
         "import json, os, pathlib, sys\n"
         "assert os.environ['SIMPLICIO_RUNTIME_MODE'] == 'mapper-only'\n"
+        "assert 'HERMES_SECRET' not in os.environ\n"
         "tools = " + repr(sorted(adapter._MAPPER_TOOLS)) + "\n"
         "receipt = " + repr(receipt) + "\n"
         "marker = pathlib.Path(" + repr(str(marker)) + ")\n"
@@ -401,6 +481,7 @@ def test_stdio_transport_enforces_mode_and_rejects_login_errors(tmp_path, monkey
     if os.name == "nt":
         pytest.skip("POSIX test fixture executable")
     monkeypatch.setenv("SIMPLICIO_RUNTIME_MODE", "full")
+    monkeypatch.setenv("HERMES_SECRET", "do-not-forward")
     bridge = adapter.RuntimeMcpBridge(binary=program, timeout=2)
     try:
         with pytest.raises(adapter.SimplicioHermesError):
