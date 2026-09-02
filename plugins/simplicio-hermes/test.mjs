@@ -167,3 +167,48 @@ test("execution is always the host's original event", () => {
   const event = { execute: () => "native" };
   assert.equal(createHermesPlugin().hooks.llm_execution(event), event);
 });
+
+test("forwards real Hermes identity and records host capabilities", async () => {
+  const runtime = runtimeFixture();
+  const plugin = createHermesPlugin({ runtime });
+  await plugin.hooks.llm_request({
+    messages: [], provider: "provider/name", model: "model/name",
+    session_id: "session-real", turn_id: "turn-real", api_request_id: "api-real",
+    logical_request_id: "logical-real", attempt_id: "attempt-real",
+    hermes_capabilities: { middleware: true, version: "0.20.4" },
+  });
+  assert.deepEqual(runtime.calls.prepare[0], {
+    host: "hermes", host_session_id: "session-real", turn_id: "turn-real",
+    api_request_id: "api-real", logical_request_id: "logical-real", attempt_id: "attempt-real",
+    synthetic: false, synthetic_ids: [], provider: "provider/name", model: "model/name",
+    hermes_capabilities: { middleware: true, version: "0.20.4" },
+    repo: process.cwd(), lifecycle: "provider_request", protection_mode: "best_effort",
+  });
+  assert.equal(plugin.status().provider_path_active, true);
+});
+
+test("synthetic identity is explicit and cannot prove provider coverage", async () => {
+  const runtime = runtimeFixture();
+  const plugin = createHermesPlugin({ runtime });
+  const prepared = await plugin.prepare_model_call({ messages: [], api_request_id: "synthetic-api" });
+  const result = await plugin.record_model_result({
+    session_id: prepared.simplicio.session_id, api_request_id: "synthetic-api",
+  });
+  assert.equal(result.simplicio.reason_code, "receipt_recorded");
+  assert.equal(runtime.calls.record[0].coverage_proven, false);
+  assert.equal(plugin.status().provider_path_active, false);
+});
+
+test("missing and duplicate results emit bounded correlation receipts", async () => {
+  const runtime = runtimeFixture();
+  const plugin = createHermesPlugin({ runtime });
+  await plugin.prepare_model_call({ messages: [], session_id: "s", turn_id: "t", api_request_id: "a" });
+  const missing = await plugin.record_model_result({ session_id: "s", api_request_id: "unknown" });
+  assert.equal(missing.simplicio.reason_code, "correlation_missing");
+  await plugin.record_model_result({ session_id: "s", turn_id: "t", api_request_id: "a" });
+  const duplicate = await plugin.record_model_result({ session_id: "s", turn_id: "t", api_request_id: "a" });
+  assert.equal(duplicate.simplicio.reason_code, "duplicate_result");
+  assert.deepEqual(plugin.correlationReceipts().map((item) => item.reason_code), [
+    "correlation_missing", "duplicate_result",
+  ]);
+});
