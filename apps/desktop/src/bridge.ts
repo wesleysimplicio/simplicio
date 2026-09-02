@@ -31,6 +31,7 @@ import {
   type RuntimeInstallReconciliation,
   type RuntimeInstallStatus,
 } from "./runtime_install";
+import { parseRuntimeLifecycleReceipt, type RuntimeLifecycleReceipt } from "./runtime_lifecycle";
 
 const readSnapshot = createReadonlyRequest<DesktopSnapshot>(30_000, "desktop_snapshot_timeout");
 const readContext = createContextReader((repoPath) => invoke<unknown>("desktop_context_report", { repoPath: repoPath || null }));
@@ -170,6 +171,19 @@ export async function loadDesktopRuntimeInstallStatus(): Promise<RuntimeInstallS
     return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
   }
   return parseRuntimeInstallStatus(await invoke<unknown>("desktop_runtime_install_status"));
+}
+
+/**
+ * Read an optional full lifecycle receipt. Unsupported native builds fail
+ * closed rather than downgrading an install/rollback claim to a version string.
+ */
+export async function loadDesktopRuntimeLifecycle(): Promise<RuntimeLifecycleReceipt> {
+  if (!isTauri()) throw new Error("preview_no_runtime");
+  return parseRuntimeLifecycleReceipt(await withTimeout(
+    invoke<unknown>("desktop_runtime_lifecycle"),
+    30_000,
+    "runtime_lifecycle_timeout",
+  ));
 }
 
 export async function beginDesktopLogin(): Promise<DesktopSnapshot> {
