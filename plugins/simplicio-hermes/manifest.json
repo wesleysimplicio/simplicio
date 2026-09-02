@@ -1,6 +1,6 @@
 {
   "name": "simplicio-hermes",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "host": "hermes",
   "entry": "./index.mjs",
   "hooks": [
@@ -17,7 +17,15 @@
     "prepare": "prepare_model_call",
     "record": "record_model_result",
     "mode": "mapper-only",
-    "login_required": true
+    "login_required": true,
+    "mapper_fallback": {
+      "producer": "simplicio-mapper",
+      "version_command": "version --json",
+      "protocol": "simplicio.mapper/v1",
+      "schema": "simplicio.mapper-prefix/v1",
+      "requires_digest": true,
+      "requires_compatibility_range": true
+    }
   },
   "failure_policy": "best_effort"
 }
