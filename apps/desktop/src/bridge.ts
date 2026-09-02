@@ -19,6 +19,7 @@ import { createReadonlyRequest } from "./readonly_request";
 import { createContextReader } from "./context_report";
 import { parseUsageProjects } from "./project_usage";
 import { applyUsageChangefeedEvent, createUsageChangefeedState, type UsageChangefeedState } from "./usage_changefeed";
+import { exportUnifiedUsageProjection, parseUnifiedUsageProjection, type UnifiedUsageProjection, type UsageQuery } from "./unified_usage";
 import { createConsolidatedReader, type ConsolidatedQuery, type ConsolidatedReport } from "./consolidated_tokens";
 import {
   createPreviewRuntimeInstallResult,
@@ -44,6 +45,22 @@ export function loadDesktopConsolidatedTokens(request: ConsolidatedQuery): Promi
 export async function loadDesktopUsageProjects() {
   if (!isTauri()) throw new Error("preview_no_runtime");
   return parseUsageProjects(await readUsageProjects(() => invoke<unknown>("desktop_usage_projects")));
+}
+
+export async function loadDesktopUnifiedUsage(query: UsageQuery = {}): Promise<UnifiedUsageProjection> {
+  if (!isTauri()) throw new Error("preview_no_runtime");
+  return parseUnifiedUsageProjection(await withTimeout(
+    invoke<unknown>("desktop_unified_usage", { query }),
+    60_000,
+    "unified_usage_timeout",
+  ));
+}
+
+export function exportDesktopUnifiedUsage(
+  projection: UnifiedUsageProjection,
+  format: "json" | "csv",
+): string {
+  return exportUnifiedUsageProjection(projection, format);
 }
 
 export function loadDesktopContextReport(repoPath: string) {

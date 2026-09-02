@@ -4,7 +4,8 @@ import { ContextSavings } from "../components/ContextSavings";
 import { TokenProjects } from "../components/TokenProjects";
 import { ConsolidatedTokens } from "../components/ConsolidatedTokens";
 import type { UsageProjects } from "../project_usage";
-import { exportDesktopTokenReport, loadDesktopTokenReport } from "../bridge";
+import type { UnifiedUsageProjection } from "../unified_usage";
+import { exportDesktopTokenReport, loadDesktopTokenReport, loadDesktopUnifiedUsage } from "../bridge";
 import { TOKEN_PERIODS, tokenErrorMessage, tokenExportErrorMessage, type TokenPeriod, type TokenQuery, type TokenUsageReport } from "../token_usage";
 
 export function TokensScreen({ initialRepoPath = "", projectPaths = [] }: { initialRepoPath?: string; projectPaths?: string[] }) {
@@ -19,6 +20,9 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [] }: { init
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [report, setReport] = useState<TokenUsageReport | null>(null);
+  const [unifiedProjection, setUnifiedProjection] = useState<UnifiedUsageProjection | null>(null);
+  const [unifiedBusy, setUnifiedBusy] = useState(false);
+  const [unifiedError, setUnifiedError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -75,6 +79,23 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [] }: { init
       }
     }
     void load(query);
+  }
+
+  async function loadUnifiedUsage() {
+    if (unifiedBusy) return;
+    setUnifiedBusy(true);
+    setUnifiedProjection(null);
+    setUnifiedError(null);
+    try {
+      // Project paths are intentionally not sent to this contract. Runtime owns
+      // project identity and redaction; the public v1 query supports session scope.
+      const query = sessionId.trim() ? { session_id: sessionId.trim() } : {};
+      setUnifiedProjection(await loadDesktopUnifiedUsage(query));
+    } catch (cause) {
+      setUnifiedError(cause instanceof Error ? cause.message : "unified_usage_unavailable");
+    } finally {
+      setUnifiedBusy(false);
+    }
   }
 
   async function exportReport(format: "json" | "csv") {
@@ -139,6 +160,20 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [] }: { init
           {exportError && <p role="alert">{exportError}</p>}
         </section>
       </>}
+      <section className="panel token-evidence" aria-label="Uso unificado">
+        <h2>Uso unificado</h2>
+        <p>Provider, modelo, host e sessão só aparecem quando o Runtime fornecer a projeção versionada e redigida.</p>
+        <button className="button button-secondary" type="button" disabled={unifiedBusy || exporting} onClick={() => void loadUnifiedUsage()}>
+          {unifiedBusy ? "Consultando projeção…" : "Consultar uso unificado"}
+        </button>
+        {unifiedError && <p role="status">Projeção indisponível: <code>{unifiedError}</code>. Nenhum zero foi inferido.</p>}
+        {unifiedProjection && <div className="token-unified-result">
+          <p>{unifiedProjection.rows.length} agrupamento(s) · {unifiedProjection.totals.event_count} evento(s) · cobertura: {unifiedProjection.metadata.coverage.status}</p>
+          <p>Tokens registrados: {unifiedProjection.totals.total_tokens.toLocaleString("pt-BR")}; custo: {unifiedProjection.totals.cost_usd === null ? "indisponível" : `US$ ${unifiedProjection.totals.cost_usd.toFixed(6)}`}</p>
+          <ul>{unifiedProjection.rows.slice(0, 10).map((row) => <li key={`${row.provider}:${row.model}:${row.host}:${row.session_id ?? "none"}`}>{row.provider} · {row.model} · {row.host} · {row.total_tokens.toLocaleString("pt-BR")} tokens · {row.provenance}</li>)}</ul>
+          <code>{unifiedProjection.metadata.report_digest}</code>
+        </div>}
+      </section>
       <ContextSavings repoPath={repoPath} autoLoad={autoContext} />
       </section>
     </div>
