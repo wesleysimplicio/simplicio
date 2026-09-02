@@ -25,7 +25,7 @@ const projection: UnifiedUsageProjection = {
     source: "runtime", generated_by: "runtime_usage_ledger", generated_at_epoch: 1700000100,
     report_digest: "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     pricing_version: null, pricing_sources: [],
-    coverage: { status: "no_data", missing_usage_events: 0, unpriced_events: 0, providers: [], reason: null },
+    coverage: { status: "partial", missing_usage_events: 0, unpriced_events: 0, providers: [], reason: null },
     redacted: true,
   },
 };
