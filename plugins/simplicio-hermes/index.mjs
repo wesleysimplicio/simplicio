@@ -65,23 +65,40 @@ function injectContext(request, content) {
   throw new HermesProtectionError("unsupported_request_shape");
 }
 
+function metricValue(source, path) {
+  let value = source;
+  for (const part of path.split(".")) value = value?.[part];
+  return Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+}
+
 function tokenUsage(event) {
   const usage = event.usage ?? event.response?.usage ?? event.result?.usage ?? {};
   const aliases = {
     input_tokens: ["prompt_tokens", "input_tokens"],
     output_tokens: ["output_tokens", "completion_tokens"],
-    cache_read_input_tokens: ["cache_read_input_tokens", "cache_read_tokens"],
+    cache_read_input_tokens: [
+      "cache_read_input_tokens", "cache_read_tokens", "cached_input_tokens",
+      "input_tokens_details.cached_tokens", "prompt_tokens_details.cached_tokens",
+    ],
+    cache_write_tokens: [
+      "cache_write_tokens", "cache_write_input_tokens", "cache_creation_input_tokens",
+      "cache_creation_tokens", "input_tokens_details.cache_write_tokens",
+      "input_tokens_details.cache_creation_input_tokens",
+      "prompt_tokens_details.cache_write_tokens", "prompt_tokens_details.cache_creation_input_tokens",
+    ],
+    reasoning_tokens: [
+      "reasoning_tokens", "reasoning",
+      "completion_tokens_details.reasoning_tokens",
+      "output_tokens_details.reasoning_tokens",
+      "reasoning_details.reasoning_tokens",
+    ],
   };
   const result = {};
   for (const [target, names] of Object.entries(aliases)) {
     for (const source of [event, usage]) {
-      const value = names.map((name) => source?.[name]).find((item) => Number.isSafeInteger(item) && item >= 0);
+      const value = names.map((name) => metricValue(source, name)).find((item) => item !== undefined);
       if (value !== undefined) { result[target] = value; break; }
     }
-  }
-  if (result.cache_read_input_tokens === undefined) {
-    const value = usage.input_tokens_details?.cached_tokens ?? usage.prompt_tokens_details?.cached_tokens;
-    if (Number.isSafeInteger(value) && value >= 0) result.cache_read_input_tokens = value;
   }
   return result;
 }
