@@ -5,7 +5,8 @@ import { TokenProjects } from "../components/TokenProjects";
 import { ConsolidatedTokens } from "../components/ConsolidatedTokens";
 import type { UsageProjects } from "../project_usage";
 import type { UnifiedUsageProjection } from "../unified_usage";
-import { exportDesktopTokenReport, loadDesktopTokenReport, loadDesktopUnifiedUsage } from "../bridge";
+import type { CostProjection } from "../cost_projection";
+import { exportDesktopTokenReport, loadDesktopTokenReport, loadDesktopUnifiedUsage, loadDesktopCostProjection } from "../bridge";
 import { TOKEN_PERIODS, tokenErrorMessage, tokenExportErrorMessage, type TokenPeriod, type TokenQuery, type TokenUsageReport } from "../token_usage";
 
 export function TokensScreen({ initialRepoPath = "", projectPaths = [] }: { initialRepoPath?: string; projectPaths?: string[] }) {
@@ -23,6 +24,9 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [] }: { init
   const [unifiedProjection, setUnifiedProjection] = useState<UnifiedUsageProjection | null>(null);
   const [unifiedBusy, setUnifiedBusy] = useState(false);
   const [unifiedError, setUnifiedError] = useState<string | null>(null);
+  const [costProjection, setCostProjection] = useState<CostProjection | null>(null);
+  const [costBusy, setCostBusy] = useState(false);
+  const [costError, setCostError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -95,6 +99,21 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [] }: { init
       setUnifiedError(cause instanceof Error ? cause.message : "unified_usage_unavailable");
     } finally {
       setUnifiedBusy(false);
+    }
+  }
+
+  async function loadCostProjection() {
+    if (costBusy) return;
+    setCostBusy(true);
+    setCostProjection(null);
+    setCostError(null);
+    try {
+      const query = sessionId.trim() ? { session_id: sessionId.trim() } : {};
+      setCostProjection(await loadDesktopCostProjection(query));
+    } catch (cause) {
+      setCostError(cause instanceof Error ? cause.message : "cost_projection_unavailable");
+    } finally {
+      setCostBusy(false);
     }
   }
 
@@ -172,6 +191,19 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [] }: { init
           <p>Tokens registrados: {unifiedProjection.totals.total_tokens.toLocaleString("pt-BR")}; custo: {unifiedProjection.totals.cost_usd === null ? "indisponível" : `US$ ${unifiedProjection.totals.cost_usd.toFixed(6)}`}</p>
           <ul>{unifiedProjection.rows.slice(0, 10).map((row) => <li key={`${row.provider}:${row.model}:${row.host}:${row.session_id ?? "none"}`}>{row.provider} · {row.model} · {row.host} · {row.total_tokens.toLocaleString("pt-BR")} tokens · {row.provenance}</li>)}</ul>
           <code>{unifiedProjection.metadata.report_digest}</code>
+        </div>}
+      </section>
+      <section className="panel token-evidence" aria-label="Custo e economia">
+        <h2>Custo, economia e confiança</h2>
+        <p>Valores só são exibidos quando o Runtime fornece períodos, pricing e proveniência reconciliados.</p>
+        <button className="button button-secondary" type="button" disabled={costBusy || exporting} onClick={() => void loadCostProjection()}>
+          {costBusy ? "Consultando custo…" : "Consultar custo e economia"}
+        </button>
+        {costError && <p role="status">Relatório indisponível: <code>{costError}</code>. Nenhuma economia foi estimada no renderer.</p>}
+        {costProjection && <div className="token-cost-result">
+          <p>{costProjection.periods.length} período(s) · {costProjection.breakdown.length} agrupamento(s) · pricing: {costProjection.metadata.pricing.status} · cobertura: {costProjection.metadata.coverage.status}</p>
+          <p>Tokens reais: {costProjection.totals.actual_tokens === null ? "indisponível" : costProjection.totals.actual_tokens.toLocaleString("pt-BR")}; economia: {costProjection.totals.saved_tokens === null ? "indisponível" : costProjection.totals.saved_tokens.toLocaleString("pt-BR")}; custo economizado: {costProjection.totals.saved_cost_usd === null ? "indisponível" : `US$ ${costProjection.totals.saved_cost_usd.toFixed(6)}`}</p>
+          <p>Proveniência: {costProjection.breakdown.map((row) => row.provenance).filter((value, index, values) => values.indexOf(value) === index).join(", ") || "indisponível"} · digest <code>{costProjection.metadata.report_digest}</code></p>
         </div>}
       </section>
       <ContextSavings repoPath={repoPath} autoLoad={autoContext} />
