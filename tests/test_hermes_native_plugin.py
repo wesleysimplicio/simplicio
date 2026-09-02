@@ -153,19 +153,21 @@ def test_auth_errors_legacy_runtime_and_invalid_map_never_reach_provider(receipt
         receipt["context_packet"]["content_sha256"] = "0" * 64
     bridge.call = lambda *_: receipt
     request = {"messages": [{"role": "user", "content": "native work"}]}
-    assert context.middleware["llm_request"](
-        request=request, session_id="s", model="model", provider="p", cwd=str(ROOT),
-    ) is None
+    with pytest.raises(adapter.SimplicioHermesError, match="mandatory"):
+        context.middleware["llm_request"](
+            request=request, session_id="s", model="model", provider="p", cwd=str(ROOT),
+        )
     assert request["messages"][0]["content"] == "native work"
     assert not adapter._PREPARED
 
 
 def test_runtime_outage_does_not_block_requests_or_leak_raw_errors(caplog):
-    _, bridge, context = setup_plugin()
+    adapter, bridge, context = setup_plugin()
     bridge.failure = RuntimeError("secret-refresh-token")
-    assert context.middleware["llm_request"](
-        request={"messages": []}, session_id="s", model="model", cwd=str(ROOT),
-    ) is None
+    with pytest.raises(adapter.SimplicioHermesError, match="mandatory"):
+        context.middleware["llm_request"](
+            request={"messages": []}, session_id="s", model="model", cwd=str(ROOT),
+        )
     assert "secret-refresh-token" not in caplog.text
 
 

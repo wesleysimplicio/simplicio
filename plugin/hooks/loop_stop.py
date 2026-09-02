@@ -57,9 +57,8 @@ ORIENTATION_END = "<!-- SIMPLICIO-LLM-ORIENTATION:END -->"
 ORIENTATION_LABEL = "[simplicio-loop startup orientation]"
 # Core operate/survey pair — always required when the simplicio-loop skill is present.
 BOUND_OPERATORS = ("simplicio-mapper", "simplicio-dev-cli")
-# Adaptive: Runtime (simplicio) and Fast are required only when operational (or forced).
+# Adaptive: Runtime (simplicio) is required only when operational (or forced).
 RUNTIME_BINARY = "simplicio"
-FAST_BINARY = "simplicio-fast"
 WEB_EXTS = {".tsx", ".jsx", ".vue", ".svelte", ".html"}
 _TRUE = frozenset({"1", "true", "yes", "on", "strict", "full-stack", "required"})
 _FALSE = frozenset({"0", "false", "no", "off", "disabled", "standalone", "legacy"})
@@ -570,7 +569,7 @@ def required_bound_operators():
     Runtime (``simplicio``): when SIMPLICIO_LOOP_REQUIRE_RUNTIME=required, always;
     when auto (default), only if currently operational — then it is required so a
     mid-run disappearance cannot silently drop to standalone.
-    Fast: under strict mode, if currently operational it becomes required.
+    Fast is a project-consultation skill, never a lifecycle-hook dependency.
     """
     required = list(BOUND_OPERATORS)
     rt_mode = _env_flag("SIMPLICIO_LOOP_REQUIRE_RUNTIME", "off") or "off"
@@ -583,8 +582,6 @@ def required_bound_operators():
     runtime_ok = _binary_operational(RUNTIME_BINARY, ("--version",))
     if rt_mode == "required" or (rt_mode == "auto" and runtime_ok):
         required.append(RUNTIME_BINARY)
-    if _strict_loop_enabled() and _binary_operational(FAST_BINARY, ("--version",)):
-        required.append(FAST_BINARY)
     # de-dupe
     seen = set()
     ordered = []
@@ -626,10 +623,6 @@ def missing_bound_operators():
             if binary == RUNTIME_BINARY:
                 if not _binary_operational(RUNTIME_BINARY, ("--version",)):
                     missing.append(RUNTIME_BINARY)
-                continue
-            if binary == FAST_BINARY:
-                if not _binary_operational(FAST_BINARY, ("--version",)):
-                    missing.append(FAST_BINARY)
                 continue
             if shutil.which(binary) is None or not _binary_operational(binary, ("--version",)):
                 missing.append(binary)
@@ -1284,7 +1277,8 @@ def main():
 
         # (2b) Bound operators required (#83) — when this repo ships the simplicio-loop
         # companion skill, `simplicio-mapper`/`simplicio-dev-cli` are hard deps of the running
-        # loop, not just the installer. Runtime/Fast join the set when operational (or forced).
+        # loop, not just the installer. Runtime joins the set when operational (or forced);
+        # project retrieval accelerators are not lifecycle-hook dependencies.
         # A genuine BLOCK (handoff + stop), mirroring the cap gate, so a marketplace install /
         # PATH gap can never silently degrade to LLM hand-survey/hand-edit.
         missing_ops = missing_bound_operators()

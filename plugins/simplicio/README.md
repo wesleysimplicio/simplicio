@@ -20,9 +20,20 @@ surface, and ships the same governed Simplicio skills.
 
 The package does not pretend every product has the same plugin API. The
 machine-readable `host-surfaces.json` records the supported surface for all 32
-Runtime host contracts. Native pre-hooks remain Runtime-managed so they can be
-installed transactionally, preserve unrelated host configuration, and stay
-version-aligned with the running binary.
+Runtime host contracts. Claude Code owns its native Mapper-only hooks: each
+supported lifecycle event confirms or refreshes the current project map and
+reuses `.simplicio/hook-context/` for the same project generation. The Runtime
+still owns MCP bootstrap and authentication. Runtime mapping is preferred; if
+it fails, the hook invokes the installed `simplicio-mapper` Python project,
+then stores the resulting map in the same cache and receipt format. Both paths
+are Mapper-only, and the hook never starts Fast or another context pipeline.
+
+The Python fallback is resolved from `SIMPLICIO_MAPPER_BIN`, an optional
+`SIMPLICIO_MAPPER_ROOT` checkout, the `simplicio-mapper` executable on `PATH`,
+or an importable `simplicio_mapper` module. Hooks never install packages or
+access the network; provision it during setup with
+`python -m pip install --upgrade simplicio-mapper` when Runtime fallback is
+needed.
 
 ## Automatic Runtime bootstrap
 
@@ -73,9 +84,9 @@ Included skills:
 - `simplicio-setup`: verify bootstrap, authentication, repair, and explicit
   global host registration.
 - `simplicio-mapper`: survey repositories and produce bounded, revision-aware
-  context before implementation.
-- `simplicio-fast`: accelerate indexed, cache-aware, read-only retrieval while
-  preserving Mapper provenance and freshness checks.
+  context before implementation. Claude's hooks require this layer.
+- `simplicio-fast`: optional explicit project consultation over a compatible
+  Mapper snapshot; it is not wired into Claude lifecycle hooks.
 - `simplicio-dev-cli`: perform deterministic edits, tests, diagnostics, and
   evidence-backed validation through the Dev CLI contract.
 - `simplicio-loop`: orchestrate multi-step work with bounded stages, retries,

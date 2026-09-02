@@ -91,7 +91,7 @@ function tokenUsage(event) {
  * Runtime; it never switches a shared Runtime or invokes a model itself.
  */
 export function createHermesPlugin({ runtime, mode = RUNTIME_MODE, maxContextBytes } = {}) {
-  // Migrate old protection-mode settings without retaining provider blocking.
+  // Migrate old protection-mode settings, but keep Mapper preparation mandatory.
   if (![RUNTIME_MODE, "best_effort", "enforce"].includes(mode)) {
     throw new TypeError("Hermes supports only mapper-only Runtime");
   }
@@ -122,10 +122,10 @@ export function createHermesPlugin({ runtime, mode = RUNTIME_MODE, maxContextByt
     state.context_path_active = state.provider_path_active = state.usage_collector_active = false;
     state.provider_cache_status = "unknown";
     if ((runtimeBridge.runtime_mode ?? runtimeBridge.capabilities?.runtime_mode) !== RUNTIME_MODE) {
-      return failed(request, "runtime_mapper_only_required");
+      throw new HermesProtectionError("runtime_mapper_only_required");
     }
     if (typeof runtimeBridge.prepare_model_call !== "function") {
-      return failed(request, "runtime_prepare_unavailable");
+      throw new HermesProtectionError("runtime_prepare_unavailable");
     }
     const identity = {
       host: "hermes",
@@ -158,7 +158,8 @@ export function createHermesPlugin({ runtime, mode = RUNTIME_MODE, maxContextByt
         api_request_id: identity.api_request_id, provider_cache_status: "unknown",
       } };
     } catch (error) {
-      return failed(request, error instanceof HermesProtectionError ? error.reasonCode : "runtime_prepare_failed");
+      if (error instanceof HermesProtectionError) throw error;
+      throw new HermesProtectionError("runtime_prepare_failed");
     }
   }
 
