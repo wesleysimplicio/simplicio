@@ -14,6 +14,7 @@ import {
   applyDesktopHostPlugins,
   reconcileDesktopHostPlugins,
   dispatchDesktopBotAction,
+  pullDesktopUsageChangefeed,
 } from "./bridge";
 import { Shell, type View } from "./components/Shell";
 import { AccessGate, LoadingScreen, RuntimeInstallScreen, SignInScreen, type RuntimeInstallPhase } from "./screens/AccessScreens";
@@ -39,6 +40,7 @@ import "./runtime_panels.css";
 import type { HostPluginOperationResult } from "./integration_setup";
 import type { RuntimeInstallResult } from "./runtime_install";
 import { runtimeIsValid } from "./setup_flow";
+import { createDesktopUsageStore, createUsageChangefeedSupervisor } from "./usage_store";
 
 function initialView(fallback: View): View {
   if (typeof window === "undefined") return "home";
@@ -70,6 +72,29 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
   const [storageError, setStorageError] = useState<string | null>(null);
   const tokenRepo = route.tokenRepo;
   const actionLock = useRef(false);
+  const [usageStore] = useState(createDesktopUsageStore);
+  const [usage, setUsage] = useState(() => usageStore.getState());
+
+  useEffect(() => usageStore.subscribe(setUsage), [usageStore]);
+
+  useEffect(() => {
+    if (
+      !snapshot ||
+      snapshot.access.state !== "active" ||
+      typeof window === "undefined" ||
+      !("__TAURI_INTERNALS__" in window)
+    ) return;
+    const supervisor = createUsageChangefeedSupervisor(pullDesktopUsageChangefeed, {
+      pollIntervalMs: 5_000,
+      initialBackoffMs: 250,
+      maxBackoffMs: 8_000,
+      maxQueue: 64,
+      onState: (next) => usageStore.replaceChangefeed(next),
+    });
+    supervisor.start();
+    return () => { void supervisor.stop(); };
+  }, [snapshot?.access.state, usageStore]);
+
 
   function setView(next: View, restoreRoute?: NavigationEntry) {
     setHistory((current) => navigate(current, viewNavigationEntry(current.entries[current.index], next, restoreRoute)));
@@ -410,7 +435,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       onRefresh={refresh} busy={action !== null}>
       {actionError && <div className="desktop-action-error" role="alert">{actionError}</div>}
       {storageError && <div className="desktop-action-error" role="alert">{storageError}</div>}
-      {(view === "home" || view === "project") && <WorkbenchHome key={selectedProject?.id ?? "home"} snapshot={snapshot}
+      {(view === "home" || view === "project") && <WorkbenchHome key={selectedProject?.id ?? "home"} snapshot={snapshot} usage={usage}
         project={view === "project" ? selectedProject : undefined} onAddProject={() => setShowProjectDialog(true)}
         onViewChange={setView} onTokens={projectTokens} onRemoveProject={() => {
           saveWorkbench({ ...workbench, projects: workbench.projects.filter((item) => item.id !== selectedProject?.id), selectedProjectId: null });
@@ -437,12 +462,12 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
         />
       )}
       {view === "memory" && <MemoryScreen snapshot={snapshot} />}
-      {view === "tokens" && <TokensScreen key={tokenRepo} initialRepoPath={tokenRepo} projectPaths={workbench.projects.map(project => project.path)} />}
+      {view === "tokens" && <TokensScreen key={tokenRepo} initialRepoPath={tokenRepo} projectPaths={workbench.projects.map(project => project.path)} usage={usage} />}
       {(view === "settings" || view === "diagnostics") && (
         <SettingsScreen section={view === "diagnostics" ? "diagnostics" : "account"} snapshot={snapshot} busy={action !== null} onRefresh={refresh} onSubscribe={subscribe} onLogout={logout} logoutBusy={action === "logout"} />
       )}
       {(view === "general" || view === "shortcuts" || view === "models") && <PreferencesScreen view={view} snapshot={snapshot} preferences={workbench.preferences} onPreferences={(preferences) => saveWorkbench({ ...workbench, preferences })} onProviders={() => setView("agents")} />}
-      {view === "activity" && <ActivityScreen snapshot={snapshot} />}
+      {view === "activity" && <ActivityScreen snapshot={snapshot} usage={usage} />}
       {isReferenceSettingsView(view) && <ReferenceSettingsScreen key={view} view={view} snapshot={snapshot} onNavigate={setView} onRefresh={refresh} busy={action !== null} />}
       {showProjectDialog && <ProjectDialog onClose={() => setShowProjectDialog(false)} onAdd={addProject} />}
     </Shell>

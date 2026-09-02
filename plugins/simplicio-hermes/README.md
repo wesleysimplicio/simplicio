@@ -17,8 +17,8 @@ prompt, response bodies and secrets are never copied.
 
 ## Python fallback contract
 
-The Python fallback is resolved only from `SIMPLICIO_MAPPER_BIN`,
-`SIMPLICIO_MAPPER_ROOT`, or an installer-managed Mapper manifest. Before a map
+The Python fallback is resolved only from an explicitly configured executable
+or an installer-managed Mapper manifest. Before a map
 is used, the adapter executes `version --json` and validates producer, version,
 protocol, schema, capabilities, digest and an explicit minimum/maximum
 compatibility range. An incompatible or unverifiable Mapper fails closed; the

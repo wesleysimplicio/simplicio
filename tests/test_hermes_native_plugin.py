@@ -262,7 +262,7 @@ def test_pre_hook_maps_but_middleware_avoids_duplicate_spilled_context():
 
 
 def test_session_start_warms_authenticated_mapper_without_waiting():
-    _, bridge, context = setup_plugin()
+    adapter, bridge, context = setup_plugin()
     entered, release = threading.Event(), threading.Event()
 
     def slow_call(*args):

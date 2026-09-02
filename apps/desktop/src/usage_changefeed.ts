@@ -1,4 +1,5 @@
 import { parseUnifiedUsageProjection, type UnifiedUsageProjection } from "./unified_usage";
+import { parseCostProjection, type CostProjection } from "./cost_projection";
 
 export const USAGE_CHANGEFEED_SCHEMA = "simplicio.desktop-usage-changefeed/v1";
 export const MAX_CHANGEFEED_EVENT_IDS = 128;
@@ -14,6 +15,7 @@ export interface UsageChangefeedEvent {
   kind: UsageChangefeedKind;
   generated_at_epoch: number;
   projection: unknown;
+  cost_projection?: unknown;
 }
 
 export interface UsageChangefeedCursor {
@@ -26,6 +28,7 @@ export interface UsageChangefeedState {
   connection: UsageChangefeedConnection;
   cursor: UsageChangefeedCursor;
   projection: UnifiedUsageProjection | null;
+  cost_projection: CostProjection | null;
   last_event_at_epoch: number | null;
   reason_code: string;
 }
@@ -68,6 +71,7 @@ function parseEvent(value: unknown): UsageChangefeedEvent {
     kind: kind as UsageChangefeedKind,
     generated_at_epoch: integer(raw.generated_at_epoch),
     projection: raw.projection,
+    ...(raw.cost_projection === undefined ? {} : { cost_projection: raw.cost_projection }),
   };
 }
 
@@ -76,6 +80,7 @@ export function createUsageChangefeedState(): UsageChangefeedState {
     connection: "offline",
     cursor: { sequence: 0, revision: 0, event_ids: [] },
     projection: null,
+    cost_projection: null,
     last_event_at_epoch: null,
     reason_code: "usage_changefeed_unavailable",
   };
@@ -105,11 +110,15 @@ export function applyUsageChangefeedEvent(
   }
 
   const projection = parseUnifiedUsageProjection(event.projection);
+  const cost_projection = event.cost_projection === undefined
+    ? state.cost_projection
+    : parseCostProjection(event.cost_projection);
   const cursor = remember({ ...state.cursor, sequence: event.sequence, revision: event.revision }, event.event_id);
   return {
     connection: "live",
     cursor,
     projection,
+    cost_projection,
     last_event_at_epoch: event.generated_at_epoch,
     reason_code: event.kind === "delta" ? "usage_changefeed_delta_applied" : "usage_changefeed_snapshot_applied",
   };
