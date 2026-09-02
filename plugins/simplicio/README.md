@@ -24,16 +24,12 @@ Runtime host contracts. Claude Code owns its native Mapper-only hooks: each
 supported lifecycle event confirms or refreshes the current project map and
 reuses `.simplicio/hook-context/` for the same project generation. The Runtime
 still owns MCP bootstrap and authentication. Runtime mapping is preferred; if
-it fails, the hook invokes the installed `simplicio-mapper` Python project,
-then stores the resulting map in the same cache and receipt format. Both paths
-are Mapper-only, and the hook never starts Fast or another context pipeline.
-
-The Python fallback is resolved from `SIMPLICIO_MAPPER_BIN`, an optional
-`SIMPLICIO_MAPPER_ROOT` checkout, the `simplicio-mapper` executable on `PATH`,
-or an importable `simplicio_mapper` module. Hooks never install packages or
-access the network; provision it during setup with
-`python -m pip install --upgrade simplicio-mapper` when Runtime fallback is
-needed.
+it fails, the hook uses the bundled Mapper fallback already maintained inside
+the Simplicio-managed `.simplicio` state, then stores the resulting map in the
+same cache and receipt format. Both paths are Mapper-only, and the hook never
+starts Fast or another context pipeline. Hooks do not download or install
+packages during a lifecycle event. If both Mapper paths fail, the host request
+is denied instead of continuing without a verified map.
 
 ## Automatic Runtime bootstrap
 

@@ -22,7 +22,7 @@ from typing import Any
 LOGGER = logging.getLogger(__name__)
 _PROTOCOL_VERSION = "2024-11-05"
 _DEFAULT_TIMEOUT_SECONDS = 20.0
-_VERSION = "0.3.0"
+_VERSION = "0.3.1"
 RUNTIME_MODE = "mapper-only"
 _PYTHON_MAPPER_ENV = "SIMPLICIO_MAPPER_BIN"
 _PYTHON_MAPPER_ROOT_ENV = "SIMPLICIO_MAPPER_ROOT"
@@ -59,7 +59,7 @@ def _find_runtime() -> Path:
 
 
 def _find_python_mapper() -> tuple[list[str], dict[str, str]]:
-    """Resolve an already-provisioned simplicio-mapper Python fallback."""
+    """Resolve the already-maintained bundled Mapper fallback."""
     configured = os.environ.get(_PYTHON_MAPPER_ENV)
     if configured:
         configured_path = Path(configured).expanduser()
@@ -84,10 +84,7 @@ def _find_python_mapper() -> tuple[list[str], dict[str, str]]:
         return [executable], os.environ.copy()
     if importlib.util.find_spec("simplicio_mapper") is not None:
         return [sys.executable, "-B", "-m", "simplicio_mapper.cli"], os.environ.copy()
-    raise SimplicioHermesError(
-        "Python simplicio-mapper fallback was not found; install it or set "
-        "SIMPLICIO_MAPPER_BIN/SIMPLICIO_MAPPER_ROOT"
-    )
+    raise SimplicioHermesError("Bundled Mapper fallback was not found")
 
 
 def _project_generation(root: Path) -> str:
@@ -147,16 +144,16 @@ def _python_mapper_receipt(arguments: dict[str, Any]) -> dict[str, Any]:
         text=True, timeout=_DEFAULT_TIMEOUT_SECONDS, check=False, env=environment,
     )
     if result.returncode != 0:
-        raise SimplicioHermesError("Python simplicio-mapper failed to map the project")
+        raise SimplicioHermesError("Bundled Mapper fallback failed to map the project")
     docs = root / ".simplicio" / "docs" / "architecture.md"
     if docs.is_file() and docs.stat().st_size:
-        content = "# Simplicio Mapper (Python fallback)\n\n" + docs.read_text(encoding="utf-8")
+        content = "# Simplicio Mapper fallback\n\n" + docs.read_text(encoding="utf-8")
     else:
         project_map = root / ".simplicio" / "project-map.json"
         if not project_map.is_file() or not project_map.stat().st_size:
-            raise SimplicioHermesError("Python Mapper produced no project map")
+            raise SimplicioHermesError("Bundled Mapper fallback produced no project map")
         payload = json.loads(project_map.read_text(encoding="utf-8"))
-        content = "# Simplicio Mapper (Python fallback)\n\n```json\n" + json.dumps(
+        content = "# Simplicio Mapper fallback\n\n```json\n" + json.dumps(
             payload, ensure_ascii=False, indent=2, sort_keys=True
         ) + "\n```\n"
     _write_atomic(map_path, content)
@@ -395,7 +392,7 @@ def _prepare(arguments: dict[str, Any]) -> tuple[dict[str, Any], str]:
             return receipt, _mapper_context(receipt)
         except Exception as python_error:
             raise SimplicioHermesError(
-                "Runtime Mapper failed and Python simplicio-mapper fallback was unavailable"
+                "Runtime Mapper failed and the bundled Mapper fallback was unavailable"
             ) from python_error
 
 

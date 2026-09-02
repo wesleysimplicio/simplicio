@@ -204,7 +204,7 @@ export function createHermesPlugin({ runtime, mode = RUNTIME_MODE, maxContextByt
   };
 
   return Object.freeze({
-    name: "simplicio-hermes", version: "0.3.0", mode: RUNTIME_MODE,
+    name: "simplicio-hermes", version: "0.3.1", mode: RUNTIME_MODE,
     hooks, status, prepare_model_call, record_model_result,
   });
 }

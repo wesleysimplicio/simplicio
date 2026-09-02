@@ -5,11 +5,11 @@ Code marketplaces, the portable Agent Plugins v1 contract, and a Gemini CLI
 extension. Hosts without a verified plugin API use the Runtime-owned MCP/config
 integration instead of an invented plugin format.
 
-The official `install.sh` and `install.ps1` detect installed hosts and install
-every compatible published package automatically. Claude Code, GitHub Copilot
-CLI, and Qwen Code receive all five marketplace plugins; Codex and Gemini
-receive their native package; Cursor and Kiro receive the portable Agent Plugin;
-and Hermes receives and enables the native `simplicio-hermes` plugin.
+The official `install.sh` and `install.ps1` install the verified Runtime and
+register only the host surfaces supported by that Runtime. Marketplace plugin
+updates remain an explicit host action: Claude Code, Codex, Gemini, Cursor,
+Copilot, Qwen, Kiro, and Hermes are never mutated by a shell installer without
+their own host update/consent flow.
 
 ## Install in Codex
 
@@ -65,16 +65,24 @@ The main `simplicio` package bootstraps the verified Runtime automatically and
 installs mandatory Mapper-only Claude hooks. The hooks keep the project map in
 `.simplicio/hook-context/`, reuse it while the project generation is unchanged,
 and refresh it after a visible project change. They call the Runtime map
-operation first and use the installed `simplicio-mapper` Python project as a
-Mapper-only fallback if Runtime mapping fails. Fast and other context
-accelerators are not lifecycle dependencies. To provision the fallback ahead
-of time, use `python -m pip install --upgrade simplicio-mapper` or point the
-hook at a checkout with `SIMPLICIO_MAPPER_ROOT`.
+operation first and use the bundled Mapper fallback already maintained inside
+the Simplicio-managed `.simplicio` state if Runtime mapping fails. Fast and
+other context accelerators are consultation-only; they are not lifecycle
+dependencies. Hooks never download, install, or expose a second context
+pipeline. If both Mapper paths fail, the host request is denied.
 
 The separate `simplicio-loop`, `simplicio-prompt`, `simplicio-sprint`, and
 `simplicio-hermes` packages remain available for explicit workflows and their
 respective hosts. Install `simplicio-loop` only when the Loop orchestration
 surface is intentionally needed.
+
+### Updating an existing installation
+
+Update the Simplicio Runtime with the normal installer, refresh the Claude
+marketplace entry and update/reinstall `simplicio`, or reinstall Hermes with
+`--force --enable`. Start a new host session after the update. Existing
+`.simplicio` data is preserved; each Claude/Hermes lifecycle event then
+revalidates the project generation and refreshes or reuses the Mapper cache.
 
 ## Published components
 

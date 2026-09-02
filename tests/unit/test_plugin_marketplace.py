@@ -89,7 +89,34 @@ def test_simplicio_plugin_manifests_share_one_version() -> None:
         _load_json("plugins/simplicio/gemini-extension.json"),
     ]
 
-    assert {manifest["version"] for manifest in manifests} == {"0.2.5"}
+    assert {manifest["version"] for manifest in manifests} == {"0.2.6"}
+
+
+def test_hermes_plugin_manifests_share_one_version() -> None:
+    manifests = [
+        _load_json("plugins/simplicio-hermes/.claude-plugin/plugin.json"),
+        _load_json("plugins/simplicio-hermes/manifest.json"),
+        _load_json("plugins/simplicio-hermes/package.json"),
+    ]
+
+    assert {manifest["version"] for manifest in manifests} == {"0.3.1"}
+
+
+def test_public_install_docs_do_not_expose_fallback_provisioning() -> None:
+    public_docs = [
+        ROOT / "README.md",
+        ROOT / "INSTALL.md",
+        ROOT / "PLUGIN.md",
+        ROOT / "plugins/simplicio/README.md",
+        ROOT / "plugins/simplicio-hermes/README.md",
+    ]
+
+    for path in public_docs:
+        text = path.read_text(encoding="utf-8").lower()
+        assert "pip install --upgrade simplicio-mapper" not in text
+        assert "simplicio_mapper" not in text
+        assert "simplicio_mapper_bin" not in text
+        assert "simplicio_mapper_root" not in text
 
 
 def test_host_surface_registry_is_complete_and_honest() -> None:

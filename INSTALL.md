@@ -54,6 +54,14 @@ that plan after explicit user consent. The installers never invoke Codex, Claude
 Gemini, Copilot, Qwen, Hermes, Cursor or Kiro plugin commands, and never fetch a
 mutable source-branch archive for plugin installation.
 
+To update an existing host integration, first update the verified Runtime with
+the normal installer, then refresh/reinstall the host plugin through its own
+official update flow and restart the host. For Hermes, reinstall
+`simplicio-hermes` with `--force --enable`. Existing `.simplicio` data is
+preserved; the next lifecycle event revalidates the project generation and
+refreshes or reuses the Mapper cache. Do not treat a Runtime update alone as a
+host-plugin update.
+
 The durable receipt is written atomically to
 `~/.simplicio/install-receipt.json` (or the configured
 `SIMPLICIO_BUNDLE_DIR`). An exit code `1` after a possible effect records

@@ -280,6 +280,19 @@ Registration does not require an active Google session. Authentication is still
 validated when an MCP session uses protected Runtime capabilities. Restart each
 open client after installation so it reloads its MCP server and hook files.
 
+### Agent contract: Mapper first
+
+Every agent integration must map the project before planning, reading broadly,
+editing, provider access, or completion. Claude and Hermes use Mapper-only
+hooks and reuse the verified map in `.simplicio/hook-context/`; the map is
+refreshed when the project generation changes. Runtime mapping is preferred,
+with the bundled fallback already maintained by the Simplicio installation if
+native mapping is unavailable. If neither path produces a verified map, the
+request is blocked. Fast and other context accelerators remain explicit
+consultation tools and are never lifecycle-hook dependencies.
+
+The complete operating rules for agents are in [`AGENTS.md`](AGENTS.md).
+
 MCP clients launch `command` directly, so do not use `~` and do not expect
 shell expansion. The generated registration uses the following local STDIO MCP
 shape for the current operating system.
@@ -400,6 +413,7 @@ This public repository also publishes the Simplicio Claude Code marketplace:
 
 ```text
 /plugin marketplace add wesleysimplicio/simplicio
+/plugin install simplicio@simplicio
 /plugin install simplicio-loop@simplicio
 /plugin install simplicio-prompt@simplicio
 /plugin install simplicio-sprint@simplicio
