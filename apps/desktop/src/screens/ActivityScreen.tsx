@@ -6,15 +6,15 @@ import { createActivityProjection } from "../activity_projection";
 
 type StatusFilter = "all" | ActivityItem["status"];
 
-export function redactedActivity(items: ActivityItem[]) {
+export function redactedActivity(items: ActivityItem[], savingsProven = false) {
   return items.map(({ id, title, provider, savedTokens, occurredAt, status }) => ({
-    id, title, provider, savedTokens, occurredAt, status,
+    id, title, provider, savedTokens: savingsProven ? savedTokens : null, occurredAt, status,
   }));
 }
 
-function downloadActivity(items: ActivityItem[]) {
+function downloadActivity(items: ActivityItem[], savingsProven: boolean) {
   if (typeof document === "undefined") return;
-  const payload = JSON.stringify({ schema: "simplicio.activity-export/v1", items: redactedActivity(items) }, null, 2);
+  const payload = JSON.stringify({ schema: "simplicio.activity-export/v1", items: redactedActivity(items, savingsProven) }, null, 2);
   const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
   const link = document.createElement("a");
   link.href = url;
@@ -29,6 +29,7 @@ function statusLabel(status: ActivityItem["status"]): string {
 
 export function ActivityScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
   const projection = createActivityProjection(snapshot);
+  const savingsProven = snapshot.savings.proofKind === "measured" || snapshot.savings.proofKind === "replayed" || snapshot.savings.proofKind === "mixed";
   const [status, setStatus] = useState<StatusFilter>("all");
   const [provider, setProvider] = useState("all");
   const [page, setPage] = useState(0);
@@ -50,7 +51,7 @@ export function ActivityScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
     try {
       const path = await exportDesktopSnapshot("activity", { status, provider });
       if (path) setExported(path);
-      else downloadActivity(filtered);
+      else downloadActivity(filtered, savingsProven);
     } catch { setExportError("Não foi possível salvar os recibos em Downloads. Verifique as permissões e o espaço em disco."); }
     finally { exportLock.current = false; setExporting(false); }
   }
@@ -61,7 +62,7 @@ export function ActivityScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
         <div>
           <span className="eyebrow">Recibos</span>
           <h1>Atividade</h1>
-          <p>Execuções, cache e economia com evidência limitada ao snapshot.</p>
+          <p>Execuções, cache e economia com evidência limitada ao snapshot.</p>\n          <p className="token-proof-note">Economia: <code>{snapshot.savings.proofKind}</code>{!savingsProven && " · indisponível neste recorte"}</p>
         </div>
         <button className="button button-secondary" type="button" disabled={exporting} onClick={() => void exportReceipts()}>{exporting ? "Exportando…" : "Exportar recibos"}</button>
       </section>
@@ -88,7 +89,7 @@ export function ActivityScreen({ snapshot }: { snapshot: DesktopSnapshot }) {
             <article className="activity-page-row" key={item.id}>
               <div className={`activity-status ${item.status === "attention" ? "attention" : ""}`}><Glyph name="activity" size={15} /></div>
               <div className="activity-copy"><strong>{item.title}</strong><p>{item.detail}</p><span>{item.provider} · {new Date(item.occurredAt).toLocaleString("pt-BR")}</span></div>
-              <div className="activity-saving"><strong>−{item.savedTokens.toLocaleString("pt-BR")}</strong><span>tokens</span></div>
+              <div className={`activity-saving${savingsProven ? "" : " muted"}`}><strong>{savingsProven ? `−${item.savedTokens.toLocaleString("pt-BR")}` : "—"}</strong><span>{savingsProven ? "tokens" : "sem evidência"}</span></div>
             </article>
           ))}
         </div>
