@@ -1,55 +1,34 @@
 # Simplicio Hermes Mapper-only adapter
 
-The Hermes plugin uses Simplicio only for authenticated repository mapping and
-provider usage receipts. Mapper preparation is mandatory before a provider
-request; native Hermes tools, terminal, edits, tests, approvals, model
-selection and execution remain owned by Hermes and each project.
+Version 0.4.0 keeps the adapter thin: Hermes owns provider execution and
+Simplicio owns authenticated Mapper context plus redacted usage receipts.
 
-The Python adapter starts its own stdio Runtime with
-`SIMPLICIO_RUNTIME_MODE=mapper-only`. It verifies that initialization and the
-MCP tool catalogue confirm Mapper-only before calling a tool. Global settings,
-project settings, Codex and any shared HTTP Runtime remain unchanged. An older
-Runtime without Mapper-only support is declined; Hermes continues natively.
+## Request identity and receipts
 
-## Mapping and prompt caching
+Hermes 0.20.4+ request, session, turn, logical-request and attempt IDs are
+forwarded byte-for-byte when the host supplies them. Missing values are marked
+`synthetic`; synthetic identities never prove provider-path coverage. Warmup is
+tagged separately and never enters the provider-result candidate set.
 
-`on_session_start` starts a background map warmup. `pre_llm_call` prepares the
-full native Mapper artifacts using Runtime authentication. If the Runtime
-preparation fails, the plugin invokes the bundled Mapper fallback already
-maintained inside the Simplicio-managed `.simplicio` state and converts its
-durable map into the same protected context shape.
-On Hermes versions
-with `register_middleware`, the `llm_request` middleware checks authentication
-and repository generation before every provider request and inserts the entire
-verified map into the provider's existing messages, system or instructions
-shape. This uses Hermes' supported middleware rather than changing its global
-hook output-spill limits.
+Zero candidates, ambiguous candidates, duplicate hooks and duplicate provider
+IDs produce bounded `simplicio.hermes-correlation-receipt/v1` diagnostics rather
+than silent returns. Those receipts contain identifiers and reason codes only;
+prompt, response bodies and secrets are never copied.
 
-The map bytes are stable across session, turn and request IDs. They contain no
-per-request timestamps or local cache-hit flags. The adapter does not silently
-truncate the map or replace it with a receipt handle. Runtime's normal source
-selection limits and ignores still apply. Provider/model/tools, streaming,
-sampling and existing cache settings are preserved.
+## Python fallback contract
 
-Older Hermes versions retain the context-only pre-hook fallback. Their own hook
-output limits may spill large maps; use a Hermes version with request middleware
-for complete provider delivery. The plugin never disables host safeguards to
-work around an older host.
+The Python fallback is resolved only from `SIMPLICIO_MAPPER_BIN`,
+`SIMPLICIO_MAPPER_ROOT`, or an installer-managed Mapper manifest. Before a map
+is used, the adapter executes `version --json` and validates producer, version,
+protocol, schema, capabilities, digest and an explicit minimum/maximum
+compatibility range. An incompatible or unverifiable Mapper fails closed; the
+hook never installs, downloads, or invokes a model.
 
-A stable prefix makes provider prompt caching possible; a local Mapper cache
-hit does not prove an LLM cache hit. `post_api_request` records actual host
-usage/cache counters against the matching API request. Missing counters remain
-unknown. No synthetic model request or paid warmup is performed.
-
-## Login and availability
-
-Mapper requires login. Runtime owns the saved session and subscription-period
-verification; the plugin neither copies credentials nor opens login repeatedly.
-Missing login, confirmed inactive subscription, timeout, offline Runtime,
-unsupported Runtime or an invalid map invokes the bundled Mapper fallback when
-it is available; if both Mapper paths fail, the provider request is blocked. It
-must not silently bypass Mapper. The plugin registers no native
-tool gate, edit wrapper, execution middleware, Loop or Fast integration.
+Fallback receipts use `producer=simplicio-mapper` and `backend=python`, include
+version/digest/resolution source, and never claim native provenance. The map
+cache generation hashes effective project file bytes (excluding `.git` and
+`.simplicio`), so changing content while preserving `git status` invalidates a
+stale map.
 
 ## Install and validate
 
@@ -58,20 +37,7 @@ hermes plugins install wesleysimplicio/simplicio/plugins/simplicio-hermes --forc
 hermes plugins doctor simplicio-hermes --ci
 ```
 
-The fallback is maintained by the Simplicio installation. Hooks do not install
-packages or access the network.
-
-Use a Runtime build that advertises Mapper-only and restart Hermes after the
-plugin update. A source merge alone does not update the installed binary.
-
-The JavaScript embedder adapter in `index.mjs` follows the same Mapper-only
-policy. Its supplied bridge must expose `runtime_mode: "mapper-only"` from a
-verified Runtime handshake and implement the prepare/record methods. A failed
-Mapper preparation raises a typed error and cannot silently send an un-mapped
-provider request.
-Legacy `best_effort` and `enforce` constructor options migrate to Mapper-only;
-they do not retain provider blocking. An explicit `maxContextBytes` budget may
-omit an oversized map, but never truncate it or block native work.
-
-Run `python3 -m pytest tests/test_hermes_native_plugin.py` at the repository root
-and `npm test --prefix plugins/simplicio-hermes` for the two adapters.
+Run `python3 -m pytest tests/test_hermes_native_plugin.py` and
+`npm test --prefix plugins/simplicio-hermes`. A source merge does not update an
+already installed plugin or Runtime. Official Hermes checkout and clean-profile
+tests remain required release evidence when the host checkout is available.
