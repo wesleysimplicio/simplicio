@@ -9,6 +9,8 @@ import {
   logoutDesktop,
   openDesktopSubscription,
   refreshDesktopSnapshot,
+  reconcileDesktopRuntimeInstall,
+  loadDesktopRuntimeInstallStatus,
   applyDesktopHostPlugins,
   reconcileDesktopHostPlugins,
   dispatchDesktopBotAction,
@@ -53,6 +55,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
   const [actionError, setActionError] = useState<string | null>(null);
   const [runtimeInstallPhase, setRuntimeInstallPhase] = useState<RuntimeInstallPhase>("idle");
   const [runtimeInstallReceipt, setRuntimeInstallReceipt] = useState<RuntimeInstallResult | undefined>();
+  const [runtimeInstallRecovery, setRuntimeInstallRecovery] = useState(false);
   const [applicationRecovery, setApplicationRecovery] = useState<InstallFailureRecovery | undefined>();
   const [workbench, setWorkbench] = useState(loadWorkbench);
   const [history, setHistory] = useState<NavigationState>(() => ({ entries: [{
@@ -111,8 +114,18 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
   useEffect(() => {
     if (initialSnapshot) return;
     let current = true;
-    loadDesktopSnapshot()
+    loadDesktopRuntimeInstallStatus()
+      .then((status) => {
+        if (!current) return null;
+        if (status.status === "pending") {
+          setRuntimeInstallRecovery(true);
+          setLoadFailed(true);
+          return null;
+        }
+        return loadDesktopSnapshot();
+      })
       .then((next) => {
+        if (!next) return;
         if (current) {
           setSnapshot(next);
           setBotCenter(next.botCenter);
@@ -122,6 +135,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
         if (current) {
           setLoadFailed(true);
           const code = typeof error === "string" ? error : error instanceof Error ? error.message : "";
+          setRuntimeInstallRecovery(code === "runtime_install_reconciliation_required");
           setActionError(code === "runtime_install_required" ? null : runtimeFailureMessage(error, "query"));
         }
       });
@@ -155,6 +169,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
     actionLock.current = true;
     setAction("install");
     setActionError(null);
+    setRuntimeInstallRecovery(false);
     setRuntimeInstallReceipt(undefined);
     setRuntimeInstallPhase("installing");
     let receipt: RuntimeInstallResult | undefined;
@@ -177,6 +192,40 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       if (receipt) setRuntimeInstallReceipt(receipt);
       setLoadFailed(true);
       setRuntimeInstallPhase("failed");
+      const code = typeof error === "string" ? error : error instanceof Error ? error.message : "";
+      setRuntimeInstallRecovery(code === "runtime_install_reconciliation_required");
+      setActionError(runtimeFailureMessage(error, "install"));
+    } finally {
+      setAction(null);
+      actionLock.current = false;
+    }
+  }
+
+  async function reconcileRuntimeInstall() {
+    if (actionLock.current) return;
+    actionLock.current = true;
+    setAction("install");
+    setRuntimeInstallPhase("validating");
+    setActionError(null);
+    try {
+      const result = await reconcileDesktopRuntimeInstall();
+      if (result.current) {
+        const next = await refreshDesktopSnapshot();
+        if (!runtimeIsValid(next)) throw new Error("runtime_install_snapshot_invalid");
+        setSnapshot(next);
+        setBotCenter(next.botCenter);
+        setRuntimeInstallRecovery(false);
+        setRuntimeInstallPhase("idle");
+        setLoadFailed(false);
+        setView("home");
+      } else {
+        setRuntimeInstallRecovery(false);
+        setRuntimeInstallPhase("failed");
+        setActionError("O estado foi reconciliado, mas o Runtime ainda não está instalado.");
+      }
+    } catch (error) {
+      setRuntimeInstallPhase("failed");
+      setRuntimeInstallRecovery(true);
       setActionError(runtimeFailureMessage(error, "install"));
     } finally {
       setAction(null);
@@ -317,6 +366,8 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       receipt={runtimeInstallReceipt}
       error={actionError}
       onInstall={installRuntime}
+      reconciliationRequired={runtimeInstallRecovery}
+      onReconcile={reconcileRuntimeInstall}
     />;
   }
 
