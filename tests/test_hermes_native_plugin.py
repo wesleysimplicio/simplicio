@@ -223,13 +223,19 @@ def test_post_api_records_real_cache_usage_and_correlates_concurrent_requests():
     context.hooks["post_api_request"](
         session_id="s", turn_id="t", api_request_id="a", model="model", provider="p",
         response={"body": {"id": "provider-a"}},
-        usage={"input_tokens": 100, "output_tokens": 5, "cache_read_tokens": 80},
+        usage={
+            "input_tokens": 100, "output_tokens": 5, "cache_read_tokens": 80,
+            "cache_creation_input_tokens": 7,
+            "completion_tokens_details": {"reasoning_tokens": 3},
+        },
     )
     tool, args = bridge.calls[-1]
     assert tool == "simplicio_record_model_result"
     assert args["api_request_id"] == "a"
     assert args["provider_request_id"] == "provider-a"
     assert args["cache_read_input_tokens"] == 80
+    assert args["cache_write_tokens"] == 7
+    assert args["reasoning_tokens"] == 3
     assert args["input_tokens"] == 100 and args["output_tokens"] == 5
     assert "complete_map_tail" not in json.dumps(args)
     assert len(adapter._PREPARED) == 1
@@ -352,8 +358,12 @@ def test_canonical_hermes_usage_keeps_total_prompt_and_cache_buckets():
     adapter = load_adapter()
     assert adapter._token_usage({"usage": {
         "input_tokens": 20, "prompt_tokens": 100, "output_tokens": 4,
-        "cache_read_tokens": 80,
-    }}) == {"input_tokens": 100, "output_tokens": 4, "cache_read_input_tokens": 80}
+        "cache_read_tokens": 80, "cache_creation_input_tokens": 7,
+        "completion_tokens_details": {"reasoning_tokens": 3},
+    }}) == {
+        "input_tokens": 100, "output_tokens": 4, "cache_read_input_tokens": 80,
+        "cache_write_tokens": 7, "reasoning_tokens": 3,
+    }
     assert adapter._token_usage({"usage": {"input_tokens_details": {"cached_tokens": 0}}}) == {
         "cache_read_input_tokens": 0,
     }
