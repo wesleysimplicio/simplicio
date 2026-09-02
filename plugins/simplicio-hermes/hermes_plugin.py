@@ -474,34 +474,53 @@ def _llm_request(request: dict[str, Any], session_id: str = "", model: str = "",
         raise SimplicioHermesError("Mapper preparation is mandatory") from error
 
 
+def _metric_value(source: dict[str, Any], path: str) -> int | None:
+    value: Any = source
+    for part in path.split("."):
+        if not isinstance(value, dict):
+            return None
+        value = value.get(part)
+    if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+        return value
+    return None
+
+
 def _token_usage(event: dict[str, Any]) -> dict[str, int]:
     usage = event.get("usage")
     if not isinstance(usage, dict):
         usage = {}
-    result = {}
+    result: dict[str, int] = {}
     aliases = {
         "input_tokens": ("prompt_tokens", "input_tokens"),
         "output_tokens": ("output_tokens", "completion_tokens"),
-        "cache_read_input_tokens": ("cache_read_input_tokens", "cache_read_tokens"),
+        "cache_read_input_tokens": (
+            "cache_read_input_tokens", "cache_read_tokens", "cached_input_tokens",
+            "input_tokens_details.cached_tokens", "prompt_tokens_details.cached_tokens",
+        ),
+        "cache_write_tokens": (
+            "cache_write_tokens", "cache_write_input_tokens", "cache_creation_input_tokens",
+            "cache_creation_tokens", "input_tokens_details.cache_write_tokens",
+            "input_tokens_details.cache_creation_input_tokens",
+            "prompt_tokens_details.cache_write_tokens",
+            "prompt_tokens_details.cache_creation_input_tokens",
+        ),
+        "reasoning_tokens": (
+            "reasoning_tokens", "reasoning",
+            "completion_tokens_details.reasoning_tokens",
+            "output_tokens_details.reasoning_tokens",
+            "reasoning_details.reasoning_tokens",
+        ),
     }
     for target, names in aliases.items():
         for source in (event, usage):
             for name in names:
-                value = source.get(name)
-                if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                value = _metric_value(source, name)
+                if value is not None:
                     result[target] = value
                     break
             if target in result:
                 break
-    if "cache_read_input_tokens" not in result:
-        for key in ("input_tokens_details", "prompt_tokens_details"):
-            details = usage.get(key)
-            cached = details.get("cached_tokens") if isinstance(details, dict) else None
-            if isinstance(cached, int) and not isinstance(cached, bool) and cached >= 0:
-                result["cache_read_input_tokens"] = cached
-                break
     return result
-
 
 def _record(session_id: str = "", status: str = "completed", **kwargs: Any) -> None:
     with _STATE_LOCK:
