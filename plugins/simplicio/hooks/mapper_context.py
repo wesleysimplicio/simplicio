@@ -4,9 +4,8 @@
 This is a host adapter, not a second execution pipeline. Every supported hook
 event verifies a Mapper artifact for the current project revision. The artifact
 is reused while the revision is unchanged and is replaced atomically after a
-project change. The verified Runtime is preferred; the Python
-``simplicio-mapper`` project is a Mapper-only fallback when Runtime mapping
-fails.
+project change. The verified Runtime is preferred; the bundled Mapper fallback
+is used in Mapper-only mode when Runtime mapping fails.
 """
 
 from __future__ import annotations
@@ -78,12 +77,11 @@ def _runtime() -> Path:
 
 
 def _python_mapper() -> tuple[list[str], dict[str, str]]:
-    """Resolve the Python Mapper fallback without installing during a hook.
+    """Resolve the bundled Mapper fallback without installing during a hook.
 
-    Installation belongs to plugin/bootstrap setup. Hook execution only uses
-    an explicitly configured mapper, a checkout explicitly supplied through
-    ``SIMPLICIO_MAPPER_ROOT``, or an already-installed console/module. This
-    keeps hooks deterministic and prevents network/package-manager activity in
+    The managed Simplicio installation owns the fallback material. Hook
+    execution only resolves that material (or an explicitly configured
+    compatibility path); it never performs network or package-manager work in
     the Claude lifecycle.
     """
     configured = os.environ.get(PYTHON_MAPPER_ENV)
@@ -117,10 +115,7 @@ def _python_mapper() -> tuple[list[str], dict[str, str]]:
         return [executable], os.environ.copy()
     if importlib.util.find_spec("simplicio_mapper") is not None:
         return [sys.executable, "-B", "-m", "simplicio_mapper.cli"], os.environ.copy()
-    raise RuntimeError(
-        "Python simplicio-mapper fallback was not found; install simplicio-mapper "
-        "or set SIMPLICIO_MAPPER_BIN/SIMPLICIO_MAPPER_ROOT"
-    )
+    raise RuntimeError("Bundled Mapper fallback was not found")
 
 
 def _generation(root: Path) -> str:
@@ -241,18 +236,18 @@ def _python_map_markdown(root: Path) -> str:
     """Read the Python Mapper's durable output into the hook's cache format."""
     docs_map = root / ".simplicio" / "docs" / "architecture.md"
     if docs_map.is_file() and docs_map.stat().st_size:
-        return "# Simplicio Mapper (Python fallback)\n\n" + docs_map.read_text(encoding="utf-8")
+        return "# Simplicio Mapper fallback\n\n" + docs_map.read_text(encoding="utf-8")
 
     project_map = root / ".simplicio" / "project-map.json"
     if project_map.is_file() and project_map.stat().st_size:
         payload = json.loads(project_map.read_text(encoding="utf-8"))
         return (
-            "# Simplicio Mapper (Python fallback)\n\n"
+            "# Simplicio Mapper fallback\n\n"
             "```json\n"
             f"{json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)}\n"
             "```\n"
         )
-    raise RuntimeError("Python Mapper did not produce project-map.json or architecture.md")
+    raise RuntimeError("Bundled Mapper fallback did not produce a project map")
 
 
 def _run_python_mapper(root: Path, temporary: Path) -> None:
@@ -278,7 +273,7 @@ def _run_python_mapper(root: Path, temporary: Path) -> None:
         env=environment,
     )
     if result.returncode != 0:
-        raise RuntimeError("Python simplicio-mapper failed to map the project")
+        raise RuntimeError("Bundled Mapper fallback failed to map the project")
     temporary.write_text(_python_map_markdown(root), encoding="utf-8")
 
 
@@ -305,7 +300,7 @@ def _ensure_map(root: Path, generation: str) -> tuple[Path, dict[str, Any]]:
             except Exception as python_error:
                 temporary.unlink(missing_ok=True)
                 raise RuntimeError(
-                    "Runtime Mapper failed and Python simplicio-mapper fallback was unavailable"
+                    "Runtime Mapper failed and the bundled Mapper fallback was unavailable"
                 ) from python_error
         data = temporary.read_bytes()
         digest = hashlib.sha256(data).hexdigest()

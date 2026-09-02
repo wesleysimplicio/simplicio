@@ -1,6 +1,6 @@
 {
   "name": "simplicio-hermes",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Authenticated Mapper-only context and provider cache telemetry for Hermes.",
   "author": "Wesley Simplicio",
   "license": "MIT",
