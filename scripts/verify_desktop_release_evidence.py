@@ -26,10 +26,23 @@ REASON_CODES = {
     "artifact_not_built",
     "environment_blocked",
 }
+UNSAFE_KEY = re.compile(r"(?:path|cwd|home|argv|secret|password|credential|authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|raw[_-]?(?:output|payload))", re.I)
 
 
 def _error(code: str, message: str) -> dict[str, str]:
     return {"code": code, "message": message}
+
+
+def _contains_unsafe_key(value: Any) -> bool:
+    if isinstance(value, dict):
+        return any(
+            not isinstance(key, str) or UNSAFE_KEY.search(key) is not None
+            or _contains_unsafe_key(child)
+            for key, child in value.items()
+        )
+    if isinstance(value, list):
+        return any(_contains_unsafe_key(child) for child in value)
+    return False
 
 
 def _safe_path(root: Path, value: Any) -> Path | None:
@@ -58,6 +71,8 @@ def verify_evidence(document: Any, staging_root: Path) -> dict[str, Any]:
     errors: list[dict[str, str]] = []
     if not isinstance(document, dict):
         return {"schema": SCHEMA, "ready": False, "errors": [_error("document_invalid", "evidence must be a JSON object")], "verified_platforms": []}
+    if _contains_unsafe_key(document):
+        return {"schema": SCHEMA, "ready": False, "errors": [_error("sensitive_field", "evidence contains a forbidden sensitive field")], "verified_platforms": []}
     if document.get("schema") != SCHEMA:
         errors.append(_error("schema_invalid", f"schema must be {SCHEMA}"))
     tag = document.get("release_tag")

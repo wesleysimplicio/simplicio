@@ -63,3 +63,11 @@ def test_digest_and_path_fail_closed(tmp_path: Path) -> None:
     codes = {item["code"] for item in report["errors"]}
     assert "artifact_digest_mismatch" in codes
     assert "artifact_path_invalid" in codes
+
+
+def test_sensitive_evidence_fields_are_rejected(tmp_path: Path) -> None:
+    document = valid_document(tmp_path)
+    document["platforms"][0]["raw_output"] = "secret"
+    report = verify_evidence(document, tmp_path)
+    assert report["ready"] is False
+    assert report["errors"][0]["code"] == "sensitive_field"
