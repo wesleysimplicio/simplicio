@@ -131,12 +131,18 @@ test("records actual cache telemetry with matching request and no source bodies"
   });
   await plugin.record_model_result({
     session_id: "s", api_request_id: "a", response: { id: "provider-a" },
-    usage: { input_tokens: 20, prompt_tokens: 100, output_tokens: 4, cache_read_tokens: 80 },
+    usage: {
+      input_tokens: 20, prompt_tokens: 100, output_tokens: 4, cache_read_tokens: 80,
+      cache_creation_input_tokens: 7,
+      completion_tokens_details: { reasoning_tokens: 3 },
+    },
   });
   const record = runtime.calls.record[0];
   assert.equal(record.api_request_id, "a");
   assert.equal(record.provider_request_id, "provider-a");
   assert.equal(record.cache_read_input_tokens, 80);
+  assert.equal(record.cache_write_tokens, 7);
+  assert.equal(record.reasoning_tokens, 3);
   assert.equal(record.input_tokens, 100);
   assert.doesNotMatch(JSON.stringify(record), /complete_map_tail/);
   assert.equal(plugin.status().provider_cache_status, "reported");
