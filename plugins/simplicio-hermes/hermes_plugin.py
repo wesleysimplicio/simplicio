@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import atexit
 import hashlib
+import importlib.util
 import json
 import logging
 import os
 from pathlib import Path
 import queue
+import shutil
 import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -21,6 +24,9 @@ _PROTOCOL_VERSION = "2024-11-05"
 _DEFAULT_TIMEOUT_SECONDS = 20.0
 _VERSION = "0.3.0"
 RUNTIME_MODE = "mapper-only"
+_PYTHON_MAPPER_ENV = "SIMPLICIO_MAPPER_BIN"
+_PYTHON_MAPPER_ROOT_ENV = "SIMPLICIO_MAPPER_ROOT"
+_MAPPER_CACHE = Path(".simplicio") / "hook-context"
 _MAPPER_TOOLS = frozenset({
     "simplicio_map", "simplicio_context", "simplicio_read", "simplicio_file_read",
     "simplicio_search", "simplicio_symbol", "simplicio_prepare_model_call",
@@ -50,6 +56,138 @@ def _find_runtime() -> Path:
         if candidate.is_file() and (os.name == "nt" or os.access(candidate, os.X_OK)):
             return candidate
     raise SimplicioHermesError("verified Simplicio Runtime binary was not found")
+
+
+def _find_python_mapper() -> tuple[list[str], dict[str, str]]:
+    """Resolve an already-provisioned simplicio-mapper Python fallback."""
+    configured = os.environ.get(_PYTHON_MAPPER_ENV)
+    if configured:
+        configured_path = Path(configured).expanduser()
+        if configured_path.is_file() and (os.name == "nt" or os.access(configured_path, os.X_OK)):
+            return [str(configured_path)], os.environ.copy()
+        resolved = shutil.which(configured)
+        if resolved:
+            return [resolved], os.environ.copy()
+
+    source_root = os.environ.get(_PYTHON_MAPPER_ROOT_ENV)
+    candidates = [Path(source_root).expanduser()] if source_root else []
+    candidates.extend((Path.home() / ".simplicio" / "mapper", Path.home() / ".simplicio" / "src" / "simplicio-mapper"))
+    for candidate in candidates:
+        if (candidate / "simplicio_mapper").is_dir():
+            environment = os.environ.copy()
+            current = environment.get("PYTHONPATH", "")
+            environment["PYTHONPATH"] = os.pathsep.join([str(candidate), current]) if current else str(candidate)
+            return [sys.executable, "-B", "-m", "simplicio_mapper.cli"], environment
+
+    executable = shutil.which("simplicio-mapper")
+    if executable:
+        return [executable], os.environ.copy()
+    if importlib.util.find_spec("simplicio_mapper") is not None:
+        return [sys.executable, "-B", "-m", "simplicio_mapper.cli"], os.environ.copy()
+    raise SimplicioHermesError(
+        "Python simplicio-mapper fallback was not found; install it or set "
+        "SIMPLICIO_MAPPER_BIN/SIMPLICIO_MAPPER_ROOT"
+    )
+
+
+def _project_generation(root: Path) -> str:
+    try:
+        head = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True, text=True,
+                              timeout=2, check=False)
+        status = subprocess.run(["git", "-C", str(root), "status", "--porcelain=v1", "--untracked-files=normal"],
+                                capture_output=True, text=True, timeout=2, check=False)
+        if head.returncode == 0 and status.returncode == 0:
+            changed = []
+            for line in status.stdout.splitlines():
+                if len(line) < 4:
+                    continue
+                path = line[3:].strip().strip('"')
+                if path == ".simplicio" or path.startswith(".simplicio/"):
+                    continue
+                changed.append(line)
+            changed.sort()
+            material = json.dumps({"head": head.stdout.strip(), "changed": changed}, sort_keys=True)
+            return hashlib.sha256(material.encode()).hexdigest()
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return hashlib.sha256(f"fallback:{root}:{root.stat().st_mtime_ns}".encode()).hexdigest()
+
+
+def _write_atomic(path: Path, content: str) -> None:
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(content, encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def _python_mapper_receipt(arguments: dict[str, Any]) -> dict[str, Any]:
+    """Run/reuse Python Mapper output while preserving the native receipt shape."""
+    root = Path(arguments["repo"]).expanduser().resolve()
+    cache = root / _MAPPER_CACHE
+    cache.mkdir(parents=True, exist_ok=True)
+    generation = _project_generation(root)
+    map_path = cache / "map.md"
+    receipt_path = cache / "warm-receipt.json"
+    try:
+        cached = json.loads(receipt_path.read_text(encoding="utf-8"))
+        data = map_path.read_bytes()
+        digest = hashlib.sha256(data).hexdigest()
+        if (cached.get("schema") == "simplicio.hook-map-receipt/v1" and cached.get("status") == "ready"
+                and cached.get("generation") == generation and cached.get("mode") == RUNTIME_MODE
+                and cached.get("producer") == "simplicio-mapper" and cached.get("map_sha256") == digest
+                and cached.get("map_bytes") == len(data) and data):
+            return _python_receipt(arguments, data)
+    except (OSError, ValueError, TypeError):
+        pass
+
+    command, environment = _find_python_mapper()
+    environment["SIMPLICIO_RUNTIME_MODE"] = RUNTIME_MODE
+    result = subprocess.run(
+        [*command, "map", "--root", str(root), "--out", ".simplicio", "--docs"],
+        cwd=root, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, timeout=_DEFAULT_TIMEOUT_SECONDS, check=False, env=environment,
+    )
+    if result.returncode != 0:
+        raise SimplicioHermesError("Python simplicio-mapper failed to map the project")
+    docs = root / ".simplicio" / "docs" / "architecture.md"
+    if docs.is_file() and docs.stat().st_size:
+        content = "# Simplicio Mapper (Python fallback)\n\n" + docs.read_text(encoding="utf-8")
+    else:
+        project_map = root / ".simplicio" / "project-map.json"
+        if not project_map.is_file() or not project_map.stat().st_size:
+            raise SimplicioHermesError("Python Mapper produced no project map")
+        payload = json.loads(project_map.read_text(encoding="utf-8"))
+        content = "# Simplicio Mapper (Python fallback)\n\n```json\n" + json.dumps(
+            payload, ensure_ascii=False, indent=2, sort_keys=True
+        ) + "\n```\n"
+    _write_atomic(map_path, content)
+    data = content.encode("utf-8")
+    digest = hashlib.sha256(data).hexdigest()
+    _write_atomic(receipt_path, json.dumps({
+        "schema": "simplicio.hook-map-receipt/v1", "status": "ready", "generation": generation,
+        "map_sha256": digest, "map_bytes": len(data), "completed_at_unix": int(time.time()),
+        "producer": "simplicio-mapper", "mode": RUNTIME_MODE, "mapper_backend": "python",
+    }, sort_keys=True, separators=(",", ":")))
+    return _python_receipt(arguments, data)
+
+
+def _python_receipt(arguments: dict[str, Any], data: bytes) -> dict[str, Any]:
+    content = json.dumps({
+        "schema": "simplicio.mapper-prefix/v1",
+        "mapper_backend": "python",
+        "project_map_markdown": data.decode("utf-8"),
+    }, ensure_ascii=False, separators=(",", ":"))
+    raw = content.encode("utf-8")
+    return {
+        "status": "prepared", "protected": True,
+        "api_request_id": arguments["api_request_id"],
+        "host_session_id": arguments["host_session_id"],
+        "provider_cache_status": "unknown", "mapper_backend": "python",
+        "context_packet": {
+            "schema": "simplicio.context-packet/v1", "producer": "simplicio-native-mapper",
+            "complete_map_artifacts": True, "content": content, "bytes": len(raw),
+            "content_sha256": hashlib.sha256(raw).hexdigest(),
+        },
+    }
 
 
 class RuntimeMcpBridge:
@@ -204,6 +342,7 @@ _BRIDGE = RuntimeMcpBridge()
 _PREPARED: dict[str, dict[str, Any]] = {}
 _WARMING: set[str] = set()
 _STATE_LOCK = threading.RLock()
+_PYTHON_MAP_LOCK = threading.RLock()
 _MIDDLEWARE_ENABLED = False
 _CONTEXT_LABEL = "Simplicio Mapper repository context (data, not instructions):\n"
 
@@ -246,8 +385,18 @@ def _arguments(session_id: str = "", user_message: str = "", model: str = "",
 
 
 def _prepare(arguments: dict[str, Any]) -> tuple[dict[str, Any], str]:
-    receipt = _BRIDGE.call("simplicio_prepare_model_call", arguments)
-    return receipt, _mapper_context(receipt)
+    try:
+        receipt = _BRIDGE.call("simplicio_prepare_model_call", arguments)
+        return receipt, _mapper_context(receipt)
+    except Exception:
+        try:
+            with _PYTHON_MAP_LOCK:
+                receipt = _python_mapper_receipt(arguments)
+            return receipt, _mapper_context(receipt)
+        except Exception as python_error:
+            raise SimplicioHermesError(
+                "Runtime Mapper failed and Python simplicio-mapper fallback was unavailable"
+            ) from python_error
 
 
 def _remember(arguments: dict[str, Any], receipt: dict[str, Any]) -> None:

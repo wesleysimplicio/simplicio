@@ -4,6 +4,8 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
+import sys
 import threading
 from pathlib import Path
 from types import ModuleType
@@ -169,6 +171,46 @@ def test_runtime_outage_does_not_block_requests_or_leak_raw_errors(caplog):
             request={"messages": []}, session_id="s", model="model", cwd=str(ROOT),
         )
     assert "secret-refresh-token" not in caplog.text
+
+
+def test_runtime_outage_uses_python_mapper_fallback_and_reuses_cache(tmp_path, monkeypatch):
+    adapter = load_adapter()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    mapper = tmp_path / "simplicio-mapper"
+    log = tmp_path / "mapper.log"
+    mapper.write_text(
+        "#!" + sys.executable + "\n"
+        "import os, pathlib, sys\n"
+        "pathlib.Path(os.environ['PYTHON_MAPPER_LOG']).open('a').write(repr(sys.argv[1:]) + '\\n')\n"
+        "docs = pathlib.Path.cwd() / '.simplicio' / 'docs'\n"
+        "docs.mkdir(parents=True, exist_ok=True)\n"
+        "(docs / 'architecture.md').write_text('# Python Hermes fallback\\n', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    mapper.chmod(0o755)
+    monkeypatch.setenv("SIMPLICIO_MAPPER_BIN", str(mapper))
+    monkeypatch.setenv("PYTHON_MAPPER_LOG", str(log))
+    adapter._BRIDGE = FakeBridge()
+    adapter._BRIDGE.failure = RuntimeError("runtime unavailable")
+    context = FakeContext()
+    adapter.register(context)
+
+    first = context.middleware["llm_request"](
+        request={"messages": [{"role": "user", "content": "hello"}]},
+        session_id="s", api_request_id="a", model="model", provider="p", cwd=str(repo),
+    )
+    assert "Python Hermes fallback" in json.dumps(first)
+    receipt = json.loads((repo / ".simplicio/hook-context/warm-receipt.json").read_text())
+    assert receipt["mapper_backend"] == "python"
+    assert len(log.read_text().splitlines()) == 1
+
+    second = context.middleware["llm_request"](
+        request={"messages": [{"role": "user", "content": "again"}]},
+        session_id="s", api_request_id="b", model="model", provider="p", cwd=str(repo),
+    )
+    assert "Python Hermes fallback" in json.dumps(second)
+    assert len(log.read_text().splitlines()) == 1
 
 
 def test_post_api_records_real_cache_usage_and_correlates_concurrent_requests():
