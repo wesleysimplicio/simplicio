@@ -43,6 +43,10 @@ const REASONS: Readonly<Record<string, string>> = {
   runtime_install_precondition_changed: "O Runtime local mudou durante a preparação; a instalação foi interrompida sem sobrescrever o novo estado.",
   runtime_install_snapshot_invalid: "O Runtime instalado não devolveu um estado atual válido.",
   runtime_install_unavailable: "A operação nativa de instalação do Runtime não está disponível.",
+  runtime_install_reconciliation_required: "A última tentativa de instalação não teve resultado confirmado. Consulte e reconcilie o estado antes de tentar novamente.",
+  runtime_install_reconciliation_unavailable: "Não foi possível esclarecer o estado da última instalação. Nenhuma nova tentativa foi iniciada.",
+  runtime_install_journal_unavailable: "Não foi possível registrar com segurança o estado da instalação. Nenhuma alteração foi iniciada.",
+  runtime_install_reconciliation_invalid: "A resposta de reconciliação do Runtime não passou na validação.",
 };
 
 const NEXT_STEPS: Readonly<Record<RuntimeOperation, string>> = {

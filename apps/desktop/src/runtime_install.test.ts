@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseRuntimeInstallResult } from "./runtime_install";
+import { parseRuntimeInstallReconciliation, parseRuntimeInstallResult, parseRuntimeInstallStatus } from "./runtime_install";
 
 function validResult() {
   return {
@@ -44,5 +44,46 @@ describe("Runtime core installer receipt", () => {
     ]) {
       expect(() => parseRuntimeInstallResult(invalid)).toThrow("runtime_install_result_invalid");
     }
+  });
+});
+
+describe("durable Runtime install reconciliation", () => {
+  it("surfaces only whether a persisted attempt is pending", () => {
+    expect(parseRuntimeInstallStatus({
+      schema: "simplicio.desktop-install-status/v1",
+      status: "pending",
+      redacted: true,
+      error: "runtime_install_timeout",
+    })).toEqual({ schema: "simplicio.desktop-install-status/v1", status: "pending", redacted: true });
+  });
+
+  it("accepts only the closed redacted reconciliation projection", () => {
+    expect(parseRuntimeInstallReconciliation({
+      schema: "simplicio.desktop-install-reconciliation/v1",
+      status: "reconciled",
+      current: true,
+      redacted: true,
+      path: "/private/user/.simplicio/install-attempt.json",
+    })).toEqual({
+      schema: "simplicio.desktop-install-reconciliation/v1",
+      status: "reconciled",
+      current: true,
+      redacted: true,
+    });
+  });
+
+  it("fails closed on malformed or unredacted reconciliation", () => {
+    expect(() => parseRuntimeInstallReconciliation({
+      schema: "simplicio.desktop-install-reconciliation/v1",
+      status: "reconciled",
+      current: true,
+      redacted: false,
+    })).toThrow("runtime_install_reconciliation_invalid");
+    expect(() => parseRuntimeInstallReconciliation({
+      schema: "simplicio.desktop-install-reconciliation/v1",
+      status: "pending",
+      current: false,
+      redacted: true,
+    })).toThrow("runtime_install_reconciliation_invalid");
   });
 });

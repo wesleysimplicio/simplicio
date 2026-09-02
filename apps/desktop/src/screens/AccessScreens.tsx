@@ -35,16 +35,20 @@ function runtimeInstallStepStates(phase: RuntimeInstallPhase, receipt?: RuntimeI
   return ["pending", "pending", "pending", "pending"] as const;
 }
 
-export function RuntimeInstallScreen({ phase, receipt, error, onInstall }: {
+export function RuntimeInstallScreen({ phase, receipt, error, onInstall, reconciliationRequired, onReconcile }: {
   phase: RuntimeInstallPhase;
   receipt?: RuntimeInstallResult;
   error: string | null;
   onInstall: () => void;
+  reconciliationRequired?: boolean;
+  onReconcile?: () => void;
 }) {
   const states = runtimeInstallStepStates(phase, receipt);
   const busy = phase === "installing" || phase === "validating";
   const progress = phase === "validating" || (phase === "failed" && receipt) ? 75 : phase === "installing" ? 25 : 0;
-  const status = phase === "installing"
+  const status = reconciliationRequired
+    ? "A tentativa anterior precisa ser esclarecida antes de qualquer nova instalação."
+    : phase === "installing"
     ? "Validando e instalando o Runtime…"
     : phase === "validating"
       ? "Runtime instalado. Confirmando o estado atual…"
@@ -85,7 +89,10 @@ export function RuntimeInstallScreen({ phase, receipt, error, onInstall }: {
     </main>
     <div className="setup-actionbar">
       <div className="setup-footer-inner">
-        <button className="button button-primary" type="button" onClick={onInstall} disabled={busy} aria-busy={busy}>
+        {reconciliationRequired && onReconcile && <button className="button button-secondary" type="button" onClick={onReconcile} disabled={busy} aria-busy={busy}>
+          {busy ? "Consultando…" : "Consultar estado"}
+        </button>}
+        <button className="button button-primary" type="button" onClick={onInstall} disabled={busy || reconciliationRequired} aria-busy={busy}>
           {busy ? "Preparando…" : phase === "failed" ? "Tentar novamente" : "Instalar e validar Runtime"}
           {!busy && <Glyph name="arrow" size={17} />}
         </button>

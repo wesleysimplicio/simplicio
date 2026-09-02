@@ -9,6 +9,7 @@ mod consolidated_tokens;
 mod context_report;
 mod desktop_queries;
 mod host_plugins;
+mod install_journal;
 mod local_projects;
 #[cfg(desktop)]
 mod native_menu;
@@ -19,6 +20,8 @@ mod runtime_process;
 mod snapshot_exports;
 mod supervisor;
 mod token_exports;
+
+static INSTALL_PROCESS_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[tauri::command]
 async fn desktop_validate_project(path: String) -> Result<Value, String> {
@@ -67,6 +70,13 @@ const STATUS_ARGS: &[&str] = auth_login::STATUS_ARGS;
 const HOST_PLUGIN_PLAN_ARGS: &[&str] = &["host-plugins", "plan", "--all"];
 const SUBSCRIPTION_URL: &str = "https://simpleti.com.br/simplicio";
 const RELEASES_URL: &str = "https://github.com/wesleysimplicio/simplicio/releases";
+
+fn install_journal_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map(|directory| directory.join("install-attempt.json"))
+        .map_err(|_| "runtime_install_journal_unavailable".to_string())
+}
 
 fn runtime_capture_limits(args: &[&str]) -> runtime_process::CaptureLimits {
     if matches!(args, ["host-plugins", "apply" | "reconcile", ..]) {
@@ -467,18 +477,78 @@ async fn refresh_desktop_snapshot() -> Result<Value, String> {
 }
 
 #[tauri::command]
-async fn desktop_install_runtime() -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(|| {
+async fn desktop_install_runtime(app: tauri::AppHandle) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _process_lock = INSTALL_PROCESS_LOCK
+            .lock()
+            .map_err(|_| "runtime_install_busy".to_string())?;
+        let journal_path = install_journal_path(&app)?;
+        let mut attempt = install_journal::InstallAttempt::load(&journal_path);
+        if attempt.pending_error().is_some() {
+            return Err("runtime_install_reconciliation_required".to_string());
+        }
+        attempt.begin_persisted(&journal_path)?;
         let current_executable = std::env::current_exe()
             .map_err(|_| "runtime_install_package_unavailable".to_string())?;
-        runtime_install::install(
+        let result = runtime_install::install(
             &current_executable,
             &runtime_user_home()?,
             snapshot_from_binary,
-        )
+        );
+        attempt.finish_persisted(&journal_path, &result)?;
+        result
     })
     .await
     .map_err(|_| "runtime_install_unavailable".to_string())?
+}
+
+#[tauri::command]
+async fn desktop_runtime_install_status(app: tauri::AppHandle) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = install_journal_path(&app)?;
+        let pending = install_journal::InstallAttempt::load(&path)
+            .pending_error()
+            .is_some();
+        Ok(serde_json::json!({
+            "schema": "simplicio.desktop-install-status/v1",
+            "status": if pending { "pending" } else { "clear" },
+            "redacted": true,
+        }))
+    })
+    .await
+    .map_err(|_| "runtime_install_journal_unavailable".to_string())?
+}
+
+#[tauri::command]
+async fn desktop_reconcile_runtime_install(app: tauri::AppHandle) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _process_lock = INSTALL_PROCESS_LOCK
+            .lock()
+            .map_err(|_| "runtime_install_busy".to_string())?;
+        let journal_path = install_journal_path(&app)?;
+        let mut attempt = install_journal::InstallAttempt::load(&journal_path);
+        if attempt.pending_error().is_none() {
+            return Ok(serde_json::json!({
+                "schema": "simplicio.desktop-install-reconciliation/v1",
+                "status": "clear",
+                "current": false,
+                "redacted": true,
+            }));
+        }
+        let current_executable = std::env::current_exe()
+            .map_err(|_| "runtime_install_package_unavailable".to_string())?;
+        let home = runtime_user_home()?;
+        let snapshot = runtime_install::current_snapshot(&current_executable, &home, snapshot_from_binary)?;
+        attempt.finish_persisted(&journal_path, &Ok(serde_json::json!({"status":"reconciled"})))?;
+        Ok(serde_json::json!({
+            "schema": "simplicio.desktop-install-reconciliation/v1",
+            "status": "reconciled",
+            "current": snapshot.is_some(),
+            "redacted": true,
+        }))
+    })
+    .await
+    .map_err(|_| "runtime_install_reconciliation_unavailable".to_string())?
 }
 
 #[tauri::command]
@@ -570,6 +640,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             desktop_snapshot,
             desktop_install_runtime,
+            desktop_runtime_install_status,
+            desktop_reconcile_runtime_install,
             desktop_validate_project,
             desktop_open_project,
             desktop_export_snapshot,

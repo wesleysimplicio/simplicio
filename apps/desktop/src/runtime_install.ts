@@ -14,6 +14,19 @@ export interface RuntimeInstallResult {
   };
 }
 
+export interface RuntimeInstallReconciliation {
+  schema: "simplicio.desktop-install-reconciliation/v1";
+  status: "clear" | "reconciled";
+  current: boolean;
+  redacted: true;
+}
+
+export interface RuntimeInstallStatus {
+  schema: "simplicio.desktop-install-status/v1";
+  status: "clear" | "pending";
+  redacted: true;
+}
+
 const SEMVER = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
 
 function validVersion(value: unknown): value is string {
@@ -83,5 +96,39 @@ export function createPreviewRuntimeInstallResult(): RuntimeInstallResult {
     backupAvailable: false,
     pluginsMutated: false,
     runtime: { state: "healthy", version: "0.0.0-preview" },
+  };
+}
+
+export function parseRuntimeInstallReconciliation(value: unknown): RuntimeInstallReconciliation {
+  const result = record(value);
+  if (
+    result.schema !== "simplicio.desktop-install-reconciliation/v1"
+    || (result.status !== "clear" && result.status !== "reconciled")
+    || typeof result.current !== "boolean"
+    || result.redacted !== true
+  ) {
+    throw new Error("runtime_install_reconciliation_invalid");
+  }
+  return {
+    schema: "simplicio.desktop-install-reconciliation/v1",
+    status: result.status,
+    current: result.current,
+    redacted: true,
+  };
+}
+
+export function parseRuntimeInstallStatus(value: unknown): RuntimeInstallStatus {
+  const result = record(value);
+  if (
+    result.schema !== "simplicio.desktop-install-status/v1"
+    || (result.status !== "clear" && result.status !== "pending")
+    || result.redacted !== true
+  ) {
+    throw new Error("runtime_install_status_invalid");
+  }
+  return {
+    schema: "simplicio.desktop-install-status/v1",
+    status: result.status,
+    redacted: true,
   };
 }

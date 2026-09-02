@@ -22,7 +22,11 @@ import { createConsolidatedReader, type ConsolidatedQuery, type ConsolidatedRepo
 import {
   createPreviewRuntimeInstallResult,
   parseRuntimeInstallResult,
+  parseRuntimeInstallReconciliation,
+  parseRuntimeInstallStatus,
   type RuntimeInstallResult,
+  type RuntimeInstallReconciliation,
+  type RuntimeInstallStatus,
 } from "./runtime_install";
 
 const readSnapshot = createReadonlyRequest<DesktopSnapshot>(30_000, "desktop_snapshot_timeout");
@@ -108,6 +112,20 @@ export async function installDesktopRuntime(): Promise<RuntimeInstallResult> {
   // This is a native, atomic side effect. The frontend never times it out or
   // retries it; the command itself owns locking, rollback, and verification.
   return parseRuntimeInstallResult(await invoke<unknown>("desktop_install_runtime"));
+}
+
+export async function reconcileDesktopRuntimeInstall(): Promise<RuntimeInstallReconciliation> {
+  if (!isTauri()) {
+    return { schema: "simplicio.desktop-install-reconciliation/v1", status: "clear", current: false, redacted: true };
+  }
+  return parseRuntimeInstallReconciliation(await invoke<unknown>("desktop_reconcile_runtime_install"));
+}
+
+export async function loadDesktopRuntimeInstallStatus(): Promise<RuntimeInstallStatus> {
+  if (!isTauri()) {
+    return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+  }
+  return parseRuntimeInstallStatus(await invoke<unknown>("desktop_runtime_install_status"));
 }
 
 export async function beginDesktopLogin(): Promise<DesktopSnapshot> {
