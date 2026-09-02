@@ -11,7 +11,7 @@ from typing import Any, Mapping
 
 SCHEMA = "simplicio.desktop.release-gate/v1"
 REQUIRED_TRACKS = ("install", "oauth", "e2e", "usage", "cost", "privacy", "release")
-REQUIRED_DEPENDENCIES = ("#282", "#283", "#286", "#287", "#288", "#289")
+REQUIRED_DEPENDENCIES = ("#282", "#283", "#286", "#287", "#288", "#289", "#301", "#302", "#303")
 STATUSES = ("verified", "unavailable", "blocked")
 SOURCES = ("installed", "runtime")
 SAFE_ID = re.compile(r"^[A-Za-z0-9#][A-Za-z0-9_.:#-]{0,127}$")

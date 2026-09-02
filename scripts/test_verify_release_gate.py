@@ -50,7 +50,7 @@ def valid_document():
                 "evidence_ids": [f"{issue}:receipt"],
                 "redacted": True,
             }
-            for issue in ("#282", "#283", "#286", "#287", "#288", "#289")
+            for issue in ("#282", "#283", "#286", "#287", "#288", "#289", "#301", "#302", "#303")
         },
     }
 
@@ -92,6 +92,14 @@ def test_zero_usage_requires_proof_and_sensitive_or_preview_data_is_rejected():
             *valid_document()["tracks"][:-1],
             {**valid_document()["tracks"][-1], "path": "/private/evidence"},
         ]})
+
+
+def test_new_usage_and_ux_issues_are_required_dependencies():
+    document = valid_document()
+    del document["dependencies"]["#303"]
+    result = module.verify_gate(document)
+    assert result["status"] == "blocked"
+    assert "dependencies=exact_required_issues" in result["blocking_reasons"]
 
 
 def test_required_issue_set_cannot_be_skipped():
