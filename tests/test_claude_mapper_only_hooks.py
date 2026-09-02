@@ -28,13 +28,28 @@ print("# Mapper project map\\n\\ncomplete_map_tail")
     path.chmod(0o755)
 
 
-def _run_hook(event: str, repo: Path, runtime: Path, *, session: str = "session") -> subprocess.CompletedProcess[str]:
+def _run_hook(
+    event: str,
+    repo: Path,
+    runtime: Path,
+    *,
+    session: str = "session",
+    python_mapper: Path | None = None,
+    path: str | None = None,
+    extra_env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     payload = {"hookEventName": event, "cwd": str(repo), "session_id": session}
     env = {
         **os.environ,
         "SIMPLICIO_BIN": str(runtime),
         "FAKE_MAPPER_LOG": str(runtime.with_name("mapper.log")),
     }
+    if python_mapper is not None:
+        env["SIMPLICIO_MAPPER_BIN"] = str(python_mapper)
+    if path is not None:
+        env["PATH"] = path
+    if extra_env:
+        env.update(extra_env)
     return subprocess.run(
         [sys.executable, str(HOOK)],
         input=json.dumps(payload),
@@ -44,6 +59,23 @@ def _run_hook(event: str, repo: Path, runtime: Path, *, session: str = "session"
         check=False,
         timeout=10,
     )
+
+
+def _fake_python_mapper(path: Path) -> None:
+    path.write_text(
+        """#!/usr/bin/env python3
+import os, pathlib, sys
+log = pathlib.Path(os.environ["FAKE_PYTHON_MAPPER_LOG"])
+log.open("a", encoding="utf-8").write(repr(sys.argv[1:]) + "\\n")
+if sys.argv[1:] != ["map", "--root", os.environ["FAKE_PYTHON_ROOT"], "--out", ".simplicio", "--docs"]:
+    raise SystemExit(31)
+docs = pathlib.Path.cwd() / ".simplicio" / "docs"
+docs.mkdir(parents=True, exist_ok=True)
+(docs / "architecture.md").write_text("# Python fallback map\\n", encoding="utf-8")
+""",
+        encoding="utf-8",
+    )
+    path.chmod(0o755)
 
 
 def _git_repo(path: Path) -> None:
@@ -114,7 +146,12 @@ def test_mapper_failure_is_not_a_silent_native_bypass(tmp_path: Path) -> None:
     env = os.environ.copy()
     other = tmp_path / "other"
     other.mkdir()
-    env.update({"SIMPLICIO_BIN": str(runtime), "FAKE_MAPPER_LOG": str(runtime.with_name("mapper.log")), "FAKE_MAPPER_FAIL": "1"})
+    env.update({
+        "SIMPLICIO_BIN": str(runtime),
+        "FAKE_MAPPER_LOG": str(runtime.with_name("mapper.log")),
+        "FAKE_MAPPER_FAIL": "1",
+        "PATH": str(tmp_path / "empty-path"),
+    })
     failed = subprocess.run(
         [sys.executable, str(HOOK)],
         input=json.dumps({"hookEventName": "PreToolUse", "cwd": str(other)}),
@@ -128,6 +165,37 @@ def test_mapper_failure_is_not_a_silent_native_bypass(tmp_path: Path) -> None:
     payload = json.loads(failed.stdout)
     assert payload["hookSpecificOutput"]["permissionDecision"] == "deny"
     assert "Mapper obrigatório" in payload["hookSpecificOutput"]["permissionDecisionReason"]
+
+
+def test_python_mapper_is_a_mapper_only_runtime_failover(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git_repo(repo)
+    runtime = tmp_path / "simplicio"
+    _fake_mapper(runtime, runtime.with_name("mapper.log"))
+    python_mapper = tmp_path / "simplicio-mapper"
+    _fake_python_mapper(python_mapper)
+
+    fallback_env = {
+        "FAKE_MAPPER_FAIL": "1",
+        "FAKE_PYTHON_MAPPER_LOG": str(tmp_path / "python-mapper.log"),
+        "FAKE_PYTHON_ROOT": str(repo),
+    }
+    result = _run_hook(
+        "SessionStart", repo, runtime, python_mapper=python_mapper, extra_env=fallback_env
+    )
+    assert result.returncode == 0, result.stderr
+    assert "Python fallback map" in result.stdout
+    receipt = json.loads((repo / ".simplicio/hook-context/warm-receipt.json").read_text())
+    assert receipt["mode"] == "mapper-only"
+    assert receipt["mapper_backend"] == "python"
+    assert len((tmp_path / "python-mapper.log").read_text().splitlines()) == 1
+
+    reused = _run_hook(
+        "PreToolUse", repo, runtime, python_mapper=python_mapper, extra_env=fallback_env
+    )
+    assert reused.returncode == 0
+    assert len((tmp_path / "python-mapper.log").read_text().splitlines()) == 1
 
 
 def test_hermes_manifest_and_adapter_remain_mapper_only() -> None:

@@ -4,15 +4,19 @@
 This is a host adapter, not a second execution pipeline. Every supported hook
 event verifies a Mapper artifact for the current project revision. The artifact
 is reused while the revision is unchanged and is replaced atomically after a
-project change. Only the Runtime ``map`` command is invoked here.
+project change. The verified Runtime is preferred; the Python
+``simplicio-mapper`` project is a Mapper-only fallback when Runtime mapping
+fails.
 """
 
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import time
@@ -23,6 +27,8 @@ MAP_RECEIPT_SCHEMA = "simplicio.hook-map-receipt/v1"
 DELIVERY_RECEIPT_SCHEMA = "simplicio.mapper-hook-delivery/v1"
 DEFAULT_TIMEOUT_SECONDS = 120
 CACHE_DIR_NAME = ".simplicio/hook-context"
+PYTHON_MAPPER_ENV = "SIMPLICIO_MAPPER_BIN"
+PYTHON_MAPPER_ROOT_ENV = "SIMPLICIO_MAPPER_ROOT"
 
 
 def _event_name(payload: dict[str, Any]) -> str:
@@ -69,6 +75,52 @@ def _runtime() -> Path:
         if candidate.is_file() and (os.name == "nt" or os.access(candidate, os.X_OK)):
             return candidate
     raise RuntimeError("verified Simplicio Runtime binary was not found")
+
+
+def _python_mapper() -> tuple[list[str], dict[str, str]]:
+    """Resolve the Python Mapper fallback without installing during a hook.
+
+    Installation belongs to plugin/bootstrap setup. Hook execution only uses
+    an explicitly configured mapper, a checkout explicitly supplied through
+    ``SIMPLICIO_MAPPER_ROOT``, or an already-installed console/module. This
+    keeps hooks deterministic and prevents network/package-manager activity in
+    the Claude lifecycle.
+    """
+    configured = os.environ.get(PYTHON_MAPPER_ENV)
+    if configured:
+        configured_path = Path(configured).expanduser()
+        if configured_path.is_file() and (os.name == "nt" or os.access(configured_path, os.X_OK)):
+            return [str(configured_path)], os.environ.copy()
+        resolved = shutil.which(configured)
+        if resolved:
+            return [resolved], os.environ.copy()
+
+    source_root = os.environ.get(PYTHON_MAPPER_ROOT_ENV)
+    source_candidates = [Path(source_root).expanduser()] if source_root else []
+    source_candidates.extend(
+        (
+            Path.home() / ".simplicio" / "mapper",
+            Path.home() / ".simplicio" / "src" / "simplicio-mapper",
+        )
+    )
+    for candidate in source_candidates:
+        if (candidate / "simplicio_mapper").is_dir():
+            environment = os.environ.copy()
+            current_python_path = environment.get("PYTHONPATH", "")
+            environment["PYTHONPATH"] = os.pathsep.join(
+                [str(candidate), current_python_path]
+            ) if current_python_path else str(candidate)
+            return [sys.executable, "-B", "-m", "simplicio_mapper.cli"], environment
+
+    executable = shutil.which("simplicio-mapper")
+    if executable:
+        return [executable], os.environ.copy()
+    if importlib.util.find_spec("simplicio_mapper") is not None:
+        return [sys.executable, "-B", "-m", "simplicio_mapper.cli"], os.environ.copy()
+    raise RuntimeError(
+        "Python simplicio-mapper fallback was not found; install simplicio-mapper "
+        "or set SIMPLICIO_MAPPER_BIN/SIMPLICIO_MAPPER_ROOT"
+    )
 
 
 def _generation(root: Path) -> str:
@@ -162,6 +214,74 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     os.replace(temporary, path)
 
 
+def _run_runtime_mapper(root: Path, temporary: Path) -> None:
+    runtime = _runtime()
+    if not runtime.is_file() or (os.name != "nt" and not os.access(runtime, os.X_OK)):
+        raise RuntimeError("verified Simplicio Runtime binary is not executable")
+    environment = os.environ.copy()
+    # Scope Mapper-only to this Claude hook process; do not rewrite global settings.
+    environment["SIMPLICIO_RUNTIME_MODE"] = "mapper-only"
+    with temporary.open("wb") as stream:
+        result = subprocess.run(
+            [str(runtime), "map", "--repo", str(root), "--for-llm", "markdown"],
+            cwd=root,
+            stdin=subprocess.DEVNULL,
+            stdout=stream,
+            stderr=subprocess.PIPE,
+            timeout=DEFAULT_TIMEOUT_SECONDS,
+            check=False,
+            env=environment,
+        )
+    if result.returncode != 0 or not temporary.is_file() or temporary.stat().st_size == 0:
+        temporary.unlink(missing_ok=True)
+        raise RuntimeError("Runtime Mapper did not produce a complete project map")
+
+
+def _python_map_markdown(root: Path) -> str:
+    """Read the Python Mapper's durable output into the hook's cache format."""
+    docs_map = root / ".simplicio" / "docs" / "architecture.md"
+    if docs_map.is_file() and docs_map.stat().st_size:
+        return "# Simplicio Mapper (Python fallback)\n\n" + docs_map.read_text(encoding="utf-8")
+
+    project_map = root / ".simplicio" / "project-map.json"
+    if project_map.is_file() and project_map.stat().st_size:
+        payload = json.loads(project_map.read_text(encoding="utf-8"))
+        return (
+            "# Simplicio Mapper (Python fallback)\n\n"
+            "```json\n"
+            f"{json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)}\n"
+            "```\n"
+        )
+    raise RuntimeError("Python Mapper did not produce project-map.json or architecture.md")
+
+
+def _run_python_mapper(root: Path, temporary: Path) -> None:
+    command, environment = _python_mapper()
+    environment["SIMPLICIO_RUNTIME_MODE"] = "mapper-only"
+    result = subprocess.run(
+        [
+            *command,
+            "map",
+            "--root",
+            str(root),
+            "--out",
+            ".simplicio",
+            "--docs",
+        ],
+        cwd=root,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=DEFAULT_TIMEOUT_SECONDS,
+        check=False,
+        env=environment,
+    )
+    if result.returncode != 0:
+        raise RuntimeError("Python simplicio-mapper failed to map the project")
+    temporary.write_text(_python_map_markdown(root), encoding="utf-8")
+
+
 def _ensure_map(root: Path, generation: str) -> tuple[Path, dict[str, Any]]:
     cache = _cache(root)
     ready = _read_ready(cache, generation)
@@ -173,23 +293,20 @@ def _ensure_map(root: Path, generation: str) -> tuple[Path, dict[str, Any]]:
         ready = _read_ready(cache, generation)
         if ready is not None:
             return cache, ready
-        runtime = _runtime()
-        if not runtime.is_file() or (os.name != "nt" and not os.access(runtime, os.X_OK)):
-            raise RuntimeError("verified Simplicio Runtime binary is not executable")
         temporary = cache / f"map.md.{os.getpid()}.tmp"
-        environment = os.environ.copy()
-        # Scope Mapper-only to this Claude hook process; do not rewrite global settings.
-        environment["SIMPLICIO_RUNTIME_MODE"] = "mapper-only"
-        with temporary.open("wb") as stream:
-            result = subprocess.run(
-                [str(runtime), "map", "--repo", str(root), "--for-llm", "markdown"],
-                cwd=root, stdin=subprocess.DEVNULL, stdout=stream,
-                stderr=subprocess.PIPE, timeout=DEFAULT_TIMEOUT_SECONDS,
-                check=False, env=environment,
-            )
-        if result.returncode != 0 or not temporary.is_file() or temporary.stat().st_size == 0:
+        mapper_backend = "runtime"
+        try:
+            _run_runtime_mapper(root, temporary)
+        except Exception:
             temporary.unlink(missing_ok=True)
-            raise RuntimeError("Mapper did not produce a complete project map; verify Runtime login and availability")
+            try:
+                mapper_backend = "python"
+                _run_python_mapper(root, temporary)
+            except Exception as python_error:
+                temporary.unlink(missing_ok=True)
+                raise RuntimeError(
+                    "Runtime Mapper failed and Python simplicio-mapper fallback was unavailable"
+                ) from python_error
         data = temporary.read_bytes()
         digest = hashlib.sha256(data).hexdigest()
         os.replace(temporary, cache / "map.md")
@@ -202,6 +319,7 @@ def _ensure_map(root: Path, generation: str) -> tuple[Path, dict[str, Any]]:
             "completed_at_unix": int(time.time()),
             "producer": "simplicio-mapper",
             "mode": "mapper-only",
+            "mapper_backend": mapper_backend,
         }
         _write_json(cache / "warm-receipt.json", receipt)
         return cache, receipt

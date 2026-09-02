@@ -64,8 +64,12 @@ In Claude Code:
 The main `simplicio` package bootstraps the verified Runtime automatically and
 installs mandatory Mapper-only Claude hooks. The hooks keep the project map in
 `.simplicio/hook-context/`, reuse it while the project generation is unchanged,
-and refresh it after a visible project change. They call only the Runtime map
-operation; Fast and other context accelerators are not lifecycle dependencies.
+and refresh it after a visible project change. They call the Runtime map
+operation first and use the installed `simplicio-mapper` Python project as a
+Mapper-only fallback if Runtime mapping fails. Fast and other context
+accelerators are not lifecycle dependencies. To provision the fallback ahead
+of time, use `python -m pip install --upgrade simplicio-mapper` or point the
+hook at a checkout with `SIMPLICIO_MAPPER_ROOT`.
 
 The separate `simplicio-loop`, `simplicio-prompt`, `simplicio-sprint`, and
 `simplicio-hermes` packages remain available for explicit workflows and their
