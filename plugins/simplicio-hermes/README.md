@@ -14,7 +14,10 @@ Runtime without Mapper-only support is declined; Hermes continues natively.
 ## Mapping and prompt caching
 
 `on_session_start` starts a background map warmup. `pre_llm_call` prepares the
-full native Mapper artifacts using Runtime authentication. On Hermes versions
+full native Mapper artifacts using Runtime authentication. If the Runtime
+preparation fails, the plugin invokes the installed `simplicio-mapper` Python
+project and converts its durable map into the same protected context shape.
+On Hermes versions
 with `register_middleware`, the `llm_request` middleware checks authentication
 and repository generation before every provider request and inserts the entire
 verified map into the provider's existing messages, system or instructions
@@ -42,8 +45,9 @@ unknown. No synthetic model request or paid warmup is performed.
 Mapper requires login. Runtime owns the saved session and subscription-period
 verification; the plugin neither copies credentials nor opens login repeatedly.
 Missing login, confirmed inactive subscription, timeout, offline Runtime,
-unsupported Runtime or an invalid map prevents the provider request from being
-prepared; it must not silently bypass Mapper. The plugin registers no native
+unsupported Runtime or an invalid map invokes the Python fallback when it is
+available; if both Mapper paths fail, the provider request is blocked. It must
+not silently bypass Mapper. The plugin registers no native
 tool gate, edit wrapper, execution middleware, Loop or Fast integration.
 
 ## Install and validate
@@ -51,7 +55,13 @@ tool gate, edit wrapper, execution middleware, Loop or Fast integration.
 ```bash
 hermes plugins install wesleysimplicio/simplicio/plugins/simplicio-hermes --force --enable
 hermes plugins doctor simplicio-hermes --ci
+# Optional Runtime failover, provisioned before starting Hermes:
+python -m pip install --upgrade simplicio-mapper
 ```
+
+The fallback may also be pointed at a local checkout with
+`SIMPLICIO_MAPPER_ROOT` or an executable with `SIMPLICIO_MAPPER_BIN`. Hooks do
+not install packages or access the network.
 
 Use a Runtime build that advertises Mapper-only and restart Hermes after the
 plugin update. A source merge alone does not update the installed binary.
