@@ -1,8 +1,9 @@
 # Simplicio Hermes Mapper-only adapter
 
 The Hermes plugin uses Simplicio only for authenticated repository mapping and
-provider usage receipts. Native Hermes tools, terminal, edits, tests, approvals,
-model selection and execution remain owned by Hermes and each project.
+provider usage receipts. Mapper preparation is mandatory before a provider
+request; native Hermes tools, terminal, edits, tests, approvals, model
+selection and execution remain owned by Hermes and each project.
 
 The Python adapter starts its own stdio Runtime with
 `SIMPLICIO_RUNTIME_MODE=mapper-only`. It verifies that initialization and the
@@ -41,9 +42,9 @@ unknown. No synthetic model request or paid warmup is performed.
 Mapper requires login. Runtime owns the saved session and subscription-period
 verification; the plugin neither copies credentials nor opens login repeatedly.
 Missing login, confirmed inactive subscription, timeout, offline Runtime,
-unsupported Runtime or an invalid map simply omit Simplicio context. Hermes'
-native request and project tools continue. The plugin registers no native tool
-gate, edit wrapper, execution middleware, Loop or Fast integration.
+unsupported Runtime or an invalid map prevents the provider request from being
+prepared; it must not silently bypass Mapper. The plugin registers no native
+tool gate, edit wrapper, execution middleware, Loop or Fast integration.
 
 ## Install and validate
 
@@ -55,9 +56,11 @@ hermes plugins doctor simplicio-hermes --ci
 Use a Runtime build that advertises Mapper-only and restart Hermes after the
 plugin update. A source merge alone does not update the installed binary.
 
-The JavaScript embedder adapter in `index.mjs` follows the same Mapper-only and
-best-effort policy. Its supplied bridge must expose `runtime_mode: "mapper-only"`
-from a verified Runtime handshake and implement the prepare/record methods.
+The JavaScript embedder adapter in `index.mjs` follows the same Mapper-only
+policy. Its supplied bridge must expose `runtime_mode: "mapper-only"` from a
+verified Runtime handshake and implement the prepare/record methods. A failed
+Mapper preparation raises a typed error and cannot silently send an un-mapped
+provider request.
 Legacy `best_effort` and `enforce` constructor options migrate to Mapper-only;
 they do not retain provider blocking. An explicit `maxContextBytes` budget may
 omit an oversized map, but never truncate it or block native work.

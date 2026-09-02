@@ -66,8 +66,9 @@ Each step buys a concrete gain in **quality**, **token economy**, or **delivery 
 | `PreToolUse` (all tools) | `mcp-route.sh` (mandatory Runtime route) · `action_gate.py` (fail-closed safety gate) · `orient_rewrite.py` (opt-in output clamp) |
 
 The Runtime route is mandatory inside the host session: native reads, edits, shell commands, and
-directory exploration are denied, while Simplicio MCP tools are allowed. It also warms a bounded
-`map → fast` context packet in the background on lifecycle events. Install the Runtime first so
+directory exploration are denied, while Simplicio MCP tools are allowed. In this Claude bundle the
+route is explicitly scoped to Mapper-only and warms only the project Map; Fast remains an explicit
+project-consultation skill and is never a lifecycle-hook dependency. Install the Runtime first so
 `~/.simplicio/hooks/mcp-route.sh` exists; there is no environment-variable escape hatch. All hooks
 run locally and make zero network calls.
 

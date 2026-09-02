@@ -81,20 +81,23 @@ test("unscoped full Runtime is never called", async () => {
   runtime.runtime_mode = "full";
   const plugin = createHermesPlugin({ runtime });
   const original = { messages: [{ role: "user", content: "native work" }] };
-  const result = await plugin.prepare_model_call(original);
-  assert.deepEqual(result.messages, original.messages);
+  await assert.rejects(() => plugin.prepare_model_call(original), (error) => {
+    assert.equal(error.reasonCode, "runtime_mapper_only_required");
+    return true;
+  });
   assert.equal(runtime.calls.prepare.length, 0);
-  assert.equal(result.simplicio.reason_code, "runtime_mapper_only_required");
 });
 
-test("legacy enforce settings migrate without blocking native requests", async () => {
+test("legacy enforce settings migrate but Mapper failure blocks native requests", async () => {
   const runtime = runtimeFixture();
   runtime.prepare_model_call = async () => { throw new Error("secret-token"); };
   const plugin = createHermesPlugin({ runtime, mode: "enforce" });
   const request = { provider: "p", model: "m", tools: [{ name: "native" }], messages: [] };
-  const result = await plugin.hooks.llm_request(request);
-  assert.deepEqual(result.tools, request.tools);
-  assert.equal(result.simplicio.protected, false);
+  await assert.rejects(() => plugin.hooks.llm_request(request), (error) => {
+    assert.equal(error.name, "HermesProtectionError");
+    assert.equal(error.reasonCode, "runtime_prepare_failed");
+    return true;
+  });
   assert.equal(plugin.status().mode, "mapper-only");
   assert.doesNotMatch(JSON.stringify(plugin.status()), /secret-token/);
 });
@@ -107,17 +110,17 @@ test("missing login and corrupt map never become provider context", async () => 
   ]) {
     const runtime = runtimeFixture();
     runtime.prepare_model_call = async () => receipt;
-    const result = await createHermesPlugin({ runtime }).prepare_model_call({ messages: [] });
-    assert.deepEqual(result.messages, []);
-    assert.equal(result.simplicio.protected, false);
+    await assert.rejects(() => createHermesPlugin({ runtime }).prepare_model_call({ messages: [] }),
+      (error) => error.name === "HermesProtectionError");
   }
 });
 
-test("an explicit size budget omits the map without truncating or blocking", async () => {
+test("an explicit size budget rejects an unmappable provider request", async () => {
   const plugin = createHermesPlugin({ runtime: runtimeFixture(), mode: "enforce", maxContextBytes: 64 });
-  const result = await plugin.prepare_model_call({ messages: [] });
-  assert.deepEqual(result.messages, []);
-  assert.equal(result.simplicio.reason_code, "context_packet_too_large");
+  await assert.rejects(() => plugin.prepare_model_call({ messages: [] }), (error) => {
+    assert.equal(error.reasonCode, "context_packet_too_large");
+    return true;
+  });
 });
 
 test("records actual cache telemetry with matching request and no source bodies", async () => {

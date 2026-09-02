@@ -59,15 +59,18 @@ In Claude Code:
 ```text
 /plugin marketplace add wesleysimplicio/simplicio
 /plugin install simplicio@simplicio
-/plugin install simplicio-loop@simplicio
-/plugin install simplicio-prompt@simplicio
-/plugin install simplicio-sprint@simplicio
-/plugin install simplicio-hermes@simplicio
 ```
 
-The main `simplicio` package bootstraps the verified Runtime automatically.
-The separate `simplicio-loop`, `simplicio-prompt`, and `simplicio-sprint`
-packages remain available for their specialized workflows.
+The main `simplicio` package bootstraps the verified Runtime automatically and
+installs mandatory Mapper-only Claude hooks. The hooks keep the project map in
+`.simplicio/hook-context/`, reuse it while the project generation is unchanged,
+and refresh it after a visible project change. They call only the Runtime map
+operation; Fast and other context accelerators are not lifecycle dependencies.
+
+The separate `simplicio-loop`, `simplicio-prompt`, `simplicio-sprint`, and
+`simplicio-hermes` packages remain available for explicit workflows and their
+respective hosts. Install `simplicio-loop` only when the Loop orchestration
+surface is intentionally needed.
 
 ## Published components
 

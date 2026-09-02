@@ -3,7 +3,7 @@
   "version": 1,
   "portablePackage": {"manifest": "plugin.json", "mcp": "mcp.json", "skills": "skills/"},
   "hosts": [
-    {"id":"claude-code","name":"Claude Code","surface":"native-plugin","manifest":".claude-plugin/plugin.json","preHooks":"runtime-managed"},
+    {"id":"claude-code","name":"Claude Code","surface":"native-plugin","manifest":".claude-plugin/plugin.json","preHooks":"host-managed"},
     {"id":"codex","name":"Codex","surface":"native-plugin","manifest":".codex-plugin/plugin.json","preHooks":"runtime-managed"},
     {"id":"grok","name":"Grok","surface":"runtime-mcp","preHooks":"runtime-managed"},
     {"id":"cursor","name":"Cursor","surface":"agent-plugin-v1","manifest":"plugin.json","preHooks":"runtime-managed"},

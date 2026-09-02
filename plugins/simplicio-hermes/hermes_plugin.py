@@ -265,7 +265,7 @@ def _remember(arguments: dict[str, Any], receipt: dict[str, Any]) -> None:
 
 def _warn(stage: str, error: Exception) -> None:
     # Auth/MCP exception strings can contain upstream response bodies.
-    LOGGER.warning("Simplicio Mapper %s unavailable (%s); Hermes continues natively",
+    LOGGER.warning("Simplicio Mapper %s unavailable (%s); provider request is blocked",
                    stage, type(error).__name__)
 
 
@@ -282,7 +282,7 @@ def _pre_llm_call(session_id: str = "", user_message: str = "", model: str = "",
         return {"context": content}
     except Exception as error:
         _warn("pre-hook", error)
-        return None
+        raise SimplicioHermesError("Mapper preparation is mandatory") from error
 
 
 def _inject_context(request: dict[str, Any], content: str) -> dict[str, Any]:
@@ -325,7 +325,7 @@ def _llm_request(request: dict[str, Any], session_id: str = "", model: str = "",
         return {"request": updated, "source": "simplicio-hermes", "reason": "mapper_context_prepared"}
     except Exception as error:
         _warn("request preparation", error)
-        return None
+        raise SimplicioHermesError("Mapper preparation is mandatory") from error
 
 
 def _token_usage(event: dict[str, Any]) -> dict[str, int]:
