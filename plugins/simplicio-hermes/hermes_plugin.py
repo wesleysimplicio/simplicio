@@ -13,6 +13,7 @@ from pathlib import Path
 import queue
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -96,6 +97,40 @@ def _process_group_options() -> dict[str, Any]:
     if os.name == "nt":
         return {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)}
     return {"start_new_session": True}
+
+
+def _terminate_process_group(process: subprocess.Popen[str], *, force: bool = False) -> None:
+    """Stop the mapper/runtime and descendants, not just the direct child."""
+    try:
+        if os.name == "nt":
+            if force:
+                process.kill()
+            else:
+                process.send_signal(getattr(signal, "CTRL_BREAK_EVENT", signal.SIGTERM))
+        else:
+            os.killpg(process.pid, signal.SIGKILL if force else signal.SIGTERM)
+    except (OSError, ProcessLookupError):
+        pass
+
+
+def _run_scoped(command: tuple[str, ...], cwd: Path, environment: dict[str, str],
+                timeout: float) -> tuple[int, str]:
+    process = subprocess.Popen(
+        list(command), cwd=str(cwd), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL, text=True, encoding="utf-8", env=environment,
+        **_process_group_options(),
+    )
+    try:
+        stdout, _ = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired as error:
+        _terminate_process_group(process)
+        try:
+            process.communicate(timeout=1)
+        except subprocess.TimeoutExpired:
+            _terminate_process_group(process, force=True)
+            process.communicate()
+        raise error
+    return process.returncode, stdout
 
 
 def _runtime_candidates() -> list[Path]:
@@ -242,18 +277,17 @@ def _resolve_python_mapper() -> MapperResolution:
 
     environment = _minimal_environment(extra)
     try:
-        result = subprocess.run(
-            [*command, "version", "--json"], cwd=str(candidate if candidate.is_dir() else candidate.parent),
-            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            text=True, encoding="utf-8", timeout=_DEFAULT_TIMEOUT_SECONDS, check=False,
-            env=environment, **_process_group_options(),
+        returncode, output = _run_scoped(
+            (*command, "version", "--json"),
+            candidate if candidate.is_dir() else candidate.parent,
+            environment, _DEFAULT_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired as error:
         raise SimplicioHermesError("mapper_version_timeout") from error
-    if result.returncode != 0:
+    if returncode != 0:
         raise SimplicioHermesError("mapper_version_failed")
     try:
-        payload = json.loads(result.stdout)
+        payload = json.loads(output)
     except (ValueError, TypeError) as error:
         raise SimplicioHermesError("mapper_version_not_json") from error
     if not isinstance(payload, dict):
@@ -357,15 +391,13 @@ def _python_mapper_receipt(arguments: dict[str, Any]) -> dict[str, Any]:
         pass
 
     try:
-        result = subprocess.run(
-            [*resolution.command, "map", "--root", str(root), "--out", ".simplicio", "--docs"],
-            cwd=root, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            text=True, timeout=_DEFAULT_TIMEOUT_SECONDS, check=False,
-            env=resolution.environment, **_process_group_options(),
+        returncode, _ = _run_scoped(
+            (*resolution.command, "map", "--root", str(root), "--out", ".simplicio", "--docs"),
+            root, resolution.environment, _DEFAULT_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired as error:
         raise SimplicioHermesError("mapper_map_timeout") from error
-    if result.returncode != 0:
+    if returncode != 0:
         raise SimplicioHermesError("mapper_map_failed")
     docs = root / ".simplicio" / "docs" / "architecture.md"
     if docs.is_file() and docs.stat().st_size:
@@ -557,10 +589,10 @@ class RuntimeMcpBridge:
                     pass
             if process.poll() is None:
                 try:
-                    process.terminate()
+                    _terminate_process_group(process)
                     process.wait(timeout=1)
                 except subprocess.TimeoutExpired:
-                    process.kill()
+                    _terminate_process_group(process, force=True)
                     process.wait(timeout=1)
                 except OSError:
                     pass
