@@ -18,6 +18,7 @@ import { parseLocalProject, type LocalProject } from "./workbench";
 import { createReadonlyRequest } from "./readonly_request";
 import { createContextReader } from "./context_report";
 import { parseUsageProjects } from "./project_usage";
+import { applyUsageChangefeedEvent, createUsageChangefeedState, type UsageChangefeedState } from "./usage_changefeed";
 import { createConsolidatedReader, type ConsolidatedQuery, type ConsolidatedReport } from "./consolidated_tokens";
 import {
   createPreviewRuntimeInstallResult,
@@ -105,6 +106,22 @@ export async function loadDesktopSnapshot(): Promise<DesktopSnapshot> {
   }
 
   return readSnapshot(() => invoke<DesktopSnapshot>("desktop_snapshot"));
+}
+
+/**
+ * Pull one Runtime-owned usage event. The current public Runtime may not
+ * expose this command yet; callers keep the last state and surface the
+ * capability error instead of showing a false zero.
+ */
+export async function pullDesktopUsageChangefeed(
+  cursor: UsageChangefeedState = createUsageChangefeedState(),
+): Promise<UsageChangefeedState> {
+  if (!isTauri()) throw new Error("preview_no_runtime");
+  const event = await withTimeout(invoke<unknown>("desktop_usage_changefeed", {
+    afterSequence: cursor.cursor.sequence,
+    afterRevision: cursor.cursor.revision,
+  }), 30_000, "usage_changefeed_timeout");
+  return applyUsageChangefeedEvent(cursor, event);
 }
 
 export async function installDesktopRuntime(): Promise<RuntimeInstallResult> {
