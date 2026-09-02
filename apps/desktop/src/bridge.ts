@@ -20,6 +20,7 @@ import { createContextReader } from "./context_report";
 import { parseUsageProjects } from "./project_usage";
 import { applyUsageChangefeedEvent, createUsageChangefeedState, type UsageChangefeedState } from "./usage_changefeed";
 import { exportUnifiedUsageProjection, parseUnifiedUsageProjection, type UnifiedUsageProjection, type UsageQuery } from "./unified_usage";
+import { parseCostProjection, type CostProjection, type CostQuery } from "./cost_projection";
 import { createConsolidatedReader, type ConsolidatedQuery, type ConsolidatedReport } from "./consolidated_tokens";
 import {
   createPreviewRuntimeInstallResult,
@@ -61,6 +62,15 @@ export function exportDesktopUnifiedUsage(
   format: "json" | "csv",
 ): string {
   return exportUnifiedUsageProjection(projection, format);
+}
+
+export async function loadDesktopCostProjection(query: CostQuery = {}): Promise<CostProjection> {
+  if (!isTauri()) throw new Error("preview_no_runtime");
+  return parseCostProjection(await withTimeout(
+    invoke<unknown>("desktop_cost_projection", { query }),
+    60_000,
+    "cost_projection_timeout",
+  ));
 }
 
 export function loadDesktopContextReport(repoPath: string) {
