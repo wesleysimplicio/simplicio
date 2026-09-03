@@ -11,7 +11,9 @@ function SessionCenter({ usage }: { usage?: DesktopUsageState }) {
   const status = changefeed?.connection ?? "offline";
   const statusLabel = status === "live" ? "ao vivo" : status === "reconnecting" ? "reconectando" : status === "stale" ? "último dado conhecido" : "offline";
   const tokens = (value: number | null | undefined) => value === null || value === undefined ? "—" : value.toLocaleString("pt-BR");
-  const costValue = costProjection?.totals.actual_cost_usd ?? projection?.totals.cost_usd;
+  const costValue = costProjection
+    ? costProjection.totals.actual_cost_usd
+    : projection?.totals.cost_usd;
   const cost = costValue === null || costValue === undefined ? "—" : "US$ " + costValue.toFixed(6);
 
   return <section className="panel session-center" aria-label="Sessão atual">

@@ -7,7 +7,7 @@ const digestB = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 const fixture: CostProjection = {
   schema: 'simplicio.desktop-cost-projection/v1',
   generated_at_epoch: 1700000100,
-  query: { provider: 'openai', session_id: 'session-1' },
+  query: { provider: 'openai', session_id: digestB },
   usage_revision: digestA,
   pricing: {
     status: 'known',
@@ -68,7 +68,32 @@ describe('Runtime desktop cost projection contract', () => {
     expect(() => parseCostProjection({
       ...fixture,
       rows: [{ ...fixture.rows[0], saved_cost_usd: 0 }, fixture.rows[1]],
-    })).toThrow('cost_projection_savings_mismatch');
+    })).toThrow('cost_projection_invalid');
+  });
+
+  it('accepts the contract availability state and rejects impossible numeric savings', () => {
+    const unavailable = parseCostProjection({
+      ...fixture,
+      baseline: {
+        ...fixture.baseline,
+        identity_status: 'unavailable',
+        versions: [],
+        methods: [],
+      },
+    });
+    expect(unavailable.baseline.identity_status).toBe('unavailable');
+    expect(() => parseCostProjection({
+      ...fixture,
+      rows: [{ ...fixture.rows[0], baseline_tokens: 200 } , fixture.rows[1]],
+    })).toThrow('cost_projection_invalid');
+  });
+
+  it('rejects unknown properties and non-digest project selectors', () => {
+    expect(() => parseCostProjection({ ...fixture, unexpected: true })).toThrow('cost_projection_invalid');
+    expect(() => parseCostProjection({
+      ...fixture,
+      query: { project_id: '/private/project' },
+    })).toThrow('cost_projection_invalid');
   });
 
   it('rejects preview, paths, and sensitive fields', () => {
