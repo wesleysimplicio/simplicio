@@ -38,6 +38,22 @@ publish the root `signing_pubkey` exactly as
 Do not publish a new release from a checkout where `version.txt` and the
 manifest disagree.
 
+When a Runtime release promotes an external Loop fallback composition, its
+operator bundle is a separate signed, offline asset set. Validate the promoted
+composition and the staged bytes before publication:
+
+```bash
+python3 scripts/verify_operator_bundle_manifest.py \
+  /absolute/path/to/simplicio-operator-bundle.json \
+  --bundle /absolute/path/to/operator-bundle
+```
+
+The gate requires exact Runtime, Loop, Mapper, Dev CLI, Fast, and Prompt
+identities, Ed25519 signatures, SBOM and provenance sidecars, absolute
+entrypoints, atomic Runtime/operator slots, native-first fallback policy, and
+separate host-plugin consent. An unsigned upstream package or an unavailable
+operator release is release-blocking; it must not be relabeled as verified.
+
 The Codex hooks are versioned tag files rather than GitHub Release assets.
 Before tagging, execute `bash tests/test_codex_hooks.sh` and require every
 allow-unchanged case to exit zero with empty stdout. A bare

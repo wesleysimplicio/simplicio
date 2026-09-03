@@ -21,6 +21,7 @@ mod runtime_process;
 mod snapshot_exports;
 mod supervisor;
 mod token_exports;
+mod unified_usage_bridge;
 mod usage_changefeed;
 
 static INSTALL_PROCESS_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -331,7 +332,6 @@ async fn desktop_cost_projection(
     .await
     .map_err(|_| "cost_projection_unavailable".to_string())?
 }
-
 #[tauri::command]
 async fn desktop_token_report(
     request: Value,

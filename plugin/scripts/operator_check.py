@@ -13,7 +13,7 @@ upgrade" with two independent, deterministic rules:
    `maybe_upgrade()` never invokes the upgrade command — no network call, no subprocess.
 2. **Per-run version pin.** The operator version actually resolved at arming time is written
    once into the run's `.simplicio/orchestrator/loop/scratchpad.md` frontmatter
-   (`operator_versions: {"simplicio-mapper": "0.23.1", ...}`) and never rewritten mid-run.
+   (`operator_versions: {"simplicio-mapper": "0.0.0-test", ...}`) and never rewritten mid-run.
    A later iteration that observes a different version is a warning
    (`check_pin_mismatch()`), never a silent upgrade — the pin is deliberately one-way for the
    lifetime of a run.
@@ -21,9 +21,9 @@ upgrade" with two independent, deterministic rules:
 Usage::
 
     python3 scripts/operator_check.py should-upgrade --json
-    python3 scripts/operator_check.py record --versions '{"simplicio-mapper":"0.23.1"}'
-    python3 scripts/operator_check.py pin --scratchpad <path> --versions '{"simplicio-mapper":"0.23.1"}'
-    python3 scripts/operator_check.py check-pin --scratchpad <path> --versions '{"simplicio-mapper":"0.24.0"}'
+    python3 scripts/operator_check.py record --versions '{"simplicio-mapper":"0.0.0-test"}'
+    python3 scripts/operator_check.py pin --scratchpad <path> --versions '{"simplicio-mapper":"0.0.0-test"}'
+    python3 scripts/operator_check.py check-pin --scratchpad <path> --versions '{"simplicio-mapper":"0.0.1-test"}'
 """
 
 from __future__ import annotations
@@ -54,6 +54,12 @@ DEFAULT_PACKAGES = (
 )
 ALWAYS_LATEST_ENV = "SIMPLICIO_OPERATOR_ALWAYS_LATEST"
 _FALSE = frozenset({"0", "false", "no", "off", "disabled", "legacy"})
+
+# These values are deliberately synthetic. Keeping self-tests independent from published
+# operator trains prevents copied historical versions from looking like current composition
+# claims (distribution issue #322).
+SELFTEST_OPERATOR_VERSION = "0.0.0-test"
+SELFTEST_OPERATOR_VERSION_MISMATCH = "0.0.1-test"
 
 # Same override convention as scripts/install_lib.py: an explicit override keeps isolated
 # tests (and portable profiles) honest; normal runs use the platform's real user home.
@@ -430,7 +436,7 @@ def _selftest() -> int:
         cache = Path(tmp) / "operator-check.json"
         decision = should_upgrade(cache, binaries=())
         ok = ok and decision["should_upgrade"] is True
-        record_check(cache, {"simplicio-mapper": "0.23.1"})
+        record_check(cache, {"simplicio-mapper": SELFTEST_OPERATOR_VERSION})
         # Explicit legacy TTL: within-window must NOT upgrade (always-latest default
         # would otherwise force True; TTL tests pin the classic gate).
         decision2 = should_upgrade(cache, ttl_days=7, binaries=())
@@ -438,10 +444,12 @@ def _selftest() -> int:
 
         scratchpad = Path(tmp) / "scratchpad.md"
         scratchpad.write_text("---\niteration: 1\n---\ngoal\n", encoding="utf-8")
-        ok = ok and pin_versions(scratchpad, {"simplicio-mapper": "0.23.1"})
-        ok = ok and not pin_versions(scratchpad, {"simplicio-mapper": "9.9.9"})
-        ok = ok and read_pinned_versions(scratchpad) == {"simplicio-mapper": "0.23.1"}
-        warnings = check_pin_mismatch(scratchpad, {"simplicio-mapper": "0.24.0"})
+        ok = ok and pin_versions(scratchpad, {"simplicio-mapper": SELFTEST_OPERATOR_VERSION})
+        ok = ok and not pin_versions(scratchpad, {"simplicio-mapper": SELFTEST_OPERATOR_VERSION_MISMATCH})
+        ok = ok and read_pinned_versions(scratchpad) == {"simplicio-mapper": SELFTEST_OPERATOR_VERSION}
+        warnings = check_pin_mismatch(
+            scratchpad, {"simplicio-mapper": SELFTEST_OPERATOR_VERSION_MISMATCH}
+        )
         ok = ok and len(warnings) == 1
 
     print("operator_check selftest: %s" % ("PASS" if ok else "FAIL"))

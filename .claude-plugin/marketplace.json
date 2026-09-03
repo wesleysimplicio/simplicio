@@ -27,12 +27,6 @@
       "description": "Tuple-Space and Yool safe-speed prompt runtime with fan-out commands and an opt-in UserPromptSubmit adapter."
     },
     {
-      "name": "simplicio-sprint",
-      "source": "./plugins/simplicio-sprint",
-      "category": "development",
-      "description": "SendSprint intake and delivery skill for Jira, Azure DevOps, and GitHub sprint-to-draft-PR workflows."
-    },
-    {
       "name": "simplicio-hermes",
       "source": "./plugins/simplicio-hermes",
       "category": "development",
