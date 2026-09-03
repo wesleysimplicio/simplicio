@@ -71,8 +71,8 @@ other context accelerators are consultation-only; they are not lifecycle
 dependencies. Hooks never download, install, or expose a second context
 pipeline. If both Mapper paths fail, the host request is denied.
 
-The separate `simplicio-loop`, `simplicio-prompt`, `simplicio-sprint`, and
-`simplicio-hermes` packages remain available for explicit workflows and their
+The separate `simplicio-loop`, `simplicio-prompt`, and `simplicio-hermes`
+packages remain available for explicit workflows and their
 respective hosts. Install `simplicio-loop` only when the Loop orchestration
 surface is intentionally needed.
 
@@ -91,11 +91,10 @@ revalidates the project generation and refreshes or reuses the Mapper cache.
 | `simplicio` (Codex, Claude, Agent Plugins v1, Gemini) | Verified Runtime bootstrap, complete live MCP surface, shared skills, and Runtime-managed pre-hooks | This repository |
 | `simplicio-loop` | Loop, tasks alias, orient, review, compress, learn, autoresearch, Prism, Mapper, Fast, Dev CLI, Runtime skills and safety hooks | [`simplicio-loop`](https://github.com/wesleysimplicio/simplicio-loop) |
 | `simplicio-prompt` | Tuple-Space/Yool prompt contract, fan-out commands, and opt-in prompt adapter | [`simplicio-prompt`](https://github.com/wesleysimplicio/simplicio-prompt) |
-| `simplicio-sprint` | Sprint intake, mapping, evidence collection, and draft-PR delivery | [`simplicio-sprint`](https://github.com/wesleysimplicio/simplicio-sprint) |
 | `simplicio-hermes` | Native `pre_llm_call` context preparation and post-call Runtime receipts for Hermes Agent | This repository |
 
-The Loop plugin is the default integration. Prompt and Sprint remain separate
-installable plugins so their hooks and commands do not create duplicate runtime
+The Loop plugin is the default integration. Prompt remains a separate
+installable plugin so its hooks and commands do not create duplicate runtime
 activation or hidden provider calls.
 
 ## Verification

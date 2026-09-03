@@ -15,6 +15,13 @@ def _load_json(relative: str) -> dict:
 def test_marketplace_lists_existing_plugins() -> None:
     marketplace = _load_json(".claude-plugin/marketplace.json")
     assert marketplace["name"] == "simplicio"
+    assert [entry["name"] for entry in marketplace["plugins"]] == [
+        "simplicio",
+        "simplicio-loop",
+        "simplicio-prompt",
+        "simplicio-hermes",
+    ]
+    assert not (ROOT / "plugins/simplicio-sprint").exists()
 
     for entry in marketplace["plugins"]:
         source = ROOT / entry["source"]
@@ -138,8 +145,3 @@ def test_published_adapters_point_to_their_canonical_commands() -> None:
     assert prompt["name"] == "simplicio-prompt"
     assert (ROOT / "plugins/simplicio-prompt/commands/simplicio.md").is_file()
     assert (ROOT / "plugins/simplicio-prompt/hooks/plugin-runtime-adapter/adapter.mjs").is_file()
-
-    sprint = _load_json("plugins/simplicio-sprint/.claude-plugin/plugin.json")
-    assert sprint["name"] == "simplicio-sprint"
-    skill = ROOT / "plugins/simplicio-sprint/skills/sendsprint/SKILL.md"
-    assert "sendsprint run" in skill.read_text(encoding="utf-8")
