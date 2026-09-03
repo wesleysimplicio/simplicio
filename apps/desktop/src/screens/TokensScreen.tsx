@@ -95,7 +95,7 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
       // Project paths are intentionally not sent to this contract. Runtime owns
       // project identity and redaction; the public v1 query supports session scope.
       const query = sessionId.trim() ? { session_id: sessionId.trim() } : {};
-      setUnifiedProjection(await loadDesktopUnifiedUsage(query));
+      setUnifiedProjection(await loadDesktopUnifiedUsage(query, repoPath || undefined));
     } catch (cause) {
       setUnifiedError(cause instanceof Error ? cause.message : "unified_usage_unavailable");
     } finally {
@@ -110,7 +110,7 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
     setCostError(null);
     try {
       const query = sessionId.trim() ? { session_id: sessionId.trim() } : {};
-      setCostProjection(await loadDesktopCostProjection(query));
+      setCostProjection(await loadDesktopCostProjection(query, repoPath || undefined));
     } catch (cause) {
       setCostError(cause instanceof Error ? cause.message : "cost_projection_unavailable");
     } finally {
@@ -207,9 +207,10 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
         </button>
         {costError && <p role="status">Relatório indisponível: <code>{costError}</code>. Nenhuma economia foi estimada no renderer.</p>}
         {costProjection && <div className="token-cost-result">
-          <p>{costProjection.periods.length} período(s) · {costProjection.breakdown.length} agrupamento(s) · pricing: {costProjection.metadata.pricing.status} · cobertura: {costProjection.metadata.coverage.status}</p>
-          <p>Tokens reais: {costProjection.totals.actual_tokens === null ? "indisponível" : costProjection.totals.actual_tokens.toLocaleString("pt-BR")}; economia: {costProjection.totals.saved_tokens === null ? "indisponível" : costProjection.totals.saved_tokens.toLocaleString("pt-BR")}; custo economizado: {costProjection.totals.saved_cost_usd === null ? "indisponível" : `US$ ${costProjection.totals.saved_cost_usd.toFixed(6)}`}</p>
-          <p>Proveniência: {costProjection.breakdown.map((row) => row.provenance).filter((value, index, values) => values.indexOf(value) === index).join(", ") || "indisponível"} · digest <code>{costProjection.metadata.report_digest}</code></p>
+          <p>{costProjection.rows.length} agrupamento(s) · pricing: {costProjection.pricing.status} · cobertura: {costProjection.metadata.coverage.status}</p>
+          <p>Tokens reais: {costProjection.totals.actual_tokens === null ? "indisponível" : costProjection.totals.actual_tokens.toLocaleString("pt-BR")}; baseline: {costProjection.totals.baseline_tokens === null ? "indisponível" : costProjection.totals.baseline_tokens.toLocaleString("pt-BR")}; economia: {costProjection.totals.saved_tokens === null ? "indisponível" : costProjection.totals.saved_tokens.toLocaleString("pt-BR")}</p>
+          <p>Custo real: {costProjection.totals.actual_cost_usd === null ? "indisponível" : `US$ ${costProjection.totals.actual_cost_usd.toFixed(6)}`}; baseline: {costProjection.totals.baseline_cost_usd === null ? "indisponível" : `US$ ${costProjection.totals.baseline_cost_usd.toFixed(6)}`}; economizado: {costProjection.totals.saved_cost_usd === null ? "indisponível" : `US$ ${costProjection.totals.saved_cost_usd.toFixed(6)}`}</p>
+          <p>Proveniência: {costProjection.rows.map((row) => row.state).filter((value, index, values) => values.indexOf(value) === index).join(", ") || "indisponível"} · confiança: {costProjection.confidence.actual} · baseline: {costProjection.baseline.values_status} · digest <code>{costProjection.metadata.report_digest}</code></p>
         </div>}
       </section>
       <ContextSavings repoPath={repoPath} autoLoad={autoContext} />

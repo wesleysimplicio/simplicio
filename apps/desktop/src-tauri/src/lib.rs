@@ -15,6 +15,7 @@ mod local_projects;
 mod native_menu;
 mod project_discovery_process;
 mod project_usage;
+mod projection_queries;
 mod runtime_install;
 mod runtime_process;
 mod snapshot_exports;
@@ -279,6 +280,56 @@ async fn desktop_usage_changefeed(
     })
     .await
     .map_err(|_| "usage_changefeed_unavailable".to_string())?
+}
+
+fn default_projection_repo() -> Result<PathBuf, String> {
+    std::env::var_os("SIMPLICIO_DESKTOP_REPO")
+        .or_else(|| std::env::var_os("HOME"))
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map(PathBuf::from)
+        .ok_or_else(|| "projection_query_invalid".to_string())
+}
+
+#[tauri::command]
+async fn desktop_unified_usage(
+    query: Value,
+    repo_path: Option<String>,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        require_read_access()?;
+        let default_repo = default_projection_repo()?;
+        let args = projection_queries::query_args(
+            "desktop-unified-usage",
+            &query,
+            repo_path.as_deref(),
+            &default_repo,
+        )?;
+        let borrowed = args.iter().map(String::as_str).collect::<Vec<_>>();
+        run_runtime_json(&borrowed).map_err(|_| "unified_usage_unavailable".to_string())
+    })
+    .await
+    .map_err(|_| "unified_usage_unavailable".to_string())?
+}
+
+#[tauri::command]
+async fn desktop_cost_projection(
+    query: Value,
+    repo_path: Option<String>,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        require_read_access()?;
+        let default_repo = default_projection_repo()?;
+        let args = projection_queries::query_args(
+            "desktop-cost-projection",
+            &query,
+            repo_path.as_deref(),
+            &default_repo,
+        )?;
+        let borrowed = args.iter().map(String::as_str).collect::<Vec<_>>();
+        run_runtime_json(&borrowed).map_err(|_| "cost_projection_unavailable".to_string())
+    })
+    .await
+    .map_err(|_| "cost_projection_unavailable".to_string())?
 }
 
 #[tauri::command]
@@ -675,6 +726,8 @@ pub fn run() {
             desktop_plan_integrations,
             desktop_usage_projects,
             desktop_usage_changefeed,
+            desktop_unified_usage,
+            desktop_cost_projection,
             desktop_context_report,
             desktop_token_report,
             desktop_consolidated_token_report,

@@ -49,10 +49,10 @@ export async function loadDesktopUsageProjects() {
   return parseUsageProjects(await readUsageProjects(() => invoke<unknown>("desktop_usage_projects")));
 }
 
-export async function loadDesktopUnifiedUsage(query: UsageQuery = {}): Promise<UnifiedUsageProjection> {
+export async function loadDesktopUnifiedUsage(query: UsageQuery = {}, repoPath?: string): Promise<UnifiedUsageProjection> {
   if (!isTauri()) throw new Error("preview_no_runtime");
   return parseUnifiedUsageProjection(await withTimeout(
-    invoke<unknown>("desktop_unified_usage", { query }),
+    invoke<unknown>("desktop_unified_usage", { query, repoPath: repoPath || null }),
     60_000,
     "unified_usage_timeout",
   ));
@@ -65,10 +65,10 @@ export function exportDesktopUnifiedUsage(
   return exportUnifiedUsageProjection(projection, format);
 }
 
-export async function loadDesktopCostProjection(query: CostQuery = {}): Promise<CostProjection> {
+export async function loadDesktopCostProjection(query: CostQuery = {}, repoPath?: string): Promise<CostProjection> {
   if (!isTauri()) throw new Error("preview_no_runtime");
   return parseCostProjection(await withTimeout(
-    invoke<unknown>("desktop_cost_projection", { query }),
+    invoke<unknown>("desktop_cost_projection", { query, repoPath: repoPath || null }),
     60_000,
     "cost_projection_timeout",
   ));
