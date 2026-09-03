@@ -421,7 +421,6 @@ const pluginPackages = [
   { id: "simplicio", name: "Simplicio", description: "Runtime, MCP, ferramentas e skills para agentes compatíveis.", category: "Runtime e MCP" },
   { id: "simplicio-loop", name: "Simplicio Loop", description: "Fluxos de tarefas e orquestração governada.", category: "Orquestração" },
   { id: "simplicio-prompt", name: "Simplicio Prompt", description: "Preparação de contexto e contratos de prompt.", category: "Contexto" },
-  { id: "simplicio-sprint", name: "Simplicio Sprint", description: "Compatibilidade com fluxos de sprint do ecossistema.", category: "Fluxos" },
   { id: "simplicio-hermes", name: "Simplicio Hermes", description: "Pacote de integração nativa com Hermes.", category: "Integrações" },
 ];
 
