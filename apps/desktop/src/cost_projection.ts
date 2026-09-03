@@ -6,7 +6,7 @@ export const MAX_COST_EXPORT_BYTES = 64 * 1024;
 
 export type CostExecution = 'local' | 'remote';
 export type CostProvenance = 'measured' | 'provider-reported' | 'estimated' | 'unavailable';
-export type CostCoverageStatus = 'complete' | 'partial' | 'no_data' | 'unavailable' | 'conflicted';
+export type CostCoverageStatus = 'complete' | 'partial' | 'no_data';
 export type CostConfidence = 'high' | 'medium' | 'blocked';
 
 export interface CostQuery {
@@ -28,11 +28,11 @@ export interface CostPricing {
 }
 
 export interface CostBaseline {
-  identity_status: 'known' | 'mixed' | 'unknown';
+  identity_status: 'known' | 'mixed' | 'unknown' | 'unavailable';
   versions: string[];
   methods: string[];
-  values_status: 'known' | 'mixed' | 'unavailable';
-  reason: string | null;
+  values_status: 'unavailable';
+  reason: 'baseline_values_not_recorded';
 }
 
 export interface CostConfidenceSummary {
@@ -96,7 +96,7 @@ export interface CostProjection {
 const EXECUTIONS: CostExecution[] = ['local', 'remote'];
 const PROVENANCES: CostProvenance[] = ['measured', 'provider-reported', 'estimated', 'unavailable'];
 const CONFIDENCES: CostConfidence[] = ['high', 'medium', 'blocked'];
-const COVERAGE: CostCoverageStatus[] = ['complete', 'partial', 'no_data', 'unavailable', 'conflicted'];
+const COVERAGE: CostCoverageStatus[] = ['complete', 'partial', 'no_data'];
 const SENSITIVE_KEY = /(^|_)(path|cwd|home|argv|prompt|secret|password|credential|authorization|api_key|access_token|refresh_token|raw_payload|raw_output|preview)(_|$)/i;
 
 function object(value: unknown): Record<string, unknown> {
@@ -104,9 +104,22 @@ function object(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function exactObject(
+  value: unknown,
+  allowed: readonly string[],
+  required: readonly string[] = allowed,
+): Record<string, unknown> {
+  const raw = object(value);
+  if (Object.keys(raw).some(key => !allowed.includes(key))
+    || required.some(key => !(key in raw))) {
+    throw new Error('cost_projection_invalid');
+  }
+  return raw;
+}
+
 function text(value: unknown, max = 256): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > max
-    || /[\u0000-\u001f\u007f]/.test(value) || /[\\/]/.test(value)) {
+    || /[\u0000-\u001f\u007f]/.test(value)) {
     throw new Error('cost_projection_invalid');
   }
   return value;
@@ -124,6 +137,12 @@ function digest(value: unknown): string {
 function integer(value: unknown): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) throw new Error('cost_projection_invalid');
   return value;
+}
+
+function positiveInteger(value: unknown): number {
+  const result = integer(value);
+  if (result < 1) throw new Error('cost_projection_invalid');
+  return result;
 }
 
 function epoch(value: unknown): number {
@@ -169,35 +188,29 @@ function rejectSensitiveKeys(value: unknown): void {
 }
 
 function parseQuery(value: unknown): CostQuery {
-  if (value === undefined) return {};
-  const raw = object(value);
+  const raw = exactObject(value, [
+    'from_epoch', 'to_epoch', 'provider', 'model', 'host', 'project_id', 'session_id',
+  ], []);
   const query: CostQuery = {};
   if (raw.from_epoch !== undefined) query.from_epoch = epoch(raw.from_epoch);
   if (raw.to_epoch !== undefined) query.to_epoch = epoch(raw.to_epoch);
   if (query.from_epoch !== undefined && query.to_epoch !== undefined && query.from_epoch >= query.to_epoch) {
     throw new Error('cost_projection_invalid');
   }
-  for (const key of ['provider', 'model', 'host', 'project_id', 'session_id'] as const) {
+  for (const key of ['provider', 'model', 'host'] as const) {
     if (raw[key] !== undefined) query[key] = text(raw[key]);
+  }
+  for (const key of ['project_id', 'session_id'] as const) {
+    if (raw[key] !== undefined) query[key] = digest(raw[key]);
   }
   return query;
 }
 
-function validateSavings(totals: CostTotals): void {
-  const tokensKnown = totals.actual_tokens !== null && totals.baseline_tokens !== null;
-  if ((totals.saved_tokens !== null) !== tokensKnown) throw new Error('cost_projection_savings_mismatch');
-  if (tokensKnown && totals.saved_tokens !== totals.baseline_tokens! - totals.actual_tokens!) {
-    throw new Error('cost_projection_savings_mismatch');
-  }
-  const costsKnown = totals.actual_cost_usd !== null && totals.baseline_cost_usd !== null;
-  if ((totals.saved_cost_usd !== null) !== costsKnown) throw new Error('cost_projection_savings_mismatch');
-  if (costsKnown && Math.abs(totals.saved_cost_usd! - (totals.baseline_cost_usd! - totals.actual_cost_usd!)) > 0.00000001) {
-    throw new Error('cost_projection_savings_mismatch');
-  }
-}
-
 function parseTotals(value: unknown): CostTotals {
-  const raw = object(value);
+  const raw = exactObject(value, [
+    'event_count', 'actual_tokens', 'actual_cost_usd', 'baseline_tokens',
+    'baseline_cost_usd', 'saved_tokens', 'saved_cost_usd',
+  ]);
   const totals: CostTotals = {
     event_count: integer(raw.event_count),
     actual_tokens: nullableInteger(raw.actual_tokens),
@@ -207,12 +220,19 @@ function parseTotals(value: unknown): CostTotals {
     saved_tokens: nullableInteger(raw.saved_tokens),
     saved_cost_usd: money(raw.saved_cost_usd),
   };
-  validateSavings(totals);
+  if (totals.baseline_tokens !== null || totals.baseline_cost_usd !== null
+    || totals.saved_tokens !== null || totals.saved_cost_usd !== null) {
+    throw new Error('cost_projection_invalid');
+  }
   return totals;
 }
 
 function parseRow(value: unknown): CostRow {
-  const raw = object(value);
+  const raw = exactObject(value, [
+    'provider', 'model', 'host', 'project_id', 'session_id', 'execution', 'event_count',
+    'actual_tokens', 'actual_cost_usd', 'baseline_tokens', 'baseline_cost_usd',
+    'saved_tokens', 'saved_cost_usd', 'state', 'confidence', 'reason',
+  ]);
   const row: CostRow = {
     provider: text(raw.provider),
     model: text(raw.model),
@@ -220,7 +240,7 @@ function parseRow(value: unknown): CostRow {
     project_id: digest(raw.project_id),
     session_id: digest(raw.session_id),
     execution: enumValue(raw.execution, EXECUTIONS),
-    event_count: integer(raw.event_count),
+    event_count: positiveInteger(raw.event_count),
     actual_tokens: nullableInteger(raw.actual_tokens),
     actual_cost_usd: money(raw.actual_cost_usd),
     baseline_tokens: nullableInteger(raw.baseline_tokens),
@@ -231,17 +251,22 @@ function parseRow(value: unknown): CostRow {
     confidence: enumValue(raw.confidence, CONFIDENCES),
     reason: nullableText(raw.reason),
   };
-  validateSavings(row);
+  if (row.baseline_tokens !== null || row.baseline_cost_usd !== null
+    || row.saved_tokens !== null || row.saved_cost_usd !== null) {
+    throw new Error('cost_projection_invalid');
+  }
   return row;
 }
 
 function parseCoverage(value: unknown): CostCoverage {
-  const raw = object(value);
+  const raw = exactObject(value, [
+    'status', 'missing_usage_events', 'unpriced_events', 'providers', 'reason',
+  ]);
   const coverage: CostCoverage = {
-    status: enumValue(raw.status, COVERAGE),
+    status: enumValue(raw.status, ['complete', 'partial', 'no_data'] as const),
     missing_usage_events: integer(raw.missing_usage_events),
     unpriced_events: integer(raw.unpriced_events),
-    providers: identityArray(raw.providers ?? []),
+    providers: identityArray(raw.providers),
     reason: nullableText(raw.reason),
   };
   if (coverage.status === 'complete'
@@ -264,7 +289,6 @@ function sumRows(rows: CostRow[]): CostTotals {
     saved_tokens: sumNullable(rows.map(row => row.saved_tokens)),
     saved_cost_usd: sumNullable(rows.map(row => row.saved_cost_usd)),
   };
-  validateSavings(totals);
   return totals;
 }
 
@@ -283,35 +307,38 @@ function sameTotals(left: CostTotals, right: CostTotals): boolean {
 }
 
 function parsePricing(value: unknown): CostPricing {
-  const raw = object(value);
+  const raw = exactObject(value, ['status', 'identity', 'version', 'versions', 'sources']);
   const pricing: CostPricing = {
     status: enumValue(raw.status, ['known', 'mixed', 'unavailable'] as const),
     identity: raw.identity === null ? null : digest(raw.identity),
     version: raw.version === null ? null : text(raw.version),
-    versions: identityArray(raw.versions ?? []),
-    sources: identityArray(raw.sources ?? []),
+    versions: identityArray(raw.versions),
+    sources: identityArray(raw.sources),
   };
+  if (pricing.sources.some(source => !['measured', 'provider-reported', 'estimated'].includes(source))) {
+    throw new Error('cost_projection_invalid');
+  }
   if (pricing.status === 'unavailable' && (pricing.identity !== null || pricing.version !== null
     || pricing.versions.length !== 0 || pricing.sources.length !== 0)) throw new Error('cost_projection_pricing_invalid');
-  if (pricing.status === 'known' && (pricing.identity === null || pricing.version === null
-    || pricing.versions.length === 0 || pricing.sources.length === 0)) throw new Error('cost_projection_pricing_invalid');
-  if (pricing.status === 'mixed' && (pricing.identity === null || pricing.sources.length === 0)) throw new Error('cost_projection_pricing_invalid');
+  if (['known', 'mixed'].includes(pricing.status)
+    && (pricing.identity === null || pricing.versions.length === 0 || pricing.sources.length === 0)) {
+    throw new Error('cost_projection_pricing_invalid');
+  }
   return pricing;
 }
 
 function parseBaseline(value: unknown): CostBaseline {
-  const raw = object(value);
+  const raw = exactObject(value, [
+    'identity_status', 'versions', 'methods', 'values_status', 'reason',
+  ]);
   const baseline: CostBaseline = {
-    identity_status: enumValue(raw.identity_status, ['known', 'mixed', 'unknown'] as const),
-    versions: identityArray(raw.versions ?? []),
-    methods: identityArray(raw.methods ?? []),
-    values_status: enumValue(raw.values_status, ['known', 'mixed', 'unavailable'] as const),
-    reason: nullableText(raw.reason),
+    identity_status: enumValue(raw.identity_status, ['known', 'mixed', 'unknown', 'unavailable'] as const),
+    versions: identityArray(raw.versions),
+    methods: identityArray(raw.methods),
+    values_status: 'unavailable',
+    reason: 'baseline_values_not_recorded',
   };
-  if (baseline.identity_status === 'known' && (baseline.versions.length !== 1 || baseline.methods.length !== 1)) {
-    throw new Error('cost_projection_baseline_invalid');
-  }
-  if (baseline.identity_status === 'unknown' && (baseline.versions.length !== 0 || baseline.methods.length !== 0)) {
+  if (raw.values_status !== 'unavailable' || raw.reason !== 'baseline_values_not_recorded') {
     throw new Error('cost_projection_baseline_invalid');
   }
   return baseline;
@@ -320,16 +347,25 @@ function parseBaseline(value: unknown): CostBaseline {
 /** Parse only the Runtime's redacted cost projection; unknown fields are intentionally discarded. */
 export function parseCostProjection(value: unknown): CostProjection {
   rejectSensitiveKeys(value);
-  const raw = object(value);
+  const raw = exactObject(value, [
+    'schema', 'generated_at_epoch', 'query', 'usage_revision', 'pricing', 'baseline',
+    'confidence', 'rows', 'totals', 'metadata',
+  ]);
   if (raw.schema !== COST_PROJECTION_SCHEMA) throw new Error('cost_projection_invalid');
   const rowsRaw = raw.rows;
   if (!Array.isArray(rowsRaw) || rowsRaw.length > MAX_COST_ROWS) throw new Error('cost_projection_invalid');
   const rows = rowsRaw.map(parseRow);
   const totals = parseTotals(raw.totals);
   if (!sameTotals(totals, sumRows(rows))) throw new Error('cost_projection_totals_mismatch');
-  const metadataRaw = object(raw.metadata);
+  const metadataRaw = exactObject(raw.metadata, [
+    'source', 'generated_by', 'revision', 'report_digest', 'coverage', 'redacted',
+  ]);
   if (metadataRaw.source !== 'runtime' || metadataRaw.generated_by !== 'runtime_usage_ledger' || metadataRaw.redacted !== true) {
     throw new Error('cost_projection_untrusted_source');
+  }
+  const confidence = exactObject(raw.confidence, ['actual', 'baseline', 'savings']);
+  if (confidence.baseline !== 'blocked' || confidence.savings !== 'blocked') {
+    throw new Error('cost_projection_invalid');
   }
   const metadata: CostProjectionMetadata = {
     source: 'runtime',
@@ -339,14 +375,6 @@ export function parseCostProjection(value: unknown): CostProjection {
     coverage: parseCoverage(metadataRaw.coverage),
     redacted: true,
   };
-  if (metadata.coverage.status === 'no_data' || metadata.coverage.status === 'unavailable') {
-    if (rows.length !== 0 || totals.event_count !== 0) throw new Error('cost_projection_coverage_mismatch');
-  }
-  if (metadata.coverage.status === 'partial' && metadata.coverage.missing_usage_events === 0
-    && metadata.coverage.unpriced_events === 0 && rows.every(row => row.confidence !== 'blocked')) {
-    throw new Error('cost_projection_coverage_mismatch');
-  }
-  const confidence = object(raw.confidence);
   return {
     schema: COST_PROJECTION_SCHEMA,
     generated_at_epoch: epoch(raw.generated_at_epoch),

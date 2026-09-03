@@ -83,6 +83,9 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
     setUnifiedProjection(null);
     setUnifiedError(null);
     setUnifiedBusy(false);
+    setCostProjection(null);
+    setCostError(null);
+    setCostBusy(false);
   }
 
   function invalidate() {
@@ -165,8 +168,19 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
     setCostProjection(null);
     setCostError(null);
     try {
-      const query = sessionId.trim() ? { session_id: sessionId.trim() } : {};
-      setCostProjection(await loadDesktopCostProjection(query, repoPath || undefined));
+      const customFrom = Math.floor(new Date(from).getTime() / 1000);
+      const customTo = Math.floor(new Date(to).getTime() / 1000);
+      const query = buildUnifiedUsageQuery({
+        period,
+        now_epoch: Math.floor(Date.now() / 1000),
+        selected_range: selected ? { from_epoch: selected.from_epoch, to_epoch: selected.to_epoch } : undefined,
+        custom_range: period === "custom" ? { from_epoch: customFrom, to_epoch: customTo } : undefined,
+        provider,
+        model,
+        host,
+        session_id: sessionId,
+      });
+      setCostProjection(await loadDesktopCostProjection(query, repoPath.trim() || undefined));
     } catch (cause) {
       setCostError(cause instanceof Error ? cause.message : "cost_projection_unavailable");
     } finally {
