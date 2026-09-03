@@ -119,7 +119,7 @@ function exactObject(
 
 function text(value: unknown, max = 256): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > max
-    || /[\u0000-\u001f\u007f]/.test(value)) {
+    || !/^[\x20-\x7e]+$/.test(value)) {
     throw new Error('cost_projection_invalid');
   }
   return value;
@@ -319,7 +319,7 @@ function parsePricing(value: unknown): CostPricing {
     throw new Error('cost_projection_invalid');
   }
   if (pricing.status === 'unavailable' && (pricing.identity !== null || pricing.version !== null
-    || pricing.versions.length !== 0 || pricing.sources.length !== 0)) throw new Error('cost_projection_pricing_invalid');
+    || pricing.sources.length !== 0)) throw new Error('cost_projection_pricing_invalid');
   if (['known', 'mixed'].includes(pricing.status)
     && (pricing.identity === null || pricing.versions.length === 0 || pricing.sources.length === 0)) {
     throw new Error('cost_projection_pricing_invalid');
@@ -357,6 +357,11 @@ export function parseCostProjection(value: unknown): CostProjection {
   const rows = rowsRaw.map(parseRow);
   const totals = parseTotals(raw.totals);
   if (!sameTotals(totals, sumRows(rows))) throw new Error('cost_projection_totals_mismatch');
+  const pricing = parsePricing(raw.pricing);
+  if (pricing.status === 'unavailable'
+    && (totals.actual_cost_usd !== null || rows.some(row => row.actual_cost_usd !== null))) {
+    throw new Error('cost_projection_pricing_invalid');
+  }
   const metadataRaw = exactObject(raw.metadata, [
     'source', 'generated_by', 'revision', 'report_digest', 'coverage', 'redacted',
   ]);
@@ -380,7 +385,7 @@ export function parseCostProjection(value: unknown): CostProjection {
     generated_at_epoch: epoch(raw.generated_at_epoch),
     query: parseQuery(raw.query),
     usage_revision: digest(raw.usage_revision),
-    pricing: parsePricing(raw.pricing),
+    pricing,
     baseline: parseBaseline(raw.baseline),
     confidence: {
       actual: enumValue(confidence.actual, CONFIDENCES),

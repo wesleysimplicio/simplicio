@@ -94,6 +94,19 @@ describe('Runtime desktop cost projection contract', () => {
       ...fixture,
       query: { project_id: '/private/project' },
     })).toThrow('cost_projection_invalid');
+    expect(() => parseCostProjection({
+      ...fixture,
+      rows: [{ ...fixture.rows[0], provider: 'não' }, fixture.rows[1]],
+    })).toThrow('cost_projection_invalid');
+  });
+
+  it('never presents actual cost when Runtime pricing is unavailable', () => {
+    expect(() => parseCostProjection({
+      ...fixture,
+      pricing: {
+        status: 'unavailable', identity: null, version: null, versions: [], sources: [],
+      },
+    })).toThrow('cost_projection_pricing_invalid');
   });
 
   it('rejects preview, paths, and sensitive fields', () => {

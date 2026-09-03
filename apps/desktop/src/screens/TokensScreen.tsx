@@ -55,6 +55,7 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
   const exportLock = useRef(false);
   const sequence = useRef(0);
   const unifiedRequests = useRef(new UnifiedUsageRequestGuard());
+  const costRequests = useRef(new UnifiedUsageRequestGuard());
 
   async function load(query: TokenQuery) {
     const request = ++sequence.current;
@@ -75,7 +76,11 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
 
   useEffect(() => {
     void load({ timezoneOffsetSeconds: -new Date().getTimezoneOffset() * 60, ...(initialRepoPath ? { repoPath: initialRepoPath } : {}) });
-    return () => { sequence.current += 1; unifiedRequests.current.invalidate(); };
+    return () => {
+      sequence.current += 1;
+      unifiedRequests.current.invalidate();
+      costRequests.current.invalidate();
+    };
   }, [initialRepoPath]);
 
   function invalidateUnifiedUsage() {
@@ -83,6 +88,7 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
     setUnifiedProjection(null);
     setUnifiedError(null);
     setUnifiedBusy(false);
+    costRequests.current.invalidate();
     setCostProjection(null);
     setCostError(null);
     setCostBusy(false);
@@ -164,6 +170,7 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
 
   async function loadCostProjection() {
     if (costBusy) return;
+    const request = costRequests.current.begin();
     setCostBusy(true);
     setCostProjection(null);
     setCostError(null);
@@ -180,11 +187,14 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
         host,
         session_id: sessionId,
       });
-      setCostProjection(await loadDesktopCostProjection(query, repoPath.trim() || undefined));
+      const next = await loadDesktopCostProjection(query, repoPath.trim() || undefined);
+      if (costRequests.current.isCurrent(request)) setCostProjection(next);
     } catch (cause) {
-      setCostError(cause instanceof Error ? cause.message : "cost_projection_unavailable");
+      if (costRequests.current.isCurrent(request)) {
+        setCostError(cause instanceof Error ? cause.message : "cost_projection_unavailable");
+      }
     } finally {
-      setCostBusy(false);
+      if (costRequests.current.isCurrent(request)) setCostBusy(false);
     }
   }
 
