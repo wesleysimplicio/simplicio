@@ -28,7 +28,7 @@ function SessionCenter({ usage }: { usage?: DesktopUsageState }) {
     <p className="token-proof-note">{costProjection ? costProjection.totals.event_count + " evento(s) · cobertura " + costProjection.metadata.coverage.status : projection ? projection.totals.event_count + " evento(s) · cobertura " + projection.metadata.coverage.status : "Aguardando um snapshot comprovado pelo Runtime; nenhum zero foi inferido."}</p>
     <details>
       <summary>Como calculamos</summary>
-      <p>O Runtime fornece a projeção redigida. Provider/modelo: {projection?.metadata.coverage.providers.join(", ") || "indisponível"} · pricing: {costProjection?.metadata.pricing.version || projection?.metadata.pricing_version || "indisponível"} · motivo: {changefeed?.reason_code || "usage_changefeed_unavailable"}.</p>
+      <p>O Runtime fornece a projeção redigida. Provider/modelo: {projection?.metadata.coverage.providers.join(", ") || "indisponível"} · pricing: {costProjection?.pricing.version || projection?.metadata.pricing_version || "indisponível"} · motivo: {changefeed?.reason_code || "usage_changefeed_unavailable"}.</p>
     </details>
   </section>;
 }
