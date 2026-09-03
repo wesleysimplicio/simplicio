@@ -49,10 +49,10 @@ export async function loadDesktopUsageProjects() {
   return parseUsageProjects(await readUsageProjects(() => invoke<unknown>("desktop_usage_projects")));
 }
 
-export async function loadDesktopUnifiedUsage(query: UsageQuery = {}): Promise<UnifiedUsageProjection> {
+export async function loadDesktopUnifiedUsage(query: UsageQuery = {}, repoPath?: string): Promise<UnifiedUsageProjection> {
   if (!isTauri()) throw new Error("preview_no_runtime");
   return parseUnifiedUsageProjection(await withTimeout(
-    invoke<unknown>("desktop_unified_usage", { query }),
+    invoke<unknown>("desktop_unified_usage", { query, repoPath }),
     60_000,
     "unified_usage_timeout",
   ));

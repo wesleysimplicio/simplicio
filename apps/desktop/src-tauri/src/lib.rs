@@ -20,6 +20,7 @@ mod runtime_process;
 mod snapshot_exports;
 mod supervisor;
 mod token_exports;
+mod unified_usage_bridge;
 mod usage_changefeed;
 
 static INSTALL_PROCESS_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -300,6 +301,23 @@ async fn desktop_token_report(
     })
     .await
     .map_err(|_| "token_report_unavailable".to_string())?
+}
+
+#[tauri::command]
+async fn desktop_unified_usage(query: Value, repo_path: Option<String>) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        require_read_access()?;
+        let default_repo = std::env::var_os("SIMPLICIO_DESKTOP_REPO")
+            .or_else(|| std::env::var_os("HOME"))
+            .or_else(|| std::env::var_os("USERPROFILE"))
+            .map(PathBuf::from)
+            .ok_or_else(|| "unified_usage_query_invalid".to_string())?;
+        let args = unified_usage_bridge::query_args(&query, repo_path.as_deref(), &default_repo)?;
+        let borrowed = args.iter().map(String::as_str).collect::<Vec<_>>();
+        run_runtime_json(&borrowed).map_err(|_| "unified_usage_unavailable".to_string())
+    })
+    .await
+    .map_err(|_| "unified_usage_unavailable".to_string())?
 }
 
 #[tauri::command]
@@ -676,6 +694,7 @@ pub fn run() {
             desktop_usage_projects,
             desktop_usage_changefeed,
             desktop_context_report,
+            desktop_unified_usage,
             desktop_token_report,
             desktop_consolidated_token_report,
             desktop_export_token_report,
