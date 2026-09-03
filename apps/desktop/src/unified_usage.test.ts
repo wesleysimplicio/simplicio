@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildUnifiedUsageQuery,
   exportUnifiedUsageProjection,
   parseUnifiedUsageProjection,
+  UNIFIED_USAGE_ACCOUNT_LIMITS,
+  UnifiedUsageRequestGuard,
   type UnifiedUsageProjection,
 } from './unified_usage';
 
@@ -28,12 +31,22 @@ const fixture: UnifiedUsageProjection = {
       input_tokens: 100,
       cache_read_tokens: 20,
       cache_write_tokens: 5,
+      reported_output_tokens: 40,
       output_tokens: 40,
       reasoning_tokens: 10,
       total_tokens: 150,
       cost_usd: 0.02,
       provenance: 'provider-reported',
+      reasoning_semantics: 'separate',
+      reasoning_semantics_provenance: 'provider-reported',
+      reasoning_semantics_reason: null,
       event_count: 1,
+      source_completeness: 'complete',
+      incomplete_events: 0,
+      missing_usage_events: 0,
+      unpriced_events: 0,
+      metric_provenance: { input_tokens: ['provider-reported'] },
+      missing_metrics: {},
     },
     {
       provider: 'local-provider',
@@ -45,12 +58,22 @@ const fixture: UnifiedUsageProjection = {
       input_tokens: 30,
       cache_read_tokens: 0,
       cache_write_tokens: 0,
+      reported_output_tokens: 5,
       output_tokens: 5,
       reasoning_tokens: 0,
       total_tokens: 35,
       cost_usd: null,
       provenance: 'unavailable',
+      reasoning_semantics: 'unknown',
+      reasoning_semantics_provenance: 'unavailable',
+      reasoning_semantics_reason: 'not_reported',
       event_count: 1,
+      source_completeness: 'partial',
+      incomplete_events: 1,
+      missing_usage_events: 1,
+      unpriced_events: 1,
+      metric_provenance: { input_tokens: ['unavailable'] },
+      missing_metrics: { cost_microusd: 1 },
     },
   ],
   totals: {
@@ -58,6 +81,7 @@ const fixture: UnifiedUsageProjection = {
     input_tokens: 130,
     cache_read_tokens: 20,
     cache_write_tokens: 5,
+    reported_output_tokens: 45,
     output_tokens: 45,
     reasoning_tokens: 10,
     total_tokens: 185,
@@ -68,6 +92,7 @@ const fixture: UnifiedUsageProjection = {
     generated_by: 'runtime_usage_ledger',
     generated_at_epoch: 1700000100,
     report_digest: 'sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+    revision: 'sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
     pricing_version: 'pricing-2026-01',
     pricing_sources: ['runtime-pricing-ledger'],
     coverage: {
@@ -97,11 +122,37 @@ describe('unified usage Runtime contract', () => {
     })).toThrow('usage_projection_sensitive_field');
   });
 
-  it('fails closed on inconsistent totals instead of recomputing them', () => {
-    expect(() => parseUnifiedUsageProjection({
+  it('consumes internally valid Runtime totals verbatim without aggregating rows', () => {
+    const runtimeTotals = {
+      ...fixture.totals,
+      input_tokens: 200,
+      total_tokens: 255,
+    };
+    const parsed = parseUnifiedUsageProjection({
       ...fixture,
-      totals: { ...fixture.totals, total_tokens: 999 },
-    })).toThrow('usage_projection_invalid');
+      totals: runtimeTotals,
+    });
+    expect(parsed.totals).toEqual(runtimeTotals);
+  });
+
+  it('keeps remote account limits explicitly unavailable instead of inferring quota or balance', () => {
+    expect(UNIFIED_USAGE_ACCOUNT_LIMITS).toEqual({
+      status: 'unavailable',
+      limit: null,
+      remaining: null,
+      reset_at_epoch: null,
+      reason: 'not_in_runtime_contract_v1',
+    });
+  });
+
+  it('logically aborts a late native reply after filters are invalidated', () => {
+    const requests = new UnifiedUsageRequestGuard();
+    const stale = requests.begin();
+    requests.invalidate();
+    const current = requests.begin();
+
+    expect(requests.isCurrent(stale)).toBe(false);
+    expect(requests.isCurrent(current)).toBe(true);
   });
 
   it('exports bounded JSON and CSV without raw IDs or sensitive fields', () => {
@@ -110,7 +161,40 @@ describe('unified usage Runtime contract', () => {
     expect(json).toContain('simplicio.desktop-unified-usage/v1');
     expect(json).not.toContain('do not export');
     expect(csv.split('\n')[0]).toContain('input_tokens');
+    expect(csv.split('\n')[0]).toContain('reported_output_tokens');
+    expect(csv.split('\n')[0]).toContain('source_completeness');
     expect(csv).toContain('provider-reported');
     expect(csv).not.toContain('prompt');
+  });
+
+  it('builds period and provider/model/host/session filters without exposing a project path', () => {
+    expect(buildUnifiedUsageQuery({
+      period: '7d',
+      now_epoch: 1_700_000_000,
+      provider: ' openai ',
+      model: ' gpt-5 ',
+      host: ' codex ',
+      session_id: ' session-redacted ',
+    })).toEqual({
+      from_epoch: 1_699_395_200,
+      to_epoch: 1_700_000_000,
+      provider: 'openai',
+      model: 'gpt-5',
+      host: 'codex',
+      session_id: 'session-redacted',
+    });
+  });
+
+  it('prefers the Runtime token-report range and rejects an invalid custom period', () => {
+    expect(buildUnifiedUsageQuery({
+      period: '12m',
+      now_epoch: 1_700_000_000,
+      selected_range: { from_epoch: 100, to_epoch: 200 },
+    })).toEqual({ from_epoch: 100, to_epoch: 200 });
+    expect(() => buildUnifiedUsageQuery({
+      period: 'custom',
+      now_epoch: 1_700_000_000,
+      custom_range: { from_epoch: 200, to_epoch: 100 },
+    })).toThrow('unified_usage_query_invalid');
   });
 });

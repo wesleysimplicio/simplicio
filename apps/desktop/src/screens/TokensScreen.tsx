@@ -4,11 +4,27 @@ import { ContextSavings } from "../components/ContextSavings";
 import { TokenProjects } from "../components/TokenProjects";
 import { ConsolidatedTokens } from "../components/ConsolidatedTokens";
 import type { UsageProjects } from "../project_usage";
-import type { UnifiedUsageProjection } from "../unified_usage";
+import { buildUnifiedUsageQuery, exportUnifiedUsageProjection, UNIFIED_USAGE_ACCOUNT_LIMITS, UnifiedUsageRequestGuard, unifiedUsageState, type UnifiedUsageProjection } from "../unified_usage";
 import type { CostProjection } from "../cost_projection";
 import type { DesktopUsageState } from "../usage_store";
 import { exportDesktopTokenReport, loadDesktopTokenReport, loadDesktopUnifiedUsage, loadDesktopCostProjection } from "../bridge";
 import { TOKEN_PERIODS, tokenErrorMessage, tokenExportErrorMessage, type TokenPeriod, type TokenQuery, type TokenUsageReport } from "../token_usage";
+
+interface TokenScreenPeriodActions {
+  invalidate: () => void;
+  setPeriod: (period: TokenPeriod) => void;
+  setReport: (report: TokenUsageReport | null) => void;
+}
+
+/** Apply the screen transition so a prior report range cannot survive a period change. */
+export function applyTokenScreenPeriodTransition(
+  period: TokenPeriod,
+  actions: TokenScreenPeriodActions,
+): void {
+  actions.invalidate();
+  actions.setReport(null);
+  actions.setPeriod(period);
+}
 
 export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }: { initialRepoPath?: string; projectPaths?: string[]; usage?: DesktopUsageState }) {
   const [discovery, setDiscovery] = useState<UsageProjects | null>(null);
@@ -19,6 +35,9 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
   const [allowAutoSelect, setAllowAutoSelect] = useState(!initialRepoPath);
   const [autoContext, setAutoContext] = useState(Boolean(initialRepoPath));
   const [sessionId, setSessionId] = useState("");
+  const [provider, setProvider] = useState("");
+  const [model, setModel] = useState("");
+  const [host, setHost] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [report, setReport] = useState<TokenUsageReport | null>(null);
@@ -35,6 +54,7 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
   const [exportError, setExportError] = useState<string | null>(null);
   const exportLock = useRef(false);
   const sequence = useRef(0);
+  const unifiedRequests = useRef(new UnifiedUsageRequestGuard());
 
   async function load(query: TokenQuery) {
     const request = ++sequence.current;
@@ -55,11 +75,19 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
 
   useEffect(() => {
     void load({ timezoneOffsetSeconds: -new Date().getTimezoneOffset() * 60, ...(initialRepoPath ? { repoPath: initialRepoPath } : {}) });
-    return () => { sequence.current += 1; };
+    return () => { sequence.current += 1; unifiedRequests.current.invalidate(); };
   }, [initialRepoPath]);
+
+  function invalidateUnifiedUsage() {
+    unifiedRequests.current.invalidate();
+    setUnifiedProjection(null);
+    setUnifiedError(null);
+    setUnifiedBusy(false);
+  }
 
   function invalidate() {
     sequence.current += 1;
+    invalidateUnifiedUsage();
     setReport(null);
     setError(null);
     setBusy(false);
@@ -88,19 +116,47 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
 
   async function loadUnifiedUsage() {
     if (unifiedBusy) return;
+    const request = unifiedRequests.current.begin();
     setUnifiedBusy(true);
     setUnifiedProjection(null);
     setUnifiedError(null);
     try {
       // Project paths are intentionally not sent to this contract. Runtime owns
       // project identity and redaction; the public v1 query supports session scope.
-      const query = sessionId.trim() ? { session_id: sessionId.trim() } : {};
-      setUnifiedProjection(await loadDesktopUnifiedUsage(query));
+      const customFrom = Math.floor(new Date(from).getTime() / 1000);
+      const customTo = Math.floor(new Date(to).getTime() / 1000);
+      const query = buildUnifiedUsageQuery({
+        period,
+        now_epoch: Math.floor(Date.now() / 1000),
+        selected_range: selected ? { from_epoch: selected.from_epoch, to_epoch: selected.to_epoch } : undefined,
+        custom_range: period === "custom" ? { from_epoch: customFrom, to_epoch: customTo } : undefined,
+        provider,
+        model,
+        host,
+        session_id: sessionId,
+      });
+      const next = await loadDesktopUnifiedUsage(query, repoPath.trim() || undefined);
+      if (unifiedRequests.current.isCurrent(request)) setUnifiedProjection(next);
     } catch (cause) {
-      setUnifiedError(cause instanceof Error ? cause.message : "unified_usage_unavailable");
+      if (unifiedRequests.current.isCurrent(request)) {
+        setUnifiedError(cause instanceof Error ? cause.message : "unified_usage_unavailable");
+      }
     } finally {
-      setUnifiedBusy(false);
+      if (unifiedRequests.current.isCurrent(request)) setUnifiedBusy(false);
     }
+  }
+
+  function downloadUnifiedUsage(format: "json" | "csv") {
+    if (!unifiedProjection || typeof document === "undefined") return;
+    const payload = exportUnifiedUsageProjection(unifiedProjection, format);
+    const url = URL.createObjectURL(new Blob([payload], {
+      type: format === "json" ? "application/json" : "text/csv",
+    }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `simplicio-usage-${unifiedProjection.metadata.report_digest.slice(7, 19)}.${format}`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   async function loadCostProjection() {
@@ -138,6 +194,7 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
   const selected = report?.periods.find((item) => item.window === period);
   const totals = selected?.totals;
   const hasUsage = Boolean(totals && totals.sample_count > totals.missing_usage_events);
+  const unifiedState = unifiedProjection ? unifiedUsageState(unifiedProjection) : null;
   const metric = (value: number | undefined) => hasUsage && value !== undefined ? value.toLocaleString("pt-BR") : "—";
 
   return (
@@ -158,9 +215,12 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
         setAllowAutoSelect(false); setAutoContext(true); invalidate(); setRepoPath(path); submit(path);
       }} />
       <form className="panel token-query" onSubmit={(event) => { event.preventDefault(); submit(); }}>
-        <label><span id="token-period-label">Período</span><span className="token-select"><select aria-labelledby="token-period-label" value={period} disabled={exporting} onChange={(event) => { setPeriod(event.target.value as TokenPeriod); if (event.target.value === "custom") invalidate(); }}>{TOKEN_PERIODS.map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select></span></label>
+        <label><span id="token-period-label">Período</span><span className="token-select"><select aria-labelledby="token-period-label" value={period} disabled={exporting} onChange={(event) => applyTokenScreenPeriodTransition(event.target.value as TokenPeriod, { invalidate, setPeriod, setReport })}>{TOKEN_PERIODS.map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select></span></label>
         <label>Pasta do projeto (opcional)<input value={repoPath} maxLength={4096} disabled={exporting} onChange={(event) => { setAllowAutoSelect(false); setAutoContext(false); invalidate(); setRepoPath(event.target.value); }} placeholder="Vazio: pasta pessoal" autoComplete="off" spellCheck={false} /></label>
         <label>Sessão (opcional)<input value={sessionId} maxLength={256} disabled={exporting} onChange={(event) => { invalidate(); setSessionId(event.target.value); }} placeholder="Todas as sessões do ledger" autoComplete="off" /></label>
+        <label>Provider (opcional)<input value={provider} maxLength={256} disabled={exporting} onChange={(event) => { invalidateUnifiedUsage(); setProvider(event.target.value); }} placeholder="Todos os providers" autoComplete="off" /></label>
+        <label>Modelo (opcional)<input value={model} maxLength={256} disabled={exporting} onChange={(event) => { invalidateUnifiedUsage(); setModel(event.target.value); }} placeholder="Todos os modelos" autoComplete="off" /></label>
+        <label>Host/IDE (opcional)<input value={host} maxLength={256} disabled={exporting} onChange={(event) => { invalidateUnifiedUsage(); setHost(event.target.value); }} placeholder="Todos os hosts" autoComplete="off" /></label>
         {period === "custom" && <><label>Início<input type="datetime-local" value={from} required disabled={exporting} onChange={(event) => { invalidate(); setFrom(event.target.value); }} /></label><label>Fim (exclusivo)<input type="datetime-local" value={to} required disabled={exporting} onChange={(event) => { invalidate(); setTo(event.target.value); }} /></label></>}
         <button className="button button-primary" type="submit" disabled={busy || exporting}><Glyph name="refresh" size={17} />{busy ? "Consultando…" : "Consultar uso"}</button>
       </form>
@@ -191,11 +251,19 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
         <button className="button button-secondary" type="button" disabled={unifiedBusy || exporting} onClick={() => void loadUnifiedUsage()}>
           {unifiedBusy ? "Consultando projeção…" : "Consultar uso unificado"}
         </button>
+        <button className="button button-secondary" type="button" disabled={!unifiedProjection || exporting} onClick={() => downloadUnifiedUsage("json")}>Exportar uso JSON</button>
+        <button className="button button-secondary" type="button" disabled={!unifiedProjection || exporting} onClick={() => downloadUnifiedUsage("csv")}>Exportar uso CSV</button>
         {unifiedError && <p role="status">Projeção indisponível: <code>{unifiedError}</code>. Nenhum zero foi inferido.</p>}
+        <p>Histórico local: eventos redigidos do ledger do Runtime para o projeto selecionado.</p>
+        <p role="status">Limites remotos da conta: {UNIFIED_USAGE_ACCOUNT_LIMITS.status}. O contrato v1 não fornece cota, saldo restante ou data de renovação; nenhum zero foi inferido.</p>
         {unifiedProjection && <div className="token-unified-result">
-          <p>{unifiedProjection.rows.length} agrupamento(s) · {unifiedProjection.totals.event_count} evento(s) · cobertura: {unifiedProjection.metadata.coverage.status}</p>
-          <p>Tokens registrados: {unifiedProjection.totals.total_tokens.toLocaleString("pt-BR")}; custo: {unifiedProjection.totals.cost_usd === null ? "indisponível" : `US$ ${unifiedProjection.totals.cost_usd.toFixed(6)}`}</p>
-          <ul>{unifiedProjection.rows.slice(0, 10).map((row) => <li key={`${row.provider}:${row.model}:${row.host}:${row.session_id ?? "none"}`}>{row.provider} · {row.model} · {row.host} · {row.total_tokens.toLocaleString("pt-BR")} tokens · {row.provenance}</li>)}</ul>
+          <p role="status">{unifiedState?.message}</p>
+          <p>Última leitura: {unifiedProjection.metadata.generated_at_epoch === 0 ? "sem evento disponível" : new Date(unifiedProjection.metadata.generated_at_epoch * 1000).toLocaleString("pt-BR")} · revisão <code>{unifiedProjection.metadata.revision}</code></p>
+          {unifiedState?.showMetrics && <>
+            <p>{unifiedProjection.rows.length} agrupamento(s) · {unifiedProjection.totals.event_count} evento(s) · cobertura: {unifiedProjection.metadata.coverage.status}</p>
+            <p>Entrada {unifiedProjection.totals.input_tokens.toLocaleString("pt-BR")} · cache lido {unifiedProjection.totals.cache_read_tokens.toLocaleString("pt-BR")} · cache escrito {unifiedProjection.totals.cache_write_tokens.toLocaleString("pt-BR")} · saída exclusiva {unifiedProjection.totals.output_tokens.toLocaleString("pt-BR")} · raciocínio {unifiedProjection.totals.reasoning_tokens.toLocaleString("pt-BR")} · total {unifiedProjection.totals.total_tokens.toLocaleString("pt-BR")} · custo {unifiedProjection.totals.cost_usd === null ? "indisponível" : `US$ ${unifiedProjection.totals.cost_usd.toFixed(6)}`}</p>
+            <ul>{unifiedProjection.rows.slice(0, 10).map((row) => <li key={`${row.provider}:${row.model}:${row.host}:${row.session_id ?? "none"}`}>{row.provider} · {row.model} · {row.host} · {row.execution} · {row.total_tokens.toLocaleString("pt-BR")} tokens · {row.provenance} · fonte {row.source_completeness}</li>)}</ul>
+          </>}
           <code>{unifiedProjection.metadata.report_digest}</code>
         </div>}
       </section>
