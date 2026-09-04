@@ -1,9 +1,12 @@
 # Installing Simplicio
 
-Simplicio is a terminal-based AI coding agent and runtime. The PyPI package
-installs a small launcher with no runtime package dependencies. The launcher
-resolves its versioned GitHub Release, verifies the signed manifest and target
-asset, and refuses to finish when the public release contract is incomplete.
+Simplicio is an intended Desktop-first product with a verified terminal-based
+AI coding agent and runtime. The signed Desktop package is not included in the
+current public release; until it is published, the CLI bootstrap below is the
+supported public installation path. The PyPI package installs a small launcher
+with no runtime package dependencies. The launcher resolves its versioned
+GitHub Release, verifies the signed manifest and target asset, and refuses to
+finish when the public release contract is incomplete.
 
 ## Quick Install
 
@@ -35,8 +38,10 @@ Windows (PowerShell):
 irm https://raw.githubusercontent.com/wesleysimplicio/simplicio/master/install.ps1 | iex
 ```
 
-The PyPI package is the recommended bootstrap: it installs the launcher, verifies
-the signed SHA256/Ed25519 Runtime release, and installs the platform binary.
+Until a signed Desktop package is published, the verified CLI bootstrap is the
+current supported path. The PyPI package is one supported CLI bootstrap: it
+installs the launcher, verifies the signed SHA256/Ed25519 Runtime release, and
+installs the platform binary.
 If the Python script directory is not already on `PATH`, add it before running
 `simplicio install`.
 

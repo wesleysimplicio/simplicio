@@ -1,14 +1,16 @@
 # Bootstrap profiles
 
-The public download surface offers exactly two channels:
+The product defines two installation channels; public availability is
+release-dependent:
 
-1. `recommended-desktop` — the recommended signed Desktop shell. Desktop
+1. `recommended-desktop` — the intended default signed Desktop shell. Desktop
    includes the CLI and bootstraps the Runtime, state, skills, managed
    integrations, updater, rollback metadata, uninstall ledger, and savings
-   receipts after login.
-2. `recommended-cli` — a per-user CLI bootstrap for terminals and headless
-   environments. It uses the same Runtime transaction, component lock, state
-   profile, and receipts, but excludes the Desktop shell.
+   receipts after login. This channel is not included in the current public
+   release until a signed Desktop package is published.
+2. `recommended-cli` — the current public per-user CLI bootstrap for terminals
+   and headless environments. It uses the same Runtime transaction, component
+   lock, state profile, and receipts, but excludes the Desktop shell.
 
 The machine-readable contract is
 [`distribution/bootstrap-profiles.json`](../distribution/bootstrap-profiles.json).
@@ -18,8 +20,8 @@ this repository owns the stable public profile IDs and download choices.
 ## Happy path
 
 ```text
-Desktop download → open → login → bootstrap apply → ready
-CLI bootstrap    → login → bootstrap apply → ready
+Desktop download (when published) → open → login → bootstrap apply → ready
+Current public CLI  → login → bootstrap apply → ready
 ```
 
 The application must not add a mode wizard, technical preflight, embedded
