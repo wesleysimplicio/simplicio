@@ -37,8 +37,11 @@ def _run_hook(
     python_mapper: Path | None = None,
     path: str | None = None,
     extra_env: dict[str, str] | None = None,
+    payload_extra: dict[str, object] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     payload = {"hookEventName": event, "cwd": str(repo), "session_id": session}
+    if payload_extra:
+        payload.update(payload_extra)
     env = {
         **os.environ,
         "SIMPLICIO_BIN": str(runtime),
@@ -120,6 +123,9 @@ def test_mapper_cache_is_reused_and_refreshed_after_project_change(tmp_path: Pat
     second = _run_hook("UserPromptSubmit", repo, runtime)
     third = _run_hook("PreToolUse", repo, runtime)
     assert second.returncode == third.returncode == 0
+    assert "additionalContext" not in json.loads(second.stdout)["hookSpecificOutput"]
+    fresh_session = _run_hook("UserPromptSubmit", repo, runtime, session="new-session")
+    assert "complete_map_tail" in fresh_session.stdout
     calls = [json.loads(line) for line in runtime.with_name("mapper.log").read_text().splitlines()]
     assert len(calls) == 1
     assert calls[0]["mode"] == "mapper-only"
