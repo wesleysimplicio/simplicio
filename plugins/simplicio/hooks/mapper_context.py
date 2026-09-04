@@ -395,6 +395,31 @@ def _emit_context(event: str, body: str | None) -> None:
     print(json.dumps({"hookSpecificOutput": hook_output}, separators=(",", ":")))
 
 
+def _recovery_command(payload: dict[str, Any]) -> str | None:
+    """Recognize only explicit non-project recovery commands.
+
+    Hooks must not infer intent from arbitrary prose: a normal project action
+    remains denied when the Mapper is unavailable. These commands only expose
+    static guidance so a user can recover the managed installation or inspect
+    help without an MCP/provider dependency.
+    """
+    for key in ("command", "command_name", "action"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip().lower() in {"help", "login", "repair"}:
+            return value.strip().lower()
+    return None
+
+
+def _emit_recovery(event: str, command: str) -> None:
+    _emit_context(
+        event,
+        "Simplicio Mapper is unavailable for this project. "
+        f"The explicit '{command}' recovery action may continue without MCP context. "
+        "Run the managed Simplicio installer or repair command outside this hook, "
+        "then start a new session; this hook never installs, downloads, or changes hosts.",
+    )
+
+
 def _fail(event: str, reason: str) -> None:
     print(json.dumps({
         "hookSpecificOutput": {
@@ -428,6 +453,11 @@ def main() -> int:
     except SystemExit:
         raise
     except Exception as error:
+        if "payload" in locals():
+            command = _recovery_command(payload)
+            if command is not None:
+                _emit_recovery(event if "event" in locals() else "", command)
+                return 0
         _fail(event if "event" in locals() else "", _safe_reason(error))
     return 2
 

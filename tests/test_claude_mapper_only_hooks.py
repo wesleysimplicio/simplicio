@@ -174,6 +174,24 @@ def test_mapper_failure_is_not_a_silent_native_bypass(tmp_path: Path) -> None:
     assert "Mapper obrigatório" in payload["hookSpecificOutput"]["permissionDecisionReason"]
 
 
+def test_explicit_recovery_commands_get_static_guidance_without_bypass(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    runtime = tmp_path / "simplicio"
+    _fake_mapper(runtime, runtime.with_name("mapper.log"))
+    result = _run_hook(
+        "UserPromptSubmit",
+        repo,
+        runtime,
+        payload_extra={"command": "repair"},
+        extra_env={"FAKE_MAPPER_FAIL": "1", "PATH": str(tmp_path / "empty-path")},
+    )
+    assert result.returncode == 0
+    hook_output = json.loads(result.stdout)["hookSpecificOutput"]
+    assert "repair" in hook_output["additionalContext"]
+    assert "permissionDecision" not in hook_output
+
+
 def test_python_mapper_is_a_mapper_only_runtime_failover(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
