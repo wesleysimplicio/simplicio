@@ -493,6 +493,124 @@ def test_mapper_cache_metadata_never_infers_provider_cache_status():
     assert metadata == {
         "status": "hit", "map_build_count": 1, "file_count": 141, "context_bytes": 821200,
     }
+
+
+def test_local_mapper_hit_with_absent_provider_usage_is_explicitly_unmeasured():
+    adapter, bridge, context = setup_plugin()
+    bridge.call = lambda tool, arguments: (
+        {**mapper_receipt(arguments), "mapper_cache": {"status": "hit", "map_build_count": 0}}
+        if tool == "simplicio_prepare_model_call" else {"status": "recorded"}
+    )
+    context.middleware["llm_request"](
+        request={"messages": []}, session_id="s", turn_id="t", api_request_id="a",
+        logical_request_id="l", attempt_id="attempt", model="m", provider="p", cwd=str(ROOT),
+    )
+    context.hooks["post_api_request"](session_id="s", turn_id="t", api_request_id="a")
+    final = adapter.correlation_receipts()[-1]
+    assert final["mapper_cache_status"] == "hit"
+    assert final["provider_prompt_cache_status"] == "unknown"
+    assert final["provider_prompt_cache"]["cache_read_tokens"] is None
+    assert final["measurement_status"] == "unmeasured"
+    assert final["measurement_reason_codes"] == ["usage_not_collected"]
+
+
+def test_provider_prompt_cache_hit_does_not_require_local_mapper_hit():
+    adapter, bridge, context = setup_plugin()
+    def call(tool, arguments):
+        if tool == "simplicio_prepare_model_call":
+            return {**mapper_receipt(arguments), "mapper_cache": {"status": "miss", "map_build_count": 1}}
+        return {"status": "recorded", "provider_prompt_cache_status": "hit"}
+    bridge.call = call
+    context.middleware["llm_request"](
+        request={"messages": []}, session_id="s", turn_id="t", api_request_id="a",
+        logical_request_id="l", attempt_id="attempt", model="m", provider="p", cwd=str(ROOT),
+    )
+    context.hooks["post_api_request"](
+        session_id="s", turn_id="t", api_request_id="a",
+        usage={"input_tokens": 10, "output_tokens": 1, "cache_read_tokens": 0},
+    )
+    final = adapter.correlation_receipts()[-1]
+    assert final["mapper_cache_status"] == "miss"
+    assert final["provider_prompt_cache_status"] == "hit"
+    assert final["provider_prompt_cache"]["cache_read_tokens"] == 0
+
+
+def test_normal_and_strict_modes_handle_absent_usage_truthfully():
+    adapter, _, context = setup_plugin()
+    context.middleware["llm_request"](
+        request={"messages": []}, session_id="normal", turn_id="t", api_request_id="a",
+        logical_request_id="l", attempt_id="attempt", model="m", provider="p", cwd=str(ROOT),
+    )
+    context.hooks["post_api_request"](session_id="normal", turn_id="t", api_request_id="a")
+    assert adapter.correlation_receipts()[-1]["measurement_status"] == "unmeasured"
+
+    context.middleware["llm_request"](
+        request={"messages": []}, session_id="strict", turn_id="t", api_request_id="b",
+        logical_request_id="l", attempt_id="attempt", model="m", provider="p", cwd=str(ROOT),
+        measurement_mode="strict",
+    )
+    with pytest.raises(adapter.SimplicioHermesError, match="strict measurement rejected"):
+        context.hooks["post_api_request"](session_id="strict", turn_id="t", api_request_id="b")
+    final = adapter.correlation_receipts()[-1]
+    assert final["measurement_mode"] == "strict"
+    assert final["run_outcome"] == "completed"
+    assert final["measurement_reason_codes"] == ["usage_not_collected"]
+
+
+def test_strict_mode_rejects_synthetic_correlation_and_ambiguous_results():
+    adapter, _, context = setup_plugin()
+    context.middleware["llm_request"](
+        request={"messages": []}, session_id="s", api_request_id="a",
+        model="m", provider="p", cwd=str(ROOT), measurement_mode="strict",
+    )
+    with pytest.raises(adapter.SimplicioHermesError, match="synthetic_correlation_ids"):
+        context.hooks["post_api_request"](
+            session_id="s", api_request_id="a", usage={"input_tokens": 1, "output_tokens": 1},
+        )
+
+    for request in ("b", "c"):
+        context.middleware["llm_request"](
+            request={"messages": []}, session_id="s2", turn_id="t2", api_request_id=request,
+            model="m", provider="p", cwd=str(ROOT), measurement_mode="benchmark",
+        )
+    with pytest.raises(adapter.SimplicioHermesError, match="correlation_ambiguous"):
+        context.hooks["post_api_request"](
+            session_id="s2", turn_id="t2", run_outcome="completed",
+        )
+    receipt = adapter.correlation_receipts()[-1]
+    assert receipt["measurement_status"] == "unmeasured"
+    assert receipt["run_outcome"] == "completed"
+
+
+def test_endpoint_and_api_mode_have_truthful_sources_and_redact_queries():
+    adapter, _, context = setup_plugin()
+    context.middleware["llm_request"](
+        request={"instructions": "native", "model": "m"}, session_id="s", turn_id="t",
+        api_request_id="a", logical_request_id="l", attempt_id="attempt", provider="p",
+        endpoint="https://api.example.test/v1/responses?token=secret", cwd=str(ROOT),
+    )
+    context.hooks["post_api_request"](
+        session_id="s", turn_id="t", api_request_id="a",
+        usage={"input_tokens": 1, "output_tokens": 0},
+    )
+    route = adapter.correlation_receipts()[-1]["provider_route"]
+    assert route == {
+        "endpoint": "https://api.example.test/v1/responses",
+        "endpoint_source": "host_reported", "endpoint_reason": None,
+        "api_mode": "responses", "api_mode_source": "request_shape", "api_mode_reason": None,
+    }
+
+    arguments = adapter._arguments(
+        "s2", turn_id="t", api_request_id="b", logical_request_id="l",
+        attempt_id="attempt", provider="p", model="m", cwd=str(ROOT),
+    )
+    route = adapter._final_usage_receipt(
+        arguments, {"receipt": mapper_receipt(arguments)}, {},
+        {"input_tokens": 1, "output_tokens": 0}, "succeeded", "completed", None,
+    )["provider_route"]
+    assert route["endpoint"] is None and route["endpoint_reason"] == "not_provided_by_host"
+    assert route["api_mode"] is None and route["api_mode_reason"] == "not_provided_or_inferable"
+
 def test_stdio_transport_enforces_mode_and_rejects_login_errors(tmp_path, monkeypatch):
     import os
     import sys

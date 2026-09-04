@@ -96,7 +96,7 @@ def test_simplicio_plugin_manifests_share_one_version() -> None:
         _load_json("plugins/simplicio/gemini-extension.json"),
     ]
 
-    assert {manifest["version"] for manifest in manifests} == {"0.2.6"}
+    assert {manifest["version"] for manifest in manifests} == {manifests[0]["version"]}
 
 
 def test_hermes_plugin_manifests_share_one_version() -> None:

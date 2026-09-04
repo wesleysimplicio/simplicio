@@ -15,6 +15,30 @@ IDs produce bounded `simplicio.hermes-correlation-receipt/v1` diagnostics rather
 than silent returns. Those receipts contain identifiers and reason codes only;
 prompt, response bodies and secrets are never copied.
 
+## Provider and measurement evidence
+
+Final `simplicio.hermes-usage-receipt/v1` receipts keep the local Mapper cache
+and provider prompt cache in separate objects. A `mapper_cache_hit` only means
+that the local map artifact was reused; it never proves a provider prompt-cache
+hit or token savings. Provider cache state and token buckets are recorded only
+from provider/host evidence, and numeric zero remains a measured value.
+
+The provider route includes endpoint and API mode when Hermes supplies them.
+API mode may also be identified from the native request shape. Every route
+field includes a source or an explicit unavailable reason, and endpoint query
+strings/fragments are discarded before recording.
+
+Normal mode continues after incomplete measurement and emits
+`measurement_status=unmeasured` with reason codes. For controlled benchmarks,
+set `SIMPLICIO_HERMES_MEASUREMENT_MODE=strict` (or `benchmark`). That policy
+rejects results without required provider usage or stable prepare-to-response
+correlation. It does not rewrite the host outcome: a completed Hermes run can
+still carry a failed bridge event or a rejected measurement.
+
+Plugin-generated IDs are labeled `synthetic`. If any required correlation ID
+(`host_session_id`, `turn_id`, or `api_request_id`) is synthetic, the receipt is
+unmeasured rather than presenting that ID as provider-confirmed attribution.
+
 ## Python fallback contract
 
 The Python fallback is resolved only from an explicitly configured executable
