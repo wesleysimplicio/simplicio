@@ -149,6 +149,8 @@ describe("workbench navigation and evidence", () => {
     snapshot.savings.proofKind = "mixed";
     expect(runtimeSummary(snapshot).measuredSavings).toBeNull();
     snapshot.savings.proofKind = "measured"; snapshot.savings.ledgerStatus = "valid";
+    expect(runtimeSummary(snapshot).measuredSavings).toBeNull();
+    snapshot.source = "runtime";
     expect(runtimeSummary(snapshot).measuredSavings).toBe(snapshot.savings.monthTokens);
   });
 });
