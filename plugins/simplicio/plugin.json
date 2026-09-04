@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "simplicio",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Governed local-first coding through the verified Simplicio Runtime MCP and portable agent skills.",
   "author": {
     "name": "Wesley Simplicio",
