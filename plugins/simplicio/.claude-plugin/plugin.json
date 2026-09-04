@@ -1,6 +1,6 @@
 {
   "name": "simplicio",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "description": "Verified Simplicio Runtime MCP bootstrap with mandatory Mapper-only Claude hooks and reusable project-map cache.",
   "author": {
     "name": "Wesley Simplicio"
