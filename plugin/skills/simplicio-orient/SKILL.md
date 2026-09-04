@@ -6,7 +6,7 @@ description: Terminal-first execution — answer facts with the shell, never wit
 # simplicio-orient — terminal-first, token-frugal execution
 
 For **max-speed delivery law** (Runtime decide, Mapper→Fast→dev-cli, Prism waves,
-economy-parallel, DONE|NEXT|BLOCKED), see `docs/LLM_MAX_SPEED_ORIENTATION.md` and the loop
+economy-parallel, DONE|NEXT|BLOCKED), see `../simplicio-loop/references/LLM_MAX_SPEED_ORIENTATION.md` and the loop
 re-feed block `SIMPLICIO-LLM-ORIENTATION` in `simplicio-loop/SKILL.md`. This skill owns
 **terminal token clamps**; that doc owns **how the stack orients the LLM for speed**.
 
