@@ -1,14 +1,14 @@
 # 🔥 Simplicio — El agente de IA que AHORRA HASTA EL 96% DE TUS TOKENS
 
 <p align="center">
-  <img src="assets/simplicio-hero.png" alt="Simplicio — agente de IA para programación" width="920" />
+  <img src="../assets/simplicio-hero.png" alt="Simplicio — agente de IA para programación" width="920" />
 </p>
 
 <p align="center">
   <a href="https://github.com/wesleysimplicio/simplicio/releases/latest"><img src="https://img.shields.io/github/v/release/wesleysimplicio/simplicio?color=blue&label=latest" alt="Última versión"></a>
   <a href="https://github.com/wesleysimplicio/simplicio/stargazers"><img src="https://img.shields.io/github/stars/wesleysimplicio/simplicio?style=social" alt="Estrellas"></a>
   <a href="https://github.com/wesleysimplicio/simplicio/releases"><img src="https://img.shields.io/github/downloads/wesleysimplicio/simplicio/total?color=green" alt="Descargas"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="Licencia"></a>
+  <a href="../LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="Licencia"></a>
 </p>
 
 <p align="center">
@@ -20,21 +20,21 @@
 
 <p align="center">
   <strong>🌍 Idiomas:</strong><br>
-  <a href="README.md">🇬🇧 English</a> |
-  <a href="READMEs/README.pt-BR.md">🇧🇷 Português</a> |
-  <a href="READMEs/README.es-ES.md">🇪🇸 Español</a> |
-  <a href="READMEs/README.fr-FR.md">🇫🇷 Français</a> |
-  <a href="READMEs/README.ja-JP.md">🇯🇵 日本語</a> |
-  <a href="READMEs/README.ko-KR.md">🇰🇷 한국어</a> |
-  <a href="READMEs/README.zh-CN.md">🇨🇳 简体中文</a> |
-  <a href="READMEs/README.it-IT.md">🇮🇹 Italiano</a> |
-  <a href="READMEs/README.ru-RU.md">🇷🇺 Русский</a> |
-  <a href="READMEs/README.pl-PL.md">🇵🇱 Polski</a> |
-  <a href="READMEs/README.hi-IN.md">🇮🇳 हिन्दी</a> |
-  <a href="READMEs/README.ar-SA.md">🇸🇦 العربية</a> |
-  <a href="READMEs/README.he-IL.md">🇮🇱 עברית</a> |
-  <a href="READMEs/README.ms-MY.md">🇲🇾 Bahasa Melayu</a> |
-  <a href="READMEs/README.id-ID.md">🇮🇩 Bahasa Indonesia</a>
+  <a href="../README.md">🇬🇧 English</a> |
+  <a href="README.pt-BR.md">🇧🇷 Português</a> |
+  <a href="README.es-ES.md">🇪🇸 Español</a> |
+  <a href="README.fr-FR.md">🇫🇷 Français</a> |
+  <a href="README.ja-JP.md">🇯🇵 日本語</a> |
+  <a href="README.ko-KR.md">🇰🇷 한국어</a> |
+  <a href="README.zh-CN.md">🇨🇳 简体中文</a> |
+  <a href="README.it-IT.md">🇮🇹 Italiano</a> |
+  <a href="README.ru-RU.md">🇷🇺 Русский</a> |
+  <a href="README.pl-PL.md">🇵🇱 Polski</a> |
+  <a href="README.hi-IN.md">🇮🇳 हिन्दी</a> |
+  <a href="README.ar-SA.md">🇸🇦 العربية</a> |
+  <a href="README.he-IL.md">🇮🇱 עברית</a> |
+  <a href="README.ms-MY.md">🇲🇾 Bahasa Melayu</a> |
+  <a href="README.id-ID.md">🇮🇩 Bahasa Indonesia</a>
 </p>
 
 ---
@@ -271,7 +271,7 @@ simplicio license status
 ## 📄 Licencia
 
 Propietaria. El binario es gratuito para descargar y usar. Las funciones de IA son gratuitas durante la
-beta pública. Consulta [LICENSE](LICENSE).
+beta pública. Consulta [LICENSE](../LICENSE).
 
 ---
 
