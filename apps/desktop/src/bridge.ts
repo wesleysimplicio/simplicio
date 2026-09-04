@@ -10,6 +10,7 @@ import {
   createPreviewHostPluginResult,
   createPreviewIntegrationPlan,
   parseHostPluginOperationResult,
+  isHostPluginDigest,
   parseIntegrationPlan,
   type HostPluginOperationResult,
   type IntegrationPlan,
@@ -221,12 +222,14 @@ export async function exportDesktopTokenReport(reportHash: string, format: "json
 }
 
 export async function applyDesktopHostPlugins(planDigest: string): Promise<HostPluginOperationResult> {
+  if (!isHostPluginDigest(planDigest)) throw new Error("host_plugin_plan_digest_invalid");
   if (!isTauri()) return createPreviewHostPluginResult(planDigest);
   // A side effect is never timed out or replayed by the frontend.
   return parseHostPluginOperationResult(await invoke<unknown>("desktop_apply_host_plugins", { planDigest }), "apply");
 }
 
 export async function reconcileDesktopHostPlugins(receiptId: string): Promise<HostPluginOperationResult> {
+  if (!isHostPluginDigest(receiptId)) throw new Error("host_plugin_receipt_id_invalid");
   if (!isTauri()) return createPreviewHostPluginResult(receiptId, "reconcile");
   // Reconciliation is an explicit Runtime operation, never part of snapshot refresh.
   return parseHostPluginOperationResult(await invoke<unknown>("desktop_reconcile_host_plugins", { receiptId }), "reconcile");
