@@ -2,7 +2,7 @@
 """simplicio-tasks / simplicio-loop — video_evidence worker (demo-video proof, two engines).
 
 The runnable form of the `video_evidence` extension point documented in
-`.claude/skills/simplicio-tasks/references/video-evidence.md`. Produces a demo video of a
+`plugin/skills/simplicio-loop/references/video-evidence.md`. Produces a demo video of a
 screen/feature and records it as evidence a change works. Evidence is ALWAYS a file path + a boolean
 verdict — never the video bytes, frames, or HTML are fed back into the model context (token economy).
 

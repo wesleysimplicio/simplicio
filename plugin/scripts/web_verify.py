@@ -2,7 +2,7 @@
 """simplicio-tasks — web_verify worker (front-end proof via Playwright).
 
 The runnable form of the `web_verify` extension point documented in
-`.claude/skills/simplicio-tasks/references/web-evidence.md`. Drives a real headless browser to
+`plugin/skills/simplicio-loop/references/web-evidence.md`. Drives a real headless browser to
 PROVE a front-end change renders, and captures a **screenshot + trace** as evidence. Evidence is
 ALWAYS a file path + a boolean verdict — never DOM, pixels, or page HTML (token economy).
 

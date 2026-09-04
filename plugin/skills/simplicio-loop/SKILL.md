@@ -17,7 +17,7 @@ single human-readable state file, exact-match promise sentinel, two-hook split �
 the simplicio safety spine (evidence-gated promise, max-iteration cap, cross-platform hook).
 
 For queue/body-of-work runs, pair this file with the shared deep references under
-`../simplicio-tasks/references/` for extension points, orchestration, token economy, delivery,
+`references/` for extension points, orchestration, token economy, delivery,
 and safety details.
 
 ## GitHub coordination default
@@ -110,7 +110,7 @@ the block concise, stable, and free of task-specific details; update the ADR and
 the focused hook tests when changing it.
 
 <!-- SIMPLICIO-LLM-ORIENTATION:BEGIN -->
-Orientação operacional do Loop (MAX SPEED — detail: docs/LLM_MAX_SPEED_ORIENTATION.md):
+Orientação operacional do Loop (MAX SPEED — detail: references/LLM_MAX_SPEED_ORIENTATION.md):
 - Runtime first when available: consult `simplicio loop decide --json` and honor `.simplicio/runtime/loop-decision.json`; when Runtime is absent, continue through the standalone Loop operators and report Runtime integration as degraded (never claim Runtime authority).
 - Economy-parallel: `simplicio-loop economy apply --json` + `preflight --strict` antes de trabalho autônomo.
 - Hot path: Mapper (scan/handoff) → Fast (understand|plan|apply se up) → dev-cli/edit --plan (STRICT; sem hand-edit).
