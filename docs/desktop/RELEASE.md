@@ -7,7 +7,7 @@ not a GitHub Actions workflow. The Runtime's closed-world artifact manifest,
 signatures, SBOM and provenance remain mandatory; Desktop installers are separate
 companion assets, not additional members of that Runtime manifest. Record the
 Desktop source revision, target, installer digest and bundled Runtime identity
-separately. Never replace already-published bytes under an immutable version.
+separately. Never replace already-published bytes under an immutable version. This document is the normative source for the Desktop release and updater requirements; the former `distribution/desktop-release.json` duplicate specification is not consumed by the application.
 
 `Check for Updates...` currently performs a read-only check of public GitHub
 release metadata and offers the release page for manual installation when a
