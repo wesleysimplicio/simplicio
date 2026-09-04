@@ -93,9 +93,10 @@ revalidates the project generation and refreshes or reuses the Mapper cache.
 | `simplicio-prompt` | Tuple-Space/Yool prompt contract, fan-out commands, and opt-in prompt adapter | [`simplicio-prompt`](https://github.com/wesleysimplicio/simplicio-prompt) |
 | `simplicio-hermes` | Native `pre_llm_call` context preparation and post-call Runtime receipts for Hermes Agent | This repository |
 
-The Loop plugin is the default integration. Prompt remains a separate
-installable plugin so its hooks and commands do not create duplicate runtime
-activation or hidden provider calls.
+The main `simplicio` plugin is the default integration entry point.
+The Loop plugin remains available for explicit orchestration workflows. Prompt
+remains a separate installable plugin so its hooks and commands do not create
+duplicate runtime activation or hidden provider calls.
 
 ## Verification
 
