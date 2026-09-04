@@ -8,7 +8,7 @@
   <a href="https://github.com/wesleysimplicio/simplicio/releases/latest"><img src="https://img.shields.io/github/v/release/wesleysimplicio/simplicio?color=blue&label=latest" alt="גרסה אחרונה"></a>
   <a href="https://github.com/wesleysimplicio/simplicio/stargazers"><img src="https://img.shields.io/github/stars/wesleysimplicio/simplicio?style=social" alt="כוכבים"></a>
   <a href="https://github.com/wesleysimplicio/simplicio/releases"><img src="https://img.shields.io/github/downloads/wesleysimplicio/simplicio/total?color=green" alt="הורדות"></a>
-  <a href="../LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="רישיון"></a>
+  <a href="../plugins/simplicio/LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="רישיון"></a>
 </p>
 
 <p align="center">
@@ -270,7 +270,7 @@ simplicio license status
 ## 📄 רישיון
 
 קנייני. הבינארי חופשי להורדה ולשימוש. תכונות AI בחינם במהלך
-הבטא הציבורית. ראה [LICENSE](../LICENSE).
+הבטא הציבורית. ראה [LICENSE](../plugins/simplicio/LICENSE).
 
 ---
 
