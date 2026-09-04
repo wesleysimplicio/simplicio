@@ -8,7 +8,7 @@
   <a href="https://github.com/wesleysimplicio/simplicio/releases/latest"><img src="https://img.shields.io/github/v/release/wesleysimplicio/simplicio?color=blue&label=latest" alt="Latest Release"></a>
   <a href="https://github.com/wesleysimplicio/simplicio/stargazers"><img src="https://img.shields.io/github/stars/wesleysimplicio/simplicio?style=social" alt="Stars"></a>
   <a href="https://github.com/wesleysimplicio/simplicio/releases"><img src="https://img.shields.io/github/downloads/wesleysimplicio/simplicio/total?color=green" alt="Downloads"></a>
-  <a href="../LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="License"></a>
+  <a href="../plugins/simplicio/LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="License"></a>
 </p>
 
 <p align="center">
@@ -269,7 +269,7 @@ simplicio license status
 ## 📄 라이선스
 
 Proprietary. 바이너리는 무료로 다운로드 및 사용 가능합니다. AI 기능은
-공개 베타 기간 동안 무료입니다. [LICENSE](../LICENSE)를 참조하세요.
+공개 베타 기간 동안 무료입니다. [LICENSE](../plugins/simplicio/LICENSE)를 참조하세요.
 
 ---
 
