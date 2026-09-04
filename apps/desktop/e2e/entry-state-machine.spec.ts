@@ -169,3 +169,20 @@ test("logout returns only to login and does not reinstall Runtime or mutate plug
   expect(count(calls, "desktop_login")).toBe(0);
   expectNoHostPluginEffects(calls);
 });
+
+
+test("logout and relogin preserve the installed Runtime without reinstalling", async ({ page }) => {
+  await mockEntryFlow(page, "active");
+  await page.goto("/?view=settings");
+  await page.getByRole("button", { name: "Sair da conta", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Começar", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Começar", exact: true }).click();
+  await page.getByRole("button", { name: "Continuar com Google", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Simplicio", exact: true })).toBeVisible();
+
+  const calls = await entryCalls(page);
+  expect(count(calls, "desktop_logout")).toBe(1);
+  expect(count(calls, "desktop_login")).toBe(1);
+  expect(count(calls, "desktop_install_runtime")).toBe(0);
+  expectNoHostPluginEffects(calls);
+});
