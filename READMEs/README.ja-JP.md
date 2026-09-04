@@ -8,7 +8,7 @@
   <a href="https://github.com/wesleysimplicio/simplicio/releases/latest"><img src="https://img.shields.io/github/v/release/wesleysimplicio/simplicio?color=blue&label=latest" alt="最新リリース"></a>
   <a href="https://github.com/wesleysimplicio/simplicio/stargazers"><img src="https://img.shields.io/github/stars/wesleysimplicio/simplicio?style=social" alt="スター"></a>
   <a href="https://github.com/wesleysimplicio/simplicio/releases"><img src="https://img.shields.io/github/downloads/wesleysimplicio/simplicio/total?color=green" alt="ダウンロード数"></a>
-  <a href="../LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="ライセンス"></a>
+  <a href="../plugins/simplicio/LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="ライセンス"></a>
 </p>
 
 <p align="center">
@@ -263,7 +263,7 @@ simplicio license status
 
 ## 📄 ライセンス
 
-Proprietary（プロプライエタリ）。バイナリは無料でダウンロードして使用できます。AI機能はパブリックベータ期間中無料です。詳しくは [LICENSE](../LICENSE) をご覧ください。
+Proprietary（プロプライエタリ）。バイナリは無料でダウンロードして使用できます。AI機能はパブリックベータ期間中無料です。詳しくは [LICENSE](../plugins/simplicio/LICENSE) をご覧ください。
 
 ---
 
