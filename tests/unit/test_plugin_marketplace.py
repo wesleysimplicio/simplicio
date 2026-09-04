@@ -174,3 +174,24 @@ def test_local_publisher_includes_gemini_and_rejects_version_drift(tmp_path, mon
     monkeypatch.setattr(module, "ROOT", tmp_path)
     with pytest.raises(module.PublishError, match="plugin manifest versions differ"):
         module.plugin_manifests()
+
+
+def test_loop_bundle_uses_canonical_reference_paths() -> None:
+    loop_root = ROOT / "plugin/skills/simplicio-loop"
+    tasks_root = ROOT / "plugin/skills/simplicio-tasks"
+
+    assert not (tasks_root / "references").exists()
+    assert (loop_root / "references/LLM_MAX_SPEED_ORIENTATION.md").is_file()
+
+    loop_skill = (loop_root / "SKILL.md").read_text(encoding="utf-8")
+    tasks_skill = (tasks_root / "SKILL.md").read_text(encoding="utf-8")
+    orient_skill = (ROOT / "plugin/skills/simplicio-orient/SKILL.md").read_text(encoding="utf-8")
+    assert "references/LLM_MAX_SPEED_ORIENTATION.md" in loop_skill
+    assert "../simplicio-loop/references/LLM_MAX_SPEED_ORIENTATION.md" in orient_skill
+    assert "../simplicio-loop/references/extension-points.md" in tasks_skill
+    assert ".claude/skills/simplicio-loop/SKILL.md" not in tasks_skill
+    assert "simplicio-global-llm-architecture-rules:start" not in tasks_skill
+
+    for relative in ("plugin/scripts/web_verify.py", "plugin/scripts/video_evidence.py"):
+        source = (ROOT / relative).read_text(encoding="utf-8")
+        assert "plugin/skills/simplicio-loop/references/" in source
