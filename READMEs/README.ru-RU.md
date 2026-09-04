@@ -8,7 +8,7 @@
   <a href="https://github.com/wesleysimplicio/simplicio/releases/latest"><img src="https://img.shields.io/github/v/release/wesleysimplicio/simplicio?color=blue&label=latest" alt="Latest Release"></a>
   <a href="https://github.com/wesleysimplicio/simplicio/stargazers"><img src="https://img.shields.io/github/stars/wesleysimplicio/simplicio?style=social" alt="Stars"></a>
   <a href="https://github.com/wesleysimplicio/simplicio/releases"><img src="https://img.shields.io/github/downloads/wesleysimplicio/simplicio/total?color=green" alt="Downloads"></a>
-  <a href="../LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="License"></a>
+  <a href="../plugins/simplicio/LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="License"></a>
 </p>
 
 <p align="center">
@@ -272,7 +272,7 @@ simplicio license status
 ## 📄 Лицензия
 
 Проприетарная. Бинарный файл можно бесплатно скачивать и использовать. AI-функции бесплатны в период
-публичной беты. См. [LICENSE](../LICENSE).
+публичной беты. См. [LICENSE](../plugins/simplicio/LICENSE).
 
 ---
 
