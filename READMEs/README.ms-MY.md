@@ -8,7 +8,7 @@
   <a href="https://github.com/wesleysimplicio/simplicio/releases/latest"><img src="https://img.shields.io/github/v/release/wesleysimplicio/simplicio?color=blue&label=terkini" alt="Keluaran Terkini"></a>
   <a href="https://github.com/wesleysimplicio/simplicio/stargazers"><img src="https://img.shields.io/github/stars/wesleysimplicio/simplicio?style=social" alt="Bintang"></a>
   <a href="https://github.com/wesleysimplicio/simplicio/releases"><img src="https://img.shields.io/github/downloads/wesleysimplicio/simplicio/total?color=green" alt="Muat Turun"></a>
-  <a href="../LICENSE"><img src="https://img.shields.io/badge/licensi-Proprietary-red" alt="Lesen"></a>
+  <a href="../plugins/simplicio/LICENSE"><img src="https://img.shields.io/badge/licensi-Proprietary-red" alt="Lesen"></a>
 </p>
 
 <p align="center">
@@ -271,7 +271,7 @@ simplicio license status
 ## 📄 Lesen
 
 Proprietari. Binari percuma untuk dimuat turun dan digunakan. Ciri AI percuma
-semasa beta awam. Lihat [LICENSE](../LICENSE).
+semasa beta awam. Lihat [LICENSE](../plugins/simplicio/LICENSE).
 
 ---
 
