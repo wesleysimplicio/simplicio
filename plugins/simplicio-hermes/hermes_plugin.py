@@ -46,6 +46,9 @@ _BRIDGE_TOOLS = frozenset({
 })
 
 
+_CACHE_STATUSES = frozenset({"hit", "miss", "unknown", "unsupported", "not_collected", "failed"})
+
+
 class SimplicioHermesError(RuntimeError):
     """Raised when the Runtime preparation path cannot produce a receipt."""
 
@@ -386,7 +389,7 @@ def _python_mapper_receipt(arguments: dict[str, Any]) -> dict[str, Any]:
                 and cached.get("mapper_version") == resolution.version
                 and cached.get("mapper_digest") == resolution.digest
                 and cached.get("resolution_source") == resolution.resolution_source):
-            return _python_receipt(arguments, data, resolution)
+            return _python_receipt(arguments, data, resolution, mapper_cache_status="hit", map_build_count=0)
     except (OSError, ValueError, TypeError):
         pass
 
@@ -422,21 +425,37 @@ def _python_mapper_receipt(arguments: dict[str, Any]) -> dict[str, Any]:
         "mapper_digest": resolution.digest, "resolution_source": resolution.resolution_source,
         "compatibility": resolution.compatibility,
     }, sort_keys=True, separators=(",", ":")))
-    return _python_receipt(arguments, data, resolution)
+    return _python_receipt(arguments, data, resolution, mapper_cache_status="miss", map_build_count=1)
 
 
-def _python_receipt(arguments: dict[str, Any], data: bytes, resolution: MapperResolution) -> dict[str, Any]:
+def _python_receipt(arguments: dict[str, Any], data: bytes, resolution: MapperResolution, *, mapper_cache_status: str = "unknown", map_build_count: int = 0) -> dict[str, Any]:
     content = json.dumps({
         "schema": "simplicio.mapper-prefix/v1",
         "mapper_backend": "python",
         "project_map_markdown": data.decode("utf-8"),
     }, ensure_ascii=False, separators=(",", ":"))
     raw = content.encode("utf-8")
+    mapper_cache_status = mapper_cache_status if mapper_cache_status in {
+        "hit", "miss", "unknown", "unsupported", "not_collected", "failed"
+    } else "unknown"
+    mapper_cache = {
+        "status": mapper_cache_status,
+        "map_build_count": max(0, int(map_build_count)),
+        "file_count": None,
+        "context_bytes": len(raw),
+    }
     return {
         "status": "prepared", "protected": True,
         "api_request_id": arguments["api_request_id"],
         "host_session_id": arguments["host_session_id"],
-        "provider_cache_status": "unknown", "mapper_backend": "python",
+        "run_id": arguments.get("run_id", arguments["host_session_id"]),
+        "session_id": arguments["host_session_id"],
+        "provider_cache_status": "unknown",
+        "provider_prompt_cache_status": "unknown",
+        "mapper_cache_status": mapper_cache_status,
+        "mapper_cache_hit": mapper_cache_status == "hit",
+        "mapper_cache": mapper_cache,
+        "mapper_backend": "python",
         "producer": "simplicio-mapper", "mapper_version": resolution.version,
         "mapper_protocol": resolution.protocol, "mapper_schema": resolution.schema,
         "mapper_capabilities": list(resolution.capabilities), "mapper_digest": resolution.digest,
@@ -449,6 +468,29 @@ def _python_receipt(arguments: dict[str, Any], data: bytes, resolution: MapperRe
             "content_sha256": hashlib.sha256(raw).hexdigest(),
         },
     }
+
+
+
+def _mapper_cache_metadata(receipt: dict[str, Any], context_bytes: int | None = None) -> dict[str, Any]:
+    raw = receipt.get("mapper_cache")
+    if not isinstance(raw, dict):
+        raw = receipt.get("mapperCache")
+    status = raw.get("status") if isinstance(raw, dict) else None
+    if not isinstance(status, str):
+        status = receipt.get("mapper_cache_status")
+    if status not in _CACHE_STATUSES:
+        status = "unknown"
+    metadata = {
+        "status": status,
+        "map_build_count": raw.get("map_build_count") if isinstance(raw, dict) else None,
+        "file_count": raw.get("file_count") if isinstance(raw, dict) else None,
+        "context_bytes": raw.get("context_bytes") if isinstance(raw, dict) else context_bytes,
+    }
+    for key in ("map_build_count", "file_count", "context_bytes"):
+        value = metadata[key]
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            metadata[key] = None
+    return metadata
 
 
 class RuntimeMcpBridge:
@@ -688,10 +730,12 @@ def _arguments(session_id: str = "", user_message: str = "", model: str = "",
     capabilities = _safe_capabilities(
         kwargs.get("hermes_capabilities", kwargs.get("capabilities"))
     )
+    run_id = _first_string(kwargs.get("run_id"), kwargs.get("hermes_run_id")) or provided["host_session_id"]
     return {
         "repo": str(kwargs.get("cwd") or kwargs.get("repo") or os.getenv("TERMINAL_CWD") or os.getcwd()),
         "host": "hermes",
-        "host_session_id": provided["host_session_id"], "turn_id": provided["turn_id"],
+        "host_session_id": provided["host_session_id"], "session_id": provided["host_session_id"],
+        "run_id": run_id, "turn_id": provided["turn_id"],
         "api_request_id": provided["api_request_id"], "logical_request_id": provided["logical_request_id"],
         "attempt_id": provided["attempt_id"], "synthetic": bool(synthetic_ids),
         "synthetic_ids": synthetic_ids, "provider": provider, "model": model_value,
@@ -867,6 +911,71 @@ def _token_usage(event: dict[str, Any]) -> dict[str, int]:
                 break
     return result
 
+def _provider_cache_status(record_receipt: dict[str, Any], usage: dict[str, int]) -> str:
+    raw = record_receipt.get("provider_prompt_cache")
+    status = raw.get("status") if isinstance(raw, dict) else None
+    if not isinstance(status, str):
+        status = record_receipt.get("provider_prompt_cache_status")
+    if not isinstance(status, str):
+        status = record_receipt.get("provider_cache_status")
+    if status not in _CACHE_STATUSES and status not in {"reported", "zero"}:
+        status = "reported" if "cache_read_input_tokens" in usage else "unknown"
+    return status
+
+
+def _final_usage_receipt(arguments: dict[str, Any], prepared: dict[str, Any],
+                         record_receipt: dict[str, Any], usage: dict[str, int],
+                         event_status: str, run_outcome: str, provider_id: str | None,
+                         failure: str | None = None) -> dict[str, Any]:
+    mapper_cache = _mapper_cache_metadata(
+        prepared.get("receipt", {}), arguments.get("context_bytes")
+    )
+    provider_cache_status = _provider_cache_status(record_receipt, usage)
+    usage_values = {
+        key: usage.get(key) for key in (
+            "input_tokens", "cache_read_input_tokens", "cache_write_tokens",
+            "output_tokens", "reasoning_tokens",
+        )
+    }
+    receipt = {
+        "schema": "simplicio.hermes-usage-receipt/v1",
+        "event_name": "model_call_completed" if event_status == "succeeded" else "model_call_failed",
+        "event_status": event_status,
+        "run_outcome": run_outcome,
+        "host": "hermes",
+        "host_session_id": arguments["host_session_id"],
+        "session_id": arguments["host_session_id"],
+        "run_id": arguments.get("run_id", arguments["host_session_id"]),
+        "turn_id": arguments["turn_id"],
+        "api_request_id": arguments["api_request_id"],
+        "logical_request_id": arguments["logical_request_id"],
+        "attempt_id": arguments["attempt_id"],
+        "model_call_id": provider_id,
+        "provider": arguments.get("provider", "unknown"),
+        "model": arguments.get("model", "unknown"),
+        "mapper_cache": mapper_cache,
+        "mapper_cache_status": mapper_cache["status"],
+        "mapper_cache_hit": mapper_cache["status"] == "hit",
+        "provider_prompt_cache": {
+            "status": provider_cache_status,
+            "status_source": "provider_reported" if "cache_read_input_tokens" in usage else "unavailable",
+            "cache_read_tokens": usage.get("cache_read_input_tokens"),
+        },
+        "provider_prompt_cache_status": provider_cache_status,
+        "usage": {
+            "source": "provider_reported" if usage else "not_collected",
+            "scope": "request",
+            **usage_values,
+        },
+        "retry_count": _metric_value(arguments, "retries"),
+        "latency_ms": _metric_value(arguments, "latency_ms"),
+        "http_status": _metric_value(arguments, "http_status"),
+        "fallback_used": arguments.get("fallback_used"),
+        "failure": {"reason_code": failure} if failure else None,
+    }
+    return receipt
+
+
 def _record(session_id: str = "", status: str = "completed", **kwargs: Any) -> None:
     observed_session = _first_string(session_id, kwargs.get("host_session_id")) or ""
     requested_api_id = _first_string(kwargs.get("api_request_id"), kwargs.get("request_id"))
@@ -904,29 +1013,56 @@ def _record(session_id: str = "", status: str = "completed", **kwargs: Any) -> N
         if provider_id:
             _bounded_insert(_RECORDED_PROVIDER_IDS, provider_id, candidate_key)
     original = prepared["arguments"]
+    usage = _token_usage(kwargs)
+    event_status = kwargs.get("event_status")
+    if event_status not in {"succeeded", "failed", "unknown"}:
+        event_status = "failed" if status == "error" else "succeeded"
+    run_outcome = kwargs.get("run_outcome")
+    if not isinstance(run_outcome, str) or not run_outcome:
+        run_outcome = "completed" if status != "error" else "unknown"
+    bridge_status = "error" if event_status == "failed" else "completed"
     arguments = {
         key: original[key] for key in (
-            "repo", "host", "host_session_id", "turn_id", "api_request_id", "logical_request_id",
-            "attempt_id", "provider", "model", "synthetic", "synthetic_ids", "hermes_capabilities",
-        )
+            "repo", "host", "host_session_id", "session_id", "run_id", "turn_id",
+            "api_request_id", "logical_request_id", "attempt_id", "provider", "model",
+            "synthetic", "synthetic_ids", "hermes_capabilities",
+        ) if key in original
     }
     arguments.update(
-        status=status, prepared_receipt=prepared["receipt"],
+        status=bridge_status, event_status=event_status, run_outcome=run_outcome,
+        prepared_receipt=prepared["receipt"],
         coverage_proven=not original["synthetic"],
         coverage={
             "provider_path_active": not original["synthetic"],
             "identity": "real" if not original["synthetic"] else "synthetic",
         },
     )
-    arguments.update(_token_usage(kwargs))
+    arguments.update(usage)
+    for key in ("retries", "latency_ms", "http_status", "fallback_used"):
+        if key in kwargs:
+            arguments[key] = kwargs[key]
     if provider_id:
         arguments["provider_request_id"] = provider_id
+        arguments["model_call_id"] = provider_id
     try:
-        _BRIDGE.call("simplicio_record_model_result", arguments)
+        record_receipt = _BRIDGE.call("simplicio_record_model_result", arguments)
+        if not isinstance(record_receipt, dict):
+            record_receipt = {}
         with _STATE_LOCK:
             _RECORDED_REQUESTS[candidate_key] = observed_session
+            final = _final_usage_receipt(
+                arguments, prepared, record_receipt, usage, event_status, run_outcome, provider_id
+            )
+            _CORRELATION_RECEIPTS.append(final)
     except Exception as error:
         _warn("result recording", error)
+        with _STATE_LOCK:
+            _CORRELATION_RECEIPTS.append(
+                _final_usage_receipt(
+                    arguments, prepared, {}, usage, event_status, run_outcome, provider_id,
+                    failure="runtime_record_failed",
+                )
+            )
 
 
 def _post_llm_call(session_id: str = "", **kwargs: Any) -> None:

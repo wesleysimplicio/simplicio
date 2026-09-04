@@ -449,6 +449,50 @@ def test_real_ids_prove_provider_path_but_synthetic_ids_do_not():
     assert bridge.calls[-1][1]["coverage_proven"] is False
 
 
+
+
+def test_final_receipt_separates_mapper_cache_provider_cache_and_run_outcome():
+    adapter, bridge, context = setup_plugin()
+    context.middleware["llm_request"](
+        request={"messages": []}, session_id="s", turn_id="t", api_request_id="a",
+        logical_request_id="logical", attempt_id="attempt", model="m", provider="p", cwd=str(ROOT),
+    )
+    context.hooks["post_api_request"](
+        session_id="s", turn_id="t", api_request_id="a",
+        response={"id": "provider-a"},
+        usage={
+            "input_tokens": 100, "cache_read_tokens": 80,
+            "cache_creation_input_tokens": 7, "output_tokens": 5,
+            "completion_tokens_details": {"reasoning_tokens": 3},
+        },
+        event_status="failed", run_outcome="completed", retries=1, latency_ms=42,
+        http_status=200, fallback_used=False,
+    )
+    final = next(item for item in adapter.correlation_receipts()
+                 if item["schema"] == "simplicio.hermes-usage-receipt/v1")
+    assert final["mapper_cache_status"] == "unknown"
+    assert final["mapper_cache_hit"] is False
+    assert final["provider_prompt_cache_status"] == "reported"
+    assert final["provider_prompt_cache"]["cache_read_tokens"] == 80
+    assert final["usage"]["cache_write_tokens"] == 7
+    assert final["usage"]["reasoning_tokens"] == 3
+    assert final["event_status"] == "failed"
+    assert final["run_outcome"] == "completed"
+    assert final["model_call_id"] == "provider-a"
+    recorded = bridge.calls[-1][1]
+    assert recorded["run_id"] == "s" and recorded["session_id"] == "s"
+    assert recorded["event_status"] == "failed"
+    assert recorded["run_outcome"] == "completed"
+
+
+def test_mapper_cache_metadata_never_infers_provider_cache_status():
+    adapter = load_adapter()
+    metadata = adapter._mapper_cache_metadata({
+        "mapper_cache": {"status": "hit", "map_build_count": 1, "file_count": 141, "context_bytes": 821200},
+    })
+    assert metadata == {
+        "status": "hit", "map_build_count": 1, "file_count": 141, "context_bytes": 821200,
+    }
 def test_stdio_transport_enforces_mode_and_rejects_login_errors(tmp_path, monkeypatch):
     import os
     import sys

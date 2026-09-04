@@ -42,6 +42,8 @@ function requestIdentity(request, session) {
   for (const key of synthetic_ids) values[key] = randomUUID();
   return {
     ...values, synthetic: synthetic_ids.length > 0, synthetic_ids,
+    run_id: firstValue(request.run_id, request.hermes_run_id, values.host_session_id),
+    session_id: values.host_session_id,
     provider: request.provider ?? "unknown", model: request.model ?? "unknown",
     hermes_capabilities: safeCapabilities(request.hermes_capabilities ?? request.capabilities),
   };
@@ -135,6 +137,71 @@ function tokenUsage(event) {
   return result;
 }
 
+const CACHE_STATUSES = new Set(["hit", "miss", "unknown", "unsupported", "not_collected", "failed"]);
+
+function mapperCacheMetadata(prepared, contextBytes) {
+  const raw = prepared?.mapper_cache ?? prepared?.mapperCache;
+  let status = raw?.status ?? prepared?.mapper_cache_status;
+  if (!CACHE_STATUSES.has(status)) status = "unknown";
+  const integer = (value) => Number.isSafeInteger(value) && value >= 0 ? value : null;
+  return {
+    status,
+    map_build_count: integer(raw?.map_build_count),
+    file_count: integer(raw?.file_count),
+    context_bytes: integer(raw?.context_bytes) ?? integer(contextBytes),
+  };
+}
+
+function providerCacheStatus(recordReceipt, usage) {
+  const raw = recordReceipt?.provider_prompt_cache;
+  let status = raw?.status ?? recordReceipt?.provider_prompt_cache_status ??
+    recordReceipt?.savings?.provider_cache_status;
+  if (typeof status !== "string" || !(CACHE_STATUSES.has(status) || ["reported", "zero"].includes(status))) {
+    status = Object.hasOwn(usage, "cache_read_input_tokens") ? "reported" : "unknown";
+  }
+  return status;
+}
+
+function finalUsageReceipt(identity, prepared, recordReceipt, usage, eventStatus, runOutcome, providerId, failure) {
+  const mapperCache = mapperCacheMetadata(prepared?.receipt, prepared?.receipt?.context_packet?.bytes);
+  const providerStatus = providerCacheStatus(recordReceipt, usage);
+  const usageValues = Object.fromEntries(
+    ["input_tokens", "cache_read_input_tokens", "cache_write_tokens", "output_tokens", "reasoning_tokens"]
+      .map((key) => [key, usage[key] ?? null]),
+  );
+  return {
+    schema: "simplicio.hermes-usage-receipt/v1",
+    event_name: eventStatus === "succeeded" ? "model_call_completed" : "model_call_failed",
+    event_status: eventStatus,
+    run_outcome: runOutcome,
+    host: "hermes",
+    host_session_id: identity.host_session_id,
+    session_id: identity.host_session_id,
+    run_id: identity.run_id,
+    turn_id: identity.turn_id,
+    api_request_id: identity.api_request_id,
+    logical_request_id: identity.logical_request_id,
+    attempt_id: identity.attempt_id,
+    model_call_id: providerId ?? null,
+    provider: identity.provider,
+    model: identity.model,
+    mapper_cache: mapperCache,
+    mapper_cache_hit: mapperCache.status === "hit",
+    provider_prompt_cache: {
+      status: providerStatus,
+      status_source: Object.hasOwn(usage, "cache_read_input_tokens") ? "provider_reported" : "unavailable",
+      cache_read_tokens: usage.cache_read_input_tokens ?? null,
+    },
+    provider_prompt_cache_status: providerStatus,
+    usage: { source: Object.keys(usage).length ? "provider_reported" : "not_collected", scope: "request", ...usageValues },
+    retry_count: identity.retries ?? null,
+    latency_ms: identity.latency_ms ?? null,
+    http_status: identity.http_status ?? null,
+    fallback_used: identity.fallback_used ?? null,
+    failure: failure ? { reason_code: failure } : null,
+  };
+}
+
 /**
  * Thin embedder adapter. Its bridge must advertise a verified Mapper-only
  * Runtime; it never switches a shared Runtime or invokes a model itself.
@@ -152,8 +219,11 @@ export function createHermesPlugin({ runtime, mode = RUNTIME_MODE, maxContextByt
   const correlation = [];
   const state = {
     context_path_active: false, provider_path_active: false, usage_collector_active: false,
-    provider_cache_status: "unknown", last_reason_code: "session_not_started",
-    hermes_capabilities: undefined,
+    provider_cache_status: "unknown", provider_prompt_cache_status: "unknown",
+    mapper_cache_status: "unknown", mapper_cache_hit: false, mapper_cache: {
+      status: "unknown", map_build_count: null, file_count: null, context_bytes: null,
+    },
+    last_reason_code: "session_not_started", hermes_capabilities: undefined,
   };
 
   function correlationReceipt(reasonCode, event = {}, candidateCount = 0) {
@@ -161,7 +231,7 @@ export function createHermesPlugin({ runtime, mode = RUNTIME_MODE, maxContextByt
       schema: "simplicio.hermes-correlation-receipt/v1", status: "not_recorded",
       reason_code: reasonCode, host: "hermes", candidate_count: candidateCount,
     };
-    for (const key of ["session_id", "turn_id", "api_request_id", "logical_request_id", "attempt_id"]) {
+    for (const key of ["run_id", "session_id", "turn_id", "api_request_id", "logical_request_id", "attempt_id", "model_call_id"]) {
       if (typeof event[key] === "string" && event[key]) receipt[key] = event[key];
     }
     correlation.push(receipt);
@@ -192,6 +262,10 @@ export function createHermesPlugin({ runtime, mode = RUNTIME_MODE, maxContextByt
   async function prepare_model_call(request = {}) {
     state.context_path_active = state.provider_path_active = state.usage_collector_active = false;
     state.provider_cache_status = "unknown";
+    state.provider_prompt_cache_status = "unknown";
+    state.mapper_cache_status = "unknown";
+    state.mapper_cache_hit = false;
+    state.mapper_cache = { status: "unknown", map_build_count: null, file_count: null, context_bytes: null };
     if ((runtimeBridge.runtime_mode ?? runtimeBridge.capabilities?.runtime_mode) !== RUNTIME_MODE) {
       throw new HermesProtectionError("runtime_mapper_only_required");
     }
@@ -209,6 +283,10 @@ export function createHermesPlugin({ runtime, mode = RUNTIME_MODE, maxContextByt
       const content = mapperContext(prepared, maxContextBytes);
       const updated = injectContext(request, content);
       const packet = prepared.context_packet ?? prepared.contextPacket;
+      const mapperCache = mapperCacheMetadata(prepared, packet.bytes);
+      state.mapper_cache = mapperCache;
+      state.mapper_cache_status = mapperCache.status;
+      state.mapper_cache_hit = mapperCache.status === "hit";
       const { content: omitted, ...packetMetadata } = packet;
       if (pending.size >= 128) pending.delete(pending.keys().next().value);
       pending.set(request_identity.api_request_id, {
@@ -222,10 +300,12 @@ export function createHermesPlugin({ runtime, mode = RUNTIME_MODE, maxContextByt
       state.last_reason_code = "context_prepared";
       return { ...updated, simplicio: {
         protected: true, mode: RUNTIME_MODE, reason_code: "context_prepared",
-        session_id: request_identity.host_session_id, turn_id: request_identity.turn_id,
+        run_id: request_identity.run_id, session_id: request_identity.host_session_id,
         api_request_id: request_identity.api_request_id, logical_request_id: request_identity.logical_request_id,
         attempt_id: request_identity.attempt_id, synthetic: request_identity.synthetic,
         synthetic_ids: request_identity.synthetic_ids, provider_cache_status: "unknown",
+        provider_prompt_cache_status: "unknown", mapper_cache_status: mapperCache.status,
+        mapper_cache_hit: mapperCache.status === "hit", mapper_cache: mapperCache,
       } };
     } catch (error) {
       if (error instanceof HermesProtectionError) throw error;
@@ -243,7 +323,9 @@ export function createHermesPlugin({ runtime, mode = RUNTIME_MODE, maxContextByt
     }
     if (typeof runtimeBridge.record_model_result !== "function") {
       pending.delete(id);
-      return failed(event, "runtime_record_unavailable");
+      const final = finalUsageReceipt(prepared.identity, prepared, {}, {}, "failed", "unknown", null, "runtime_record_unavailable");
+      correlation.push(final);
+      return failed(event, "runtime_record_unavailable", { usage_receipt: final });
     }
     const providerId = firstValue(event.provider_request_id, event.response?.id, event.response?.body?.id, event.result?.id);
     if (providerId && recordedProviders.has(providerId)) {
@@ -252,17 +334,35 @@ export function createHermesPlugin({ runtime, mode = RUNTIME_MODE, maxContextByt
       return failed(event, "duplicate_result");
     }
     pending.delete(id);
+    const usage = tokenUsage(event);
+    const eventStatus = ["succeeded", "failed", "unknown"].includes(event.event_status)
+      ? event.event_status : (event.error ? "failed" : "succeeded");
+    const runOutcome = firstValue(event.run_outcome, event.execution_outcome) ??
+      (eventStatus === "failed" ? "unknown" : "completed");
+    const identity = {
+      ...prepared.identity,
+      retries: event.retries ?? event.retry_count,
+      latency_ms: event.latency_ms,
+      http_status: event.http_status,
+      fallback_used: event.fallback_used ?? event.fallback,
+    };
+    const recordArguments = {
+      ...prepared.identity, repo: prepared.repo, prepared_receipt: prepared.receipt,
+      status: eventStatus === "failed" ? "error" : "completed",
+      event_status: eventStatus, run_outcome: runOutcome, ...usage,
+      coverage_proven: !prepared.identity.synthetic,
+      coverage: {
+        provider_path_active: !prepared.identity.synthetic,
+        identity: prepared.identity.synthetic ? "synthetic" : "real",
+      },
+      ...(providerId ? { provider_request_id: providerId, model_call_id: providerId } : {}),
+    };
+    for (const key of ["retries", "retry_count", "latency_ms", "http_status", "fallback_used", "fallback"]) {
+      if (event[key] !== undefined) recordArguments[key] = event[key];
+    }
     try {
-      const receipt = await runtimeBridge.record_model_result({
-        ...prepared.identity, repo: prepared.repo, prepared_receipt: prepared.receipt,
-        status: event.error ? "error" : "completed", ...tokenUsage(event),
-        coverage_proven: !prepared.identity.synthetic,
-        coverage: {
-          provider_path_active: !prepared.identity.synthetic,
-          identity: prepared.identity.synthetic ? "synthetic" : "real",
-        },
-        ...(providerId ? { provider_request_id: providerId } : {}),
-      });
+      const recordReceipt = await runtimeBridge.record_model_result(recordArguments);
+      const final = finalUsageReceipt(identity, prepared, recordReceipt, usage, eventStatus, runOutcome, providerId);
       if (recorded.size >= MAX_CORRELATION_RECEIPTS) recorded.delete(recorded.keys().next().value);
       recorded.set(id, prepared.identity.host_session_id);
       if (providerId) {
@@ -272,12 +372,24 @@ export function createHermesPlugin({ runtime, mode = RUNTIME_MODE, maxContextByt
         recordedProviders.set(providerId, prepared.identity.host_session_id);
       }
       state.usage_collector_active = true;
-      state.provider_cache_status = receipt?.savings?.provider_cache_status ?? "unknown";
+      state.provider_cache_status = final.provider_prompt_cache_status;
+      state.provider_prompt_cache_status = final.provider_prompt_cache_status;
       state.last_reason_code = "receipt_recorded";
-      return { ...event, simplicio: { protected: true, mode: RUNTIME_MODE, reason_code: "receipt_recorded",
-        provider_cache_status: state.provider_cache_status } };
+      correlation.push(final);
+      if (correlation.length > MAX_CORRELATION_RECEIPTS) correlation.shift();
+      return { ...event, simplicio: {
+        protected: true, mode: RUNTIME_MODE, reason_code: "receipt_recorded",
+        provider_cache_status: state.provider_cache_status,
+        provider_prompt_cache_status: state.provider_prompt_cache_status,
+        mapper_cache_status: final.mapper_cache.status,
+        mapper_cache_hit: final.mapper_cache_hit,
+        usage_receipt: final,
+      } };
     } catch {
-      return failed(event, "runtime_record_failed");
+      const final = finalUsageReceipt(identity, prepared, {}, usage, eventStatus, runOutcome, providerId, "runtime_record_failed");
+      correlation.push(final);
+      if (correlation.length > MAX_CORRELATION_RECEIPTS) correlation.shift();
+      return failed(event, "runtime_record_failed", { usage_receipt: final });
     }
   }
 

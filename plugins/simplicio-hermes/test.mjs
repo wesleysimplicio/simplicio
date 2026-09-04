@@ -178,7 +178,7 @@ test("forwards real Hermes identity and records host capabilities", async () => 
     hermes_capabilities: { middleware: true, version: "0.20.4" },
   });
   assert.deepEqual(runtime.calls.prepare[0], {
-    host: "hermes", host_session_id: "session-real", turn_id: "turn-real",
+    host: "hermes", host_session_id: "session-real", run_id: "session-real", session_id: "session-real", turn_id: "turn-real",
     api_request_id: "api-real", logical_request_id: "logical-real", attempt_id: "attempt-real",
     synthetic: false, synthetic_ids: [], provider: "provider/name", model: "model/name",
     hermes_capabilities: { middleware: true, version: "0.20.4" },
@@ -208,7 +208,11 @@ test("missing and duplicate results emit bounded correlation receipts", async ()
   await plugin.record_model_result({ session_id: "s", turn_id: "t", api_request_id: "a" });
   const duplicate = await plugin.record_model_result({ session_id: "s", turn_id: "t", api_request_id: "a" });
   assert.equal(duplicate.simplicio.reason_code, "duplicate_result");
-  assert.deepEqual(plugin.correlationReceipts().map((item) => item.reason_code), [
+  assert.deepEqual(plugin.correlationReceipts().filter((item) => item.reason_code).map((item) => item.reason_code), [
     "correlation_missing", "duplicate_result",
   ]);
+  const final = plugin.correlationReceipts().find((item) => item.schema === "simplicio.hermes-usage-receipt/v1");
+  assert.equal(final.mapper_cache_hit, false);
+  assert.equal(final.provider_prompt_cache_status, "unknown");
+  assert.equal(final.run_outcome, "completed");
 });
