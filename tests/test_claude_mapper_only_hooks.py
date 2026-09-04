@@ -150,6 +150,7 @@ def test_mapper_failure_is_not_a_silent_native_bypass(tmp_path: Path) -> None:
         "SIMPLICIO_BIN": str(runtime),
         "FAKE_MAPPER_LOG": str(runtime.with_name("mapper.log")),
         "FAKE_MAPPER_FAIL": "1",
+        "SIMPLICIO_MAPPER_BIN": str(runtime),
         "PATH": str(tmp_path / "empty-path"),
     })
     failed = subprocess.run(
