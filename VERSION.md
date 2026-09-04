@@ -8,12 +8,12 @@ This is the **public distribution repo** for [Simplicio](https://github.com/wesl
 
 The Rust Runtime source lives in the private [`simplicio-runtime`](https://github.com/wesleysimplicio/simplicio-runtime) repo. Runtime and Desktop executables are GitHub Release assets, not tracked source files.
 
-## Runtime snapshot: v3.8.45
+## Runtime snapshot: v3.8.46
 
-## Current Version: v3.8.45
+## Current Version: v3.8.46
 
 - **Source:** `simplicio-runtime` main at commit
-  `68330a7215d1a36312a56d9ec25129330f5d2fff` (Runtime v3.8.40).
+  `55ee89e6e5b52c001a9591e4eeaa4cf9334805f1` (Runtime v3.8.40).
 - **Runtime targets:** macOS ARM64, macOS x64, Linux x64, and Windows x64.
   The canonical target table and release manifest define the asset, checksum,
   Ed25519 signature, SBOM, and provenance for each Runtime platform.
