@@ -23,6 +23,14 @@ export function canConfigureRuntime(snapshot: DesktopSnapshot): boolean {
 }
 
 export function runtimeIsValid(snapshot: DesktopSnapshot): boolean {
-  return snapshot.runtime.transport !== "unavailable"
-    && snapshot.runtime.state === "healthy";
+  const runtime = snapshot.runtime;
+  return runtime.transport !== "unavailable"
+    && runtime.state === "healthy"
+    && runtime.deterministic.ready
+    && runtime.deterministic.mapper === "canonical"
+    && runtime.deterministic.mapCache === "generation_scoped"
+    && runtime.deterministic.hookContext === "receipt_only"
+    && runtime.optionalFast.required === false
+    && runtime.optionalFast.hookInjected === false
+    && runtime.optionalFast.status === "not_required";
 }
