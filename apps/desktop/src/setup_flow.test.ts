@@ -26,6 +26,19 @@ describe("guided setup evidence", () => {
     expect(canConfigureRuntime({ ...snapshot, runtime: { ...snapshot.runtime, transport: "unavailable" } })).toBe(false);
   });
 
+  it("does not treat a healthy transport as a complete managed Runtime", () => {
+    const snapshot = createDemoSnapshot("signed_out");
+    expect(runtimeIsValid({ ...snapshot, runtime: {
+      ...snapshot.runtime, deterministic: { ...snapshot.runtime.deterministic, ready: false },
+    } })).toBe(false);
+    expect(runtimeIsValid({ ...snapshot, runtime: {
+      ...snapshot.runtime, deterministic: { ...snapshot.runtime.deterministic, hookContext: "legacy" as "receipt_only" },
+    } })).toBe(false);
+    expect(runtimeIsValid({ ...snapshot, runtime: {
+      ...snapshot.runtime, optionalFast: { ...snapshot.runtime.optionalFast, hookInjected: true },
+    } })).toBe(false);
+  });
+
   it("uses only a reachable healthy Runtime to skip core installation", () => {
     const snapshot = createDemoSnapshot("signed_out");
     expect(runtimeIsValid(snapshot)).toBe(true);
