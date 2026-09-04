@@ -8,7 +8,7 @@
   <a href="https://github.com/wesleysimplicio/simplicio/releases/latest"><img src="https://img.shields.io/github/v/release/wesleysimplicio/simplicio?color=blue&label=latest" alt="最新版本"></a>
   <a href="https://github.com/wesleysimplicio/simplicio/stargazers"><img src="https://img.shields.io/github/stars/wesleysimplicio/simplicio?style=social" alt="星标"></a>
   <a href="https://github.com/wesleysimplicio/simplicio/releases"><img src="https://img.shields.io/github/downloads/wesleysimplicio/simplicio/total?color=green" alt="下载量"></a>
-  <a href="../LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="许可证"></a>
+  <a href="../plugins/simplicio/LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="许可证"></a>
 </p>
 
 <p align="center">
@@ -269,7 +269,7 @@ simplicio license status
 ## 📄 许可证
 
 专有许可。二进制文件可免费下载和使用。AI 功能在公开
-公测期间免费。详见 [LICENSE](../LICENSE)。
+公测期间免费。详见 [LICENSE](../plugins/simplicio/LICENSE)。
 
 ---
 
