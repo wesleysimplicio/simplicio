@@ -1,38 +1,38 @@
 # Contributing
 
-This repo is the public **distribution** repo for `simplicio`: committed
-release binaries plus the packaging/tooling around them (npm/pypi/Homebrew
-wrappers, install scripts, docs, release manifests). It does not contain the
-agent's Rust source, so there is no `cargo test`/`cargo check`/`cargo build`
-here.
+This repository owns public Simplicio distribution: release artifacts, installers, package-manager wrappers, host-plugin packages, manifests, documentation, and the Tauri Desktop source under apps/desktop. The Runtime implementation remains in the separate simplicio-runtime repository.
 
-## Running tests
+## Before editing
 
-Official test command for this repo's Python tooling
-(`scripts/verify_distribution_consistency.py` today; more modules will be
-added under `tests/unit` as the testing epic — issue #8 — progresses):
+Read AGENTS.md and the relevant host or Desktop contract before planning changes. Preserve unrelated work, keep the current master branch policy, and distinguish source edits, built artifacts, installed behavior, and published release evidence.
 
-```bash
-pip install -r requirements-dev.txt
-python -m pytest tests/unit -v --cov=scripts --cov-report=term-missing --cov-fail-under=85
-```
+For hook or Mapper changes, preserve the Mapper-only gate, do not add network or installation work to hooks, and update the focused Claude and Hermes tests. For Desktop changes, verify the UI, bridge, native command, packaged sidecar, and Runtime receipt boundary.
 
-- Test layout: `tests/unit/`, one `test_<module>.py` per `scripts/<module>.py`,
-  shared fixtures/builders in `tests/unit/conftest.py`.
-- Tests must be deterministic and isolated: no network access, no dependence
-  on the real wall clock (freeze `datetime.date` via `monkeypatch` if a
-  function reads it), and no reliance on execution order — each test builds
-  its own throwaway fixture tree under pytest's `tmp_path`.
-- CI runs the same command via `.github/workflows/tests.yml` on every push/PR
-  touching `scripts/`, `tests/`, or the test config.
+## Local validation
 
-See [docs/testing-strategy.md](docs/testing-strategy.md) for the full
-rationale, current coverage, and what's left for the rest of the epic.
+Install development dependencies in an isolated environment, then run the Python distribution checks:
+
+    pip install -r requirements-dev.txt
+    python -m pytest tests/unit -v --cov=scripts --cov-report=term-missing --cov-fail-under=85
+    python3 scripts/verify_distribution_consistency.py
+
+The Python suite is deterministic and should use throwaway pytest tmp_path fixtures. The 85 percent threshold applies to the measured scripts surface; critical release-integrity code has a 90 percent target when its focused coverage is available.
+
+The Desktop package declares these local commands in apps/desktop/package.json:
+
+    cd apps/desktop
+    npm test
+    npm run build
+    npm run test:e2e
+
+For native checks, run the Rust library tests from apps/desktop:
+
+    cargo test --manifest-path src-tauri/Cargo.toml
+
+Native package and installed-journey checks require the available target platform and staged, verified sidecar bytes. Report unavailable platforms, signing, notarization, or host integrations as unverified.
 
 ## Making changes
 
-- Keep PRs scoped; this repo mixes release artifacts with tooling/docs, so
-  please don't bundle binary/version bumps with unrelated tooling changes.
-- If you touch `scripts/verify_distribution_consistency.py`, add/update the
-  corresponding test(s) in `tests/unit/test_verify_distribution_consistency.py`
-  in the same PR.
+Keep pull requests scoped and include the changed paths, commands, exit codes, evidence type, and remaining uncertainty. Do not mix release version or binary changes with unrelated tooling work. Add a regression test for behavior changes and keep manifests, loaders, and package versions synchronized.
+
+The canonical integration branch is master. Open a pull request against master and use its review and merge result as delivery evidence; a local source change is not a published release.
