@@ -17,6 +17,7 @@ mod project_discovery_process;
 mod project_usage;
 mod projection_queries;
 mod runtime_install;
+mod runtime_lifecycle;
 mod runtime_process;
 mod snapshot_exports;
 mod supervisor;
@@ -292,10 +293,7 @@ fn default_projection_repo() -> Result<PathBuf, String> {
 }
 
 #[tauri::command]
-async fn desktop_unified_usage(
-    query: Value,
-    repo_path: Option<String>,
-) -> Result<Value, String> {
+async fn desktop_unified_usage(query: Value, repo_path: Option<String>) -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(move || {
         require_read_access()?;
         let default_repo = default_projection_repo()?;
@@ -313,10 +311,7 @@ async fn desktop_unified_usage(
 }
 
 #[tauri::command]
-async fn desktop_cost_projection(
-    query: Value,
-    repo_path: Option<String>,
-) -> Result<Value, String> {
+async fn desktop_cost_projection(query: Value, repo_path: Option<String>) -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(move || {
         require_read_access()?;
         let default_repo = default_projection_repo()?;
@@ -625,6 +620,33 @@ async fn desktop_reconcile_runtime_install(app: tauri::AppHandle) -> Result<Valu
 }
 
 #[tauri::command]
+async fn desktop_runtime_lifecycle(action: Option<String>) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let current_executable =
+            std::env::current_exe().map_err(|_| "runtime_lifecycle_unavailable".to_string())?;
+        let home = runtime_user_home()?;
+        match action.as_deref() {
+            None | Some("status") => {
+                runtime_lifecycle::read(&current_executable, &home, snapshot_from_binary)
+            }
+            Some("rollback") => {
+                let _process_lock = INSTALL_PROCESS_LOCK
+                    .lock()
+                    .map_err(|_| "runtime_install_busy".to_string())?;
+                runtime_lifecycle::rollback(&home, snapshot_from_binary)
+            }
+            Some(action) => {
+                let _process_lock = INSTALL_PROCESS_LOCK
+                    .lock()
+                    .map_err(|_| "runtime_install_busy".to_string())?;
+                runtime_lifecycle::apply(&current_executable, &home, action, snapshot_from_binary)
+            }
+        }
+    })
+    .await
+    .map_err(|_| "runtime_lifecycle_unavailable".to_string())?
+}
+#[tauri::command]
 async fn desktop_login() -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(|| {
         let authority = packaged_runtime_authority()?;
@@ -715,6 +737,7 @@ pub fn run() {
             desktop_install_runtime,
             desktop_runtime_install_status,
             desktop_reconcile_runtime_install,
+            desktop_runtime_lifecycle,
             desktop_validate_project,
             desktop_open_project,
             desktop_export_snapshot,

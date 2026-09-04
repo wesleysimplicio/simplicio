@@ -1267,6 +1267,100 @@ where
     }
 }
 
+/// Restores the last verified managed target without touching host plugins or
+/// configuration. The caller supplies the exact current/previous digests from a
+/// lifecycle receipt so a stale rollback request cannot target a different slot.
+pub fn rollback<F>(
+    home: &Path,
+    expected_current_digest: [u8; 32],
+    expected_previous_digest: [u8; 32],
+    previous_version: &str,
+    mut validate: F,
+) -> Result<Value, String>
+where
+    F: FnMut(&Path) -> Result<Value, String>,
+{
+    require_directory(home, "runtime_install_home_unavailable")?;
+    let root = home.join(".simplicio");
+    let (bin, target, backup) = install_paths(home);
+    ensure_private_directory(&root)?;
+    ensure_private_directory(&bin)?;
+    reject_symlink(&target)?;
+    reject_symlink(&backup)?;
+    let _lock = acquire_lock(&bin)?;
+    let previous_receipt = snapshot_managed_receipt(home)?;
+    let current_digest = stable_regular_digest(&target)
+        .map_err(|_| "runtime_install_precondition_changed".to_string())?
+        .ok_or_else(|| "runtime_install_precondition_changed".to_string())?;
+    if current_digest != expected_current_digest {
+        return Err("runtime_install_precondition_changed".to_string());
+    }
+    let backup_digest = stable_regular_digest(&backup)
+        .map_err(|_| "runtime_install_rollback_failed".to_string())?
+        .ok_or_else(|| "runtime_install_rollback_failed".to_string())?;
+    if backup_digest != expected_previous_digest {
+        return Err("runtime_install_rollback_failed".to_string());
+    }
+    let mut staged_current = stage(&target, &bin, expected_current_digest)
+        .map_err(|_| "runtime_install_rollback_failed".to_string())?;
+    if restore_backup(&backup, &target, &bin, expected_previous_digest).is_err() {
+        let _ = replace_staged(
+            &mut staged_current,
+            &target,
+            "runtime_install_rollback_failed",
+        );
+        let _ = restore_managed_receipt(home, &previous_receipt);
+        return Err("runtime_install_rollback_failed".to_string());
+    }
+    let desired_receipt = managed_receipt_bytes(previous_version, expected_previous_digest)
+        .map_err(|_| "runtime_install_rollback_failed".to_string())?;
+    let receipt_written = write_managed_receipt_transactional(
+        home,
+        &previous_receipt,
+        &desired_receipt,
+        &mut write_managed_receipt,
+    )
+    .is_ok();
+    let validated =
+        validate_stable_runtime(&target, &mut validate, "runtime_install_rollback_failed").ok();
+    let verified = receipt_written
+        && validated
+            .as_ref()
+            .is_some_and(|(snapshot, version, digest)| {
+                *digest == expected_previous_digest
+                    && runtime_summary(snapshot)
+                        .ok()
+                        .and_then(|summary| summary.get("version").cloned())
+                        .and_then(|value| value.as_str().map(str::to_string))
+                        .is_some_and(|version| version == previous_version)
+                    && *version
+                        == semantic_version(previous_version).unwrap_or_else(|_| SemanticVersion {
+                            core: (0, 0, 0),
+                            prerelease: Vec::new(),
+                        })
+            })
+        && receipt_matches_snapshot(home, &ReceiptSnapshot::Bytes(desired_receipt.clone()))
+            .unwrap_or(false);
+    if !verified {
+        let target_restored = replace_staged(
+            &mut staged_current,
+            &target,
+            "runtime_install_rollback_failed",
+        )
+        .is_ok();
+        let receipt_restored = restore_managed_receipt(home, &previous_receipt).is_ok();
+        if !target_restored || !receipt_restored {
+            return Err("runtime_install_rollback_failed".to_string());
+        }
+        return Err("runtime_install_rollback_failed".to_string());
+    }
+    Ok(receipt(
+        "rolled_back",
+        true,
+        &validated.expect("verified validation is present").0,
+    )?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1734,6 +1828,32 @@ mod tests {
         );
         assert!(!sentinel.exists());
         assert_eq!(fs::read(&target).unwrap(), original);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rollback_restores_the_verified_previous_target_and_receipt() {
+        let (root, app, home) = fixture();
+        let (bin, target, backup) = install_paths(&home);
+        fs::create_dir_all(&bin).unwrap();
+        fs::write(&target, b"runtime-current").unwrap();
+        fs::write(&backup, b"runtime-previous").unwrap();
+        let current_digest = digest(&target).unwrap();
+        let previous_digest = digest(&backup).unwrap();
+        write_managed_receipt(
+            &home,
+            &managed_receipt_bytes("3.8.40", current_digest).unwrap(),
+        )
+        .unwrap();
+        let result = rollback(&home, current_digest, previous_digest, "3.8.39", |path| {
+            assert_eq!(fs::read(path).unwrap(), b"runtime-previous");
+            Ok(versioned_snapshot("3.8.39"))
+        })
+        .unwrap();
+        assert_eq!(result["status"], "rolled_back");
+        assert_eq!(fs::read(&target).unwrap(), b"runtime-previous");
+        let receipt = read_managed_receipt(&home).unwrap().unwrap();
+        assert!(managed_evidence(Some(&receipt), previous_digest).is_some());
         fs::remove_dir_all(root).unwrap();
     }
 
