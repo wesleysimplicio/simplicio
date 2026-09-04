@@ -495,6 +495,25 @@ def test_mapper_cache_metadata_never_infers_provider_cache_status():
     }
 
 
+def test_not_reported_cache_status_is_preserved_without_becoming_unknown():
+    adapter = load_adapter()
+    assert adapter._provider_cache_status(
+        {"provider_prompt_cache_status": "not_reported"}, {},
+    ) == "not_reported"
+    arguments = adapter._arguments(
+        "s", turn_id="t", api_request_id="a", logical_request_id="l",
+        attempt_id="attempt", provider="p", model="m", cwd=str(ROOT),
+    )
+    final = adapter._final_usage_receipt(
+        arguments, {"receipt": mapper_receipt(arguments)},
+        {"provider_prompt_cache_status": "not_reported"},
+        {"input_tokens": 0, "output_tokens": 0}, "succeeded", "completed", None,
+    )
+    assert final["provider_prompt_cache_status"] == "not_reported"
+    assert final["usage"]["input_tokens"] == 0
+    assert final["usage"]["output_tokens"] == 0
+
+
 def test_local_mapper_hit_with_absent_provider_usage_is_explicitly_unmeasured():
     adapter, bridge, context = setup_plugin()
     bridge.call = lambda tool, arguments: (

@@ -47,7 +47,9 @@ _BRIDGE_TOOLS = frozenset({
 })
 
 
-_CACHE_STATUSES = frozenset({"hit", "miss", "unknown", "unsupported", "not_collected", "failed"})
+_CACHE_STATUSES = frozenset({
+    "hit", "miss", "unknown", "unsupported", "not_reported", "not_collected", "failed",
+})
 _MEASUREMENT_MODES = frozenset({"normal", "strict", "benchmark"})
 _STABLE_CORRELATION_IDS = frozenset({"host_session_id", "turn_id", "api_request_id"})
 
@@ -466,9 +468,7 @@ def _python_receipt(arguments: dict[str, Any], data: bytes, resolution: MapperRe
         "project_map_markdown": data.decode("utf-8"),
     }, ensure_ascii=False, separators=(",", ":"))
     raw = content.encode("utf-8")
-    mapper_cache_status = mapper_cache_status if mapper_cache_status in {
-        "hit", "miss", "unknown", "unsupported", "not_collected", "failed"
-    } else "unknown"
+    mapper_cache_status = mapper_cache_status if mapper_cache_status in _CACHE_STATUSES else "unknown"
     mapper_cache = {
         "status": mapper_cache_status,
         "map_build_count": max(0, int(map_build_count)),
