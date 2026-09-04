@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -145,3 +148,29 @@ def test_published_adapters_point_to_their_canonical_commands() -> None:
     assert prompt["name"] == "simplicio-prompt"
     assert (ROOT / "plugins/simplicio-prompt/commands/simplicio.md").is_file()
     assert (ROOT / "plugins/simplicio-prompt/hooks/plugin-runtime-adapter/adapter.mjs").is_file()
+
+
+def test_local_publisher_includes_gemini_and_rejects_version_drift(tmp_path, monkeypatch) -> None:
+    script = ROOT / "scripts/publish_release_local.py"
+    spec = importlib.util.spec_from_file_location("publish_release_local_manifest_parity", script)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+
+    expected = {
+        "plugins/simplicio/plugin.json",
+        "plugins/simplicio/.codex-plugin/plugin.json",
+        "plugins/simplicio/.claude-plugin/plugin.json",
+        "plugins/simplicio/gemini-extension.json",
+    }
+    assert set(module.PLUGIN_MANIFESTS) == expected
+
+    for relative in module.PLUGIN_MANIFESTS:
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        version = "0.2.10" if relative.endswith("gemini-extension.json") else "0.2.11"
+        path.write_text(json.dumps({"name": "simplicio", "version": version}), encoding="utf-8")
+
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    with pytest.raises(module.PublishError, match="plugin manifest versions differ"):
+        module.plugin_manifests()
