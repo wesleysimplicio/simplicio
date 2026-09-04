@@ -86,7 +86,7 @@ Add this server entry to any MCP-compatible client that supports STDIO:
 {
   "mcpServers": {
     "simplicio": {
-      "command": "simplicio",
+      "command": "/absolute/path/to/.simplicio/bin/simplicio",
       "args": ["serve", "--mcp", "--stdio"]
     }
   }
@@ -97,13 +97,13 @@ Common locations:
 
 | Client | File |
 |---|---|
-| Claude Code | `~/.claude/settings.json` |
+| Claude Code | `~/.claude.json` (user/local) or project `.mcp.json` |
 | Cursor | `~/.cursor/mcp.json` |
 | VS Code | `.vscode/mcp.json` |
 | Cline | `~/.config/cline/mcp_settings.json` |
 | Continue | `~/.continue/config.json` |
 
-Reload the client after editing its configuration. STDIO does not require a manually copied bearer token, but the local Runtime still requires the Google login above.
+Replace the placeholder with the installed binary's absolute path. Claude Code plugin-provided servers follow the plugin lifecycle; do not copy them into project configuration unless the host requires it. Reload the client after editing its configuration. STDIO does not require a manually copied bearer token, but the local Runtime still requires the Google login above.
 
 ## Tools
 
