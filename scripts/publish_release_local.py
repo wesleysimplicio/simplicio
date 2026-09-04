@@ -271,6 +271,7 @@ PLUGIN_MANIFESTS = (
     "plugins/simplicio/plugin.json",
     "plugins/simplicio/.codex-plugin/plugin.json",
     "plugins/simplicio/.claude-plugin/plugin.json",
+    "plugins/simplicio/gemini-extension.json",
 )
 PERSISTENT_LOGIN_MINIMUM = "3.8.40"
 
