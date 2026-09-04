@@ -50,6 +50,10 @@ const FAILURE_CODES = new Set<string>([
 const VERIFICATIONS = new Set<string>(["none", "manager_version", "installed_tree", "installed_tree_and_manager"]);
 const RECONCILE = new Set<string>(["committed", "not_applied", "partial", "drifted", "ambiguous", "not_applicable"]);
 
+export function isHostPluginDigest(value: unknown): value is string {
+  return typeof value === "string" && DIGEST.test(value);
+}
+
 export interface IntegrationPlanHost {
   host: HostPluginId;
   mode: HostPluginMode;
