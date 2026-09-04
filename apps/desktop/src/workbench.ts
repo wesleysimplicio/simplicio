@@ -127,7 +127,9 @@ export function runtimeSummary(snapshot: DesktopSnapshot) {
     healthy: snapshot.runtime.state === "healthy",
     connected: providers.filter((provider) => provider.state === "connected").length,
     installed: providers.filter((provider) => provider.installState === "installed").length,
-    measuredSavings: snapshot.savings.proofKind === "measured" && snapshot.savings.ledgerStatus === "valid"
+    measuredSavings: snapshot.source === "runtime"
+      && snapshot.savings.proofKind === "measured"
+      && snapshot.savings.ledgerStatus === "valid"
       ? snapshot.savings.monthTokens : null,
   };
 }
