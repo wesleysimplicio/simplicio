@@ -2,14 +2,14 @@
   "schema": "simplicio.provenance/v1",
   "subject": {
     "name": "simplicio-macos-x64",
-    "sha256": "09bf825fdd0451407533c58c9d80f6856bcd3a8b8e546b264e640aead45f8734",
-    "size": 57381744
+    "sha256": "7e48e56fe68f3761bf223c02850d43cb58bd723fc376d197a3439c0daac0ec09",
+    "size": 57394160
   },
   "build": {
-    "version": "3.8.42",
+    "version": "3.8.43",
     "target": "macos-x64",
-    "source_commit": "af05bd634d942bfed3e65401295f2ff3e3910fd3",
-    "builder": "local-manual-release"
+    "source_commit": "8132079bc9420786b04848b6dfcce4c46016c235",
+    "builder": "local manual release"
   },
   "optimization_profile": {
     "status": "BLOCKED",
@@ -19,10 +19,10 @@
   },
   "host_plugins": {
     "schema": "simplicio.host-plugin-release-binding/v1",
-    "runtime_commit": "af05bd634d942bfed3e65401295f2ff3e3910fd3",
-    "public_commit": "02b21e7c6bb4b6c59043ff3f13d4056f958ce28b",
-    "bundle_manifest_sha256": "fab716ec3cf1c9a45c3d4e22d3a28bfea78a9b3b9d76b9af874e210c7662bccc",
-    "payload_tree_sha256": "41ef0fa5ee331d11a3815dce1931b0eee631b299405d061223142be95bc4b1a2"
+    "runtime_commit": "8132079bc9420786b04848b6dfcce4c46016c235",
+    "public_commit": "d8b27e3c63d7bc357cd7aec83548582d564c668c",
+    "bundle_manifest_sha256": "3c110991edef1034b8ea7b482cb5509d485feec46d5d4ee2d3009bf0ef09209f",
+    "payload_tree_sha256": "14956c192cb4dab2d9700d88f72bec3daa5e632a6bd441ec056697c418f8e491"
   },
-  "generated_at": "2026-09-04T03:27:38.077071Z"
+  "generated_at": "2026-09-04T05:50:54.162969Z"
 }
