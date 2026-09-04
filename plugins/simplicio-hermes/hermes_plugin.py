@@ -30,6 +30,7 @@ RUNTIME_MODE = "mapper-only"
 _PYTHON_MAPPER_ENV = "SIMPLICIO_MAPPER_BIN"
 _PYTHON_MAPPER_ROOT_ENV = "SIMPLICIO_MAPPER_ROOT"
 _PYTHON_MAPPER_MANIFEST_ENV = "SIMPLICIO_MAPPER_MANIFEST"
+_MEASUREMENT_MODE_ENV = "SIMPLICIO_HERMES_MEASUREMENT_MODE"
 _MAPPER_CACHE = Path(".simplicio") / "hook-context"
 _MAPPER_SCHEMA = "simplicio.mapper-prefix/v1"
 _MAPPER_PROTOCOL = "simplicio.mapper/v1"
@@ -47,6 +48,8 @@ _BRIDGE_TOOLS = frozenset({
 
 
 _CACHE_STATUSES = frozenset({"hit", "miss", "unknown", "unsupported", "not_collected", "failed"})
+_MEASUREMENT_MODES = frozenset({"normal", "strict", "benchmark"})
+_STABLE_CORRELATION_IDS = frozenset({"host_session_id", "turn_id", "api_request_id"})
 
 
 class SimplicioHermesError(RuntimeError):
@@ -80,6 +83,34 @@ def _version_tuple(value: str) -> tuple[int, int, int]:
 
 def _first_string(*values: Any) -> str | None:
     return next((value for value in values if isinstance(value, str) and value), None)
+
+
+def _measurement_mode(kwargs: dict[str, Any] | None = None) -> str:
+    value = _first_string(
+        (kwargs or {}).get("measurement_mode"),
+        os.environ.get(_MEASUREMENT_MODE_ENV),
+    ) or "normal"
+    value = value.strip().lower()
+    return value if value in _MEASUREMENT_MODES else "normal"
+
+
+def _safe_route_value(value: Any) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    # Route identity is evidence, but query strings/fragments may contain secrets.
+    return value.strip().split("?", 1)[0].split("#", 1)[0][:512]
+
+
+def _request_api_mode(request: dict[str, Any]) -> str | None:
+    if "instructions" in request:
+        return "responses"
+    if "messages" in request:
+        return "chat_completions"
+    if "system" in request:
+        return "anthropic_messages"
+    if "input" in request:
+        return "responses"
+    return None
 
 
 def _minimal_environment(extra: dict[str, str] | None = None) -> dict[str, str]:
@@ -660,10 +691,14 @@ def _bounded_insert(mapping: dict[str, str], key: str, value: str) -> None:
 
 def _emit_correlation_receipt(reason_code: str, session_id: str, candidate_count: int,
                               kwargs: dict[str, Any]) -> None:
+    measurement_mode = _measurement_mode(kwargs)
     receipt = {
         "schema": "simplicio.hermes-correlation-receipt/v1",
         "status": "not_recorded", "reason_code": reason_code,
         "host": "hermes", "candidate_count": candidate_count,
+        "measurement_mode": measurement_mode,
+        "measurement_status": "unmeasured",
+        "run_outcome": kwargs.get("run_outcome", "unknown"),
     }
     for key in ("host_session_id", "turn_id", "api_request_id", "logical_request_id", "attempt_id"):
         value = kwargs.get(key)
@@ -673,6 +708,8 @@ def _emit_correlation_receipt(reason_code: str, session_id: str, candidate_count
         _CORRELATION_RECEIPTS.append(receipt)
     LOGGER.warning("Simplicio Hermes correlation unavailable (reason_code=%s candidates=%d)",
                    reason_code, candidate_count)
+    if measurement_mode in {"strict", "benchmark"}:
+        raise SimplicioHermesError(f"strict measurement rejected: {reason_code}")
 
 
 def correlation_receipts() -> list[dict[str, Any]]:
@@ -731,6 +768,14 @@ def _arguments(session_id: str = "", user_message: str = "", model: str = "",
         kwargs.get("hermes_capabilities", kwargs.get("capabilities"))
     )
     run_id = _first_string(kwargs.get("run_id"), kwargs.get("hermes_run_id")) or provided["host_session_id"]
+    endpoint = _safe_route_value(_first_string(
+        kwargs.get("endpoint"), kwargs.get("api_endpoint"), kwargs.get("base_url"), kwargs.get("url")
+    ))
+    api_mode = _safe_route_value(_first_string(
+        kwargs.get("api_mode"), kwargs.get("protocol_mode"), kwargs.get("provider_api_mode")
+    ))
+    endpoint_source = _first_string(kwargs.get("endpoint_source")) if endpoint else None
+    api_mode_source = _first_string(kwargs.get("api_mode_source")) if api_mode else None
     return {
         "repo": str(kwargs.get("cwd") or kwargs.get("repo") or os.getenv("TERMINAL_CWD") or os.getcwd()),
         "host": "hermes",
@@ -739,6 +784,9 @@ def _arguments(session_id: str = "", user_message: str = "", model: str = "",
         "api_request_id": provided["api_request_id"], "logical_request_id": provided["logical_request_id"],
         "attempt_id": provided["attempt_id"], "synthetic": bool(synthetic_ids),
         "synthetic_ids": synthetic_ids, "provider": provider, "model": model_value,
+        "measurement_mode": _measurement_mode(kwargs),
+        "endpoint": endpoint, "endpoint_source": endpoint_source or ("host_reported" if endpoint else "unavailable"),
+        "api_mode": api_mode, "api_mode_source": api_mode_source or ("host_reported" if api_mode else "unavailable"),
         "hermes_capabilities": capabilities,
         "lifecycle": kwargs.get("lifecycle", "provider_request"),
         # Task text is unnecessary for a full-project map and must not enter
@@ -847,9 +895,15 @@ def _llm_request(request: dict[str, Any], session_id: str = "", model: str = "",
                  **kwargs: Any) -> dict[str, Any] | None:
     request_metadata = dict(kwargs)
     for key in ("turn_id", "api_request_id", "request_id", "logical_request_id", "attempt_id",
-                "provider", "hermes_capabilities", "capabilities"):
+                "provider", "hermes_capabilities", "capabilities", "endpoint", "api_endpoint",
+                "base_url", "url", "api_mode", "provider_api_mode", "measurement_mode"):
         if key not in request_metadata and key in request:
             request_metadata[key] = request[key]
+    if not _first_string(request_metadata.get("api_mode"), request_metadata.get("provider_api_mode")):
+        inferred_mode = _request_api_mode(request)
+        if inferred_mode:
+            request_metadata["api_mode"] = inferred_mode
+            request_metadata["api_mode_source"] = "request_shape"
     arguments = _arguments(session_id, model=model or request.get("model", ""), **request_metadata)
     with _STATE_LOCK:
         _PREPARED.pop(arguments["api_request_id"], None)
@@ -937,6 +991,20 @@ def _final_usage_receipt(arguments: dict[str, Any], prepared: dict[str, Any],
             "output_tokens", "reasoning_tokens",
         )
     }
+    synthetic_ids = set(arguments.get("synthetic_ids") or [])
+    unstable_ids = sorted(synthetic_ids & _STABLE_CORRELATION_IDS)
+    missing_usage = [key for key in ("input_tokens", "output_tokens") if usage.get(key) is None]
+    measurement_reasons: list[str] = []
+    if unstable_ids:
+        measurement_reasons.append("synthetic_correlation_ids")
+    if not usage:
+        measurement_reasons.append("usage_not_collected")
+    elif missing_usage:
+        measurement_reasons.append("required_usage_incomplete")
+    if failure:
+        measurement_reasons.append(failure)
+    measurement_status = "unmeasured" if measurement_reasons else "measured"
+    measurement_mode = arguments.get("measurement_mode", "normal")
     receipt = {
         "schema": "simplicio.hermes-usage-receipt/v1",
         "event_name": "model_call_completed" if event_status == "succeeded" else "model_call_failed",
@@ -953,6 +1021,24 @@ def _final_usage_receipt(arguments: dict[str, Any], prepared: dict[str, Any],
         "model_call_id": provider_id,
         "provider": arguments.get("provider", "unknown"),
         "model": arguments.get("model", "unknown"),
+        "endpoint": arguments.get("endpoint"),
+        "api_mode": arguments.get("api_mode"),
+        "provider_route": {
+            "endpoint": arguments.get("endpoint"),
+            "endpoint_source": arguments.get("endpoint_source", "unavailable"),
+            "endpoint_reason": None if arguments.get("endpoint") else "not_provided_by_host",
+            "api_mode": arguments.get("api_mode"),
+            "api_mode_source": arguments.get("api_mode_source", "unavailable"),
+            "api_mode_reason": None if arguments.get("api_mode") else "not_provided_or_inferable",
+        },
+        "correlation": {
+            "status": "stable" if not unstable_ids else "synthetic",
+            "source": "host_reported" if not unstable_ids else "plugin_generated",
+            "synthetic_ids": sorted(synthetic_ids),
+        },
+        "measurement_mode": measurement_mode,
+        "measurement_status": measurement_status,
+        "measurement_reason_codes": measurement_reasons,
         "mapper_cache": mapper_cache,
         "mapper_cache_status": mapper_cache["status"],
         "mapper_cache_hit": mapper_cache["status"] == "hit",
@@ -990,6 +1076,14 @@ def _record(session_id: str = "", status: str = "completed", **kwargs: Any) -> N
         kwargs.get("provider_request_id"), response.get("id"), body.get("id"),
     )
     with _STATE_LOCK:
+        session_items = [
+            item for item in _PREPARED.values()
+            if item["arguments"]["host_session_id"] == observed_session
+        ]
+        diagnostic_kwargs = dict(kwargs)
+        if any(item["arguments"].get("measurement_mode") in {"strict", "benchmark"}
+               for item in session_items):
+            diagnostic_kwargs["measurement_mode"] = "strict"
         candidates = [
             key for key, item in _PREPARED.items()
             if item["arguments"]["host_session_id"] == observed_session
@@ -998,10 +1092,12 @@ def _record(session_id: str = "", status: str = "completed", **kwargs: Any) -> N
         ]
         if len(candidates) == 0:
             reason = "duplicate_result" if requested_api_id in _RECORDED_REQUESTS else "correlation_missing"
-            _emit_correlation_receipt(reason, observed_session, 0, kwargs)
+            _emit_correlation_receipt(reason, observed_session, 0, diagnostic_kwargs)
             return
         if len(candidates) > 1:
-            _emit_correlation_receipt("correlation_ambiguous", observed_session, len(candidates), kwargs)
+            _emit_correlation_receipt(
+                "correlation_ambiguous", observed_session, len(candidates), diagnostic_kwargs
+            )
             return
         candidate_key = candidates[0]
         if provider_id and provider_id in _RECORDED_PROVIDER_IDS:
@@ -1025,7 +1121,8 @@ def _record(session_id: str = "", status: str = "completed", **kwargs: Any) -> N
         key: original[key] for key in (
             "repo", "host", "host_session_id", "session_id", "run_id", "turn_id",
             "api_request_id", "logical_request_id", "attempt_id", "provider", "model",
-            "synthetic", "synthetic_ids", "hermes_capabilities",
+            "synthetic", "synthetic_ids", "hermes_capabilities", "measurement_mode",
+            "endpoint", "endpoint_source", "api_mode", "api_mode_source",
         ) if key in original
     }
     arguments.update(
@@ -1041,6 +1138,16 @@ def _record(session_id: str = "", status: str = "completed", **kwargs: Any) -> N
     for key in ("retries", "latency_ms", "http_status", "fallback_used"):
         if key in kwargs:
             arguments[key] = kwargs[key]
+    endpoint = _safe_route_value(_first_string(
+        kwargs.get("endpoint"), kwargs.get("api_endpoint"), kwargs.get("base_url"), kwargs.get("url")
+    ))
+    api_mode = _safe_route_value(_first_string(
+        kwargs.get("api_mode"), kwargs.get("protocol_mode"), kwargs.get("provider_api_mode")
+    ))
+    if endpoint:
+        arguments.update(endpoint=endpoint, endpoint_source="host_reported")
+    if api_mode:
+        arguments.update(api_mode=api_mode, api_mode_source="host_reported")
     if provider_id:
         arguments["provider_request_id"] = provider_id
         arguments["model_call_id"] = provider_id
@@ -1056,13 +1163,16 @@ def _record(session_id: str = "", status: str = "completed", **kwargs: Any) -> N
             _CORRELATION_RECEIPTS.append(final)
     except Exception as error:
         _warn("result recording", error)
+        final = _final_usage_receipt(
+            arguments, prepared, {}, usage, event_status, run_outcome, provider_id,
+            failure="runtime_record_failed",
+        )
         with _STATE_LOCK:
-            _CORRELATION_RECEIPTS.append(
-                _final_usage_receipt(
-                    arguments, prepared, {}, usage, event_status, run_outcome, provider_id,
-                    failure="runtime_record_failed",
-                )
-            )
+            _CORRELATION_RECEIPTS.append(final)
+    if (arguments.get("measurement_mode") in {"strict", "benchmark"}
+            and final["measurement_status"] != "measured"):
+        reasons = ",".join(final["measurement_reason_codes"])
+        raise SimplicioHermesError(f"strict measurement rejected: {reasons}")
 
 
 def _post_llm_call(session_id: str = "", **kwargs: Any) -> None:
