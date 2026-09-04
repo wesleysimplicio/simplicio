@@ -8,7 +8,7 @@
   <a href="https://github.com/wesleysimplicio/simplicio/releases/latest"><img src="https://img.shields.io/github/v/release/wesleysimplicio/simplicio?color=blue&label=latest" alt="أحدث إصدار"></a>
   <a href="https://github.com/wesleysimplicio/simplicio/stargazers"><img src="https://img.shields.io/github/stars/wesleysimplicio/simplicio?style=social" alt="النجوم"></a>
   <a href="https://github.com/wesleysimplicio/simplicio/releases"><img src="https://img.shields.io/github/downloads/wesleysimplicio/simplicio/total?color=green" alt="التنزيلات"></a>
-  <a href="../LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="الرخصة"></a>
+  <a href="../plugins/simplicio/LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red" alt="الرخصة"></a>
 </p>
 
 <p align="center">
@@ -270,7 +270,7 @@ simplicio license status
 ## 📄 الرخصة
 
 مملوكة. الملف الثنائي مجاني للتنزيل والاستخدام. ميزات الذكاء الاصطناعي مجانية خلال
-النسخة التجريبية العامة. انظر [LICENSE](../LICENSE).
+النسخة التجريبية العامة. انظر [LICENSE](../plugins/simplicio/LICENSE).
 
 ---
 
