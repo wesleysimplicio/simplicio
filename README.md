@@ -54,6 +54,28 @@ optional, not required.**
 > **🔥 Save up to 96% of tokens on controlled workloads.**
 > Simplicio records the baseline and proof type; the actual result depends on the task and model.
 
+## 🖥️ Desktop-first setup
+
+The public Desktop shell is the preferred product journey, but a signed
+downloadable Desktop package is not part of the current release yet. Until that
+package is published, use the verified CLI bootstrap below; it is the supported
+way to install the Runtime today.
+
+When a signed Desktop package is available, the first-run order is:
+
+1. Open Desktop and let it install its bundled, verified Runtime before login.
+2. Complete Google login and confirm active identity and entitlement in the app.
+3. Review and consent to the exact host-integration plan before any client files
+   are changed.
+4. Restart open MCP clients so they reload the registered command and hooks.
+5. Make one harmless tools/list or simplicio_map call and confirm the live
+   schema/receipt before starting project work.
+
+Login is never a substitute for installation, and a successful process exit is
+not proof that a host is configured. If the Desktop package is unavailable, the
+CLI path below follows the same Runtime, authentication, consent, reload, and
+first-call contract.
+
 ## 🚀 Installation
 
 ### Desktop source (public foundation)

@@ -135,7 +135,8 @@ A successful response contains the tool definitions. A `login required` error me
 
 The official PyPI bootstrap verifies the binary checksum, Ed25519 signature,
 and release-manifest contract, then requires active login. Codex MCP registration
-and routing hooks are opt-in; enable them explicitly after `simplicio install`.
+and routing hooks are registered by the installer for supported hosts;
+review the JSON receipt and any requested consent before relying on the integration.
 Other MCP clients can use the local STDIO entry above without copying tokens.
 
 A quick PyPI bootstrap is:

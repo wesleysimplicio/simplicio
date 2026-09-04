@@ -62,7 +62,7 @@ In Claude Code:
 ```
 
 The main `simplicio` package bootstraps the verified Runtime automatically and
-installs mandatory Mapper-only Claude hooks. The hooks keep the project map in
+installs mandatory Mapper-only Claude hooks. Complete Runtime installation before login, restart Claude after registration, and make a harmless first Mapper/MCP call before project work. The hooks keep the project map in
 `.simplicio/hook-context/`, reuse it while the project generation is unchanged,
 and refresh it after a visible project change. They call the Runtime map
 operation first and use the bundled Mapper fallback already maintained inside
