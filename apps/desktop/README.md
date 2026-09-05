@@ -34,6 +34,29 @@ npm run build
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
+## Manual macOS package
+
+The checked-in package command stages the exact Runtime asset for the native
+Mac architecture, verifies its version, SHA-256 and Ed25519 release signature,
+then invokes the local Tauri CLI. It never publishes a release or uses GitHub
+Actions. The default Runtime source is the installed verified binary at
+~/.simplicio/bin/simplicio; pass --runtime /absolute/path when using a
+separately downloaded release asset.
+
+```bash
+npm ci
+npm run package:stage       # verify/stage only
+npm run package:local       # stage and create the .app/DMG locally
+```
+
+The command writes a redacted local receipt to reports/desktop-build-*.json
+and marks code-signing/notarization as observed or unavailable; it never invents
+Apple signing credentials. The staged target-specific sidecar is ignored by Git.
+
+runtime_install accepts both the Tauri target-suffixed sidecar name and the
+base name after bundling, so the packaged app can locate its verified Runtime
+without consulting PATH or a writable user binary.
+
 ## Runtime boundary
 
 The Tauri process invokes one fixed executable, without a shell. The production

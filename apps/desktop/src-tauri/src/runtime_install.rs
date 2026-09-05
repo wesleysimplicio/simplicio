@@ -139,10 +139,40 @@ fn executable_name() -> &'static str {
     }
 }
 
+fn runtime_target_suffix() -> &'static str {
+    if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
+        "aarch64-apple-darwin"
+    } else if cfg!(target_os = "macos") && cfg!(target_arch = "x86_64") {
+        "x86_64-apple-darwin"
+    } else if cfg!(target_os = "windows") && cfg!(target_arch = "x86_64") {
+        "x86_64-pc-windows-msvc"
+    } else if cfg!(target_os = "linux") && cfg!(target_arch = "x86_64") {
+        "x86_64-unknown-linux-gnu"
+    } else {
+        ""
+    }
+}
+
 pub fn bundled_runtime_path(current_executable: &Path) -> Result<PathBuf, String> {
     let parent = current_executable.parent().ok_or_else(invalid_path)?;
     require_directory(parent, "runtime_install_package_unavailable")?;
-    Ok(parent.join(executable_name()))
+
+    // Tauri places an externalBin beside the app executable using the target
+    // suffix. Keep the unsuffixed name as a compatibility path for direct
+    // fixtures and manually unpacked bundles.
+    let base = parent.join(executable_name());
+    let suffix = runtime_target_suffix();
+    if !suffix.is_empty() {
+        let target_specific = parent.join(format!(
+            "simplicio-{}{}",
+            suffix,
+            if cfg!(windows) { ".exe" } else { "" }
+        ));
+        if target_specific.is_file() {
+            return Ok(target_specific);
+        }
+    }
+    Ok(base)
 }
 
 fn install_paths(home: &Path) -> (PathBuf, PathBuf, PathBuf) {
@@ -1388,6 +1418,21 @@ mod tests {
         });
         fs::write(bundle.join(executable_name()), b"runtime-current").unwrap();
         (root, app, home)
+    }
+
+    #[test]
+    fn target_specific_bundle_name_is_preferred_when_present() {
+        let (root, app, _home) = fixture();
+        let base = bundled_runtime_path(&app).unwrap();
+        fs::remove_file(&base).unwrap();
+        let target = app.parent().unwrap().join(format!(
+            "simplicio-{}{}",
+            runtime_target_suffix(),
+            if cfg!(windows) { ".exe" } else { "" }
+        ));
+        fs::write(&target, b"runtime-target-specific").unwrap();
+        assert_eq!(bundled_runtime_path(&app).unwrap(), target);
+        fs::remove_dir_all(root).unwrap();
     }
 
     fn versioned_snapshot(version: &str) -> Value {

@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json && vite build",
+    "package:local": "python3 ../../scripts/build_desktop.py",
+    "package:stage": "python3 ../../scripts/build_desktop.py --stage-only",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "preview": "vite preview",
