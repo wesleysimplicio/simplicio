@@ -1,11 +1,13 @@
 {
   "name": "simplicio",
-  "version": "0.2.11",
+  "version": "0.2.12",
   "description": "Verified Simplicio Runtime MCP bootstrap and governed coding skills for Gemini CLI.",
   "mcpServers": {
     "simplicio-runtime": {
       "command": "node",
-      "args": ["${extensionPath}/bin/simplicio-mcp-bootstrap.js"],
+      "args": [
+        "${extensionPath}/bin/simplicio-mcp-bootstrap.js"
+      ],
       "timeout": 600000
     }
   }
