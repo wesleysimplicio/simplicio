@@ -319,10 +319,10 @@ async function installRuntime(env = process.env, home = resolveHome(env)) {
   }
 }
 
-function launchRuntime(runtime) {
+function launchRuntime(runtime, environment = process.env) {
   const args = ["serve", "--mcp", "--stdio", "--no-facade-mode"];
   const child = spawn(runtime.binary, args, {
-    env: process.env,
+    env: environment,
     stdio: "inherit",
     windowsHide: true
   });
@@ -340,10 +340,10 @@ function launchRuntime(runtime) {
   });
 }
 
-async function main() {
-  const home = resolveHome();
-  const runtime = findRuntime(process.env, home) || await installRuntime(process.env, home);
-  launchRuntime(runtime);
+async function main(environment = process.env) {
+  const home = resolveHome(environment);
+  const runtime = findRuntime(environment, home) || await installRuntime(environment, home);
+  launchRuntime(runtime, environment);
 }
 
 if (require.main === module) {
@@ -360,6 +360,8 @@ module.exports = {
   executableName,
   findRuntime,
   installRuntime,
+  launchRuntime,
+  main,
   parseVersion,
   resolveHome,
   runtimeCandidates,

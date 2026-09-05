@@ -4,8 +4,10 @@
 
 This multi-host package preserves the native Codex plugin and adds official
 portable Agent Plugins v1, Claude Code, and Gemini CLI manifests. Every package
-starts the same verified Simplicio Runtime bootstrap, exposes its live MCP
-surface, and ships the same governed Simplicio skills.
+uses the verified Simplicio Runtime bootstrap, exposes its live MCP surface,
+and ships the same governed Simplicio skills. Claude Code has a host-specific
+launcher so its MCP process is authoritative Mapper-only while the portable,
+Codex, and Gemini launchers retain their host-selected Runtime mode.
 
 ## Host packages
 
@@ -42,7 +44,10 @@ first activates the package:
 3. Install the pinned Runtime release through its fail-closed SHA-256 and
    Ed25519 release checks.
 4. Start `simplicio serve --mcp --stdio --no-facade-mode` with stdout reserved
-   exclusively for MCP JSON-RPC.
+   exclusively for MCP JSON-RPC. Claude Code uses the adjacent
+   `simplicio-claude-mcp-bootstrap.js`, which sets `SIMPLICIO_RUNTIME_MODE` to
+   `mapper-only` in that process only; the shared launcher is unchanged for
+   other hosts.
 
 The managed binary is installed at `~/.simplicio/bin/simplicio`. Existing valid
 installs at `~/.local/bin/simplicio` are reused. Concurrent starts share an
