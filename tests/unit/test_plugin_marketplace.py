@@ -81,12 +81,16 @@ def test_portable_agent_plugin_contract() -> None:
     assert (source / server["args"][0].removeprefix("./")).is_file()
 
 
-def test_native_claude_and_gemini_manifests_reuse_the_bootstrap() -> None:
+def test_native_claude_and_gemini_manifests_use_their_host_bootstrap() -> None:
     claude = _load_json("plugins/simplicio/.claude-plugin/plugin.json")
     gemini = _load_json("plugins/simplicio/gemini-extension.json")
 
     assert claude["name"] == gemini["name"] == "simplicio"
     assert claude["mcpServers"] == "./.mcp.json"
+    claude_mcp = _load_json("plugins/simplicio/.mcp.json")
+    assert claude_mcp["mcpServers"]["simplicio-runtime"]["args"] == [
+        "./bin/simplicio-claude-mcp-bootstrap.js"
+    ]
     args = gemini["mcpServers"]["simplicio-runtime"]["args"]
     assert args == ["${extensionPath}/bin/simplicio-mcp-bootstrap.js"]
 

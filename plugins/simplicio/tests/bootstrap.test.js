@@ -10,6 +10,7 @@ const { spawn, spawnSync } = require("node:child_process");
 const test = require("node:test");
 
 const bootstrapPath = path.resolve(__dirname, "..", "bin", "simplicio-mcp-bootstrap.js");
+const claudeBootstrapPath = path.resolve(__dirname, "..", "bin", "simplicio-claude-mcp-bootstrap.js");
 const bootstrap = require(bootstrapPath);
 
 test("version comparison is semantic and bounded", () => {
@@ -263,6 +264,42 @@ printf '%s' "$*" > "$SIMPLICIO_TEST_ARGS_FILE"
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.stdout, "");
     assert.equal(fs.readFileSync(argsFile, "utf8"), "serve --mcp --stdio --no-facade-mode");
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("Claude bootstrap forces Mapper-only without changing the parent environment", { skip: process.platform === "win32" }, () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "simplicio-claude-bootstrap-test-"));
+  const fakeRuntime = path.join(tempDir, ".simplicio", "bin", "simplicio");
+  const launchFile = path.join(tempDir, "launch.json");
+  fs.mkdirSync(path.dirname(fakeRuntime), { recursive: true });
+  fs.writeFileSync(fakeRuntime, `#!/bin/sh
+if [ "$1" = "version" ]; then
+  printf '{"schema":"simplicio.release-manifest/v1","product":"simplicio-runtime","runtime":{"name":"simplicio-runtime","version":"${bootstrap.POLICY.runtimeVersion}","executable":{"path":"%s","version":"${bootstrap.POLICY.runtimeVersion}"}},"auto_update":{"distribution":{"source_code_distributed":true}},"identity":{"enabled":true,"login_enabled":true},"security":{"signature_required":true,"public_key_configured":true,"refuse_unsigned":true,"refuse_invalid_signature":true}}' "$0"
+  exit 0
+fi
+printf '{"argv":"%s","mode":"%s"}' "$*" "$SIMPLICIO_RUNTIME_MODE" > "$SIMPLICIO_CLAUDE_LAUNCH_FILE"
+`, { mode: 0o700 });
+
+  try {
+    const result = spawnSync(process.execPath, [claudeBootstrapPath], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        HOME: tempDir,
+        SIMPLICIO_RUNTIME_MODE: "full",
+        SIMPLICIO_CLAUDE_LAUNCH_FILE: launchFile
+      },
+      timeout: 15000
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, "");
+    assert.deepEqual(JSON.parse(fs.readFileSync(launchFile, "utf8")), {
+      argv: "serve --mcp --stdio --no-facade-mode",
+      mode: "mapper-only"
+    });
+    assert.notEqual(process.env.SIMPLICIO_RUNTIME_MODE, "mapper-only");
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }

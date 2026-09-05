@@ -3,7 +3,7 @@
     "simplicio-runtime": {
       "command": "node",
       "args": [
-        "./bin/simplicio-mcp-bootstrap.js"
+        "./bin/simplicio-claude-mcp-bootstrap.js"
       ],
       "cwd": ".",
       "env_vars": [
