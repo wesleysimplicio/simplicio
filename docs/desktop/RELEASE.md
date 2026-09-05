@@ -9,27 +9,25 @@ companion assets, not additional members of that Runtime manifest. Record the
 Desktop source revision, target, installer digest and bundled Runtime identity
 separately. Never replace already-published bytes under an immutable version. This document is the normative source for the Desktop release and updater requirements; the former `distribution/desktop-release.json` duplicate specification is not consumed by the application.
 
-`Check for Updates...` currently performs a read-only check of public GitHub
-release metadata and offers the release page for manual installation when a
-compatible package is listed. Progress reflects received metadata bytes, not an
-installer download. Metadata, a version string and an asset filename do not prove
-signature verification, installation, successful startup or rollback. The UI
-does not replace the app or Runtime in the background.
+`Check for Updates...` checks public GitHub release metadata and, for a
+compatible Desktop package with a published SHA-256 digest, offers the bounded
+download, verification and install flow. The download is anonymous, resumable,
+stored in a private directory and never starts an install before size and digest
+verification. A missing digest, stale manifest, wrong target, interrupted
+download or failed verification fails closed and leaves the current app intact.
 
-## Required contract before enabling automatic installation
+The updater transaction is implemented in `src-tauri::desktop_updater`:
 
-The automatic updater is not implemented by the current metadata dialog. It must
-follow a stage-before-swap transaction before it can be enabled:
+1. re-read the official release API and bind the requested version/tag/asset;
+2. resume into a private `.part` file and atomically stage the verified package;
+3. retain the current macOS app bundle as one rollback candidate;
+4. replace the bundle, relaunch it, and persist `awaiting_health`;
+5. reconcile the running bundle version at startup, or restore the candidate.
 
-1. download into an isolated staging directory;
-2. verify signature, checksum, provenance, and component membership;
-3. retain the current sidecar as the single rollback candidate;
-4. atomically switch the active sidecar;
-5. start the sidecar and restore the previous candidate if startup fails.
-
-An automatic-updater acceptance suite must exercise both a successful fresh
-start and a failed-start rollback. The Desktop UI must never present an update
-as complete until the Runtime returns a healthy receipt.
+The Desktop UI never reports completion until startup reconciliation confirms the
+expected bundle version. A public GitHub digest is integrity evidence, not a
+Developer ID/notarization or independent release signature; publication still
+requires the signing, provenance and artifact gates below.
 
 ## Native bundle identity
 
