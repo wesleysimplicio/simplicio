@@ -4,10 +4,10 @@ import { ContextSavings } from "../components/ContextSavings";
 import { TokenProjects } from "../components/TokenProjects";
 import { ConsolidatedTokens } from "../components/ConsolidatedTokens";
 import type { UsageProjects } from "../project_usage";
-import { buildUnifiedUsageQuery, exportUnifiedUsageProjection, UNIFIED_USAGE_ACCOUNT_LIMITS, UnifiedUsageRequestGuard, unifiedUsageState, type UnifiedUsageProjection } from "../unified_usage";
+import { buildUnifiedUsageQuery, UNIFIED_USAGE_ACCOUNT_LIMITS, UnifiedUsageRequestGuard, unifiedUsageState, type UnifiedUsageProjection, type UsageQuery } from "../unified_usage";
 import type { CostProjection } from "../cost_projection";
 import type { DesktopUsageState } from "../usage_store";
-import { exportDesktopTokenReport, loadDesktopTokenReport, loadDesktopUnifiedUsage, loadDesktopCostProjection } from "../bridge";
+import { exportDesktopTokenReport, exportDesktopUnifiedUsageReport, loadDesktopTokenReport, loadDesktopUnifiedUsage, loadDesktopCostProjection } from "../bridge";
 import { TOKEN_PERIODS, tokenErrorMessage, tokenExportErrorMessage, type TokenPeriod, type TokenQuery, type TokenUsageReport } from "../token_usage";
 
 interface TokenScreenPeriodActions {
@@ -44,6 +44,9 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
   const [unifiedProjection, setUnifiedProjection] = useState<UnifiedUsageProjection | null>(null);
   const [unifiedBusy, setUnifiedBusy] = useState(false);
   const [unifiedError, setUnifiedError] = useState<string | null>(null);
+  const [unifiedExporting, setUnifiedExporting] = useState(false);
+  const [unifiedExportPath, setUnifiedExportPath] = useState<string | null>(null);
+  const [unifiedExportError, setUnifiedExportError] = useState<string | null>(null);
   const [costProjection, setCostProjection] = useState<CostProjection | null>(null);
   const [costBusy, setCostBusy] = useState(false);
   const [costError, setCostError] = useState<string | null>(null);
@@ -55,6 +58,8 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
   const exportLock = useRef(false);
   const sequence = useRef(0);
   const unifiedRequests = useRef(new UnifiedUsageRequestGuard());
+  const unifiedExportSequence = useRef(0);
+  const unifiedExportLock = useRef(false);
 
   async function load(query: TokenQuery) {
     const request = ++sequence.current;
@@ -80,8 +85,11 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
 
   function invalidateUnifiedUsage() {
     unifiedRequests.current.invalidate();
+    unifiedExportSequence.current += 1;
     setUnifiedProjection(null);
     setUnifiedError(null);
+    setUnifiedExportPath(null);
+    setUnifiedExportError(null);
     setUnifiedBusy(false);
     setCostProjection(null);
     setCostError(null);
@@ -117,6 +125,21 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
     void load(query);
   }
 
+  function currentUnifiedQuery(): UsageQuery {
+    const customFrom = Math.floor(new Date(from).getTime() / 1000);
+    const customTo = Math.floor(new Date(to).getTime() / 1000);
+    return buildUnifiedUsageQuery({
+      period,
+      now_epoch: Math.floor(Date.now() / 1000),
+      selected_range: selected ? { from_epoch: selected.from_epoch, to_epoch: selected.to_epoch } : undefined,
+      custom_range: period === "custom" ? { from_epoch: customFrom, to_epoch: customTo } : undefined,
+      provider,
+      model,
+      host,
+      session_id: sessionId,
+    });
+  }
+
   async function loadUnifiedUsage() {
     if (unifiedBusy) return;
     const request = unifiedRequests.current.begin();
@@ -126,18 +149,7 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
     try {
       // Project paths are intentionally not sent to this contract. Runtime owns
       // project identity and redaction; the public v1 query supports session scope.
-      const customFrom = Math.floor(new Date(from).getTime() / 1000);
-      const customTo = Math.floor(new Date(to).getTime() / 1000);
-      const query = buildUnifiedUsageQuery({
-        period,
-        now_epoch: Math.floor(Date.now() / 1000),
-        selected_range: selected ? { from_epoch: selected.from_epoch, to_epoch: selected.to_epoch } : undefined,
-        custom_range: period === "custom" ? { from_epoch: customFrom, to_epoch: customTo } : undefined,
-        provider,
-        model,
-        host,
-        session_id: sessionId,
-      });
+      const query = currentUnifiedQuery();
       const next = await loadDesktopUnifiedUsage(query, repoPath.trim() || undefined);
       if (unifiedRequests.current.isCurrent(request)) setUnifiedProjection(next);
     } catch (cause) {
@@ -149,17 +161,34 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
     }
   }
 
-  function downloadUnifiedUsage(format: "json" | "csv") {
-    if (!unifiedProjection || typeof document === "undefined") return;
-    const payload = exportUnifiedUsageProjection(unifiedProjection, format);
-    const url = URL.createObjectURL(new Blob([payload], {
-      type: format === "json" ? "application/json" : "text/csv",
-    }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `simplicio-usage-${unifiedProjection.metadata.report_digest.slice(7, 19)}.${format}`;
-    link.click();
-    URL.revokeObjectURL(url);
+  async function exportUnifiedUsage(format: "json" | "csv") {
+    if (!unifiedProjection || unifiedExportLock.current) return;
+    unifiedExportLock.current = true;
+    const request = unifiedExportSequence.current;
+    setUnifiedExporting(true);
+    setUnifiedExportPath(null);
+    setUnifiedExportError(null);
+    try {
+      const receipt = await exportDesktopUnifiedUsageReport(
+        currentUnifiedQuery(),
+        repoPath.trim() || undefined,
+        format,
+        unifiedProjection.metadata.report_digest,
+      );
+      if (request === unifiedExportSequence.current) setUnifiedExportPath(receipt.path);
+    } catch (cause) {
+      if (request === unifiedExportSequence.current) {
+        const reason = cause instanceof Error ? cause.message : String(cause);
+        setUnifiedExportError(reason === "unified_usage_report_changed"
+          ? "O uso mudou desde a consulta. Consulte novamente antes de exportar."
+          : reason === "unified_usage_export_timeout"
+            ? "A exportação demorou demais e foi cancelada sem afirmar sucesso."
+            : "Não foi possível confirmar a exportação pelo Runtime. Nenhum arquivo foi presumido.");
+      }
+    } finally {
+      unifiedExportLock.current = false;
+      if (request === unifiedExportSequence.current) setUnifiedExporting(false);
+    }
   }
 
   async function loadCostProjection() {
@@ -168,18 +197,7 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
     setCostProjection(null);
     setCostError(null);
     try {
-      const customFrom = Math.floor(new Date(from).getTime() / 1000);
-      const customTo = Math.floor(new Date(to).getTime() / 1000);
-      const query = buildUnifiedUsageQuery({
-        period,
-        now_epoch: Math.floor(Date.now() / 1000),
-        selected_range: selected ? { from_epoch: selected.from_epoch, to_epoch: selected.to_epoch } : undefined,
-        custom_range: period === "custom" ? { from_epoch: customFrom, to_epoch: customTo } : undefined,
-        provider,
-        model,
-        host,
-        session_id: sessionId,
-      });
+      const query = currentUnifiedQuery();
       setCostProjection(await loadDesktopCostProjection(query, repoPath.trim() || undefined));
     } catch (cause) {
       setCostError(cause instanceof Error ? cause.message : "cost_projection_unavailable");
@@ -262,11 +280,14 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
       <section className="panel token-evidence" aria-label="Uso unificado">
         <h2>Uso unificado</h2>
         <p>Provider, modelo, host e sessão só aparecem quando o Runtime fornecer a projeção versionada e redigida.</p>
-        <button className="button button-secondary" type="button" disabled={unifiedBusy || exporting} onClick={() => void loadUnifiedUsage()}>
+        <button className="button button-secondary" type="button" disabled={unifiedBusy || exporting || unifiedExporting} onClick={() => void loadUnifiedUsage()}>
           {unifiedBusy ? "Consultando projeção…" : "Consultar uso unificado"}
         </button>
-        <button className="button button-secondary" type="button" disabled={!unifiedProjection || exporting} onClick={() => downloadUnifiedUsage("json")}>Exportar uso JSON</button>
-        <button className="button button-secondary" type="button" disabled={!unifiedProjection || exporting} onClick={() => downloadUnifiedUsage("csv")}>Exportar uso CSV</button>
+        <button className="button button-secondary" type="button" disabled={!unifiedProjection || exporting || unifiedBusy || unifiedExporting} onClick={() => void exportUnifiedUsage("json")}>Exportar uso JSON</button>
+        <button className="button button-secondary" type="button" disabled={!unifiedProjection || exporting || unifiedBusy || unifiedExporting} onClick={() => void exportUnifiedUsage("csv")}>Exportar uso CSV</button>
+        {unifiedExporting && <p role="status">Salvando a projeção atual pelo Runtime em Downloads…</p>}
+        {unifiedExportPath && <p role="status">Projeção exportada para <code>{unifiedExportPath}</code></p>}
+        {unifiedExportError && <p role="alert">Exportação indisponível: {unifiedExportError}</p>}
         {unifiedError && <p role="status">Projeção indisponível: <code>{unifiedError}</code>. Nenhum zero foi inferido.</p>}
         <p>Histórico local: eventos redigidos do ledger do Runtime para o projeto selecionado.</p>
         <p role="status">Limites remotos da conta: {UNIFIED_USAGE_ACCOUNT_LIMITS.status}. O contrato v1 não fornece cota, saldo restante ou data de renovação; nenhum zero foi inferido.</p>
