@@ -30,15 +30,15 @@ export interface RuntimeStatus {
   lastReceiptAt: string | null;
   deterministic: {
     ready: boolean;
-    cpuFirst: true;
-    mapper: "canonical";
-    mapCache: "generation_scoped";
-    hookContext: "receipt_only";
+    cpuFirst: boolean;
+    mapper: "canonical" | "legacy" | "unknown";
+    mapCache: "generation_scoped" | "legacy" | "unknown";
+    hookContext: "receipt_only" | "legacy" | "unknown";
   };
   optionalFast: {
-    required: false;
-    hookInjected: false;
-    status: "not_required";
+    required: boolean;
+    hookInjected: boolean;
+    status: "not_required" | "injected" | "unknown";
   };
 }
 
