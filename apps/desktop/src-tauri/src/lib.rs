@@ -8,6 +8,7 @@ mod auth_login;
 mod consolidated_tokens;
 mod context_report;
 mod desktop_queries;
+mod desktop_updater;
 mod host_plugins;
 mod install_journal;
 mod local_projects;
@@ -437,6 +438,76 @@ fn desktop_update_target() -> Value {
 }
 
 #[tauri::command]
+async fn desktop_update_download(
+    app: tauri::AppHandle,
+    version: String,
+    tag: String,
+    asset_name: String,
+    asset_bytes: u64,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let app_data = app
+            .path()
+            .app_data_dir()
+            .map_err(|_| "update_storage_unavailable".to_string())?;
+        desktop_updater::download(&app_data, &version, &tag, &asset_name, asset_bytes)
+    })
+    .await
+    .map_err(|_| "update_download_unavailable".to_string())?
+}
+
+#[tauri::command]
+async fn desktop_update_status(app: tauri::AppHandle) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let app_data = app
+            .path()
+            .app_data_dir()
+            .map_err(|_| "update_storage_unavailable".to_string())?;
+        desktop_updater::status(&app_data)
+    })
+    .await
+    .map_err(|_| "update_status_unavailable".to_string())?
+}
+
+#[tauri::command]
+async fn desktop_update_install(app: tauri::AppHandle, update_id: String) -> Result<Value, String> {
+    let app_for_exit = app.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let app_data = app
+            .path()
+            .app_data_dir()
+            .map_err(|_| "update_storage_unavailable".to_string())?;
+        let current_executable =
+            std::env::current_exe().map_err(|_| "update_target_unavailable".to_string())?;
+        desktop_updater::install(&app_data, &current_executable, &update_id)
+    })
+    .await
+    .map_err(|_| "update_install_unavailable".to_string())??;
+    if matches!(
+        result.get("state").and_then(Value::as_str),
+        Some("relaunch_pending") | Some("awaiting_health")
+    ) {
+        app_for_exit.exit(0);
+    }
+    Ok(result)
+}
+
+#[tauri::command]
+async fn desktop_update_rollback(app: tauri::AppHandle) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let app_data = app
+            .path()
+            .app_data_dir()
+            .map_err(|_| "update_storage_unavailable".to_string())?;
+        let current_executable =
+            std::env::current_exe().map_err(|_| "update_target_unavailable".to_string())?;
+        desktop_updater::rollback(&app_data, &current_executable)
+    })
+    .await
+    .map_err(|_| "update_rollback_unavailable".to_string())?
+}
+
+#[tauri::command]
 async fn desktop_open_releases() -> Result<(), String> {
     // Only the fixed public release page may be opened; IPC accepts no URL.
     tauri::async_runtime::spawn_blocking(|| open_browser_url(RELEASES_URL))
@@ -728,6 +799,16 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(token_exports::TokenReports::default())
         .setup(|app| {
+            let current_executable = std::env::current_exe().ok();
+            if let (Some(current_executable), Ok(app_data)) =
+                (current_executable, app.path().app_data_dir())
+            {
+                if let Err(error) =
+                    desktop_updater::reconcile_startup(&app_data, &current_executable)
+                {
+                    eprintln!("Simplicio: Desktop update recovery is pending: {error}");
+                }
+            }
             #[cfg(desktop)]
             native_menu::install(app)?;
             Ok(())
@@ -757,6 +838,10 @@ pub fn run() {
             desktop_export_token_report,
             desktop_open_subscription,
             desktop_update_target,
+            desktop_update_download,
+            desktop_update_status,
+            desktop_update_install,
+            desktop_update_rollback,
             desktop_open_releases,
             desktop_bot_action,
             runtime_status
