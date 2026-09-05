@@ -15,6 +15,7 @@ mod local_projects;
 mod native_menu;
 mod project_discovery_process;
 mod project_usage;
+mod projection_exports;
 mod projection_queries;
 mod runtime_install;
 mod runtime_lifecycle;
@@ -308,6 +309,41 @@ async fn desktop_unified_usage(query: Value, repo_path: Option<String>) -> Resul
     })
     .await
     .map_err(|_| "unified_usage_unavailable".to_string())?
+}
+
+#[tauri::command]
+async fn desktop_export_unified_usage(
+    app: tauri::AppHandle,
+    query: Value,
+    repo_path: Option<String>,
+    format: String,
+    expected_report_digest: Option<String>,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        require_active_access()?;
+        let default_repo = default_projection_repo()?;
+        let args = projection_queries::query_args(
+            "desktop-unified-usage",
+            &query,
+            repo_path.as_deref(),
+            &default_repo,
+        )?;
+        let borrowed = args.iter().map(String::as_str).collect::<Vec<_>>();
+        let projection =
+            run_runtime_json(&borrowed).map_err(|_| "unified_usage_export_unavailable")?;
+        let downloads = app
+            .path()
+            .download_dir()
+            .map_err(|_| "unified_usage_export_downloads_unavailable")?;
+        projection_exports::save(
+            &projection,
+            &format,
+            expected_report_digest.as_deref(),
+            &downloads,
+        )
+    })
+    .await
+    .map_err(|_| "unified_usage_export_unavailable".to_string())?
 }
 
 #[tauri::command]
@@ -750,6 +786,7 @@ pub fn run() {
             desktop_usage_projects,
             desktop_usage_changefeed,
             desktop_unified_usage,
+            desktop_export_unified_usage,
             desktop_cost_projection,
             desktop_context_report,
             desktop_token_report,

@@ -67,6 +67,34 @@ describe("desktop unified usage bridge", () => {
     expect(result.rows).toEqual([]);
   });
 
+  it("routes unified exports through the native Runtime command and validates its receipt", async () => {
+    invokeMock.mockResolvedValue({
+      schema: "simplicio.desktop-unified-usage-export/v1",
+      format: "json",
+      path: "/Users/test/Downloads/simplicio-unified-usage.json",
+      bytes: 128,
+      report_digest: NO_DATA.metadata.report_digest,
+    });
+    const bridge = await import("./bridge");
+
+    const result = await bridge.exportDesktopUnifiedUsageReport(
+      { provider: "openai" },
+      "/tmp/project",
+      "json",
+      NO_DATA.metadata.report_digest,
+    );
+
+    expect(invokeMock).toHaveBeenCalledOnce();
+    expect(invokeMock).toHaveBeenCalledWith("desktop_export_unified_usage", {
+      query: { provider: "openai" },
+      repoPath: "/tmp/project",
+      format: "json",
+      expectedReportDigest: NO_DATA.metadata.report_digest,
+    });
+    expect(result.path).toContain("simplicio-unified-usage.json");
+    expect(result.reportDigest).toBe(NO_DATA.metadata.report_digest);
+  });
+
   it("does not offer a browser preview when no packaged Runtime boundary exists", async () => {
     vi.stubGlobal("window", {});
     const bridge = await import("./bridge");

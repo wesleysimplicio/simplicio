@@ -66,6 +66,47 @@ export function exportDesktopUnifiedUsage(
   return exportUnifiedUsageProjection(projection, format);
 }
 
+export async function exportDesktopUnifiedUsageReport(
+  query: UsageQuery,
+  repoPath: string | undefined,
+  format: "json" | "csv",
+  expectedReportDigest: string,
+): Promise<{ schema: string; format: "json" | "csv"; path: string; bytes: number; reportDigest: string }> {
+  if (!isTauri()) throw new Error("preview_no_runtime");
+  const value = await withTimeout(
+    invoke<unknown>("desktop_export_unified_usage", {
+      query,
+      repoPath: repoPath || null,
+      format,
+      expectedReportDigest,
+    }),
+    90_000,
+    "unified_usage_export_timeout",
+  );
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("unified_usage_export_unconfirmed");
+  }
+  const receipt = value as Record<string, unknown>;
+  if (receipt.schema !== "simplicio.desktop-unified-usage-export/v1"
+    || receipt.format !== format
+    || typeof receipt.path !== "string" || !receipt.path
+    || typeof receipt.bytes !== "number" || !Number.isSafeInteger(receipt.bytes)
+    || receipt.bytes < 1 || receipt.bytes > 65_536
+    || typeof receipt.report_digest !== "string"
+    || !/^sha256:[a-f0-9]{64}$/.test(receipt.report_digest)) {
+    throw new Error("unified_usage_export_unconfirmed");
+  }
+  return {
+    schema: receipt.schema,
+    format,
+    path: receipt.path,
+    bytes: receipt.bytes,
+    reportDigest: receipt.report_digest,
+  };
+}
+
+
+
 export async function loadDesktopCostProjection(query: CostQuery = {}, repoPath?: string): Promise<CostProjection> {
   if (!isTauri()) throw new Error("preview_no_runtime");
   return parseCostProjection(await withTimeout(
