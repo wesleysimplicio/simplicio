@@ -10,6 +10,44 @@ import type { DesktopUsageState } from "../usage_store";
 import { exportDesktopTokenReport, exportDesktopUnifiedUsageReport, loadDesktopTokenReport, loadDesktopUnifiedUsage, loadDesktopCostProjection } from "../bridge";
 import { TOKEN_PERIODS, tokenErrorMessage, tokenExportErrorMessage, type TokenPeriod, type TokenQuery, type TokenUsageReport } from "../token_usage";
 
+import type { IdleSessionFinalization, ProviderUsageMetric } from "../session_idle";
+
+const IDLE_REPORT_METRICS: Array<[ProviderUsageMetric, string]> = [
+  ["input_tokens", "entrada"],
+  ["output_tokens", "saída"],
+  ["reasoning_tokens", "raciocínio"],
+  ["cache_read_tokens", "cache lido"],
+  ["cache_write_tokens", "cache escrito"],
+];
+
+function IdleFinalizationReport({ finalization }: { finalization?: IdleSessionFinalization | null }) {
+  if (!finalization) return null;
+  const statusLabel = finalization.usage.status === "complete"
+    ? "coleta concluída"
+    : finalization.usage.status === "pending_provider_refresh"
+      ? "aguardando providers"
+      : "indisponível";
+  const providerReports = finalization.usage.provider_reports ?? [];
+  const number = (report: { totals: Partial<Record<ProviderUsageMetric, number>> }, metric: ProviderUsageMetric) => {
+    const value = report.totals[metric];
+    return value === undefined ? "—" : value.toLocaleString("pt-BR");
+  };
+  return <section className="panel token-evidence idle-finalization-report" aria-label="Última finalização de sessão" data-testid="idle-finalization-report">
+    <div className="session-feed-heading">
+      <div><h2>Última finalização</h2><p>Fechamento lógico após {Math.round(finalization.idle_ms / 60_000)} min sem atividade.</p></div>
+      <span className="neutral-badge">{statusLabel}</span>
+    </div>
+    <p>{finalization.closed_sessions.length} sessão(ões) fechada(s) · recibo {finalization.finalization_id ?? "sem identificador exposto"}.</p>
+    {providerReports.length > 0
+      ? <div className="provider-usage-list">{providerReports.map((report) => <div className="provider-usage-row" key={report.provider}>
+        <div className="provider-usage-row-heading"><strong>{report.provider}</strong><span className="neutral-badge">{report.events > 0 ? report.events + " eventos" : report.status}</span></div>
+        <small>{IDLE_REPORT_METRICS.map(([metric, label]) => label + " " + number(report, metric)).join(" · ")}</small>
+      </div>)}</div>
+      : <p role="status">Uso por provider ainda não disponível{finalization.usage.reason ? ": " + finalization.usage.reason : "."} Campos sem evidência permanecem —.</p>}
+    <p className="token-proof-note">O Runtime encerra apenas a sessão lógica e não termina processos de providers.</p>
+  </section>;
+}
+
 interface TokenScreenPeriodActions {
   invalidate: () => void;
   setPeriod: (period: TokenPeriod) => void;
@@ -328,6 +366,7 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
           <p>Proveniência: {costProjection.rows.map((row) => row.state).filter((value, index, values) => values.indexOf(value) === index).join(", ") || "indisponível"} · confiança: {costProjection.confidence.actual} · baseline: {costProjection.baseline.values_status} · digest <code>{costProjection.metadata.report_digest}</code></p>
         </div>}
       </section>
+      <IdleFinalizationReport finalization={usage?.idleFinalization} />
       <ContextSavings repoPath={repoPath} autoLoad={autoContext} />
       </section>
     </div>
