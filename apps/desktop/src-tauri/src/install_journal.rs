@@ -50,7 +50,10 @@ fn write_atomic(path: &Path, state: &str, error: Option<&str>) -> io::Result<()>
     });
     let encoded = serde_json::to_vec(&record).map_err(io::Error::other)?;
     if encoded.len() > MAX_BYTES {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "journal too large"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "journal too large",
+        ));
     }
 
     let mut file = OpenOptions::new()
@@ -87,17 +90,19 @@ fn safe_error(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 128
         && value.bytes().enumerate().all(|(index, byte)| {
-            byte.is_ascii_lowercase()
-                || byte.is_ascii_digit()
-                || byte == b'_' && index > 0
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_' && index > 0
         })
         && value.as_bytes()[0].is_ascii_lowercase()
 }
 
 fn candidate(path: &Path) -> Option<PathBuf> {
-    [path.to_path_buf(), sibling(path, "bak"), sibling(path, "tmp")]
-        .into_iter()
-        .find(|candidate| candidate.exists())
+    [
+        path.to_path_buf(),
+        sibling(path, "bak"),
+        sibling(path, "tmp"),
+    ]
+    .into_iter()
+    .find(|candidate| candidate.exists())
 }
 
 /// The only durable states exposed to the Desktop are clear and blocked.
@@ -233,8 +238,11 @@ mod tests {
     fn malformed_or_interrupted_journal_fails_closed() {
         let path = path("malformed");
         cleanup(&path);
-        fs::write(&path, br#"{"schema":"simplicio.desktop-install-attempt/v1","state":"in_progress"}"#)
-            .unwrap();
+        fs::write(
+            &path,
+            br#"{"schema":"simplicio.desktop-install-attempt/v1","state":"in_progress"}"#,
+        )
+        .unwrap();
         assert!(InstallAttempt::load(&path).pending_error().is_some());
         cleanup(&path);
     }
@@ -245,7 +253,8 @@ mod tests {
         cleanup(&path);
         let mut attempt = InstallAttempt::default();
         attempt.begin_persisted(&path).unwrap();
-        attempt.finish_persisted(&path, &Ok(json!({"status":"installed"})))
+        attempt
+            .finish_persisted(&path, &Ok(json!({"status":"installed"})))
             .unwrap();
         assert!(InstallAttempt::load(&path).pending_error().is_none());
         cleanup(&path);
