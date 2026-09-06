@@ -10,11 +10,14 @@ Desktop source revision, target, installer digest and bundled Runtime identity
 separately. Never replace already-published bytes under an immutable version. This document is the normative source for the Desktop release and updater requirements; the former `distribution/desktop-release.json` duplicate specification is not consumed by the application.
 
 `Check for Updates...` checks public GitHub release metadata and, for a
-compatible Desktop package with a published SHA-256 digest, offers the bounded
-download, verification and install flow. The download is anonymous, resumable,
-stored in a private directory and never starts an install before size and digest
-verification. A missing digest, stale manifest, wrong target, interrupted
-download or failed verification fails closed and leaves the current app intact.
+compatible Desktop package with a published SHA-256 digest and matching
+`<asset>.sig` sidecar, offers the bounded download, verification and install
+flow. The sidecar is Ed25519 over the canonical `simplicio-release-v1:<sha256>`
+payload using the pinned update-signature key. The download is anonymous,
+resumable, stored in a private directory and never starts an install before
+size, digest and signature verification. A missing digest or signature, stale
+manifest, wrong target, interrupted download or failed verification fails closed
+and leaves the current app intact.
 
 ## Public v3.8.47 companion evidence
 
@@ -42,6 +45,7 @@ native Desktop status probe remain unexecuted here.
 | Gate | Status | Boundary |
 | --- | --- | --- |
 | Desktop package digest and Runtime sidecar identity | **verified** | Downloaded DMG hash and extracted sidecar match the public release assets |
+| Desktop package Ed25519 sidecar | **blocked** | v3.8.47 publishes no `Simplicio-3.8.47-arm64.dmg.sig`; the updater must fail closed with `update_signature_unavailable` |
 | Runtime closed-world manifest | **verified** | `SHA256SUMS` and `simplicio-update-manifest.json` remain Runtime-only and unchanged |
 | Apple Developer ID signing and notarization | **blocked** | No Apple credentials are available; the package is ad-hoc and Gatekeeper acceptance is not claimed |
 | Authentication-only native probe and Google acceptance | **unexecuted** | Requires a native macOS executor and a separately authorized account run; no Google flow was initiated |
@@ -54,16 +58,19 @@ the blocked or unexecuted gates as passed.
 
 The updater transaction is implemented in `src-tauri::desktop_updater`:
 
-1. re-read the official release API and bind the requested version/tag/asset;
-2. resume into a private `.part` file and atomically stage the verified package;
+1. re-read the official release API and bind the requested version/tag/asset and signature sidecar;
+2. resume into a private `.part` file, verify SHA-256 and Ed25519, and atomically stage the verified package;
 3. retain the current macOS app bundle as one rollback candidate;
 4. replace the bundle, relaunch it, and persist `awaiting_health`;
 5. reconcile the running bundle version at startup, or restore the candidate.
 
 The Desktop UI never reports completion until startup reconciliation confirms the
-expected bundle version. A public GitHub digest is integrity evidence, not a
-Developer ID/notarization or independent release signature; publication still
-requires the signing, provenance and artifact gates below.
+expected bundle version. A public GitHub digest is integrity evidence; the
+updater additionally requires the independent Ed25519 sidecar before staging.
+This does not replace Apple Developer ID signing or notarization; publication
+still requires the signing, provenance and artifact gates below. The current
+public v3.8.47 Desktop package remains outside the installed updater trust gate
+until its matching sidecar is published in a new immutable release.
 
 ## Native bundle identity
 

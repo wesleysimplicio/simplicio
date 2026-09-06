@@ -178,8 +178,9 @@ function AccountConnection({ provider }: { provider: "codex" | "grok" }) {
     lock.current = true; setBusy(true);
     try {
       const data = await readProviderQuotas();
-      const windows = provider === "codex" ? data.groups.flatMap(group => group.windows) : data.grok?.windows ?? [];
-      const reason = data.grok?.reason;
+      const providerData = data.providers.find(item => item.id === provider);
+      const windows = providerData?.windows ?? [];
+      const reason = providerData?.error;
       const next = windows.length ? "Consulta de cota confirmada. A identidade da conta não foi consultada."
         : provider === "grok" && reason === "refresh_in_grok" ? "Sessão expirada. Abra o Grok neste computador para renovar e consulte novamente."
         : data.status === "busy" ? "Outra consulta está em andamento. Tente novamente quando terminar."

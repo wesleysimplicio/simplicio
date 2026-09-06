@@ -71,6 +71,9 @@ function nativeFailureMessage(code: string): string {
     update_identity_invalid: "A identidade do pacote mudou. A atualização foi interrompida por segurança.",
     update_manifest_changed: "A release mudou desde a consulta. Verifique novamente antes de baixar.",
     update_digest_unavailable: "A distribuição não publicou um SHA-256 verificável para este pacote.",
+    update_signature_unavailable: "A distribuição não publicou a assinatura Ed25519 deste pacote.",
+    update_signature_invalid: "A assinatura publicada não atende ao contrato Ed25519.",
+    update_signature_mismatch: "A assinatura Ed25519 não corresponde ao pacote. O pacote não será instalado.",
     update_asset_invalid: "O pacote publicado não atende ao alvo ou ao contrato de distribuição.",
     update_download_failed: "O download falhou. O arquivo parcial foi preservado para retomar com segurança.",
     update_download_incomplete: "O download não terminou com o tamanho publicado. Tente novamente.",
@@ -385,7 +388,7 @@ export function DesktopUpdates() {
     status.state === "up_to_date" ? "Simplicio está atualizado" :
     status.state === "newer_local" ? "Versão local mais recente" : "Atualização não confirmada";
   const description = action.error || (action.stage === "downloading" ? "Baixando e verificando o pacote em armazenamento privado…" :
-    action.stage === "ready" ? "O pacote foi baixado e conferido por SHA-256. Está pronto para instalar." :
+    action.stage === "ready" ? "O pacote foi baixado e conferido por SHA-256 e Ed25519. Está pronto para instalar." :
     action.stage === "installing" ? "Preparando a troca do aplicativo e o reinício." :
     action.stage === "awaiting_health" ? "O aplicativo será reiniciado e validará a versão antes de confirmar a troca." :
     action.stage === "rollback" ? "Restaurando a cópia anterior do aplicativo." :
@@ -419,7 +422,7 @@ export function DesktopUpdates() {
       <div className="desktop-update-progress-label"><span role="status" aria-live="polite">{action.stage === "downloading" ? "Baixando e verificando instalador" : action.stage === "installing" ? "Instalando e preparando reinício" : "Restaurando versão anterior"}</span>
         <span>{progressBytes > 0 && result ? formatBytes(progressBytes) + " de " + formatBytes(result.release.assetBytes) : "Aguarde…"}</span></div>
       <progress aria-label="Progresso do download" value={progressRatio} max="100" />
-      <p>O arquivo é armazenado em área privada e só é instalado após a verificação de tamanho e SHA-256.</p>
+      <p>O arquivo é armazenado em área privada e só é instalado após a verificação de tamanho, SHA-256 e assinatura Ed25519.</p>
     </div>}
     {status.currentVersion && <p className="desktop-update-installed">Versão deste aplicativo: <strong>{status.currentVersion}</strong></p>}
     {result && available && <>
@@ -439,7 +442,7 @@ export function DesktopUpdates() {
     {status.state === "available" && action.stage === "idle" && <div className="desktop-update-manual"><Glyph name="external" size={17} /><div><strong>Atualização verificada pela distribuição</strong>
       <p>Baixe a release oficial para preparar uma instalação segura. O login do Simplicio não é necessário.</p></div></div>}
     {action.stage === "ready" && <div className="desktop-update-manual"><Glyph name="check" size={17} /><div><strong>Pacote pronto</strong>
-      <p>O tamanho publicado e o SHA-256 foram conferidos. Você pode instalar e reiniciar quando quiser.</p></div></div>}
+      <p>O tamanho publicado, o SHA-256 e a assinatura Ed25519 foram conferidos. Você pode instalar e reiniciar quando quiser.</p></div></div>}
     {action.stage === "awaiting_health" && <div className="desktop-update-manual"><Glyph name="refresh" size={17} /><div><strong>Reinício em validação</strong>
       <p>Se a nova versão não iniciar corretamente, use rollback para voltar à cópia anterior.</p></div></div>}
     {action.error && <p className="inline-error" role="alert">{action.error}</p>}

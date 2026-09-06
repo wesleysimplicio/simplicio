@@ -60,7 +60,10 @@ async function mockAccessUpdates(page: Page, state: "signed_out" | "unknown" | "
     body: JSON.stringify([{
       tag_name: "v3.8.40", draft: false, prerelease: false,
       html_url: `${DESKTOP_RELEASES_URL}/tag/v3.8.40`,
-      assets: [{ name, state: "uploaded", size: 100_000, browser_download_url: `${DESKTOP_RELEASES_URL}/download/v3.8.40/${name}` }],
+      assets: [
+        { name, state: "uploaded", size: 100_000, browser_download_url: `${DESKTOP_RELEASES_URL}/download/v3.8.40/${name}` },
+        { name: `${name}.sig`, state: "uploaded", size: 92, browser_download_url: `${DESKTOP_RELEASES_URL}/download/v3.8.40/${name}.sig` },
+      ],
     }]),
   }));
 }

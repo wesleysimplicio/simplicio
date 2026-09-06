@@ -14,7 +14,7 @@ test("reads native permissions and quotas and opens only the requested settings 
       if (command === "desktop_permissions") return { schema: "simplicio.desktop-permissions/v1", source: "operating_system", rows: ["microphone","camera","screen","accessibility","files","automation","network","devices"].map(id => ({id,status: id === "microphone" ? "granted" : id === "camera" ? "not_determined" : id === "accessibility" && accessibilityGranted ? "granted" : "unknown",canOpenSettings:true})) };
       if (command === "desktop_open_permission_settings") return;
       if (command === "desktop_request_media_permission") return { schema: "simplicio.desktop-permissions/v1", source: "operating_system", rows: ["microphone","camera","screen","accessibility","files","automation","network","devices"].map(id => ({id,status: id === "camera" ? "denied" : "unknown",canOpenSettings:true})) };
-      if (command === "desktop_provider_quotas") return {schema:"simplicio.provider-quotas/v1",status:"available",grok:{status:"available",windows:[{usedPercent:37,windowDurationMins:10080,resetsAt:1900000000}]},groups:[{id:"codex",windows:[{usedPercent:21,windowDurationMins:10080,resetsAt:1900000000}]}]};
+      if (command === "desktop_provider_quotas") return {schema:"simplicio.provider-quotas/v2",status:"available",observedAt:1900000000,providers:[{id:"codex",source:"codex_app_server",accountScope:"local_authenticated_account",observedAt:1900000000,redacted:true,status:"fresh",windows:[{usedPercent:21,windowDurationMins:10080,resetsAt:1900000000}]},{id:"grok",source:"grok_cli_billing",accountScope:"local_cli_session",observedAt:1900000000,redacted:true,status:"fresh",windows:[{usedPercent:37,windowDurationMins:10080,resetsAt:1900000000}]}]};
       if (command === "plugin:event|listen") return 1;
       throw "fixture_unavailable";
     } } });
@@ -34,10 +34,10 @@ test("reads native permissions and quotas and opens only the requested settings 
   await panel.getByRole("button", {name:"Compacto", exact:true}).click();
   await expect(panel.getByRole("button", {name:"Compacto", exact:true})).toHaveAttribute("aria-pressed", "true");
   await expect(panel.getByText("Renova em", {exact:false})).toHaveCount(0);
-  await expect(panel.getByRole("progressbar", {name:"Uso da janela de 10080 minutos"})).toHaveAttribute("value", "21");
+  await expect(panel.getByRole("progressbar", {name:"Uso da janela de 10080 minutos"}).first()).toHaveAttribute("value", "21");
   await panel.getByRole("button", {name:"Detalhado", exact:true}).click();
   await expect(panel.getByText("Renova em", {exact:false})).toHaveCount(2);
-  await expect(panel.getByRole("progressbar", {name:"Uso da conta Grok"})).toHaveAttribute("value", "37");
+  await expect(panel.getByRole("progressbar", {name:"Uso da janela de 10080 minutos"}).nth(1)).toHaveAttribute("value", "37");
   await page.getByRole("button",{name:"Fechar cotas"}).click();
   await expect(page.getByRole("region",{name:"Cotas dos agentes"})).toHaveCount(0);
   await page.evaluate(() => (window as unknown as {__grantAccessibility:()=>void}).__grantAccessibility());
