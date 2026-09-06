@@ -49,11 +49,14 @@ def _safe_binary(binary: str | os.PathLike[str]) -> str:
     return str(path)
 
 
-def _entry(binary: str) -> dict[str, Any]:
-    return {
+def _entry(binary: str, mcp_environment: Mapping[str, str] | None = None) -> dict[str, Any]:
+    entry: dict[str, Any] = {
         "command": binary,
         "args": ["serve", "--mcp", "--stdio"],
     }
+    if mcp_environment:
+        entry["env"] = dict(mcp_environment)
+    return entry
 
 
 def portable_cli_plan(spec: HostSpec, executable: str) -> dict[str, Any]:
@@ -113,7 +116,11 @@ def _load_json(path: Path) -> tuple[dict[str, Any], bytes, str | None]:
     return value, raw, None
 
 
-def _merge_mcp(document: dict[str, Any], binary: str) -> tuple[dict[str, Any], str]:
+def _merge_mcp(
+    document: dict[str, Any],
+    binary: str,
+    mcp_environment: Mapping[str, str] | None = None,
+) -> tuple[dict[str, Any], str]:
     result = json.loads(json.dumps(document, ensure_ascii=False))
     if isinstance(result.get("mcpServers"), dict):
         key = "mcpServers"
@@ -124,7 +131,7 @@ def _merge_mcp(document: dict[str, Any], binary: str) -> tuple[dict[str, Any], s
     servers = result.setdefault(key, {})
     if not isinstance(servers, dict):
         raise ValueError("MCP server collection must be an object")
-    servers[MANAGED_SERVER] = _entry(binary)
+    servers[MANAGED_SERVER] = _entry(binary, mcp_environment)
     return result, key
 
 
@@ -148,7 +155,8 @@ def _write_one(spec: HostSpec, path: Path, binary: str, *, dry_run: bool) -> Int
     if error:
         return IntegrationResult(spec.host_id, "failed", "", str(path), spec.capability, "none", error)
     try:
-        merged, _ = _merge_mcp(document, binary)
+        environment = dict(spec.mcp_environment)
+        merged, _ = _merge_mcp(document, binary, environment)
         encoded = (json.dumps(merged, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
     except (TypeError, ValueError):
         return IntegrationResult(spec.host_id, "failed", "", str(path), spec.capability, "none", "invalid_mcp_document")
@@ -163,7 +171,7 @@ def _write_one(spec: HostSpec, path: Path, binary: str, *, dry_run: bool) -> Int
             _atomic_write(path, encoded)
             round_trip, _, round_trip_error = _load_json(path)
             servers = round_trip.get("mcpServers", round_trip.get("servers", {}))
-            if round_trip_error or not isinstance(servers, dict) or servers.get(MANAGED_SERVER) != _entry(binary):
+            if round_trip_error or not isinstance(servers, dict) or servers.get(MANAGED_SERVER) != _entry(binary, environment):
                 raise OSError("managed entry did not survive the atomic write")
         except (OSError, ValueError):
             if backup and Path(backup).exists():

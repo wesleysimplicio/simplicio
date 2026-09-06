@@ -41,7 +41,9 @@ supported configuration locations are `~/.claude/settings.json` and
 `~/.claude/.mcp.json`; the public installer does not copy Codex-only hooks into
 those files. Verification is the Runtime registration receipt produced by
 `simplicio mcp register --binary <absolute-path> --json`, and the Runtime is
-responsible for the atomic merge and rollback of the host configuration.
+responsible for the atomic merge and rollback of the host configuration. The
+managed Claude MCP entry carries `SIMPLICIO_RUNTIME_MODE=mapper-only` so the
+direct registration path cannot silently select the full Runtime surface.
 
 Cursor is detected only through the exact `cursor` executable. The registry
 declares both user (`~/.cursor/mcp.json`) and workspace (`.cursor/mcp.json`)

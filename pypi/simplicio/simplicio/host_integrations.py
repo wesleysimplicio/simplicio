@@ -37,6 +37,7 @@ class HostSpec:
     verification_command: Tuple[str, ...] = ()
     scopes: Tuple[str, ...] = ("user",)
     default_scope: str = "user"
+    mcp_environment: Tuple[Tuple[str, str], ...] = ()
     documentation: str = ""
     reason: str = ""
 
@@ -50,6 +51,7 @@ def _runtime_mcp(
     minimum_version: str = "not-pinned",
     scopes: Sequence[str] = ("user",),
     default_scope: str = "user",
+    mcp_environment: Sequence[Tuple[str, str]] = (),
 ) -> HostSpec:
     return HostSpec(
         host_id=host_id,
@@ -69,6 +71,7 @@ def _runtime_mcp(
         ),
         scopes=tuple(scopes),
         default_scope=default_scope,
+        mcp_environment=tuple(mcp_environment),
         documentation=documentation,
         reason="The Runtime owns the atomic MCP/native-hook registration.",
     )
@@ -96,6 +99,7 @@ HOSTS: Tuple[HostSpec, ...] = (
         ("claude",),
         ("~/.claude/settings.json", "~/.claude/.mcp.json"),
         "https://docs.anthropic.com/claude/docs/claude-code",
+        mcp_environment=(("SIMPLICIO_RUNTIME_MODE", "mapper-only"),),
     ),
     _runtime_mcp(
         "cursor",
