@@ -5,8 +5,8 @@ export const HOST_PLUGIN_IDS = [
   "copilot",
   "qwen",
   "hermes",
-  "cursor",
-  "kiro",
+  "kilo",
+  "opencode",
 ] as const;
 
 export type HostPluginId = typeof HOST_PLUGIN_IDS[number];
@@ -282,7 +282,7 @@ export function createPreviewIntegrationPlan(): IntegrationPlan {
     pluginVersion: "preview",
     hosts: HOST_PLUGIN_IDS.map((host, index) => ({
       host,
-      mode: host === "cursor" || host === "kiro" ? "portable" : "manager",
+      mode: host === "hermes" ? "hybrid" : "manager",
       disposition: index < 2 ? "ready" : index < 5 ? "already_exact" : "not_detected",
       reasonCode: index < 2 ? "ready" : index < 5 ? "already_exact" : "not_detected",
     })),

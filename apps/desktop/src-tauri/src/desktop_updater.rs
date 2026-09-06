@@ -23,6 +23,7 @@ const MAX_ASSET_NAME: usize = 180;
 const MAX_DOWNLOAD_SECONDS: u64 = 900;
 const STATE_DIR: &str = "desktop-updates";
 const STATE_FILE: &str = "state.json";
+static UPDATE_EFFECT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct ReleaseArtifact {
@@ -495,6 +496,7 @@ pub fn download(
     {
         return Err(error("update_identity_invalid"));
     }
+    let _effect = UPDATE_EFFECT_LOCK.try_lock().map_err(|_| error("update_busy"))?;
     ensure_private_dir(&update_root(app_data))?;
     let artifact = load_manifest(&update_root(app_data), tag, asset_name)?;
     if artifact.version != version
@@ -504,6 +506,7 @@ pub fn download(
     }
     let id = update_id(&artifact);
     let staged_path = update_root(app_data).join(format!("{id}.part"));
+    reject_symlink(&staged_path)?;
     let received_bytes = fs::metadata(&staged_path)
         .map(|metadata| metadata.len())
         .unwrap_or(0);
@@ -563,10 +566,7 @@ fn current_bundle(current_executable: &Path) -> Result<PathBuf, String> {
             }
         }
     }
-    let parent = current_executable
-        .parent()
-        .ok_or_else(|| error("update_target_unavailable"))?;
-    Ok(parent.to_path_buf())
+    Err(error("update_target_unavailable"))
 }
 
 fn find_app(root: &Path) -> Option<PathBuf> {
@@ -688,8 +688,14 @@ fn install_bundle(
         return Err(error("update_package_unsupported"));
     }
     let current = current_bundle(current_executable)?;
+    validate_upgrade_version(&current, &state.artifact.version)?;
     let extraction = update_root(app_data).join(format!("extract-{}", state.id));
     let candidate = extract_archive(&state.staged_path, &extraction)?;
+    if bundle_version(&candidate).as_deref() != Some(state.artifact.version.as_str())
+        || bundle_property(&candidate, "CFBundleIdentifier").as_deref() != Some("br.com.simpleti.simplicio")
+    {
+        return Err(error("update_bundle_identity_mismatch"));
+    }
     let parent = current
         .parent()
         .ok_or_else(|| error("update_target_unavailable"))?;
@@ -713,7 +719,7 @@ fn install_bundle(
         let _ = fs::rename(&backup, &current);
         return Err(format!("update_install_failed:{rename_error}"));
     }
-    state.state = "relaunch_pending".to_string();
+    state.state = "awaiting_health".to_string();
     state.previous_path = Some(backup);
     write_state(app_data, state)?;
     command_ok(
@@ -725,18 +731,33 @@ fn install_bundle(
                 .ok_or_else(|| error("update_path_invalid"))?,
         ],
     )?;
-    state.state = "awaiting_health".to_string();
-    write_state(app_data, state)?;
+    // The child may already have settled the journal. Never overwrite its result.
     Ok(state_to_json(state))
 }
 
-fn bundle_version(bundle: &Path) -> Option<String> {
+fn bundle_property(bundle: &Path, property: &str) -> Option<String> {
     let plist = fs::read_to_string(bundle.join("Contents/Info.plist")).ok()?;
-    let key = plist.find("<key>CFBundleShortVersionString</key>")?;
+    let key = plist.find(&format!("<key>{property}</key>"))?;
     let rest = &plist[key..];
     let start = rest.find("<string>")? + "<string>".len();
     let end = rest[start..].find("</string>")?;
     Some(rest[start..start + end].to_string())
+}
+
+fn bundle_version(bundle: &Path) -> Option<String> {
+    bundle_property(bundle, "CFBundleShortVersionString")
+}
+
+fn validate_upgrade_version(current: &Path, expected: &str) -> Result<(), String> {
+    let parse = |version: &str| -> Option<Vec<u64>> {
+        if !version_valid(version) || version.contains('-') { return None; }
+        version.split('.').map(|part| part.parse::<u64>().ok()).collect()
+    };
+    let current = bundle_version(current).ok_or_else(|| error("update_identity_invalid"))?;
+    let installed = parse(&current).ok_or_else(|| error("update_identity_invalid"))?;
+    let candidate = parse(expected).ok_or_else(|| error("update_identity_invalid"))?;
+    if candidate <= installed { return Err(error("update_not_newer")); }
+    Ok(())
 }
 
 fn swap_back(
@@ -798,6 +819,7 @@ pub fn install(
     if !safe_component(update_id, 160) {
         return Err(error("update_identity_invalid"));
     }
+    let _effect = UPDATE_EFFECT_LOCK.try_lock().map_err(|_| error("update_busy"))?;
     let mut state = read_state(app_data)?.ok_or_else(|| error("update_not_downloaded"))?;
     if state.id != update_id || state.state != "ready" {
         return Err(error("update_not_ready"));
@@ -817,6 +839,7 @@ pub fn install(
 }
 
 pub fn rollback(app_data: &Path, current_executable: &Path) -> Result<Value, String> {
+    let _effect = UPDATE_EFFECT_LOCK.try_lock().map_err(|_| error("update_busy"))?;
     let mut state = read_state(app_data)?.ok_or_else(|| error("update_rollback_unavailable"))?;
     if !matches!(state.state.as_str(), "relaunch_pending" | "awaiting_health") {
         return Err(error("update_rollback_unavailable"));
@@ -826,7 +849,17 @@ pub fn rollback(app_data: &Path, current_executable: &Path) -> Result<Value, Str
 
 pub fn status(app_data: &Path) -> Result<Value, String> {
     Ok(read_state(app_data)?
-        .map(|state| state_to_json(&state))
+        .map(|mut state| {
+            // Disk bytes are progress only, never proof of a running transfer or valid digest.
+            if state.state == "downloading" && state.staged_path.parent() == Some(update_root(app_data).as_path()) {
+                if let Ok(metadata) = fs::symlink_metadata(&state.staged_path) {
+                    if metadata.is_file() && !metadata.file_type().is_symlink() {
+                        state.received_bytes = metadata.len().min(state.artifact.asset_bytes);
+                    }
+                }
+            }
+            state_to_json(&state)
+        })
         .unwrap_or_else(|| {
             json!({
                 "schema": SCHEMA,
@@ -842,12 +875,16 @@ pub fn status(app_data: &Path) -> Result<Value, String> {
 pub fn reconcile_startup(
     app_data: &Path,
     current_executable: &Path,
+    running_version: &str,
 ) -> Result<Option<Value>, String> {
     let mut state = match read_state(app_data)? {
-        Some(state) if state.state == "awaiting_health" => state,
+        Some(state) if matches!(state.state.as_str(), "relaunch_pending" | "awaiting_health") => state,
         _ => return Ok(None),
     };
     let current = current_bundle(current_executable)?;
+    if running_version != state.artifact.version {
+        return Err(error("update_running_version_unconfirmed"));
+    }
     if bundle_version(&current).as_deref() == Some(state.artifact.version.as_str()) {
         state.state = "completed".to_string();
         write_state(app_data, &state)?;
@@ -890,6 +927,40 @@ mod tests {
             digest: "sha256:".to_string() + &"a".repeat(64),
             url: fixed_asset_url(&format!("v{version}"), "Simplicio-3.8.99-arm64.zip").unwrap(),
         }
+    }
+
+    #[test]
+    fn unbundled_executable_never_authorizes_replacing_its_parent() {
+        let root = std::env::temp_dir();
+        assert_eq!(current_bundle(&root.join("simplicio-desktop")).unwrap_err(), "update_target_unavailable");
+    }
+
+    #[test]
+    fn downgrade_and_same_version_are_rejected_before_extraction() {
+        let (root, app) = fixture("no-downgrade");
+        fs::write(app.join("Contents/Info.plist"),
+            "<key>CFBundleShortVersionString</key><string>3.8.99</string>").unwrap();
+        assert_eq!(validate_upgrade_version(&app, "3.8.98").unwrap_err(), "update_not_newer");
+        assert_eq!(validate_upgrade_version(&app, "3.8.99").unwrap_err(), "update_not_newer");
+        assert!(validate_upgrade_version(&app, "3.8.100").is_ok());
+        assert_eq!(validate_upgrade_version(&app, "999999999999999999999.0.0").unwrap_err(), "update_identity_invalid");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn status_reads_partial_bytes_without_claiming_a_finished_download() {
+        let (root, _) = fixture("progress");
+        let app_data = root.join("data");
+        ensure_private_dir(&update_root(&app_data)).unwrap();
+        let staged_path = update_root(&app_data).join("progress.part");
+        fs::write(&staged_path, b"12345").unwrap();
+        let state = UpdateState { id: "progress".to_string(), state: "downloading".to_string(),
+            artifact: artifact("3.8.99"), received_bytes: 0, staged_path, previous_path: None };
+        write_state(&app_data, &state).unwrap();
+        let report = status(&app_data).unwrap();
+        assert_eq!(report["received_bytes"], 5);
+        assert_eq!(report["state"], "downloading");
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -985,9 +1056,13 @@ mod tests {
         let result = reconcile_startup(
             &app_data,
             &app.join("Contents").join("MacOS").join("simplicio-desktop"),
+            "3.8.99",
         )
         .unwrap();
         assert_eq!(result.unwrap()["status"], "healthy");
+        write_state(&app_data, &state).unwrap();
+        assert_eq!(reconcile_startup(&app_data, &app.join("Contents/MacOS/simplicio-desktop"), "3.8.98").unwrap_err(), "update_running_version_unconfirmed");
+        assert_eq!(status(&app_data).unwrap()["state"], "awaiting_health");
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -1057,6 +1132,7 @@ mod tests {
         let result = reconcile_startup(
             &app_data,
             &app.join("Contents").join("MacOS").join("simplicio-desktop"),
+            "3.8.99",
         )
         .unwrap()
         .unwrap();

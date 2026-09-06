@@ -28,10 +28,8 @@ test("sign-in and access-gated pages use the same white background", async ({ pa
   await page.getByRole("button", { name: "Começar", exact: true }).click();
   await expect(page.locator(".access-panel")).toHaveCSS("background-color", "rgb(255, 255, 255)");
   await page.screenshot({ path: testInfo.outputPath("desktop-white-login.png"), fullPage: true });
-  await page.getByRole("button", { name: "Voltar", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Começar", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continuar com Google", exact: true })).toBeFocused();
   await page.setViewportSize({ width: 390, height: 700 });
-  await page.getByRole("button", { name: "Começar", exact: true }).click();
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
   await expect(page.getByRole("button", { name: "Continuar com Google" })).toBeVisible();
 });

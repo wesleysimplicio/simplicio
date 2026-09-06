@@ -16,6 +16,9 @@ type NativeUpdateState = {
   received_bytes?: number;
   asset_bytes?: number;
   status?: string;
+  version?: string;
+  tag?: string;
+  asset_name?: string;
 };
 
 type UpdateAction = {
@@ -61,6 +64,10 @@ function asNativeState(value: unknown): NativeUpdateState | null {
 
 function nativeFailureMessage(code: string): string {
   const messages: Record<string, string> = {
+    update_busy: "Outra operação de atualização está em andamento. Aguarde sua conclusão.",
+    update_not_newer: "O pacote não é mais recente que o aplicativo instalado.",
+    update_running_version_unconfirmed: "O novo processo ainda não confirmou a versão esperada.",
+    update_bundle_identity_mismatch: "O aplicativo extraído não corresponde à versão e à identidade esperadas.",
     update_identity_invalid: "A identidade do pacote mudou. A atualização foi interrompida por segurança.",
     update_manifest_changed: "A release mudou desde a consulta. Verifique novamente antes de baixar.",
     update_digest_unavailable: "A distribuição não publicou um SHA-256 verificável para este pacote.",
@@ -77,7 +84,7 @@ function nativeFailureMessage(code: string): string {
     update_not_ready: "O pacote ainda não está pronto para instalação.",
     update_not_downloaded: "Nenhum pacote verificado está disponível para instalação.",
   };
-  return messages[code] || "A atualização não pôde ser concluída com segurança (" + code + ").";
+  return messages[code.split(":")[0]] || "A atualização não pôde ser concluída com segurança. Tente consultar novamente.";
 }
 
 export function DesktopUpdates() {
@@ -86,12 +93,23 @@ export function DesktopUpdates() {
   const closeButton = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const activeCheck = useRef<AbortController | null>(null);
+  const hasChecked = useRef(false);
   const openLock = useRef(false);
   const openAttempt = useRef(0);
   const openTimer = useRef<number | undefined>(undefined);
   const [visible, setVisible] = useState(false);
   const [status, setStatus] = useState<CheckState>({ state: "checking", currentVersion: null, progress: { stage: "identity", receivedBytes: 0 } });
-  const [action, setAction] = useState<UpdateAction>({ stage: "idle" });
+  const [action, setActionState] = useState<UpdateAction>({ stage: "idle" });
+  const actionRef = useRef<UpdateAction>({ stage: "idle" });
+  const mutationLock = useRef(false);
+  const selectedRelease = useRef<DesktopUpdateResult | null>(null);
+  const pollGeneration = useRef(0);
+  const [notice, setNotice] = useState<DesktopUpdateResult | null>(null);
+  const setAction = useCallback((value: UpdateAction | ((previous: UpdateAction) => UpdateAction)) => {
+    const next = typeof value === "function" ? value(actionRef.current) : value;
+    actionRef.current = next;
+    setActionState(next);
+  }, []);
   const [opening, setOpening] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
 
@@ -104,10 +122,18 @@ export function DesktopUpdates() {
     return pending;
   }, []);
 
-  const startCheck = useCallback(async () => {
-    if (!dialog.current?.open && document.activeElement instanceof HTMLElement) returnFocus.current = document.activeElement;
-    setVisible(true);
-    if (activeCheck.current) return;
+  const startCheck = useCallback(async (background = false) => {
+    if (background && hasChecked.current) return;
+    hasChecked.current = true;
+    if (!background) {
+      if (!dialog.current?.open && document.activeElement instanceof HTMLElement) returnFocus.current = document.activeElement;
+      setVisible(true);
+      setNotice(null);
+    }
+    if (activeCheck.current || mutationLock.current ||
+      ["downloading", "ready", "installing", "awaiting_health", "rollback"].includes(actionRef.current.stage)) return;
+    pollGeneration.current += 1;
+    selectedRelease.current = null;
     if (!native) {
       setStatus({ state: "error", currentVersion: null, code: "preview" });
       setAction({ stage: "idle" });
@@ -138,7 +164,11 @@ export function DesktopUpdates() {
     };
     try {
       const result = await Promise.race([check(), canceled]);
-      if (activeCheck.current === controller) setStatus(result);
+      if (activeCheck.current === controller) {
+        selectedRelease.current = result;
+        setStatus(result);
+        if (background && !dialog.current?.open && result.state === "available") setNotice(result);
+      }
     } catch (error) {
       if (activeCheck.current !== controller) return;
       const code = timedOut ? "timeout" : error instanceof DesktopUpdateError ? error.code : "native_unavailable";
@@ -148,27 +178,39 @@ export function DesktopUpdates() {
       controller.signal.removeEventListener("abort", cancel);
       if (activeCheck.current === controller) activeCheck.current = null;
     }
-  }, [native]);
+  }, [native, setAction]);
 
   const refreshNativeState = useCallback(async () => {
-    if (!native) return;
+    if (!native || mutationLock.current && actionRef.current.stage !== "downloading") return;
+    const generation = pollGeneration.current;
     try {
       const state = asNativeState(await invoke<unknown>("desktop_update_status"));
-      if (!state || !state.state) return;
-      const receivedBytes = typeof state.received_bytes === "number" ? state.received_bytes : 0;
-      if (state.state === "downloading") {
-        setAction((previous) => ({ ...previous, stage: "downloading", id: state.id, receivedBytes }));
-      } else if (state.state === "ready") {
-        setAction((previous) => ({ ...previous, stage: "ready", id: state.id, receivedBytes }));
+      const release = selectedRelease.current?.release;
+      if (generation !== pollGeneration.current || !state || !release ||
+        state.version !== release.version || state.tag !== release.tag ||
+        state.asset_name !== release.assetName || state.asset_bytes !== release.assetBytes ||
+        typeof state.id !== "string" || !/^[a-zA-Z0-9_-]{1,160}$/.test(state.id)) return;
+      // A durable "downloading" receipt is not evidence that its process is still running.
+      // Never let an advisory poll erase a failed command or enable a second mutation.
+      if (actionRef.current.stage === "error" || actionRef.current.stage === "rollback") return;
+      const receivedBytes = typeof state.received_bytes === "number" && Number.isSafeInteger(state.received_bytes) &&
+        state.received_bytes >= 0 && state.received_bytes <= release.assetBytes ? state.received_bytes : undefined;
+      if (mutationLock.current) {
+        if (actionRef.current.stage === "downloading" && receivedBytes !== undefined)
+          setAction(previous => ({ ...previous, receivedBytes }));
+        return;
+      }
+      if (state.state === "ready" && receivedBytes === release.assetBytes) {
+        setAction({ stage: "ready", id: state.id, receivedBytes });
       } else if (state.state === "awaiting_health" || state.state === "relaunch_pending") {
-        setAction((previous) => ({ ...previous, stage: "awaiting_health", id: state.id, receivedBytes }));
-      } else if (state.state === "completed") {
-        setAction((previous) => ({ ...previous, stage: "completed", id: state.id, receivedBytes }));
+        setAction({ stage: "awaiting_health", id: state.id, receivedBytes });
+      } else if (state.state === "completed" && actionRef.current.id === state.id) {
+        setAction({ stage: "completed", id: state.id, receivedBytes });
       }
     } catch {
-      // Status is advisory; a failed poll must not turn a successful download into an error.
+      // A failed read never proves completion or erases the last command result.
     }
-  }, [native]);
+  }, [native, setAction]);
 
   useEffect(() => {
     let disposed = false;
@@ -197,6 +239,13 @@ export function DesktopUpdates() {
   }, [native, startCheck, invalidateOpenAttempt]);
 
   useEffect(() => {
+    if (!native) return;
+    // One anonymous metadata check per mount; never download, install, or open a modal automatically.
+    const timer = window.setTimeout(() => { void startCheck(true); }, 5_000);
+    return () => window.clearTimeout(timer);
+  }, [native, startCheck]);
+
+  useEffect(() => {
     if (visible && dialog.current && !dialog.current.open) {
       dialog.current.showModal();
       closeButton.current?.focus();
@@ -206,16 +255,14 @@ export function DesktopUpdates() {
   useEffect(() => {
     if (!visible || !native) return;
     let disposed = false;
-    const poll = () => {
-      if (!disposed) void refreshNativeState();
+    let timer: number | undefined;
+    const poll = async () => {
+      await refreshNativeState();
+      if (!disposed) timer = window.setTimeout(() => { void poll(); }, 1_500);
     };
-    poll();
-    const interval = window.setInterval(poll, action.stage === "downloading" ? 750 : 3_000);
-    return () => {
-      disposed = true;
-      window.clearInterval(interval);
-    };
-  }, [visible, native, action.stage, refreshNativeState]);
+    void poll();
+    return () => { disposed = true; window.clearTimeout(timer); pollGeneration.current += 1; };
+  }, [visible, native, refreshNativeState]);
 
   function close() {
     const pending = activeCheck.current;
@@ -252,7 +299,10 @@ export function DesktopUpdates() {
   }
 
   async function downloadUpdate() {
-    if (!native || status.state !== "available") return;
+    if (!native || status.state !== "available" || mutationLock.current ||
+      !["idle", "error"].includes(actionRef.current.stage)) return;
+    mutationLock.current = true;
+    pollGeneration.current += 1;
     setAction({ stage: "downloading", receivedBytes: 0 });
     try {
       const value = asNativeState(await invoke<unknown>("desktop_update_download", {
@@ -266,12 +316,17 @@ export function DesktopUpdates() {
     } catch (error) {
       const code = error instanceof Error ? error.message : String(error);
       setAction({ stage: "error", error: nativeFailureMessage(code) });
+    } finally {
+      mutationLock.current = false;
+      pollGeneration.current += 1;
     }
   }
 
   async function installUpdate() {
-    if (!native || !action.id) return;
-    setAction({ stage: "installing", id: action.id });
+    if (!native || mutationLock.current || actionRef.current.stage !== "ready" || !actionRef.current.id) return;
+    mutationLock.current = true;
+    pollGeneration.current += 1;
+    setAction({ stage: "installing", id: actionRef.current.id });
     try {
       const value = asNativeState(await invoke<unknown>("desktop_update_install", { updateId: action.id }));
       if (!value || (value.state !== "awaiting_health" && value.state !== "relaunch_pending")) {
@@ -281,10 +336,16 @@ export function DesktopUpdates() {
     } catch (error) {
       const code = error instanceof Error ? error.message : String(error);
       setAction({ stage: "error", id: action.id, error: nativeFailureMessage(code) });
+    } finally {
+      mutationLock.current = false;
+      pollGeneration.current += 1;
     }
   }
 
   async function rollbackUpdate() {
+    if (!native || mutationLock.current || !actionRef.current.id) return;
+    mutationLock.current = true;
+    pollGeneration.current += 1;
     setAction((previous) => ({ ...previous, stage: "rollback" }));
     try {
       const value = asNativeState(await invoke<unknown>("desktop_update_rollback"));
@@ -293,28 +354,47 @@ export function DesktopUpdates() {
     } catch (error) {
       const code = error instanceof Error ? error.message : String(error);
       setAction((previous) => ({ ...previous, stage: "error", error: nativeFailureMessage(code) }));
+    } finally {
+      mutationLock.current = false;
+      pollGeneration.current += 1;
     }
   }
 
-  if (!visible) return null;
+  if (!visible) return notice ? <aside className="desktop-update-notice" role="status" aria-label="Atualização disponível">
+    <div><strong>Simplicio {notice.release.version} disponível</strong><p>Revise o pacote oficial antes de baixar e instalar.</p></div>
+    <button type="button" className="button button-primary" onClick={() => {
+      if (document.activeElement instanceof HTMLElement) returnFocus.current = document.activeElement;
+      setNotice(null); setVisible(true);
+    }}>Ver atualização</button>
+    <button type="button" className="icon-button" aria-label="Dispensar aviso de atualização" onClick={() => setNotice(null)}><Glyph name="close" size={16} /></button>
+  </aside> : null;
   const result = "release" in status ? status : null;
   const checking = status.state === "checking" ? status : null;
   const available = status.state === "available";
   const progressBytes = action.receivedBytes && result ? action.receivedBytes : 0;
   const progressRatio = result && progressBytes > 0 ? Math.min(100, progressBytes / result.release.assetBytes * 100) : undefined;
-  const heading = status.state === "checking" ? "Procurando atualizações…" : status.state === "available" ? "Nova versão do Simplicio" :
-    status.state === "up_to_date" ? "Simplicio está atualizado" : status.state === "newer_local" ? "Versão local mais recente" :
-    action.stage === "ready" ? "Atualização pronta para instalar" : action.stage === "awaiting_health" ? "Confirmando reinicialização" :
-    action.stage === "completed" ? "Atualização concluída" : "Atualização não confirmada";
-  const description = status.state === "checking" ? "Consulta a distribuição oficial e valida o pacote compatível." :
+  const heading = action.stage === "downloading" ? "Baixando atualização…" :
+    action.stage === "ready" ? "Atualização pronta para instalar" :
+    action.stage === "installing" ? "Instalando atualização…" :
+    action.stage === "awaiting_health" ? "Confirmando reinicialização" :
+    action.stage === "rollback" ? "Restaurando versão anterior…" :
+    action.stage === "completed" ? "Operação de atualização concluída" :
+    action.stage === "error" ? "Atualização interrompida" :
+    status.state === "checking" ? "Procurando atualizações…" :
+    status.state === "available" ? "Nova versão do Simplicio" :
+    status.state === "up_to_date" ? "Simplicio está atualizado" :
+    status.state === "newer_local" ? "Versão local mais recente" : "Atualização não confirmada";
+  const description = action.error || (action.stage === "downloading" ? "Baixando e verificando o pacote em armazenamento privado…" :
+    action.stage === "ready" ? "O pacote foi baixado e conferido por SHA-256. Está pronto para instalar." :
+    action.stage === "installing" ? "Preparando a troca do aplicativo e o reinício." :
+    action.stage === "awaiting_health" ? "O aplicativo será reiniciado e validará a versão antes de confirmar a troca." :
+    action.stage === "rollback" ? "Restaurando a cópia anterior do aplicativo." :
+    action.stage === "completed" ? "Consulte o recibo e a versão em execução para distinguir atualização de restauração." :
+    status.state === "checking" ? "Consulta a distribuição oficial e valida o pacote compatível." :
     status.state === "available" ? "Simplicio " + status.release.version + " está disponível para esta plataforma." :
     status.state === "up_to_date" ? "Sua versão corresponde à mais recente com um instalador Desktop compatível nas releases consultadas." :
     status.state === "newer_local" ? "Este app é mais recente que o Desktop " + status.release.version + " encontrado no repositório. Nenhum downgrade será feito." :
-    action.error || (action.stage === "downloading" ? "Baixando e verificando o pacote em armazenamento privado…" :
-    action.stage === "ready" ? "O pacote foi baixado e conferido por SHA-256. Está pronto para instalar." :
-    action.stage === "awaiting_health" ? "O aplicativo será reiniciado e validará a versão antes de confirmar a troca." :
-    action.stage === "completed" ? "A versão em execução foi confirmada, ou o aplicativo anterior foi restaurado." :
-    "Não foi possível confirmar a atualização.");
+    "code" in status ? failureMessages[status.code] : "Não foi possível confirmar a atualização.");
 
   return <dialog className="project-dialog desktop-updates-dialog" ref={dialog} aria-labelledby="desktop-updates-heading"
     aria-describedby="desktop-updates-description" data-update-state={status.state} data-update-action={action.stage}
@@ -333,7 +413,7 @@ export function DesktopUpdates() {
       <div className="desktop-update-progress-label"><span role="status" aria-live="polite">{progressLabels[checking.progress.stage]}</span>
         <span>Etapa {checking.progress.stage === "identity" ? 1 : checking.progress.stage === "validating" ? 3 : 2} de 3</span></div>
       <progress aria-label="Progresso da consulta de atualização" />
-      <p>{checking.progress.receivedBytes > 0 ? formatBytes(checking.progress.receivedBytes) + " de metadados recebidos. " : ""}O instalador ainda não está sendo baixado.</p>
+      <p>{checking.progress.receivedBytes > 0 ? formatBytes(checking.progress.receivedBytes) + " de metadados recebidos. " : ""}O instalador não está sendo baixado.</p>
     </div>}
     {(action.stage === "downloading" || action.stage === "installing" || action.stage === "rollback") && <div className="desktop-update-progress" data-update-stage={action.stage}>
       <div className="desktop-update-progress-label"><span role="status" aria-live="polite">{action.stage === "downloading" ? "Baixando e verificando instalador" : action.stage === "installing" ? "Instalando e preparando reinício" : "Restaurando versão anterior"}</span>
@@ -368,8 +448,8 @@ export function DesktopUpdates() {
     {openError && <p className="inline-error" role="alert">{openError}</p>}
     <div className="dialog-actions desktop-update-actions">
       <button className="button button-secondary" type="button" onClick={close}>{status.state === "checking" ? "Cancelar consulta" : "Fechar"}</button>
-      {status.state !== "checking" && <button className="button button-secondary" type="button" onClick={() => void startCheck()} disabled={!native || action.stage === "downloading" || action.stage === "installing"}>Verificar novamente</button>}
-      {available && action.stage === "idle" && <button className="button button-primary" type="button" onClick={() => void downloadUpdate()} disabled={!native}>Baixar e verificar</button>}
+      {status.state !== "checking" && <button className="button button-secondary" type="button" onClick={() => void startCheck()} disabled={!native || ["downloading", "ready", "installing", "awaiting_health", "rollback"].includes(action.stage)}>Verificar novamente</button>}
+      {available && ["idle", "error"].includes(action.stage) && !action.id && <button className="button button-primary" type="button" onClick={() => void downloadUpdate()} disabled={!native}>{action.stage === "error" ? "Retomar download" : "Baixar e verificar"}</button>}
       {available && action.stage === "ready" && <button className="button button-primary" type="button" onClick={() => void installUpdate()}>Instalar e reiniciar</button>}
       {["awaiting_health", "error"].includes(action.stage) && <button className="button button-secondary" type="button" onClick={() => void rollbackUpdate()} disabled={!native || !action.id}>Rollback</button>}
       {status.state !== "checking" && <button className="button button-secondary" type="button" onClick={() => void openReleases()} disabled={opening}>{opening ? "Abrindo…" : "Ver releases oficiais"}</button>}

@@ -4,9 +4,11 @@ import {
   markUsageChangefeedOffline,
   type UsageChangefeedState,
 } from "./usage_changefeed";
+import type { IdleSessionFinalization } from "./session_idle";
 
 export interface DesktopUsageState {
   changefeed: UsageChangefeedState;
+  idleFinalization: IdleSessionFinalization | null;
 }
 
 export type DesktopUsageListener = (state: DesktopUsageState) => void;
@@ -17,12 +19,13 @@ export interface DesktopUsageStore {
   replaceChangefeed(state: UsageChangefeedState): void;
   applyEvent(value: unknown): void;
   markOffline(reasonCode?: string): void;
+  setIdleFinalization(receipt: IdleSessionFinalization | null): void;
 }
 
 export function createDesktopUsageStore(
   initial: UsageChangefeedState = createUsageChangefeedState(),
 ): DesktopUsageStore {
-  let state: DesktopUsageState = { changefeed: initial };
+  let state: DesktopUsageState = { changefeed: initial, idleFinalization: null };
   const listeners = new Set<DesktopUsageListener>();
 
   function notify() {
@@ -36,15 +39,19 @@ export function createDesktopUsageStore(
       return () => listeners.delete(listener);
     },
     replaceChangefeed(changefeed) {
-      state = { changefeed };
+      state = { ...state, changefeed };
       notify();
     },
     applyEvent(value) {
-      state = { changefeed: applyUsageChangefeedEvent(state.changefeed, value) };
+      state = { ...state, changefeed: applyUsageChangefeedEvent(state.changefeed, value) };
       notify();
     },
     markOffline(reasonCode) {
-      state = { changefeed: markUsageChangefeedOffline(state.changefeed, reasonCode) };
+      state = { ...state, changefeed: markUsageChangefeedOffline(state.changefeed, reasonCode) };
+      notify();
+    },
+    setIdleFinalization(receipt) {
+      state = { ...state, idleFinalization: receipt };
       notify();
     },
   };

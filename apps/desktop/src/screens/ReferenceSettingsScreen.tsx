@@ -6,6 +6,10 @@ import { createSettingsProjection } from "../settings_projection";
 import { REFERENCE_SCREENS, type ReferenceSettingsView } from "../reference_screens";
 import { isNavigationVisible, searchMatches, type View } from "../workbench";
 import "../reference_settings.css";
+import { DESKTOP_UPDATE_EVENT } from "../desktop_updates";
+import { readProviderQuotas } from "../components/ProviderUsage";
+import { useSystemPermissions, permissionLabels } from "../use_system_permissions";
+import { permissionIds, openPermissionSettings, requestMediaPermission, revealPermissionApp, type PermissionId } from "../system_permissions";
 
 export interface ReferenceSettingsProps {
   view: ReferenceSettingsView;
@@ -163,11 +167,37 @@ const providerStateLabels: Record<ProviderConnection["state"], string> = {
   needs_attention: "MCP requer atenção", not_installed: "Cliente não encontrado",
 };
 
+function AccountConnection({ provider }: { provider: "codex" | "grok" }) {
+  const [message, setMessage] = useState("Conexão ainda não consultada nesta tela.");
+  const [busy, setBusy] = useState(false);
+  const active = useRef(false);
+  const lock = useRef(false);
+  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
+  async function check() {
+    if (lock.current) return;
+    lock.current = true; setBusy(true);
+    try {
+      const data = await readProviderQuotas();
+      const windows = provider === "codex" ? data.groups.flatMap(group => group.windows) : data.grok?.windows ?? [];
+      const reason = data.grok?.reason;
+      const next = windows.length ? "Consulta de cota confirmada. A identidade da conta não foi consultada."
+        : provider === "grok" && reason === "refresh_in_grok" ? "Sessão expirada. Abra o Grok neste computador para renovar e consulte novamente."
+        : data.status === "busy" ? "Outra consulta está em andamento. Tente novamente quando terminar."
+        : "Não foi possível confirmar a conexão. Verifique o login no próprio cliente.";
+      if (active.current) setMessage(next);
+    } catch { if (active.current) setMessage("Consulta indisponível. Nenhuma conexão foi presumida."); }
+    finally { lock.current = false; if (active.current) setBusy(false); }
+  }
+  const native = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+  return <Row title="Conexão do cliente" description={message}><button className="button button-secondary" type="button" disabled={!native || busy} onClick={() => void check()}>{busy ? "Consultando conexão…" : "Consultar conexão " + (provider === "codex" ? "Codex" : "Grok")}</button></Row>;
+}
+
 function Accounts({ evidence, onNavigate }: { evidence: Evidence; onNavigate: Navigate }) {
   const accounts = [
     { id: "claude-code", name: "Claude", mark: "CL", description: "A autenticação do Claude Code continua sob controle do próprio agente." },
     { id: "codex", name: "Codex", mark: "CX", description: "Seu cliente Codex administra contas e credenciais; o Simplicio não importa tokens." },
     { id: "gemini", name: "Gemini", mark: "GE", description: "O login do Gemini CLI não é reutilizado automaticamente como uma conta do Desktop." },
+    { id: "grok", name: "Grok", mark: "GK", description: "O cliente Grok administra o login. O Desktop consulta a cota sem renovar a sessão nem iniciar conversas." },
     { id: "opencode", name: "OpenCode", mark: "OC", description: "Contas, modelos e chaves permanecem na configuração do OpenCode." },
   ];
   return <>
@@ -175,6 +205,7 @@ function Accounts({ evidence, onNavigate }: { evidence: Evidence; onNavigate: Na
     {accounts.map((account) => {
       const provider = evidence.providers.find((item) => item.id === account.id);
       return <section className="ref-account-card" key={account.id}><div className="ref-account-heading"><span className={"ref-monogram ref-monogram-" + account.id}>{account.mark}</span><div><h2>{account.name}</h2><p>{account.description}</p></div></div>
+        {(account.id === "codex" || account.id === "grok") && <AccountConnection provider={account.id} />}
         <Row title="Contas neste dispositivo" description="O inventário atual não informa contas gerenciadas deste provedor."><Unavailable label={"Adicionar conta " + account.name} reason="Gerenciamento de contas ainda indisponível." /></Row>
         <div className="ref-account-default"><div><strong>Autenticação no cliente</strong><p>Identidade e sessão não consultadas pelo Desktop.</p></div><Badge>Não verificada</Badge></div>
         <div className="ref-account-evidence"><span>{provider ? providerStateLabels[provider.state] : "Cliente não informado nesta consulta"}</span><LinkButton to="agents" onNavigate={onNavigate}>Ver agente e IDE</LinkButton></div>
@@ -225,11 +256,13 @@ function Orchestration({ evidence, onNavigate }: { evidence: Evidence; onNavigat
 }
 
 function Computer({ evidence, onNavigate }: { evidence: Evidence; onNavigate: Navigate }) {
+  const { rows, error } = useSystemPermissions();
   const computer = evidence.computer;
   const state = computer ? ({ bot_control: "Controle do bot informado", human_control: "Controle humano informado", paused: "Pausado no registro", blocked: "Bloqueado no registro" })[computer.state] : "Sessão não informada";
   return <>
     <div className="ref-status-banner"><Glyph name="monitor" size={25} /><div><h2>{computer?.available ? "Controle informado pelo Runtime" : "Controle do computador não confirmado"}</h2><p>{state}. Permissões do sistema são verificadas separadamente.</p></div><Badge>{computer?.available ? "Registro disponível" : "Não verificado"}</Badge></div>
-    <Section title="Permissões necessárias"><Row title="Acessibilidade" icon="shield" description="Inspeção de interfaces e ações em janelas. O Desktop ainda não consulta essa permissão."><Badge>Não consultada</Badge></Row><Row title="Capturas de tela" icon="monitor" description="Captura de janelas para inspeção visual. Nenhuma captura é feita por esta tela."><Badge>Não consultada</Badge></Row><Row title="Acesso do sistema" description="Revise os requisitos antes de permitir automação de aplicativos."><LinkButton to="permissions" onNavigate={onNavigate}>Ver permissões</LinkButton></Row></Section>
+    <Section title="Permissões necessárias"><Row title="Acessibilidade" icon="shield" description="Estado consultado diretamente no macOS para este aplicativo."><Badge>{permissionLabels[rows.find(row => row.id === "accessibility")?.status ?? "unknown"]}</Badge></Row><Row title="Capturas de tela" icon="monitor" description="Consulta de permissão sem iniciar captura."><Badge>{permissionLabels[rows.find(row => row.id === "screen")?.status ?? "unknown"]}</Badge></Row><Row title="Acesso do sistema" description="Revise os requisitos antes de permitir automação de aplicativos."><LinkButton to="permissions" onNavigate={onNavigate}>Ver permissões</LinkButton></Row></Section>
+    {error && <p role="status">{error}</p>}
     <Section title="Ferramentas de Computer Use"><Row title="Skill e sessão" description="Um nome no inventário não comprova skill instalada, permissões concedidas ou controle ativo."><LinkButton to="models" onNavigate={onNavigate}>Ver ferramentas e skills</LinkButton></Row><Row title="Controlar o computador" description="Ações só aparecem no Bot Center quando uma sessão real as autoriza."><LinkButton to="bot" onNavigate={onNavigate}>Abrir controle no Bot Center</LinkButton></Row></Section>
   </>;
 }
@@ -258,7 +291,7 @@ function Mobile({ onNavigate }: { onNavigate: Navigate }) {
 function General({ evidence, onNavigate }: { evidence: Evidence; onNavigate: Navigate }) {
   return <>
     <Section title="Aplicativo"><Row title="Simplicio" icon="settings" description="Configurações locais da interface e identidade do aplicativo."><LinkButton to="settings" onNavigate={onNavigate}>Minha conta</LinkButton></Row><Row title="Aparência e navegação" description="Tema branco, densidade e atalhos de projeto são ajustados na tela Aparência."><LinkButton to="general" onNavigate={onNavigate}>Ajustar aparência</LinkButton></Row><Row title="Ao iniciar" description="A lembrança do último projeto é uma preferência local já disponível."><LinkButton to="general" onNavigate={onNavigate}>Preferências de início</LinkButton></Row></Section>
-    <Section title="Ambiente"><Row title="Runtime" description={"Versão informada: " + evidence.runtimeVersion}><Badge>{evidence.runtimeState}</Badge></Row><Row title="Inicializar junto com o sistema" description="Nenhum serviço de inicialização automática é alterado pelo Desktop."><UnavailableSwitch label="Inicializar junto com o sistema" reason="Ação nativa indisponível." /></Row><Row title="Atualizações do Desktop" description="Use Check for Updates… no menu. A consulta procura um pacote compatível; a instalação continua manual."><Badge>Consulta de metadados</Badge></Row></Section>
+    <Section title="Ambiente"><Row title="Runtime" description={"Versão informada: " + evidence.runtimeVersion}><Badge>{evidence.runtimeState}</Badge></Row><Row title="Inicializar junto com o sistema" description="Nenhum serviço de inicialização automática é alterado pelo Desktop."><UnavailableSwitch label="Inicializar junto com o sistema" reason="Ação nativa indisponível." /></Row><Row title="Atualizações do Desktop" description="Consultar a versão compatível disponível. Download e instalação só começam após sua confirmação."><button type="button" className="button button-secondary" onClick={() => window.dispatchEvent(new Event(DESKTOP_UPDATE_EVENT))}>Verificar atualizações do Desktop</button></Row></Section>
   </>;
 }
 
@@ -381,10 +414,38 @@ const permissionRows = [
 ] as const;
 
 function Permissions({ onNavigate }: { onNavigate: Navigate }) {
+  const { rows, setRows, busy, native, refresh, error } = useSystemPermissions();
+  const [opening, setOpening] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const alive = useRef(false);
+  const actionLock = useRef(false);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  async function review(id: PermissionId) {
+    if (actionLock.current) return;
+    actionLock.current = true; setOpening(id); setMessage("");
+    try {
+      if (["microphone", "camera"].includes(id) && rows.find(row => row.id === id)?.status === "not_determined") {
+        const next = await requestMediaPermission(id);
+        if (alive.current) { setRows(next); setMessage("Resposta do macOS consultada. Nenhuma captura foi iniciada."); }
+        return;
+      }
+      await openPermissionSettings(id);
+      if (alive.current) setMessage("Ajustes do Sistema abertos. A concessão depende da sua escolha no macOS; volte ao app para consultar novamente.");
+    } catch { if (alive.current) setMessage("Não foi possível confirmar a ação no macOS. Consulte as permissões novamente antes de repetir."); }
+    finally { actionLock.current = false; if (alive.current) setOpening(null); }
+  }
   return <>
-    <Notice title="Permissões pertencem ao sistema operacional">O snapshot atual não contém uma consulta nativa de permissões. “Não consultada” não significa permissão negada nem concedida. Abrir esta página não solicita acessos.</Notice>
-    <Section title="Acesso deste aplicativo"><div className="ref-permission-list">{permissionRows.map(([name, description, action]) => <Row key={name} title={name} description={description} icon="shield"><Badge>Não consultada</Badge><Unavailable label={action} reason="Consulta e abertura nativa indisponíveis." /></Row>)}</div></Section>
-    <details className="ref-help-details"><summary>Como revisar manualmente</summary><p>No macOS, revise Privacidade e Segurança nos Ajustes do Sistema. No Windows, consulte Privacidade e segurança nas Configurações. No Linux, verifique as permissões do ambiente gráfico e do empacotamento utilizado. Conceda somente os acessos necessários à ação desejada.</p></details>
+    <Notice title="Permissões deste aplicativo no macOS">Microfone, câmera, tela e acessibilidade são consultados diretamente no sistema, sem iniciar captura. Os demais acessos devem ser revisados nos Ajustes; não existe uma autorização geral que possamos presumir.</Notice>
+    <button type="button" className="button button-secondary" onClick={() => void refresh()} disabled={!native || busy}>{busy ? "Consultando permissões…" : "Consultar permissões do macOS"}</button>
+    {native && <button type="button" className="button button-secondary" onClick={() => void revealPermissionApp().catch(() => setMessage("Não foi possível localizar este aplicativo no Finder."))}>Mostrar este aplicativo no Finder</button>}
+    <p>Esta tela consulta novamente a cada 2 segundos. Se os Ajustes mostram Simplicio autorizado, mas o estado permanece não concedido, confira a cópia exata do aplicativo: outra instalação ou uma recompilação pode ter uma identidade diferente no macOS.</p>
+    {message && <p role="status">{message}</p>}
+    {error && <p role="status">{error}</p>}
+    <Section title="Acesso deste aplicativo"><div className="ref-permission-list">{permissionRows.map(([name, description], index) => {
+      const id = permissionIds[index]; const row = rows.find(item => item.id === id);
+      return <Row key={id} title={name} description={description} icon="shield"><Badge>{permissionLabels[row?.status ?? "unknown"]}</Badge><button className="button button-secondary" type="button" disabled={!row?.canOpenSettings || opening !== null} onClick={() => void review(id)}>{opening === id ? "Aguardando macOS…" : (["microphone", "camera"].includes(id) && row?.status === "not_determined" ? "Solicitar " : "Revisar ") + name.toLowerCase()}</button></Row>;
+    })}</div></Section>
+    <p>Solicitar apresenta a confirmação nativa para microfone ou câmera. Revisar abre o painel específico do macOS; nenhuma ação concede acesso automaticamente. Alguns acessos só aparecem depois que uma funcionalidade os solicita. USB não possui uma permissão única compartilhada com Bluetooth.</p>
     <LinkButton to="computer-use" onNavigate={onNavigate}>Voltar ao uso do computador</LinkButton>
   </>;
 }
@@ -475,9 +536,9 @@ export function ReferenceSettingsScreen({ view, snapshot, onNavigate, onRefresh,
   const screen = REFERENCE_SCREENS.find((item) => item.id === view)!;
   const evidence = createReferenceSettingsEvidence(snapshot);
   return <div className="page reference-settings-page" data-settings-view={view}>
-    <header className="ref-page-heading"><div><span className="ref-eyebrow">{screen.group}</span><h1>{screen.label}</h1><p>{screen.description}</p></div>{onRefresh && <button type="button" className="button button-secondary" onClick={onRefresh} disabled={busy} aria-label="Atualizar consulta do Runtime"><Glyph name="refresh" size={16} />{busy ? "Consultando…" : "Atualizar consulta"}</button>}</header>
+    <header className="ref-page-heading"><div><span className="ref-eyebrow">{screen.group}</span><h1>{screen.label}</h1><p>{screen.description}</p></div>{onRefresh && view !== "permissions" && <button type="button" className="button button-secondary" onClick={onRefresh} disabled={busy} aria-label="Atualizar consulta do Runtime"><Glyph name="refresh" size={16} />{busy ? "Consultando…" : "Atualizar consulta"}</button>}</header>
     {snapshot.source === "preview" && <div className="ref-preview-note" role="note"><Glyph name="attention" size={17} /><span>Prévia visual. Instalação, contas, permissões e conexões deste computador não foram verificadas.</span></div>}
     <Body key={view} view={view} evidence={evidence} onNavigate={onNavigate} />
-    <footer className="ref-evidence-footer"><Glyph name="lock" size={15} /><p>{evidence.source === "runtime" ? "Metadados da consulta ao Runtime: " + evidence.observedAt + ". Abrir esta tela não renova a consulta nem autoriza ações." : "Nenhum estado da prévia é usado como comprovação de conexão ou instalação."}</p></footer>
+    <footer className="ref-evidence-footer"><Glyph name="lock" size={15} /><p>{view === "permissions" ? "Estados de permissão consultados pelo próprio Desktop. Abrir os Ajustes não concede acessos." : evidence.source === "runtime" ? "Metadados da consulta ao Runtime: " + evidence.observedAt + ". Abrir esta tela não renova a consulta nem autoriza ações." : "Nenhum estado da prévia é usado como comprovação de conexão ou instalação."}</p></footer>
   </div>;
 }

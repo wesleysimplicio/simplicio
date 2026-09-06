@@ -21,6 +21,8 @@ async function mockNativeBridge(page: Page, options: { signedOut?: boolean; fail
     const calls: Array<{ command: string; args: Record<string, unknown> }> = [];
     Object.assign(window, { __desktopTestCalls: calls, __TAURI_INTERNALS__: {
       invoke: async (command: string, args: Record<string, unknown> = {}) => {
+          if (command === "desktop_runtime_install_status") return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+          if (command === "desktop_preparation_status") return true;
         calls.push({ command, args });
         if (command === "desktop_login") { await new Promise((resolve) => setTimeout(resolve, 50)); signedOut = false; accessState = options.loginState ?? "active"; return { ...snapshot, access: { ...snapshot.access, state: accessState } }; }
         if (command === "desktop_logout") signedOut = true;
@@ -98,20 +100,20 @@ test("token reports use filtered queries and send only a native report digest fo
   await page.getByRole("combobox", { name: "Período", exact: true }).selectOption("7d");
   await page.getByLabel("Sessão (opcional)").fill("session-test");
   await page.getByLabel("Pasta do projeto (opcional)").fill("/tmp/project with spaces");
-  await page.getByRole("button", { name: "Consultar uso" }).click();
+  await page.getByRole("button", { name: "Consultar uso", exact: true }).click();
   await expect(individual.locator(".token-metric").first()).toContainText("137");
   await page.screenshot({ path: testInfo.outputPath("token-report.png"), fullPage: true });
   const requests = await calls(page, "desktop_token_report");
   expect(requests.at(-1)?.args.request).toMatchObject({ sessionId: "session-test", repoPath: "/tmp/project with spaces" });
   await page.getByRole("button", { name: "Exportar JSON" }).dblclick();
-  await expect(individual.getByRole("status")).toContainText("Exportado para /Downloads/simplicio-token-usage.json");
+  await expect(individual.getByRole("status").filter({ hasText: "Exportado para" })).toContainText("Exportado para /Downloads/simplicio-token-usage.json");
   await page.getByRole("button", { name: "Exportar CSV" }).click();
-  await expect(individual.getByRole("status")).toContainText("Exportado para /Downloads/simplicio-token-usage.csv");
+  await expect(individual.getByRole("status").filter({ hasText: "Exportado para" })).toContainText("Exportado para /Downloads/simplicio-token-usage.csv");
   expect(await calls(page, "desktop_export_token_report")).toEqual(["json", "csv"].map((format) => ({
     command: "desktop_export_token_report", args: { reportHash: `sha256:${"a".repeat(64)}`, format },
   })));
   await page.getByLabel("Pasta do projeto (opcional)").fill("/missing");
-  await page.getByRole("button", { name: "Consultar uso" }).click();
+  await page.getByRole("button", { name: "Consultar uso", exact: true }).click();
   await expect(individual.getByRole("alert")).toContainText("não significa consumo zero");
   await expect(individual.locator(".token-metric")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Exportar JSON" })).toHaveCount(0);
@@ -153,9 +155,9 @@ test("guided setup follows reviewed Runtime operations without fake progress or 
   await page.goto("/");
   await page.getByRole("button", { name: "Configurações", exact: true }).click();
   await page.getByRole("button", { name: "Instalação guiada", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Um bom começo." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Install Now", exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("setup-welcome.png"), fullPage: true });
-  await page.getByRole("button", { name: "Configurar Simplicio" }).click();
+  await page.getByRole("button", { name: "Install Now" }).click();
   await expect(page.getByRole("heading", { name: "Tudo pronto para revisar." })).toBeVisible();
   expect(await calls(page, "desktop_apply_host_plugins")).toHaveLength(0);
   await expect(page.getByRole("progressbar")).toHaveAttribute("value", "2");
@@ -186,12 +188,12 @@ test("guided setup follows reviewed Runtime operations without fake progress or 
 test("guided setup can be abandoned before consent and failure only offers a new review (mocked IPC)", async ({ page }, testInfo) => {
   await mockNativeBridge(page, { failSetup: true });
   await page.goto("/?view=setup");
-  await page.getByRole("button", { name: "Configurar Simplicio" }).click();
+  await page.getByRole("button", { name: "Install Now" }).click();
   await page.getByRole("button", { name: "Voltar ao app" }).click();
   expect(await calls(page, "desktop_apply_host_plugins")).toHaveLength(0);
   await page.getByRole("button", { name: "Configurações", exact: true }).click();
   await page.getByRole("button", { name: "Instalação guiada", exact: true }).click();
-  await page.getByRole("button", { name: "Configurar Simplicio" }).click();
+  await page.getByRole("button", { name: "Install Now" }).click();
   await page.getByRole("checkbox", { name: /Autorizo o Runtime/ }).check();
   await page.getByRole("button", { name: "Instalar e conectar" }).click();
   await expect(page.getByRole("heading", { name: "Não foi possível concluir." })).toBeVisible();
@@ -208,7 +210,7 @@ test("guided setup can be abandoned before consent and failure only offers a new
 test("the canonical apply result completes without an automatic snapshot, plan or verification call (mocked IPC)", async ({ page }) => {
   await mockNativeBridge(page);
   await page.goto("/?view=setup");
-  await page.getByRole("button", { name: "Configurar Simplicio" }).click();
+  await page.getByRole("button", { name: "Install Now" }).click();
   await page.getByRole("checkbox", { name: /Autorizo o Runtime/ }).check();
   await page.getByRole("button", { name: "Instalar e conectar" }).click();
   await expect(page.getByRole("heading", { name: "Configuração concluída", exact: true })).toBeVisible();
@@ -226,7 +228,7 @@ test("login never bypasses inactive or unknown entitlement into guided installat
     await page.getByRole("button", { name: "Começar", exact: true }).click();
     await page.getByRole("button", { name: /Continuar com Google/ }).click();
     await expect(page.getByRole("heading", { name: state === "inactive" ? "Ative o Simplicio" : "Tente novamente" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Configurar Simplicio" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Install Now" })).toHaveCount(0);
     expect(await calls(page, "desktop_apply_host_plugins")).toHaveLength(0);
     expect(await calls(page, "desktop_reconcile_host_plugins")).toHaveLength(0);
     await context.close();

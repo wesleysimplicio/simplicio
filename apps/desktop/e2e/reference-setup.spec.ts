@@ -16,6 +16,8 @@ test("guided setup keeps progress and consent-controlled actions visible in a sh
   await page.addInitScript(({ snapshot, plan, operation }) => {
     Object.assign(window, { __referenceApplyCount: 0, __TAURI_INTERNALS__: {
       invoke: async (command: string) => {
+          if (command === "desktop_runtime_install_status") return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+          if (command === "desktop_preparation_status") return true;
         if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
         if (command === "desktop_plan_integrations") return plan;
         if (command === "desktop_apply_host_plugins") {
@@ -32,7 +34,11 @@ test("guided setup keeps progress and consent-controlled actions visible in a sh
   }, { snapshot, plan, operation });
   await page.setViewportSize({ width: 960, height: 600 });
   await page.goto("/?view=setup");
-  await page.getByRole("button", { name: "Configurar Simplicio", exact: true }).click();
+  await expect(page.getByRole("img", { name: "Simplicio", exact: true })).toBeVisible();
+  await expect(page.locator(".setup-welcome button")).toHaveCount(1);
+  await expect(page.locator(".setup-welcome h1, .setup-welcome p, .setup-wordmark, .entry-footer, .entry-header")).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath("setup-logo-only.png") });
+  await page.getByRole("button", { name: "Install Now", exact: true }).click();
   const apply = page.getByRole("button", { name: "Instalar e conectar", exact: true });
   const progress = page.getByRole("progressbar");
   await expect(apply).toBeInViewport();

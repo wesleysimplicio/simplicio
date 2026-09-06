@@ -85,6 +85,8 @@ test("the status bar separates configuration records from confirmed MCP connecti
   }));
   await page.addInitScript((snapshot) => {
     Object.assign(window, { __TAURI_INTERNALS__: { invoke: async (command: string) => {
+          if (command === "desktop_runtime_install_status") return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+          if (command === "desktop_preparation_status") return true;
       if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
       if (command === "plugin:event|listen") return 1;
       if (command === "plugin:event|unlisten") return;
@@ -93,11 +95,11 @@ test("the status bar separates configuration records from confirmed MCP connecti
   }, snapshot);
   await page.goto("/");
   const status = page.getByRole("contentinfo", { name: "Estado do Simplicio", exact: true });
-  await expect(status).toContainText("0 MCP confirmados");
-  await expect(status).toContainText("2 registros detectados");
+  await expect(status).toContainText("2 instalados");
+  await expect(status).toContainText("2 registrados · 0 confirmados");
   await expect(status).not.toContainText("MCP ativos");
-  const connection = status.getByRole("button", { name: /0 MCP confirmados/ });
-  await expect(connection).toHaveAttribute("title", /não prova que o cliente está desconectado/);
+  const connection = status.getByRole("button", { name: /2 instalados/ });
+  await expect(connection).toHaveAttribute("title", /estado da conexão permanece não verificado/);
   await connection.click();
   await expect(page.getByRole("heading", { name: "Integrações MCP", exact: true })).toBeVisible();
 });

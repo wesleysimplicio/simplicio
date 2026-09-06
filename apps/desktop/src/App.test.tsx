@@ -19,7 +19,7 @@ describe("Simplicio Desktop product states", () => {
     expect(html).not.toContain("Continuar com Google");
     const login = renderToStaticMarkup(<SignInScreen initialStep="login" busy={false} error={null} onLogin={() => undefined} />);
     expect(login).toContain("Continuar com Google");
-    expect(login).toContain("Nenhuma senha passa pelo app");
+    expect(login).toContain('alt="Simplicio"');
     expect(login).not.toContain('type="password"');
     expect(login).not.toContain('type="email"');
   });
@@ -92,7 +92,8 @@ describe("Simplicio Desktop product states", () => {
     snapshot.savings.providerCache.hitPercent = null;
     snapshot.savings.providerCache.proofKind = "unavailable";
     const html = renderToStaticMarkup(<DesktopApp snapshot={snapshot} />);
-    expect(html).toContain("Sem telemetria, sem números presumidos");
+    expect(html).toContain("Ainda sem dados verificados.");
+    expect(html).toContain("Valores indisponíveis aparecem como —, nunca como zero.");
     expect(html).not.toContain("0% telemetria do provider");
   });
 

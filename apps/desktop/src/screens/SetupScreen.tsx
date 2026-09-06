@@ -20,8 +20,8 @@ const HOST_LABELS: Readonly<Record<HostPluginId, string>> = {
   copilot: "GitHub Copilot",
   qwen: "Qwen Code",
   hermes: "Hermes",
-  cursor: "Cursor",
-  kiro: "Kiro",
+  kilo: "Kilo",
+  opencode: "OpenCode",
 };
 
 function resultLabel(host: { status: HostPluginResultStatus }): string {
@@ -163,7 +163,7 @@ export function SetupScreen({ snapshot, busy, applicationError, applicationRecov
             : phase === "installing" ? "Configurando o Simplicio…" : "Reconciliando o recibo…";
 
   return <div className={`setup-layout ${phase === "welcome" ? "setup-intro" : ""}`}>
-    <header className="entry-header"><Brand /><span className="setup-context">{preview ? "Demonstração · sem instalação real" : "Instalação guiada"}</span></header>
+    {(phase !== "welcome" || preview) && <header className="entry-header"><Brand /><span className="setup-context">{preview ? "Demonstração · sem instalação real" : "Instalação guiada"}</span></header>}
     {phase !== "welcome" && <div className="setup-status-header"><div className="setup-status-inner">
       <div className="setup-progress-caption" role="status" aria-atomic="true">
         <span className={"setup-current-stage" + (phase === "failed" ? " is-failed" : "")}>{pending ? <span className="setup-spinner" aria-hidden="true" /> : <Glyph name={phase === "failed" ? "attention" : phase === "complete" ? "check" : "shield"} size={17} />}{currentStage?.label ?? (phase === "review" ? "Aguardando sua confirmação" : "Recibo recebido do Runtime")}</span>
@@ -173,16 +173,11 @@ export function SetupScreen({ snapshot, busy, applicationError, applicationRecov
     </div></div>}
     <main className="setup-main" ref={content}>
       {phase === "welcome" ? <div className="setup-welcome">
-        <img src="/icon.png" width="72" height="72" alt="" />
-        <span className="setup-wordmark">SIMPLICIO</span>
-        <h1>{heading}</h1>
-        <p>Seu Runtime e seus apps,<br />trabalhando juntos.</p>
-        <button className="button entry-primary" type="button" disabled={busy || blockedWithoutReceipt || runtimePending} onClick={() => void prepare()}>Configurar Simplicio<Glyph name="arrow" size={18} /></button>
+        <img src="/icon.png" width="88" height="88" alt="Simplicio" />
+        <button className="button entry-primary" type="button" disabled={busy || blockedWithoutReceipt || runtimePending} onClick={() => void prepare()}>Install Now<Glyph name="arrow" size={18} /></button>
         {(blockedWithoutReceipt || runtimePending) && <><div className="setup-failure setup-recovery-note" role="alert"><strong>{applicationError || "O Runtime possui uma operação de plugin pendente."}</strong><p>Uma leitura de estado não instala, verifica nem reconcilia plugins. A reconciliação abaixo usa somente o identificador escolhido pelo Runtime.</p></div>{reconcileReceiptId
           ? <button className="button button-primary" type="button" disabled={busy} onClick={() => void reconcile()}>Reconciliar recibo</button>
           : <button className="button button-secondary" type="button" disabled={busy} onClick={onDiagnostics}>Abrir diagnóstico</button>}</>}
-        <button className="text-button" type="button" disabled={busy} onClick={onFinish}>Agora não</button>
-        <span className="entry-caption">Primeiro, vamos conferir o que já existe. Login e consultas não instalam plugins.</span>
       </div> : <div className="setup-body">
         <div className={`setup-heading ${phase === "failed" ? "is-failed" : ""}`}>
           <span className="eyebrow">{phase === "complete" ? "Próximo passo: abrir seus clientes" : "Configure uma vez. Use nos seus apps."}</span>
@@ -237,6 +232,5 @@ export function SetupScreen({ snapshot, busy, applicationError, applicationRecov
         </div>
       </div>
     </div></div>}
-    <footer className="entry-footer"><Glyph name="shield" size={14} />Runtime local · Consentimento por digest · Recibo canônico</footer>
   </div>;
 }

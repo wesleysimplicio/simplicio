@@ -114,6 +114,51 @@ pub fn capture(command: &mut Command, limits: CaptureLimits) -> Result<Output, P
     }
 }
 
+/// Read-only Codex account RPC. Never starts a thread/turn or imports credentials.
+pub fn codex_account_limits(command: &mut Command) -> Result<serde_json::Value, &'static str> {
+    use std::io::Write;
+    {
+        let mut pending = PENDING_CHILDREN.lock().unwrap_or_else(|e| e.into_inner());
+        pending.retain_mut(|child| !matches!(child.try_wait(), Ok(Some(_))));
+        if !pending.is_empty() { return Err("cleanup_pending"); }
+    }
+    let mut child = command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null())
+        .spawn().map_err(|_| "cli_unavailable")?;
+    let result = (|| {
+        let mut input = child.stdin.take().ok_or("rpc_failed")?;
+        let mut output = child.stdout.take().ok_or("rpc_failed")?;
+        pipe::prepare(&output).map_err(|_| "rpc_failed")?;
+        input.write_all(b"{\"id\":1,\"method\":\"initialize\",\"params\":{\"clientInfo\":{\"name\":\"simplicio_desktop\",\"version\":\"1.0.0\"}}}\n").map_err(|_| "rpc_failed")?;
+        let start = Instant::now();
+        let mut bytes = Vec::new();
+        let mut eof = false;
+        let mut offset = 0;
+        let mut initialized = false;
+        loop {
+            if start.elapsed() > Duration::from_secs(15) { return Err("timeout"); }
+            drain_one(&mut output, &mut bytes, &mut eof, 256 * 1024, FailureKind::StdoutLimit).map_err(|_| "rpc_output_invalid")?;
+            while let Some(end) = bytes[offset..].iter().position(|b| *b == b'\n') {
+                let end = offset + end;
+                let message = serde_json::from_slice::<serde_json::Value>(&bytes[offset..end]);
+                offset = end + 1;
+                let Ok(message) = message else { continue; };
+                if message["id"] == 1 && !initialized {
+                    if message.get("error").is_some() { return Err("rpc_initialize_failed"); }
+                    initialized = true;
+                    input.write_all(b"{\"method\":\"initialized\",\"params\":{}}\n{\"id\":2,\"method\":\"account/rateLimits/read\",\"params\":{}}\n").map_err(|_| "rpc_failed")?;
+                } else if initialized && message["id"] == 2 {
+                    if message.get("error").is_some() { return Err("account_unavailable"); }
+                    return message.get("result").cloned().ok_or("rpc_output_invalid");
+                }
+            }
+            if eof || matches!(child.try_wait(), Ok(Some(_))) { return Err("rpc_exited"); }
+            std::thread::sleep(POLL_INTERVAL);
+        }
+    })();
+    if settle_owned_child(child) != ChildState::Reaped { return Err("cleanup_pending"); }
+    result
+}
+
 fn settle_owned_child(mut child: Child) -> ChildState {
     // Pipe readers are already dropped. Do not wait for a descendant to close
     // an inherited descriptor, and never leave an unbounded reader thread.

@@ -27,6 +27,8 @@ async function mockReadonlyRuntime(page: Page, snapshot: DesktopSnapshot) {
       __TAURI_INTERNALS__: {
         transformCallback: () => ++callbackId,
         invoke: async (command: string) => {
+          if (command === "desktop_runtime_install_status") return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+          if (command === "desktop_preparation_status") return true;
           calls.push(command);
           if (command === "plugin:event|listen") return ++callbackId;
           if (command === "plugin:event|unlisten") return;
@@ -79,7 +81,7 @@ test("reference capability surfaces are white, distinct, and honest about unavai
     expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
     await page.screenshot({ path: testInfo.outputPath("reference-" + view.id + "-white.png") });
   }
-  await expect(page.getByRole("button", { name: "Solicitar microfone", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Revisar microfone", exact: true })).toBeDisabled();
   await page.goto("/?view=voice");
   await expect(page.getByRole("switch", { name: "Ativar ditado por voz", exact: true })).toBeDisabled();
   await expect(page.getByRole("combobox", { name: "Modelo de voz", exact: true })).toBeDisabled();
@@ -107,7 +109,7 @@ test("plugin catalog search and evidence tabs work without pretending packages a
   await page.goto("/?view=plugins");
   const panel = page.locator(".reference-settings-page");
   const search = panel.getByRole("searchbox", { name: "Buscar plugins e skills", exact: true });
-  await expect(panel.locator(".ref-plugin-card")).toHaveCount(5);
+  await expect(panel.locator(".ref-plugin-card")).toHaveCount(4);
   await search.fill("hermes");
   await expect(panel.locator(".ref-plugin-card")).toHaveCount(1);
   await expect(panel.getByRole("heading", { name: "Simplicio Hermes", exact: true })).toBeVisible();
@@ -120,7 +122,7 @@ test("plugin catalog search and evidence tabs work without pretending packages a
   await expect(panel.getByRole("button", { name: "Skills informadas", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(panel.getByRole("heading", { name: "Nenhuma skill informada nesta consulta", exact: true })).toBeVisible();
   await panel.getByRole("button", { name: "Catálogo público", exact: true }).click();
-  await expect(panel.locator(".ref-plugin-card")).toHaveCount(5);
+  await expect(panel.locator(".ref-plugin-card")).toHaveCount(4);
   await panel.getByRole("button", { name: "Revisar plano MCP", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Integrações MCP", exact: true, level: 1 })).toBeVisible();
 });
@@ -150,12 +152,13 @@ test("read-only evidence is escaped and refresh never dispatches unsupported set
   await expect(panel.getByText("Skill de teste", { exact: true })).toBeVisible();
   await expect(panel.getByText(malicious, { exact: true })).toBeVisible();
   await sidebar.getByRole("button", { name: "Permissões do sistema", exact: true }).click();
-  await expect(panel.getByRole("button", { name: "Solicitar microfone", exact: true })).toBeDisabled();
-  await panel.getByRole("button", { name: "Solicitar microfone", exact: true }).evaluate((button) => (button as HTMLButtonElement).click());
+  await expect(panel.getByRole("button", { name: "Revisar microfone", exact: true })).toBeDisabled();
+  await panel.getByRole("button", { name: "Revisar microfone", exact: true }).evaluate((button) => (button as HTMLButtonElement).click());
+  await sidebar.getByRole("button", { name: "Comandos rápidos", exact: true }).click();
   await panel.getByRole("button", { name: "Atualizar consulta do Runtime", exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as SettingsTestWindow).__referenceCalls.filter((command) => command === "refresh_desktop_snapshot").length)).toBe(1);
   const calls = await page.evaluate(() => (window as SettingsTestWindow).__referenceCalls);
-  expect(calls.every((command) => ["desktop_snapshot", "refresh_desktop_snapshot", "plugin:event|listen", "plugin:event|unlisten"].includes(command))).toBe(true);
+  expect(calls.every((command) => ["desktop_snapshot", "refresh_desktop_snapshot", "desktop_permissions", "desktop_provider_quotas", "desktop_unified_usage", "desktop_session_close_idle", "plugin:app|version", "desktop_update_target", "plugin:event|listen", "plugin:event|unlisten"].includes(command))).toBe(true);
   expect(external).toEqual([]);
 });
 

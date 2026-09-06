@@ -176,6 +176,7 @@ export interface BotSessionProjection {
   tokenUsage: {
     input: number | null;
     output: number | null;
+    reasoning: number | null;
     cached: number | null;
     proofKind: "measured" | "unavailable";
   };

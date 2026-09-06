@@ -1,4 +1,12 @@
 import { describe, expect, it } from "vitest";
+import shippedPlan from "./runtime-host-plugin-plan.fixture.json";
+
+it("accepts the host matrix observed from the bundled Runtime 3.8.47", () => {
+  const result = parseIntegrationPlan(shippedPlan);
+  expect(result.hosts.map(row => row.host)).toContain("kilo");
+  expect(result.hosts.map(row => row.host)).toContain("opencode");
+  expect(result.hosts).toHaveLength(8);
+});
 import {
   HOST_PLUGIN_IDS,
   createPreviewIntegrationPlan,

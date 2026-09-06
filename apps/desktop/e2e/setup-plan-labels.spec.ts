@@ -15,6 +15,8 @@ test("guided setup labels all eight Runtime host dispositions without inventing 
   await page.addInitScript(({ snapshot, plan }) => {
     Object.assign(window, { __TAURI_INTERNALS__: {
       invoke: async (command: string) => {
+          if (command === "desktop_runtime_install_status") return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+          if (command === "desktop_preparation_status") return true;
         if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
         if (command === "desktop_plan_integrations") return plan;
         if (command === "plugin:event|listen") return 1;
@@ -25,7 +27,7 @@ test("guided setup labels all eight Runtime host dispositions without inventing 
   }, { snapshot, plan });
 
   await page.goto("/?view=setup");
-  await page.getByRole("button", { name: "Configurar Simplicio", exact: true }).click();
+  await page.getByRole("button", { name: "Install Now", exact: true }).click();
   const planRegion = page.getByRole("region", { name: "Plano de instalação", exact: true });
   for (const [label, status] of [
     ["Codex", "Pronto para configurar"],

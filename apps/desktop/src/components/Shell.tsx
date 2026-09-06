@@ -1,3 +1,4 @@
+import { ProviderUsage } from "./ProviderUsage";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { DesktopSnapshot } from "../contracts";
 import { Brand, Glyph, type GlyphName } from "./Brand";
@@ -71,6 +72,7 @@ export function Shell({ children, snapshot, view, route, onViewChange, workbench
   const drawerOpen = narrow && !collapsed;
   const inSettings = isSettingsView(view);
   const status = runtimeSummary(snapshot);
+  const installedProviders = snapshot.providers.filter((provider) => provider.installState === "installed").length;
   const registrations = snapshot.providers.filter((provider) => provider.registrationState === "registered").length;
   const selected = workbench.projects.find((project) => project.id === workbench.selectedProjectId);
   const modifier = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
@@ -263,9 +265,10 @@ export function Shell({ children, snapshot, view, route, onViewChange, workbench
       <footer className="workbench-status" aria-label="Estado do Simplicio" inert={drawerOpen}>
         <button type="button" onClick={() => selectView("diagnostics")} title="Abrir diagnóstico do Runtime"><span className={"status-dot " + (status.healthy ? "online" : "offline")} />{status.label}<span className="status-version">v{snapshot.runtime.version || "—"}</span></button>
         {snapshot.source === "preview" && <span className="preview-badge">Demonstração</span>}
+        <ProviderUsage onAccounts={() => selectView("provider-accounts")} onHistory={() => selectView("tokens")} />
         <span className="status-spacer" />
         <button className="status-savings" type="button" onClick={() => selectView("tokens")}><Glyph name="spark" size={14} />{status.measuredSavings === null ? "Economia sem medição" : status.measuredSavings.toLocaleString("pt-BR") + " tokens poupados"}</button>
-        <button type="button" onClick={() => selectView("providers")} title={`${registrations} registros detectados. A conexão exige registro e handshake atuais; a ausência de confirmação não prova que o cliente está desconectado.`}><Glyph name="providers" size={14} />{status.connected} MCP {status.connected === 1 ? "confirmado" : "confirmados"}<span className="status-registrations">· {registrations} {registrations === 1 ? "registro detectado" : "registros detectados"}</span></button>
+        <button type="button" onClick={() => selectView("providers")} title={`${installedProviders} clientes instalados; ${registrations} registros encontrados; ${status.connected} handshakes confirmados. Sem handshake recente, o estado da conexão permanece não verificado.`}><Glyph name="providers" size={14} />{installedProviders} {installedProviders === 1 ? "instalado" : "instalados"}<span className="status-registrations">· {registrations} {registrations === 1 ? "registrado" : "registrados"} · {status.connected} {status.connected === 1 ? "confirmado" : "confirmados"}</span></button>
         <span className="status-host"><Glyph name="monitor" size={14} />Este computador</span>
       </footer>
     </div>

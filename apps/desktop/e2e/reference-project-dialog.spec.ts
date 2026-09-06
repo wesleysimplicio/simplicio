@@ -13,6 +13,8 @@ test("choosing a native folder fills a reviewable path without adding a project 
   await page.addInitScript(({ snapshot, project }) => {
     Object.assign(window, { __TAURI_INTERNALS__: {
       invoke: async (command: string) => {
+          if (command === "desktop_runtime_install_status") return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+          if (command === "desktop_preparation_status") return true;
         if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
         if (command === "plugin:dialog|open") return project.path;
         if (command === "desktop_validate_project") return project;
@@ -45,6 +47,8 @@ test("canceling the system picker preserves the typed path and restores focus wi
     const calls: string[] = [];
     Object.assign(window, { __referenceFolderCalls: calls, __TAURI_INTERNALS__: {
       invoke: async (command: string) => {
+          if (command === "desktop_runtime_install_status") return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+          if (command === "desktop_preparation_status") return true;
         calls.push(command);
         if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
         if (command === "plugin:dialog|open") return new Promise<string | null>((resolve) => {

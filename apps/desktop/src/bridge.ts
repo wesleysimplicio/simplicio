@@ -33,6 +33,8 @@ import {
   type RuntimeInstallStatus,
 } from "./runtime_install";
 import { parseRuntimeLifecycleReceipt, type RuntimeLifecycleAction, type RuntimeLifecycleReceipt } from "./runtime_lifecycle";
+import { parseIdleSessionFinalization, IDLE_SESSION_TIMEOUT_MS, type IdleSessionFinalization } from "./session_idle";
+import { parsePreparationResult, type PreparationResult } from "./runtime_preparation_result";
 
 const readSnapshot = createReadonlyRequest<DesktopSnapshot>(30_000, "desktop_snapshot_timeout");
 const readContext = createContextReader((repoPath) => invoke<unknown>("desktop_context_report", { repoPath: repoPath || null }));
@@ -64,6 +66,26 @@ export function exportDesktopUnifiedUsage(
   format: "json" | "csv",
 ): string {
   return exportUnifiedUsageProjection(projection, format);
+}
+
+export async function closeIdleDesktopSessions(options: {
+  nowEpochMs?: number;
+  idleMs?: number;
+  profileId?: string;
+  workspaceId?: string;
+} = {}): Promise<IdleSessionFinalization> {
+  if (!isTauri()) throw new Error("preview_no_runtime");
+  const value = await withTimeout(
+    invoke<unknown>("desktop_session_close_idle", {
+      nowEpochMs: options.nowEpochMs ?? null,
+      idleMs: options.idleMs ?? IDLE_SESSION_TIMEOUT_MS,
+      profileId: options.profileId ?? null,
+      workspaceId: options.workspaceId ?? null,
+    }),
+    60_000,
+    "session_idle_finalization_timeout",
+  );
+  return parseIdleSessionFinalization(value);
 }
 
 export async function exportDesktopUnifiedUsageReport(
@@ -183,6 +205,22 @@ export async function loadDesktopSnapshot(): Promise<DesktopSnapshot> {
  * expose this command yet; callers keep the last state and surface the
  * capability error instead of showing a false zero.
  */
+/** Poll the supported Runtime ledger snapshot; this is not provider quota telemetry. */
+export async function pullDesktopUsageSnapshot(
+  cursor: UsageChangefeedState = createUsageChangefeedState(),
+): Promise<UsageChangefeedState> {
+  const projection = await loadDesktopUnifiedUsage();
+  return {
+    ...cursor,
+    connection: "live",
+    projection,
+    cost_projection: null,
+    last_event_at_epoch: projection.generated_at_epoch || null,
+    reason_code: projection.metadata.coverage.status === "no_data"
+      ? "usage_snapshot_no_data" : "usage_snapshot_observed",
+  };
+}
+
 export async function pullDesktopUsageChangefeed(
   cursor: UsageChangefeedState = createUsageChangefeedState(),
 ): Promise<UsageChangefeedState> {
@@ -199,6 +237,30 @@ export async function installDesktopRuntime(): Promise<RuntimeInstallResult> {
   // This is a native, atomic side effect. The frontend never times it out or
   // retries it; the command itself owns locking, rollback, and verification.
   return parseRuntimeInstallResult(await invoke<unknown>("desktop_install_runtime"));
+}
+
+export async function prepareDesktopRuntimeEnvironment(): Promise<PreparationResult> {
+  if (!isTauri()) {
+    return parsePreparationResult({
+      schema: "simplicio.desktop-preparation-result/v1",
+      status: "ready",
+      effectsApplied: true,
+      runtimeDependencies: { status: "ready", pythonRequired: false },
+      python: { status: "not_detected", dependenciesVerified: false },
+      memory: { ready: true, items: 100, skills: 50, migrations: 1 },
+      clients: { configured: 0, skipped: 0 },
+      redacted: true,
+    });
+  }
+  // One explicit native effect. Runtime owns migrations, seeds and detected
+  // client registration; the frontend neither times out nor retries it.
+  return parsePreparationResult(await invoke<unknown>("desktop_prepare_runtime_environment"));
+}
+
+export async function loadDesktopPreparationStatus(): Promise<boolean> {
+  // The browser preview uses a canonical demo snapshot; only native builds need a persisted receipt.
+  if (!isTauri()) return true;
+  return invoke<boolean>("desktop_preparation_status");
 }
 
 export async function reconcileDesktopRuntimeInstall(): Promise<RuntimeInstallReconciliation> {

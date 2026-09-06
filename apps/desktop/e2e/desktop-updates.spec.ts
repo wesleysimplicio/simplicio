@@ -9,6 +9,9 @@ type UpdatesWindow = Window & {
   __updatesResolveOpen: (index: number) => void;
   __updatesRejectOpen: (index: number) => void;
   __updatesResolveVersion: () => void;
+  __updatesState: Record<string, unknown>;
+  __updatesRejectDownload: () => void;
+  __updatesCompleteDownload: () => void;
 };
 
 async function mockUpdates(page: Page, options: { holdVersion?: boolean; version?: string; notes?: string } = {}) {
@@ -26,6 +29,7 @@ async function mockUpdates(page: Page, options: { holdVersion?: boolean; version
     Object.assign(window, {
       isTauri: true,
       __updatesCalls: calls,
+      __updatesState: { state: "idle" },
       __updatesListeners: () => [...listeners.values()].filter((entry) => entry.event === eventName).length,
       __updatesMenu: () => {
         for (const [id, entry] of listeners) {
@@ -47,6 +51,23 @@ async function mockUpdates(page: Page, options: { holdVersion?: boolean; version
           }
           if (command === "plugin:event|unlisten") return;
           if (command === "plugin:app|version") return holdVersion ? new Promise<string>((resolve) => versions.push(resolve)) : options.version ?? "3.8.39";
+          if (command === "desktop_runtime_install_status") return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+          if (command === "desktop_preparation_status") return true;
+          if (command === "desktop_update_status") return (window as UpdatesWindow).__updatesState;
+          if (command === "desktop_update_download") {
+            const current = { id: "update-test", version: String(args.version), tag: String(args.tag),
+              asset_name: String(args.assetName), asset_bytes: Number(args.assetBytes), received_bytes: 20_000, state: "downloading" };
+            (window as UpdatesWindow).__updatesState = current;
+            return new Promise((resolve, reject) => {
+              (window as UpdatesWindow).__updatesRejectDownload = () => reject("update_download_failed");
+              (window as UpdatesWindow).__updatesCompleteDownload = () => {
+                const ready = { ...current, state: "ready", received_bytes: current.asset_bytes };
+                (window as UpdatesWindow).__updatesState = ready;
+                resolve(ready);
+              };
+            });
+          }
+          if (command === "desktop_update_install") return { id: args.updateId, state: "awaiting_health" };
           if (command === "desktop_update_target") return { platform: "macos", arch: "arm64" };
           if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
           if (command === "desktop_open_releases") return new Promise<void>((resolve, reject) => openers.push({ resolve, reject: () => reject(new Error("mock opener failed")) }));
@@ -66,6 +87,15 @@ async function mockUpdates(page: Page, options: { holdVersion?: boolean; version
   await page.goto("/");
   await expect.poll(() => page.evaluate(() => (window as UpdatesWindow).__updatesListeners())).toBe(1);
 }
+
+test("General settings opens the same updater without starting a download", async ({ page }) => {
+  await mockUpdates(page);
+  await page.goto("/?view=general-settings");
+  await page.getByRole("button", {name:"Verificar atualizações do Desktop", exact:true}).click();
+  await expect(page.getByRole("dialog")).toHaveAttribute("data-update-state", "available");
+  const effects = await page.evaluate(() => (window as UpdatesWindow).__updatesCalls.filter(call => ["desktop_update_download", "desktop_update_install"].includes(call.command)));
+  expect(effects).toEqual([]);
+});
 
 async function showUpdates(page: Page) {
   await page.evaluate(() => (window as UpdatesWindow).__updatesMenu());
@@ -118,7 +148,7 @@ test("closing a pending opener preserves uncertainty on reopen and ignores its l
   await expect(page.getByRole("dialog")).toHaveAttribute("data-update-state", "available");
 });
 
-test("shows a white manual-update dialog and public release notes only as inert text (mocked IPC/metadata)", async ({ page }, testInfo) => {
+test("shows a white native-update dialog and public release notes only as inert text (mocked IPC/metadata)", async ({ page }, testInfo) => {
   const requests: string[] = [];
   page.on("request", (request) => requests.push(request.url()));
   const notes = "## Mudanças\n<img src='https://untrusted.invalid/pixel' onerror='alert(1)'>\n[Download](javascript:alert(1))\n<script>alert(1)</script>";
@@ -126,8 +156,8 @@ test("shows a white manual-update dialog and public release notes only as inert 
   await showUpdates(page);
   const dialog = page.getByRole("dialog");
   await expect(dialog).toHaveCSS("background-color", "rgb(255, 255, 255)");
-  await expect(dialog).toContainText("Download e instalação manuais");
-  await expect(dialog).toContainText("Localize a release v3.8.40 e o pacote acima");
+  await expect(dialog).toContainText("Atualização verificada pela distribuição");
+  await expect(dialog.getByRole("button", { name: "Baixar e verificar" })).toBeEnabled();
   await expect(dialog).toContainText("97,7 KiB");
   await expect(dialog.locator("time")).toHaveAttribute("datetime", "2026-08-31T01:34:29Z");
   await expect(dialog.locator("time")).toHaveText("31/08/2026");
@@ -220,4 +250,63 @@ test("offline checks remain unknown and only retry after the user reconnects and
   await expect(page.getByRole("dialog")).toHaveAttribute("data-update-state", "offline");
   await page.getByRole("button", { name: "Verificar novamente", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveAttribute("data-update-state", "available");
+});
+
+test("background check offers a dismissible notice without opening a modal or downloading", async ({ page }) => {
+  await mockUpdates(page);
+  await page.clock.fastForward(5_001);
+  const notice = page.getByRole("status", { name: "Atualização disponível", exact: true });
+  await expect(notice).toContainText("Simplicio 3.8.40 disponível");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect(await page.evaluate(() => (window as UpdatesWindow).__updatesCalls.filter(call => call.command === "desktop_update_download"))).toHaveLength(0);
+  await notice.getByRole("button", { name: "Ver atualização" }).click();
+  await expect(page.getByRole("dialog")).toHaveAttribute("data-update-state", "available");
+});
+
+test("download failure stays visible across stale polling and can explicitly resume", async ({ page }) => {
+  await mockUpdates(page);
+  await showUpdates(page);
+  await page.getByRole("button", { name: "Baixar e verificar", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Baixando atualização…" })).toBeVisible();
+  await page.clock.fastForward(1_501);
+  await expect(page.getByRole("progressbar", { name: "Progresso do download" })).toHaveAttribute("value", "20");
+  await page.evaluate(() => (window as UpdatesWindow).__updatesRejectDownload());
+  await expect(page.getByRole("dialog")).toHaveAttribute("data-update-action", "error");
+  await page.clock.fastForward(6_001);
+  await expect(page.getByRole("dialog")).toHaveAttribute("data-update-action", "error");
+  await expect(page.getByRole("alert")).toContainText("O download falhou");
+  await page.getByRole("button", { name: "Retomar download", exact: true }).click();
+  await page.evaluate(() => (window as UpdatesWindow).__updatesCompleteDownload());
+  await expect(page.getByRole("heading", { name: "Atualização pronta para instalar" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Instalar e reiniciar", exact: true })).toBeEnabled();
+});
+
+test("closing and reopening during a download cannot duplicate its effect", async ({ page }) => {
+  await mockUpdates(page);
+  await showUpdates(page);
+  await page.getByRole("button", { name: "Baixar e verificar", exact: true }).click();
+  await page.getByRole("button", { name: "Fechar atualizações", exact: true }).click();
+  await page.evaluate(() => (window as UpdatesWindow).__updatesMenu());
+  await expect(page.getByRole("dialog")).toHaveAttribute("data-update-action", "downloading");
+  await expect(page.getByRole("button", { name: "Verificar novamente" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Baixar e verificar", exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => (window as UpdatesWindow).__updatesCalls.filter(call => call.command === "desktop_update_download"))).toHaveLength(1);
+  await page.evaluate(() => (window as UpdatesWindow).__updatesCompleteDownload());
+  await page.getByRole("button", { name: "Instalar e reiniciar", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Confirmando reinicialização" })).toBeVisible();
+  expect(await page.evaluate(() => (window as UpdatesWindow).__updatesCalls.filter(call => call.command === "desktop_update_install"))).toEqual([{ command: "desktop_update_install", args: { updateId: "update-test" } }]);
+});
+
+test("polling never promotes a package from another release to installable", async ({ page }) => {
+  await mockUpdates(page);
+  await page.evaluate(() => {
+    (window as UpdatesWindow).__updatesState = {
+      id: "old-package", state: "ready", version: "3.8.38", tag: "v3.8.38",
+      asset_name: "Simplicio-3.8.38-arm64.dmg", asset_bytes: 100_000, received_bytes: 100_000,
+    };
+  });
+  await showUpdates(page);
+  await page.clock.fastForward(3_001);
+  await expect(page.getByRole("dialog")).toHaveAttribute("data-update-action", "idle");
+  await expect(page.getByRole("button", { name: "Instalar e reiniciar" })).toHaveCount(0);
 });

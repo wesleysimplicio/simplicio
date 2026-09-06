@@ -39,6 +39,8 @@ async function nativeSettings(page: Page) {
         unregisterCallback: () => undefined,
         metadata: { currentWindow: { label: "main" }, currentWebview: { label: "main" } },
         invoke: async (command: string, args: Record<string, unknown> = {}) => {
+          if (command === "desktop_runtime_install_status") return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+          if (command === "desktop_preparation_status") return true;
           calls.push({ command, args });
           if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
           // No auto-selected discovery candidate may hide a lost report scope.

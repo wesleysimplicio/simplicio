@@ -27,8 +27,8 @@ describe("reference settings route coverage", () => {
     expect(html).toContain('data-settings-view="' + screen.id + '"');
     expect(html).toContain("<h2>");
     expect(html).toContain("Prévia visual.");
-    expect(html).toContain('aria-label="Atualizar consulta do Runtime"');
-    expect(html).toContain("Nenhum estado da prévia é usado como comprovação");
+    expect(html).toContain(screen.id === "permissions" ? "Consultar permissões do macOS" : 'aria-label="Atualizar consulta do Runtime"');
+    expect(html).toContain(screen.id === "permissions" ? "Abrir os Ajustes não concede acessos." : "Nenhum estado da prévia é usado como comprovação");
     expect(html).not.toContain("voce@example.com");
     expect(html).not.toContain("window.open");
     expect(html).not.toMatch(/<input[^>]+type="(?:password|email|url)"/);
@@ -39,7 +39,7 @@ describe("reference settings route coverage", () => {
     const html = markup(screen.id, snapshot(true));
     expect(html).toContain("<h1>" + screen.label + "</h1>");
     expect(html).not.toContain("Prévia visual.");
-    expect(html).toContain("Abrir esta tela não renova a consulta nem autoriza ações.");
+    expect(html).toContain(screen.id === "permissions" ? "Abrir os Ajustes não concede acessos." : "Abrir esta tela não renova a consulta nem autoriza ações.");
     expect(html).not.toContain("voce@example.com");
     expect(html).not.toContain("storage.setItem");
   });
@@ -75,7 +75,7 @@ describe("reference settings route coverage", () => {
     const html = markup("permissions", value);
     expect(html).toContain("Não consultada");
     expect(html).not.toMatch(/>Concedida<|>Negada<|GRANTED|DENIED/);
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Solicitar microfone<\/button>/);
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Revisar microfone<\/button>/);
     expect(markup("computer-use", value)).toContain("Permissões do sistema são verificadas separadamente.");
   });
 
