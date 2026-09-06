@@ -66,6 +66,26 @@ are not part of the signed Runtime update manifest because they are consumed
 by the Desktop distribution path. The release record must include their exact
 filename, SHA-256, size, and platform signing/notarization status.
 
+### Current Desktop v3.8.47 companion
+
+The public `v3.8.47` release contains the macOS Apple Silicon DMG below. Its
+checksum is published separately in `DESKTOP-SHA256SUMS`; do not add it to the
+Runtime `SHA256SUMS` or signed update manifest, and do not overwrite the existing
+immutable Runtime metadata asset.
+
+| Asset | Bytes | SHA-256 | Platform status |
+| --- | ---: | --- | --- |
+| `Simplicio-3.8.47-arm64.dmg` | 41,242,676 | `9c8b02e8b804ddcf992c26f5d156ab0261fe498bee30237727d74abbbc38d779` | ad-hoc; Developer ID/notarization unavailable |
+
+The downloaded DMG's `Contents/MacOS/simplicio` matches the public
+`simplicio-macos-arm64` Runtime asset at SHA-256
+`529ab8130222b93953485d5fe7c49cddfa29767c6a7db60cdd4f5db88a1ac053`, and the
+Runtime Ed25519 signature is verified. The release metadata does not carry the
+Desktop source revision, so none is inferred. Windows Desktop is not published
+for this release; its CLI installer remains the supported Windows path. Full
+gate status and unexecuted native checks are recorded in
+[`docs/desktop/RELEASE.md`](desktop/RELEASE.md).
+
 ### Published Desktop v3.8.39
 
 The Desktop assets were added manually to the existing public `v3.8.39`

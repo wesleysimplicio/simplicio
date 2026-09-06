@@ -56,25 +56,31 @@ optional, not required.**
 
 ## 🖥️ Desktop-first setup
 
-The public Desktop shell is the preferred product journey, but a signed
-downloadable Desktop package is not part of the current release yet. Until that
-package is published, use the verified CLI bootstrap below; it is the supported
-way to install the Runtime today.
+The public Desktop channel currently provides one macOS Apple Silicon companion
+package from the immutable Runtime `v3.8.47` release:
+[`Simplicio-3.8.47-arm64.dmg`](https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.47/Simplicio-3.8.47-arm64.dmg).
+Its SHA-256 is recorded in [`DESKTOP-SHA256SUMS`](DESKTOP-SHA256SUMS). This is
+an integrity-verified, ad-hoc macOS package: Apple Developer ID signing and
+notarization are unavailable, so Gatekeeper acceptance is not claimed.
 
-When a signed Desktop package is available, the first-run order is:
+Windows Desktop is not published. On Windows, use the verified CLI bootstrap
+below until a Windows Desktop installer has its own public digest, native
+install evidence, and platform-signing evidence.
 
-1. Open Desktop and let it install its bundled, verified Runtime before login.
-2. Complete Google login and confirm active identity and entitlement in the app.
-3. Review and consent to the exact host-integration plan before any client files
+For the public macOS arm64 package, the first-run order is:
+
+1. Download the immutable DMG and verify its SHA-256 before opening it.
+2. Open Desktop and let it install its bundled, verified Runtime before login.
+3. Complete Google login and confirm active identity and entitlement in the app.
+4. Review and consent to the exact host-integration plan before any client files
    are changed.
-4. Restart open MCP clients so they reload the registered command and hooks.
-5. Make one harmless tools/list or simplicio_map call and confirm the live
-   schema/receipt before starting project work.
+5. Restart open MCP clients, then make one harmless tools/list or simplicio_map
+   call and confirm the live schema/receipt before starting project work.
 
 Login is never a substitute for installation, and a successful process exit is
-not proof that a host is configured. If the Desktop package is unavailable, the
-CLI path below follows the same Runtime, authentication, consent, reload, and
-first-call contract.
+not proof that a host is configured. The CLI path below remains the supported
+cross-platform fallback and follows the same Runtime, authentication, consent,
+reload, and first-call contract.
 
 ## 🚀 Installation
 
@@ -82,11 +88,11 @@ first-call contract.
 
 The native Simplicio Desktop is being built publicly in
 [`apps/desktop`](apps/desktop). It uses Tauri 2 as a thin, capability-scoped
-shell around the separately supervised Simplicio Runtime. The first public
-Desktop download will replace the existing Desktop channel only after signed
-macOS and Windows artifacts pass the clean-machine, entitlement, provider,
-update and rollback gates. Until that cutover, the current download entrypoint
-remains unchanged.
+shell around the separately supervised Simplicio Runtime. The current public
+channel is macOS arm64 only; Windows Desktop remains explicitly blocked until
+the required installer and native release gates are met. See the
+[Desktop release evidence](docs/desktop/RELEASE.md) for the exact digest,
+sidecar identity, and unexecuted platform gates.
 
 See the [Desktop architecture decision](docs/desktop/ADR-0001-public-tauri-shell.md),
 [product states](docs/desktop/PRODUCT-STATES.md), and

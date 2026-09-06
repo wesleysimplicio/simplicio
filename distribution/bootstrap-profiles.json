@@ -6,7 +6,7 @@
       "label": "Desktop",
       "recommended": true,
       "channel": "desktop",
-      "entrypoint": "https://github.com/wesleysimplicio/simplicio-agent/releases/latest",
+      "entrypoint": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.47/Simplicio-3.8.47-arm64.dmg",
       "source_repository": "https://github.com/wesleysimplicio/simplicio",
       "target_release_repository": "https://github.com/wesleysimplicio/simplicio/releases",
       "channel_migration": "public-foundation-before-atomic-cutover",
