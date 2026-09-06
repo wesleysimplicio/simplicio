@@ -2,6 +2,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { DesktopApp } from "./App";
 import { createDemoSnapshot } from "./demo";
+import { WorkbenchHome } from "./screens/WorkbenchHome";
+import type { ContextReport } from "./context_report";
 import { MemoryScreen } from "./screens/MemoryScreen";
 import { SettingsScreen, redactedDiagnostic } from "./screens/SettingsScreen";
 import { ActivityScreen, redactedActivity } from "./screens/ActivityScreen";
@@ -86,6 +88,38 @@ describe("Simplicio Desktop product states", () => {
     expect(apps).toContain("Token Reports");
   });
 
+  it("surfaces project context savings in the home report when the Runtime proves them", () => {
+    const report: ContextReport = {
+      schema: "simplicio.desktop-context-report/v1",
+      source: "runtime",
+      scope: "project_history",
+      eventCount: 12,
+      ledgerEventCount: 12,
+      llmSpendEventCount: 0,
+      savedTokens: 350,
+      baselineTokens: 1000,
+      actualTokens: 650,
+      netTokens: 350,
+      baselineKind: "measured",
+      confidence: "medium",
+      heuristicEventCount: 0,
+      unlabeledEstimateCount: 0,
+      proof: { measured: 12, estimated: 0, replayed: 0, benchmark: 0, unavailable: 0 },
+      reportHash: "sha256:" + "a".repeat(64),
+    };
+    const html = renderToStaticMarkup(<WorkbenchHome
+      snapshot={createDemoSnapshot("active")}
+      project={{ id: "project-" + "b".repeat(64), name: "Simplicio", path: "/projects/simplicio" }}
+      contextReport={report}
+      onAddProject={() => undefined}
+      onViewChange={() => undefined}
+      onRemoveProject={() => undefined}
+      onTokens={() => undefined}
+    />);
+    expect(html).toContain("350 tokens poupados");
+    expect(html).toContain("12 eventos de contexto");
+    expect(html).toContain("Evidência marcada como medida");
+  });
   it("does not invent cost or cache metrics without evidence", () => {
     const snapshot = createDemoSnapshot("active");
     snapshot.savings.estimatedUsd = null;

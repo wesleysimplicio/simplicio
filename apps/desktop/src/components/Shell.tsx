@@ -1,6 +1,7 @@
 import { ProviderUsage } from "./ProviderUsage";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { DesktopSnapshot } from "../contracts";
+import type { ContextReport } from "../context_report";
 import { Brand, Glyph, type GlyphName } from "./Brand";
 import { REFERENCE_SCREENS, type ReferenceSettingsView } from "../reference_screens";
 import { isNavigationVisible, isSettingsView, runtimeSummary, searchMatches, VIEW_LABELS, type LocalProject, type NavigationEntry, type View, type WorkbenchState } from "../workbench";
@@ -48,6 +49,8 @@ interface ShellProps {
   route: NavigationEntry;
   onViewChange: (view: View, restoreRoute?: NavigationEntry) => void;
   workbench: WorkbenchState;
+  /** Project-scoped Runtime context savings, when a verified report is available. */
+  contextReport?: ContextReport | null;
   onAddProject: () => void;
   onProject: (project: LocalProject) => void;
   onBack: () => void;
@@ -58,7 +61,7 @@ interface ShellProps {
   busy: boolean;
 }
 
-export function Shell({ children, snapshot, view, route, onViewChange, workbench, onAddProject, onProject,
+export function Shell({ children, snapshot, view, route, onViewChange, workbench, contextReport, onAddProject, onProject,
   onBack, onForward, canBack, canForward, onRefresh, busy }: ShellProps) {
   const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.innerWidth < 760);
   const [collapsed, setCollapsed] = useState(() => typeof window !== "undefined" && window.innerWidth < 760);
@@ -71,7 +74,7 @@ export function Shell({ children, snapshot, view, route, onViewChange, workbench
   const lastWorkspace = useRef<NavigationEntry>({ view: "home", projectId: route.projectId, tokenRepo: "" });
   const drawerOpen = narrow && !collapsed;
   const inSettings = isSettingsView(view);
-  const status = runtimeSummary(snapshot);
+  const status = runtimeSummary(snapshot, contextReport);
   const installedProviders = snapshot.providers.filter((provider) => provider.installState === "installed").length;
   const registrations = snapshot.providers.filter((provider) => provider.registrationState === "registered").length;
   const selected = workbench.projects.find((project) => project.id === workbench.selectedProjectId);

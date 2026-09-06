@@ -1,4 +1,5 @@
 import type { DesktopSnapshot } from "./contracts";
+import type { ContextReport } from "./context_report";
 import { providerRegistry } from "./provider_registry";
 import { isReferenceSettingsView, REFERENCE_LABELS, type ReferenceSettingsView } from "./reference_screens";
 
@@ -119,17 +120,29 @@ export function loadWorkbench(): WorkbenchState {
   catch { return emptyWorkbench(); }
 }
 
-export function runtimeSummary(snapshot: DesktopSnapshot) {
+/**
+ * Prefer the project-scoped Runtime context report when it is available. A
+ * report with LLM-spend events cannot prove a context-only before/after
+ * comparison, and a negative net is not presented as savings.
+ */
+function contextNetSavings(report: ContextReport | null | undefined): number | null {
+  if (!report || report.eventCount === 0 || report.llmSpendEventCount > 0
+    || report.netTokens === null || report.netTokens < 0) return null;
+  return report.netTokens;
+}
+
+export function runtimeSummary(snapshot: DesktopSnapshot, contextReport?: ContextReport | null) {
   const states = { healthy: "Runtime online", starting: "Runtime iniciando", degraded: "Runtime degradado", offline: "Runtime offline" };
   const providers = providerRegistry(snapshot.providers);
+  const projectSavings = contextNetSavings(contextReport);
   return {
     label: states[snapshot.runtime.state],
     healthy: snapshot.runtime.state === "healthy",
     connected: providers.filter((provider) => provider.state === "connected").length,
     installed: providers.filter((provider) => provider.installState === "installed").length,
-    measuredSavings: snapshot.source === "runtime"
+    measuredSavings: projectSavings ?? (snapshot.source === "runtime"
       && snapshot.savings.proofKind === "measured"
       && snapshot.savings.ledgerStatus === "valid"
-      ? snapshot.savings.monthTokens : null,
+      ? snapshot.savings.monthTokens : null),
   };
 }
