@@ -16,6 +16,42 @@ stored in a private directory and never starts an install before size and digest
 verification. A missing digest, stale manifest, wrong target, interrupted
 download or failed verification fails closed and leaves the current app intact.
 
+## Public v3.8.47 companion evidence
+
+The public Desktop channel currently contains one macOS Apple Silicon companion
+asset. Its digest is kept in [`DESKTOP-SHA256SUMS`](../../DESKTOP-SHA256SUMS),
+separate from the Runtime-only `SHA256SUMS` and
+`simplicio-update-manifest.json`; the Runtime closed-world manifest is not
+expanded with Desktop packages.
+
+| Item | Measured evidence |
+| --- | --- |
+| DMG | `Simplicio-3.8.47-arm64.dmg`, 41,242,676 bytes, SHA-256 `9c8b02e8b804ddcf992c26f5d156ab0261fe498bee30237727d74abbbc38d779` |
+| Bundled Runtime sidecar | `Contents/MacOS/simplicio`, 50,974,800 bytes, SHA-256 `529ab8130222b93953485d5fe7c49cddfa29767c6a7db60cdd4f5db88a1ac053` |
+| Runtime authenticity | Ed25519 signature for the public `simplicio-macos-arm64` asset verified with `scripts/verify_ed25519.py`; the sidecar extracted from the DMG matches that asset byte-for-byte |
+| Public release metadata | GitHub API reports the DMG as `uploaded`, with the same size and `sha256:9c8b02e8b804ddcf992c26f5d156ab0261fe498bee30237727d74abbbc38d779` |
+| Desktop source revision | Not present in the v3.8.47 release metadata; no source commit is inferred |
+
+The DMG and sidecar were downloaded again from the immutable release and the
+sidecar was extracted from its APFS image before comparison. The arm64 Runtime
+cannot execute on the available x86_64 verifier, so `version --json` and the
+native Desktop status probe remain unexecuted here.
+
+### Gate status for this public channel
+
+| Gate | Status | Boundary |
+| --- | --- | --- |
+| Desktop package digest and Runtime sidecar identity | **verified** | Downloaded DMG hash and extracted sidecar match the public release assets |
+| Runtime closed-world manifest | **verified** | `SHA256SUMS` and `simplicio-update-manifest.json` remain Runtime-only and unchanged |
+| Apple Developer ID signing and notarization | **blocked** | No Apple credentials are available; the package is ad-hoc and Gatekeeper acceptance is not claimed |
+| Authentication-only native probe and Google acceptance | **unexecuted** | Requires a native macOS executor and a separately authorized account run; no Google flow was initiated |
+| Windows Desktop | **blocked** | No Windows Desktop `.exe`/`.msi` installer is attached to v3.8.47; the CLI remains the Windows path |
+| CI | **absent** | This repository documents and runs local gates; no GitHub Actions result is invented |
+
+This evidence establishes a public macOS arm64 integrity channel, not a fully
+notarized Apple release or a published Windows Desktop channel. Do not describe
+the blocked or unexecuted gates as passed.
+
 The updater transaction is implemented in `src-tauri::desktop_updater`:
 
 1. re-read the official release API and bind the requested version/tag/asset;
