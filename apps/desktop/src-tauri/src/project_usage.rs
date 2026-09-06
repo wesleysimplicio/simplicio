@@ -583,7 +583,10 @@ mod tests {
                 r"\\?\C:\Accounts\person\Projects\project",
                 r"C:\Accounts\person\Projects\project",
             ),
-            (r"\\?\C:\Accounts\person\Projects", r"C:\Accounts\person\Projects"),
+            (
+                r"\\?\C:\Accounts\person\Projects",
+                r"C:\Accounts\person\Projects",
+            ),
             (r"\\?\C:\Accounts\person", r"C:\Accounts\person"),
         ] {
             assert_eq!(display_path_text(canonical), Some(displayed));
