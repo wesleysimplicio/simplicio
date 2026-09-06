@@ -31,6 +31,7 @@ references also include `/Users/wesleysimplicio/Desktop/prints_sistemas`.
 - [x] Update availability, progress, recovery and relaunch state are surfaced
   without silently treating a source version as an installed update.
 - [x] Usage totals do not render unavailable provider data as zero.
+- [x] Selected (or sole) local project context savings are loaded from the Runtime-owned report and surfaced in Home and the status bar with net-savings guardrails, event count, evidence kind and confidence. Provider token usage remains unreported until real provider events exist.
 - [x] Entry and setup surfaces use a restrained white/futuristic layout with progressive disclosure instead of explanatory walls of text.
 - [x] Preparation progress names packaged dependencies, Python detection, memory/seeds/migrations and detected clients without claiming unavailable metrics.
 - [x] Runtime exposes an idempotent 15-minute `session-service close-idle` transition; Desktop polls it once per minute after activation and keeps provider input/output/reasoning/cache refresh explicitly pending instead of inventing zeros. Running queued requests are excluded, and prompt enqueue/claim/completion refresh the session activity clock.
@@ -61,8 +62,10 @@ references also include `/Users/wesleysimplicio/Desktop/prints_sistemas`.
   updates, permissions, diagnostics, filters, exports and guided setup. The
   signed/notarized installed-copy identity check remains tracked in
   `wesleysimplicio/simplicio#375`.
-- [ ] Re-run the full native suite and packaging gates with sufficient free disk
-  space, then update acceptance totals.
+- [x] Re-ran the frontend suite (63 files, 406 tests), full Playwright suite
+  (117 passed) and a debug Tauri macOS build; the ad-hoc bundle was removed
+  after visual review to reclaim disk. Repository-wide Python validation still
+  has three unrelated pre-existing plugin/release failures.
 - [ ] Publish, install or replace the Applications bundle only after explicit
   release authorization.
 
@@ -75,28 +78,37 @@ references also include `/Users/wesleysimplicio/Desktop/prints_sistemas`.
 - **Repository scope:** all Desktop work is scoped to `/Users/wesleysimplicio/Projetos/ai/simplicio`; Runtime remains a separate backend repository. No second executable Desktop UI was found in `simplicio-runtime`; its `desktop/` directory is retained as backend-contract documentation only.
 - **Full-bleed brand icon:** replaced the framed asset with a full-bleed Simplicio logo and propagated it to web/native icon assets.
 - **Usage, MCPs and providers:** added liveness-backed MCP reconciliation plus observed/unavailable states for Codex, Grok and provider usage; bounded generic JSON/JSONL probes now cover the remaining named hosts without inventing metrics; real installed-app/provider acceptance remains open.
+- **Token-savings reports:** project-scoped `savings report` now feeds Home and the status bar; gross/net context savings remain separate from provider token/cost telemetry, and missing provider events stay blocked rather than zero.
 - **Permissions and updates:** added native permission refresh and honest update/recovery surfaces; signed/notarized artifact checks remain open.
 - **Logout and 15-minute close:** logout is wired; Runtime logical close and Desktop polling are implemented, while real provider refresh/collection remains an acceptance item in `simplicio#376`.
 - **Google login:** replaced the generic mark with the four-color Google mark and kept credentials in the browser callback flow; signed OAuth persistence still needs acceptance.
 - **Runtime-first onboarding:** Install Now now installs/validates the packaged Runtime, then runs bounded Python/dependencies, memory, seeds, migrations and detected-client preparation before login.
 - **Minimal clean UI:** idle entry/login expose only logo plus primary action; progress/error screens retain only actionable state and no explanatory wall of text.
-- **Disk recovery:** removed only regenerable Desktop/Runtime build outputs,
-  dependency artifacts and stale marketplace staging, preserved projects,
-  profiles, memories and active runtimes, and measured 13 GiB available (56%
-  capacity) after the final native validation; filesystem cache can fluctuate.
+- **Disk recovery:** removed only regenerable Desktop build outputs and
+  dependency artifacts, preserved projects, profiles, memories and active
+  runtimes, and measured 8.1 GiB available (68% capacity) after the final
+  validation; filesystem cache can fluctuate.
 - **Future repository rename:** no remote or package rename to `simpletibr/simplicio` was made; that remains a later release task.
 
 ## Evidence from this worktree
 
-- Frontend suite: 63 files, 404 tests passed.
+- Frontend suite: 63 files, 406 tests passed.
 - Focused first-run/preparation/session-idle suite: 2 files, 14 tests passed.
 - Native preparation tests: 6 passed; native MCP connection tests: 4 passed.
 - Runtime Agent Plane focused idle-session tests: close-idle, pending prompt and activity-clock cases — 3 passed.
 - Full Playwright suite: 117 passed with mocked IPC and preview/browser coverage.
-- Debug macOS application: built successfully for 3.8.47 with one cargo job and stripped dev debuginfo; the local artifact was removed after review to recover disk space. This remains an ad-hoc build, not a signed release.
+- Debug macOS application: rebuilt after the context-savings patch for 3.8.47
+  with one cargo job and stripped dev debuginfo; the local artifact was removed
+  after visual review to recover disk space. This remains an ad-hoc build, not a
+  signed release.
 - Packaged icon extracted from the built application: 1024 × 1024, visually
   full-bleed; the borderless login regression now checks the shared asset and
   rendered image behavior.
 - Native UI inspection of the newest debug build completed with macOS unlocked;
-  source/installed/release evidence remains separated and the ad-hoc bundle was
+  the selected project displayed Runtime-proven context savings in Home and the
+  status bar (`economia consultada`, event count, mixed/low-confidence evidence).
+  Source/installed/release evidence remains separated and the ad-hoc bundle was
   removed after review.
+- Provider token-usage ledger remained empty in this environment, so input,
+  output, reasoning, cache and cost are still truthfully blocked rather than
+  shown as zero.
