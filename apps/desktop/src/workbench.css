@@ -160,6 +160,7 @@
 .preference-row strong { display: block; font-size: 13px; font-weight: 550; line-height: 1.5; }
 .preference-row p { font-size: 12px; color: var(--muted); line-height: 1.7; margin: 4px 0 0; overflow-wrap: anywhere; }
 .preference-row > .button, .preference-row > .segmented-control, .preference-row > kbd { flex-shrink: 0; }
+.preference-select { min-height: 32px; max-width: 240px; padding: 0 28px 0 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: var(--surface-strong); font: 10px/1 var(--mono); flex: 0 0 auto; }
 .preference-switch { width: 36px; height: 22px; flex: 0 0 auto; border: 1px solid #ccd2d7; background: #d9dfe3; padding: 2px; border-radius: 20px; cursor: pointer; }
 .preference-switch span { display: block; height: 16px; width: 16px; background: #fff; box-shadow: 0 1px 3px #0000001a; border-radius: 50%; transition: transform 120ms ease; }
 .preference-switch.checked { background: var(--green-dark); border-color: var(--green-dark); }

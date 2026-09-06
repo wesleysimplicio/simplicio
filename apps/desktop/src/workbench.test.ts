@@ -23,7 +23,7 @@ describe("local workbench state", () => {
       selectedProjectId: project(1).id, preferences: { density: "compact", showProjectPaths: true, rememberProject: true, dangerousMode: true } }));
     expect(state.projects).toEqual([project(), project(1)]);
     expect(state.selectedProjectId).toBe(project(1).id);
-    expect(state.preferences).toEqual({ density: "compact", showProjectPaths: true, rememberProject: true });
+    expect(state.preferences).toEqual({ ...emptyWorkbench().preferences, density: "compact", showProjectPaths: true, rememberProject: true });
     expect(JSON.stringify(state)).not.toContain("dangerousMode");
     expect(parseWorkbench(JSON.stringify({ ...state, projects: Array.from({ length: 100 }, (_, index) => project(index)) })).projects).toHaveLength(MAX_PROJECTS);
   });
@@ -35,6 +35,18 @@ describe("local workbench state", () => {
     }
     expect(parseWorkbench(JSON.stringify({ ...emptyWorkbench(), projects: [project()], selectedProjectId: project().id,
       preferences: { rememberProject: false } })).selectedProjectId).toBeNull();
+  });
+
+  it("keeps the launch preference bounded and restores only a workbench view", () => {
+    const state = parseWorkbench(JSON.stringify({ ...emptyWorkbench(), preferences: {
+      ...emptyWorkbench().preferences, launchBehavior: "last_view", lastView: "activity",
+    } }));
+    expect(state.preferences.launchBehavior).toBe("last_view");
+    expect(state.preferences.lastView).toBe("activity");
+    const unsafe = parseWorkbench(JSON.stringify({ ...emptyWorkbench(), preferences: {
+      ...emptyWorkbench().preferences, launchBehavior: "last_view", lastView: "settings",
+    } }));
+    expect(unsafe.preferences.lastView).toBe("home");
   });
 
   it("rejects untrusted project identifiers, remote paths and control characters", () => {

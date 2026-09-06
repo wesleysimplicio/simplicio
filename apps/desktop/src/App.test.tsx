@@ -147,6 +147,9 @@ describe("Simplicio Desktop product states", () => {
     expect(html).toContain("Exportar diagnóstico");
     expect(html).toContain("Atualizar estado");
     expect(html).toContain("Sair da conta");
+    expect(html).toContain("Idioma da interface");
+    expect(html).toContain("Comportamento ao iniciar");
+    expect(html).toContain("Desinstalar Simplicio");
     expect(html).toContain("tenta revogar a sessão remota");
     expect(html).not.toContain("O Runtime revoga a sessão");
     expect(JSON.stringify(diagnostic)).not.toContain("voce@example.com");
@@ -158,6 +161,7 @@ describe("Simplicio Desktop product states", () => {
     const html = renderToStaticMarkup(<ActivityScreen snapshot={snapshot} />);
     expect(html).toContain("Exportar recibos");
     expect(html).toContain("Todos");
+    expect(html).toContain("Buscar recibos");
     expect(html).toContain("máximo 5");
     expect(redactedActivity(snapshot.activity)[0]).not.toHaveProperty("detail");
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { redactedActivity } from "./screens/ActivityScreen";
+import { activityMatchesSearch, redactedActivity } from "./screens/ActivityScreen";
 import type { ActivityItem } from "./contracts";
 
 const item: ActivityItem = {
@@ -22,5 +22,11 @@ describe("Activity savings proof", () => {
 
   it("keeps the value only when the caller has a Runtime proof class", () => {
     expect(redactedActivity([item], true)[0].savedTokens).toBe(42);
+  });
+
+  it("searches receipt title, detail and provider without accent sensitivity", () => {
+    expect(activityMatchesSearch({ ...item, title: "Validação determinística" }, "validacao")).toBe(true);
+    expect(activityMatchesSearch({ ...item, detail: "Recibo do Runtime" }, "runtime")).toBe(true);
+    expect(activityMatchesSearch(item, "grok")).toBe(false);
   });
 });

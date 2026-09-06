@@ -3,6 +3,7 @@ import type { DesktopSnapshot } from "../contracts";
 import { Glyph } from "../components/Brand";
 import { exportDesktopSnapshot } from "../bridge";
 import { runtimeSummary } from "../workbench";
+import { DEFAULT_PREFERENCES, type WorkbenchPreferences } from "../workbench";
 import { formatRuntimeTimestamp } from "../runtime_timestamp";
 
 export function redactedDiagnostic(snapshot: DesktopSnapshot) {
@@ -25,11 +26,14 @@ function previewDownload(snapshot: DesktopSnapshot) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function SettingsScreen({ snapshot, busy, onRefresh, onSubscribe, onLogout, logoutBusy, section = "all" }:
-  { snapshot: DesktopSnapshot; busy: boolean; onRefresh: () => void; onSubscribe: () => void; onLogout: () => void; logoutBusy: boolean; section?: "account" | "diagnostics" | "all" }) {
+export function SettingsScreen({ snapshot, busy, onRefresh, onSubscribe, onLogout, logoutBusy, section = "all", preferences = DEFAULT_PREFERENCES, onPreferences = () => undefined, onUninstall }:
+  { snapshot: DesktopSnapshot; busy: boolean; onRefresh: () => void; onSubscribe: () => void; onLogout: () => void; logoutBusy: boolean; section?: "account" | "diagnostics" | "all"; preferences?: WorkbenchPreferences; onPreferences?: (preferences: WorkbenchPreferences) => void; onUninstall?: () => Promise<void> }) {
   const [exporting, setExporting] = useState(false);
   const [exported, setExported] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [uninstalling, setUninstalling] = useState(false);
+  const [uninstallError, setUninstallError] = useState<string | null>(null);
+  const [uninstallOpened, setUninstallOpened] = useState(false);
   const exportLock = useRef(false);
   const runtime = runtimeSummary(snapshot);
   async function download() {
@@ -42,6 +46,21 @@ export function SettingsScreen({ snapshot, busy, onRefresh, onSubscribe, onLogou
     } catch { setExportError("Não foi possível salvar o diagnóstico em Downloads. Verifique as permissões e o espaço em disco."); }
     finally { exportLock.current = false; setExporting(false); }
   }
+  async function openUninstallLocation() {
+    if (!onUninstall || uninstalling) return;
+    setUninstalling(true); setUninstallError(null); setUninstallOpened(false);
+    try {
+      await onUninstall();
+      setUninstallOpened(true);
+    } catch {
+      setUninstallError("Não foi possível abrir a localização do aplicativo. Nenhum arquivo foi removido.");
+    } finally {
+      setUninstalling(false);
+    }
+  }
+  function updatePreferences(patch: Partial<WorkbenchPreferences>) {
+    onPreferences({ ...preferences, ...patch });
+  }
   return <div className="page preferences-page account-page">
     <section className="page-heading"><div><h1>{section === "diagnostics" ? "Runtime e diagnóstico" : "Conta Simplicio"}</h1><p>{section === "diagnostics" ? "Estado local verificado pelo Runtime. Diagnósticos sem dados sensíveis." : "Sua identidade e assinatura, verificadas pelo Simplicio Runtime."}</p></div></section>
     {section !== "diagnostics" && <section className="settings-section"><h2>Minha conta</h2><div className="settings-slab">
@@ -51,6 +70,11 @@ export function SettingsScreen({ snapshot, busy, onRefresh, onSubscribe, onLogou
       <div className="preference-row"><div><strong>Gerenciar assinatura</strong><p>Abre sua conta no site do Simplicio.</p></div><button className="button button-secondary" type="button" onClick={onSubscribe} disabled={busy}>Gerenciar plano<Glyph name="external" size={15} /></button></div>
       <div className="preference-row"><div><strong>Sair deste computador</strong><p>O Runtime remove o login local e tenta revogar a sessão remota. Seus projetos não são apagados.</p></div><button className="button button-secondary" type="button" onClick={onLogout} disabled={busy || logoutBusy}>{logoutBusy ? "Saindo…" : "Sair da conta"}</button></div>
     </div></section>}
+    {section !== "diagnostics" && <section className="settings-section"><h2>Preferências do Desktop</h2><div className="settings-slab">
+      <div className="preference-row"><div><strong>Idioma da interface</strong><p>O idioma fica salvo somente neste computador. Este build oferece Português (Brasil).</p></div><select className="preference-select" aria-label="Idioma da interface" value={preferences.language} onChange={(event) => { if (event.target.value === "pt-BR") updatePreferences({ language: "pt-BR" }); }}><option value="pt-BR">Português (Brasil)</option></select></div>
+      <div className="preference-row"><div><strong>Comportamento ao iniciar</strong><p>Escolha se o Desktop abre no Início ou retoma a última tela de trabalho.</p></div><select className="preference-select" aria-label="Comportamento ao iniciar" value={preferences.launchBehavior} onChange={(event) => updatePreferences({ launchBehavior: event.target.value === "last_view" ? "last_view" : "home" })}><option value="home">Abrir no Início</option><option value="last_view">Retomar última tela</option></select></div>
+      <div className="preference-row"><div><strong>Desinstalar Simplicio</strong><p>Abre a localização do aplicativo para você movê-lo para o Lixo. Projetos, relatórios e o Runtime gerenciado não são removidos por esta ação.</p></div><button className="button button-secondary" type="button" onClick={() => void openUninstallLocation()} disabled={!onUninstall || uninstalling}>{uninstalling ? "Abrindo…" : "Abrir localização do app"}</button></div>
+    </div>{uninstallOpened && <p className="export-feedback" role="status">Localização do aplicativo aberta. A remoção é manual no Finder ou gerenciador de arquivos.</p>}{uninstallError && <p className="inline-error" role="alert">{uninstallError}</p>}</section>}
     {section !== "account" && <>
       <section className="settings-section"><h2>Runtime local</h2><div className="settings-slab">
         <div className="preference-row"><div><strong>{runtime.label}</strong><p>Versão {snapshot.runtime.version || "não informada"} · transporte {snapshot.runtime.transport}</p></div><button className="button button-secondary" type="button" onClick={onRefresh} disabled={busy}><Glyph name="refresh" size={16} />{busy ? "Atualizando…" : "Atualizar estado"}</button></div>

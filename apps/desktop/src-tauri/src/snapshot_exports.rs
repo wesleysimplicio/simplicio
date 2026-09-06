@@ -23,14 +23,18 @@ fn projection(snapshot: &Value, kind: &str, filters: &Value) -> Result<Value, St
         "activity" => {
             let status = filters["status"].as_str().unwrap_or("all");
             let provider = filters["provider"].as_str().unwrap_or("all");
+            let search = filters["search"].as_str().unwrap_or("");
             if !matches!(status, "all" | "verified" | "running" | "attention")
                 || provider.len() > 256
+                || search.len() > 120
             {
                 return Err("snapshot_export_invalid".into());
             }
+            let search = search.to_lowercase();
             let items = snapshot["activity"].as_array().map(|items| items.iter().take(5)
                 .filter(|item| status == "all" || item["status"].as_str() == Some(status))
                 .filter(|item| provider == "all" || item["provider"].as_str() == Some(provider))
+                .filter(|item| search.is_empty() || ["id", "title", "detail", "provider", "status"].iter().any(|field| item[*field].as_str().unwrap_or("").to_lowercase().contains(&search)))
                 .map(|item| json!({
                     "id": item["id"], "title": item["title"], "provider": item["provider"],
                     "savedTokens": item["savedTokens"], "occurredAt": item["occurredAt"], "status": item["status"],
@@ -120,6 +124,14 @@ mod tests {
         .unwrap();
         assert_eq!(activity["items"].as_array().unwrap().len(), 1);
         assert!(activity["items"][0].get("detail").is_none());
+        let searched = projection(
+            &snapshot(),
+            "activity",
+            &json!({"status":"all","provider":"all","search":"private prompt"}),
+        )
+        .unwrap();
+        assert_eq!(searched["items"].as_array().unwrap().len(), 1);
+        assert_eq!(searched["items"][0]["id"], "1");
         assert!(projection(&snapshot(), "../arbitrary", &Value::Null).is_err());
         assert!(projection(&snapshot(), "activity", &json!({"status":"invalid"})).is_err());
     }

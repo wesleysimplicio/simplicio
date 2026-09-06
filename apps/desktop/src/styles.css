@@ -1510,7 +1510,11 @@ p { margin-top: 0; }
 .settings-safety p { margin: 4px 0 0; color: #7f897b; font-size: 9px; line-height: 1.4; }
 
 .activity-page-panel { padding: 18px; }
-.activity-toolbar { min-width: 0; margin-bottom: 13px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.activity-toolbar { min-width: 0; margin-bottom: 13px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.activity-search { min-width: min(260px, 100%); flex: 1 1 220px; min-height: 30px; box-sizing: border-box; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; display: flex; align-items: center; gap: 7px; color: var(--muted-soft); background: var(--surface-strong); }
+.activity-search:focus-within { border-color: #a7b8ab; box-shadow: 0 0 0 2px #dce9df; }
+.activity-search input { min-width: 0; width: 100%; border: 0; outline: 0; color: var(--ink); background: transparent; font: 10px/1 var(--mono); }
+.activity-search input::placeholder { color: var(--muted-soft); }
 .activity-provider-filter { display: inline-flex; align-items: center; gap: 7px; color: #969184; font: 8px/1 var(--mono); }
 .activity-provider-filter select { min-height: 28px; padding: 0 25px 0 8px; border: 1px solid var(--line); border-radius: 7px; color: #66675f; background: var(--surface-strong); font: 9px/1 var(--mono); }
 .activity-page-list { border-top: 1px solid var(--line-soft); }
