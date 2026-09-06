@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createDemoSnapshot } from "./demo";
 import { emptyWorkbench, isSettingsView, isView, MAX_PROJECTS, moveHistory, navigate, parseLocalProject, parseWorkbench, runtimeSummary, searchMatches, type NavigationEntry, type NavigationState } from "./workbench";
+import type { ContextReport } from "./context_report";
 
 function project(index = 0) {
   return { id: "project-" + index.toString(16).padStart(64, "0"), name: "Meu projeto " + index, path: "/projects/local-" + index };
@@ -139,6 +140,33 @@ describe("workbench navigation and evidence", () => {
     expect(isView("project")).toBe(true);
     expect(isSettingsView("providers")).toBe(true);
     expect(isSettingsView("home")).toBe(false);
+  });
+
+  it("prefers a verified project context report for measured savings", () => {
+    const snapshot = createDemoSnapshot("active");
+    snapshot.source = "runtime";
+    snapshot.savings.proofKind = "mixed";
+    const contextReport: ContextReport = {
+      schema: "simplicio.desktop-context-report/v1",
+      source: "runtime",
+      scope: "project_history",
+      eventCount: 12,
+      ledgerEventCount: 12,
+      llmSpendEventCount: 0,
+      savedTokens: 350,
+      baselineTokens: 1000,
+      actualTokens: 650,
+      netTokens: 350,
+      baselineKind: "measured",
+      confidence: "medium",
+      heuristicEventCount: 0,
+      unlabeledEstimateCount: 0,
+      proof: { measured: 12, estimated: 0, replayed: 0, benchmark: 0, unavailable: 0 },
+      reportHash: "sha256:" + "a".repeat(64),
+    };
+    expect(runtimeSummary(snapshot, contextReport).measuredSavings).toBe(350);
+    contextReport.netTokens = -25;
+    expect(runtimeSummary(snapshot, contextReport).measuredSavings).toBeNull();
   });
 
   it("never labels an offline Runtime online or counts an unverified MCP as live", () => {

@@ -6,6 +6,9 @@
 .session-metrics span { display: block; font-size: 12px; color: var(--muted); }
 .session-metrics strong { display: block; margin-top: 8px; font-size: 19px; overflow-wrap: anywhere; }
 .session-center .token-proof-note, .session-center details p { font-size: 12px; line-height: 1.6; }
+.context-savings-callout { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin-top: 14px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--green) 28%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--green) 7%, transparent); }
+.context-savings-callout strong { color: var(--green); font-size: 15px; }
+.context-savings-callout span { color: var(--muted); font-size: 12px; }
 .session-center details { margin-top: 12px; font-size: 12px; }
 @media (max-width: 760px) { .session-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .session-center details summary, .project-boundary summary { cursor: pointer; min-height: 36px; padding-block: 8px; color: var(--muted); }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { DesktopSnapshot } from "./contracts";
+import type { ContextReport } from "./context_report";
 import type { BotActionRequest } from "./bot_center";
 import { snapshotWithDemoBots } from "./bot_center";
 import {
@@ -16,6 +17,7 @@ import {
   applyDesktopHostPlugins,
   reconcileDesktopHostPlugins,
   dispatchDesktopBotAction,
+  loadDesktopContextReport,
   pullDesktopUsageSnapshot,
   closeIdleDesktopSessions,
 } from "./bridge";
@@ -73,6 +75,9 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
   }], index: 0 }));
   const route = history.entries[history.index];
   const selectedProject = workbench.projects.find((project) => project.id === route.projectId);
+  // A single bookmarked project is the safe default scope for Home; with
+  // multiple projects the user must choose one before any report is queried.
+  const contextRepoPath = selectedProject?.path ?? (workbench.projects.length === 1 ? workbench.projects[0].path : "");
   const view = route.view === "project" && !selectedProject ? "home" : route.view;
   const [showProjectDialog, setShowProjectDialog] = useState(false);
   const [storageError, setStorageError] = useState<string | null>(null);
@@ -80,8 +85,30 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
   const actionLock = useRef(false);
   const [usageStore] = useState(createDesktopUsageStore);
   const [usage, setUsage] = useState(() => usageStore.getState());
+  const [contextReport, setContextReport] = useState<ContextReport | null>(null);
 
   useEffect(() => usageStore.subscribe(setUsage), [usageStore]);
+
+  useEffect(() => {
+    const scope = contextRepoPath.trim();
+    setContextReport(null);
+    if (
+      !snapshot
+      || snapshot.access.state !== "active"
+      || !scope
+      || typeof window === "undefined"
+      || !("__TAURI_INTERNALS__" in window)
+    ) return;
+    let current = true;
+    void loadDesktopContextReport(scope).then((report) => {
+      if (current) setContextReport(report);
+    }).catch(() => {
+      // Missing or invalid project ledgers stay unavailable; the UI never
+      // turns an unreadable report into a zero or a guessed savings value.
+      if (current) setContextReport(null);
+    });
+    return () => { current = false; };
+  }, [snapshot?.access.state, snapshot?.generatedAt, contextRepoPath]);
 
   useEffect(() => {
     if (
@@ -477,13 +504,13 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
 
   return (
     <Shell snapshot={snapshot} view={view} route={route} onViewChange={setView} workbench={{ ...workbench, selectedProjectId: selectedProject?.id ?? null }}
-      onAddProject={() => setShowProjectDialog(true)} onProject={openProject}
+      contextReport={contextReport} onAddProject={() => setShowProjectDialog(true)} onProject={openProject}
       onBack={() => moveNavigation(-1)} onForward={() => moveNavigation(1)}
       canBack={history.index > 0} canForward={history.index < history.entries.length - 1}
       onRefresh={refresh} busy={action !== null}>
       {actionError && <div className="desktop-action-error" role="alert">{actionError}</div>}
       {storageError && <div className="desktop-action-error" role="alert">{storageError}</div>}
-      {(view === "home" || view === "project") && <WorkbenchHome key={selectedProject?.id ?? "home"} snapshot={snapshot} usage={usage}
+      {(view === "home" || view === "project") && <WorkbenchHome key={selectedProject?.id ?? "home"} snapshot={snapshot} usage={usage} contextReport={contextReport}
         project={view === "project" ? selectedProject : undefined} onAddProject={() => setShowProjectDialog(true)}
         onViewChange={setView} onTokens={projectTokens} onRemoveProject={() => {
           saveWorkbench({ ...workbench, projects: workbench.projects.filter((item) => item.id !== selectedProject?.id), selectedProjectId: null });

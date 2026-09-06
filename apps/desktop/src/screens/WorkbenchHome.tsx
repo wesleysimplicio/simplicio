@@ -1,19 +1,20 @@
 import { useState } from "react";
 import type { DesktopSnapshot } from "../contracts";
+import type { ContextReport } from "../context_report";
+import { CONTEXT_CONFIDENCE, CONTEXT_EVIDENCE } from "../context_report";
 import { Glyph } from "../components/Brand";
 import { openDesktopProject } from "../bridge";
 import { isNavigationVisible, runtimeSummary, type LocalProject, type View } from "../workbench";
 import type { DesktopUsageState } from "../usage_store";
 import type { ProviderUsageMetric, ProviderUsageReport } from "../session_idle";
 import "../session_center.css";
-function SessionCenter({ usage }: { usage?: DesktopUsageState }) {
+function SessionCenter({ usage, contextReport }: { usage?: DesktopUsageState; contextReport?: ContextReport | null }) {
   const changefeed = usage?.changefeed;
   const observed = changefeed?.projection;
   const hasData = observed && !["no_data", "unavailable"].includes(observed.metadata.coverage.status);
   const projection = hasData ? observed : null;
   const costProjection = changefeed?.cost_projection;
   const status = changefeed?.connection ?? "offline";
-  const statusLabel = status === "live" ? (hasData ? "consultado" : "sem dados") : status === "reconnecting" ? "reconectando" : status === "stale" ? "último dado conhecido" : "offline";
   const tokens = (value: number | null | undefined) => value === null || value === undefined ? "—" : value.toLocaleString("pt-BR");
   const costValue = costProjection
     ? costProjection.totals.actual_cost_usd
@@ -21,6 +22,13 @@ function SessionCenter({ usage }: { usage?: DesktopUsageState }) {
   const cost = costValue === null || costValue === undefined ? "—" : "US$ " + costValue.toFixed(6);
   const idleFinalization = usage?.idleFinalization;
   const providerReports = idleFinalization?.usage.provider_reports ?? [];
+  const contextSavings = contextReport && contextReport.netTokens !== null && contextReport.netTokens >= 0
+    && contextReport.eventCount > 0 && contextReport.llmSpendEventCount === 0
+    ? contextReport.netTokens : null;
+  const contextStatus = contextReport && contextReport.eventCount > 0
+    ? contextSavings === null ? "comparação indisponível" : "economia consultada"
+    : null;
+  const statusLabel = status === "live" ? (hasData ? "consultado" : contextStatus ?? "sem dados") : status === "reconnecting" ? "reconectando" : status === "stale" ? "último dado conhecido" : contextStatus ?? "offline";
   const providerToken = (report: ProviderUsageReport, metric: ProviderUsageMetric) => {
     const value = report.totals[metric];
     return value === undefined ? "—" : value.toLocaleString("pt-BR");
@@ -37,7 +45,11 @@ function SessionCenter({ usage }: { usage?: DesktopUsageState }) {
       <article><span>Economia comprovada</span><strong>{tokens(costProjection?.totals.saved_tokens)}</strong></article>
       <article><span>Custo registrado</span><strong>{cost}</strong></article>
     </div>
-    <p className="token-proof-note">{costProjection ? costProjection.totals.event_count + " evento(s) · cobertura " + costProjection.metadata.coverage.status : projection ? projection.totals.event_count + " evento(s) · cobertura " + projection.metadata.coverage.status : "Ainda sem dados verificados."}</p>
+    {contextReport && contextReport.eventCount > 0 && <div className="context-savings-callout" data-testid="context-savings-summary">
+      <strong>{contextSavings === null ? "Economia líquida indisponível" : contextSavings.toLocaleString("pt-BR") + " tokens poupados"}</strong>
+      <span>{contextReport.eventCount.toLocaleString("pt-BR")} eventos de contexto · {CONTEXT_EVIDENCE[contextReport.baselineKind]} · confiança {CONTEXT_CONFIDENCE[contextReport.confidence]}</span>
+    </div>}
+    <p className="token-proof-note">{costProjection ? costProjection.totals.event_count + " evento(s) · cobertura " + costProjection.metadata.coverage.status : projection ? projection.totals.event_count + " evento(s) · cobertura " + projection.metadata.coverage.status : contextReport && contextReport.eventCount > 0 ? contextReport.eventCount + " evento(s) · contexto verificado pelo Runtime" : "Ainda sem dados verificados."}</p>
     {idleFinalization && <p className="token-proof-note" data-testid="idle-usage-status">
       Sessão após 15 min: {idleFinalization.usage.status === "complete" ? "coleta concluída" : idleFinalization.usage.status === "pending_provider_refresh" ? "coleta parcial" : "indisponível"}.
     </p>}
@@ -58,9 +70,9 @@ function SessionCenter({ usage }: { usage?: DesktopUsageState }) {
 }
 
 
-export function WorkbenchHome({ snapshot, project, usage, onAddProject, onViewChange, onRemoveProject, onTokens }:
-  { snapshot: DesktopSnapshot; project?: LocalProject; usage?: DesktopUsageState; onAddProject: () => void; onViewChange: (view: View) => void; onRemoveProject: () => void; onTokens: (path?: string) => void }) {
-  const status = runtimeSummary(snapshot);
+export function WorkbenchHome({ snapshot, project, usage, contextReport, onAddProject, onViewChange, onRemoveProject, onTokens }:
+  { snapshot: DesktopSnapshot; project?: LocalProject; usage?: DesktopUsageState; contextReport?: ContextReport | null; onAddProject: () => void; onViewChange: (view: View) => void; onRemoveProject: () => void; onTokens: (path?: string) => void }) {
+  const status = runtimeSummary(snapshot, contextReport);
   const [opening, setOpening] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -81,7 +93,7 @@ export function WorkbenchHome({ snapshot, project, usage, onAddProject, onViewCh
       <button type="button" onClick={() => void openFolder()} disabled={opening}><Glyph name="folder" size={22} /><strong>{opening ? "Abrindo…" : "Abrir pasta"}</strong><span>No gerenciador de arquivos</span><Glyph name="external" size={17} /></button>
     </section>
     {openError && <p className="inline-error" role="alert">{openError}</p>}
-    <SessionCenter usage={usage} />
+    <SessionCenter usage={usage} contextReport={contextReport} />
     <details className="workbench-section project-boundary"><summary>Sobre os projetos locais</summary><p>Esta lista organiza atalhos locais. Adicionar uma pasta não cria um worktree, não inicia um agente e não altera permissões.</p><p>Execute suas tarefas no harness conectado ao Simplicio MCP. O Runtime continua responsável por contexto, execução e recibos.</p></details>
     <div className="project-remove">{confirmRemove ? <><p>Remover apenas o atalho? Nenhum arquivo da pasta será excluído.</p><button className="button button-secondary" type="button" onClick={() => setConfirmRemove(false)}>Manter projeto</button><button className="button button-secondary" type="button" onClick={onRemoveProject}>Confirmar remoção da lista</button></> : <button className="text-button" type="button" onClick={() => setConfirmRemove(true)}>Remover da lista</button>}</div>
   </div>;
