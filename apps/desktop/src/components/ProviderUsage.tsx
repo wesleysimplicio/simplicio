@@ -3,29 +3,118 @@ import { invoke } from "@tauri-apps/api/core";
 import "./provider_usage.css";
 
 type WindowUsage = { usedPercent: number; windowDurationMins: number; resetsAt: number };
-type GrokQuota = { status: "available" | "unavailable"; reason?: string; windows: WindowUsage[] };
-type Quotas = { grok?: GrokQuota; status: "available" | "unavailable" | "busy"; observedAt?: number; groups: Array<{ id: string; windows: WindowUsage[] }> };
-export function parseQuotas(value: unknown): Quotas {
-  const data = value as Quotas & { schema?: string };
-  if (!data || data.schema !== "simplicio.provider-quotas/v1" || !["available","unavailable","busy"].includes(data.status) || !Array.isArray(data.groups) || data.groups.length > 16) throw new Error("quota_invalid");
-  for (const group of data.groups) {
-    if (!group || typeof group.id !== "string" || !Array.isArray(group.windows) || group.windows.length > 2) throw new Error("quota_invalid");
-    for (const w of group.windows) if (!w || !Number.isFinite(w.usedPercent) || w.usedPercent < 0 || w.usedPercent > 100 || !Number.isSafeInteger(w.windowDurationMins) || w.windowDurationMins <= 0 || !Number.isSafeInteger(w.resetsAt) || w.resetsAt < 0) throw new Error("quota_invalid");
-  }
-  let grok: GrokQuota | undefined;
-  if (data.grok) {
-    const projected = parseQuotas({schema: "simplicio.provider-quotas/v1", status: data.grok.status, groups: [{id: "grok", windows: data.grok.windows}]});
-    if (projected.status === "busy") throw new Error("quota_invalid");
-    grok = {status: projected.status, windows: projected.groups[0].windows, reason: typeof data.grok.reason === "string" ? data.grok.reason : undefined};
-  }
-  return { grok, status: data.status, observedAt: typeof data.observedAt === "number" ? data.observedAt : undefined, groups: data.groups };
+type ProviderQuota = {
+  id: "codex" | "grok";
+  source: "codex_app_server" | "grok_cli_billing";
+  observedAt: number;
+  accountScope: "local_authenticated_account" | "local_cli_session";
+  redacted: true;
+  status: "fresh" | "stale" | "unavailable";
+  error?: string;
+  windows: WindowUsage[];
+};
+type Quotas = {
+  schema: "simplicio.provider-quotas/v2";
+  status: "available" | "stale" | "unavailable" | "busy";
+  observedAt: number;
+  providers: ProviderQuota[];
+};
+
+const providerIds = ["codex", "grok"] as const;
+const sources = ["codex_app_server", "grok_cli_billing"] as const;
+const scopes = ["local_authenticated_account", "local_cli_session"] as const;
+const statuses = ["fresh", "stale", "unavailable"] as const;
+const maxProviderWindows = 32;
+
+function record(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+function parseWindow(value: unknown): WindowUsage {
+  if (!record(value)) throw new Error("quota_invalid");
+  const used = value.usedPercent;
+  const minutes = value.windowDurationMins;
+  const resets = value.resetsAt;
+  if (typeof used !== "number" || !Number.isFinite(used) || used < 0 || used > 100
+    || typeof minutes !== "number" || !Number.isSafeInteger(minutes) || minutes <= 0
+    || typeof resets !== "number" || !Number.isSafeInteger(resets) || resets < 0) {
+    throw new Error("quota_invalid");
+  }
+  return { usedPercent: used, windowDurationMins: minutes, resetsAt: resets };
+}
+
+export function parseQuotas(value: unknown): Quotas {
+  if (!record(value)
+    || value.schema !== "simplicio.provider-quotas/v2"
+    || !["available", "stale", "unavailable", "busy"].includes(String(value.status))
+    || !Number.isSafeInteger(value.observedAt) || Number(value.observedAt) < 0
+    || !Array.isArray(value.providers) || value.providers.length > 2) {
+    throw new Error("quota_invalid");
+  }
+  const seen = new Set<string>();
+  const providers = value.providers.map((raw): ProviderQuota => {
+    if (!record(raw)
+      || !providerIds.includes(raw.id as typeof providerIds[number])
+      || seen.has(String(raw.id))
+      || !sources.includes(raw.source as typeof sources[number])
+      || !scopes.includes(raw.accountScope as typeof scopes[number])
+      || raw.redacted !== true
+      || !Number.isSafeInteger(raw.observedAt) || Number(raw.observedAt) < 0
+      || !statuses.includes(raw.status as typeof statuses[number])
+      || !Array.isArray(raw.windows) || raw.windows.length > maxProviderWindows
+      || (raw.status === "unavailable" && raw.windows.length !== 0)
+      || (raw.status !== "unavailable" && raw.windows.length === 0)) {
+      throw new Error("quota_invalid");
+    }
+    seen.add(String(raw.id));
+    const windows = raw.windows.map(parseWindow);
+    const error = raw.error === undefined
+      ? undefined
+      : typeof raw.error === "string" && /^[a-z_]{1,64}$/.test(raw.error) ? raw.error : null;
+    if (error === null) throw new Error("quota_invalid");
+    return {
+      id: raw.id as ProviderQuota["id"],
+      source: raw.source as ProviderQuota["source"],
+      observedAt: raw.observedAt as number,
+      accountScope: raw.accountScope as ProviderQuota["accountScope"],
+      redacted: true,
+      status: raw.status as ProviderQuota["status"],
+      error,
+      windows,
+    };
+  });
+  if (value.status === "busy" && providers.length !== 0) throw new Error("quota_invalid");
+  return {
+    schema: "simplicio.provider-quotas/v2",
+    status: value.status as Quotas["status"],
+    observedAt: value.observedAt as number,
+    providers,
+  };
+}
+
 export async function readProviderQuotas(): Promise<Quotas> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    return parseQuotas(await Promise.race([invoke("desktop_provider_quotas"), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("quota_timeout")), 40_000); })]));
-  } finally { clearTimeout(timer); }
+    return parseQuotas(await Promise.race([
+      invoke("desktop_provider_quotas"),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("quota_timeout")), 40_000); }),
+    ]));
+  } finally {
+    clearTimeout(timer);
+  }
 }
+
+function providerLabel(provider: ProviderQuota | undefined): string {
+  if (provider?.status === "stale") return "Dados anteriores; atualize para uma leitura atual.";
+  if (provider?.error === "refresh_in_grok") return "Abra o Grok neste computador para renovar a sessão e consulte novamente.";
+  if (provider?.error === "login_required") return "Entre no cliente neste computador para consultar sua cota.";
+  return "Cota indisponível. Nenhum percentual presumido.";
+}
+
+function sourceLabel(provider: ProviderQuota): string {
+  return provider.source === "codex_app_server" ? "Codex app-server" : "Grok CLI billing";
+}
+
 export function ProviderUsage({ onAccounts, onHistory }: { onAccounts: () => void; onHistory: () => void }) {
   const [open, setOpen] = useState(false);
   const [compact, setCompact] = useState(false);
@@ -35,57 +124,68 @@ export function ProviderUsage({ onAccounts, onHistory }: { onAccounts: () => voi
   const lock = useRef(false);
   const alive = useRef(false);
   const root = useRef<HTMLDivElement>(null);
+
   async function refresh() {
     if (lock.current || !("__TAURI_INTERNALS__" in window)) return;
-    lock.current = true; setBusy(true);
+    lock.current = true;
+    setBusy(true);
     try {
       const next = await readProviderQuotas();
       if (alive.current) { setData(next); setError(false); }
-    } catch { if (alive.current) setError(true); }
-    finally { lock.current = false; if (alive.current) setBusy(false); }
+    } catch {
+      if (alive.current) setError(true);
+    } finally {
+      lock.current = false;
+      if (alive.current) setBusy(false);
+    }
   }
+
   useEffect(() => {
-    alive.current = true; void refresh();
+    alive.current = true;
+    void refresh();
     const timer = setInterval(() => { if (!document.hidden) void refresh(); }, 60_000);
     return () => { alive.current = false; clearInterval(timer); };
   }, []);
+
   useEffect(() => {
     if (!open) return;
-    const outside = (e: PointerEvent) => { if (!root.current?.contains(e.target as Node)) setOpen(false); };
-    const key = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("pointerdown", outside); document.addEventListener("keydown", key);
+    const outside = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };
+    const key = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", key);
     return () => { document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", key); };
   }, [open]);
-  const windows = data?.groups.flatMap(g => g.windows) ?? [];
-  const summary = windows.find(w => w.windowDurationMins === 10080) ?? windows[0];
+
+  const codex = data?.providers.find(provider => provider.id === "codex");
+  const grok = data?.providers.find(provider => provider.id === "grok");
+  const summary = codex?.windows.find(window => window.windowDurationMins === 10080) ?? codex?.windows[0];
+  const renderWindows = (provider: ProviderQuota | undefined, label: string) => <>
+    <h3>{label}</h3>
+    {provider?.windows.map((window, index) => <div className={"quota-window" + (compact ? " quota-window-compact" : "")} key={window.windowDurationMins + "-" + window.resetsAt + "-" + index}>
+      <span>{window.windowDurationMins === 10080 ? "Semanal" : window.windowDurationMins === 300 ? "5 horas" : window.windowDurationMins + " min"} · {window.usedPercent}% usado</span>
+      <progress max={100} value={window.usedPercent} aria-label={"Uso da janela de " + window.windowDurationMins + " minutos"} />
+      {!compact && <small>Renova em {new Date(window.resetsAt * 1000).toLocaleString("pt-BR")}</small>}
+    </div>)}
+    {(!provider || !provider.windows.length) && <p>{providerLabel(provider)}</p>}
+    {provider && <small>Fonte: {sourceLabel(provider)} · consulta {new Date(provider.observedAt * 1000).toLocaleTimeString("pt-BR")}{provider.status === "stale" ? " · desatualizada" : ""}</small>}
+  </>;
+
   return <div className="provider-usage" ref={root}>
-    <button type="button" aria-expanded={open} aria-controls="provider-usage-panel" onClick={() => setOpen(!open)}>{summary && !error ? "Codex " + summary.usedPercent + "% usado" : busy ? "Consultando cotas…" : "Cotas dos agentes"}</button>
+    <button type="button" aria-expanded={open} aria-controls="provider-usage-panel" onClick={() => setOpen(!open)}>
+      {summary && !error ? "Codex " + summary.usedPercent + "% usado" + (codex?.status === "stale" ? " · desatualizado" : "") : busy ? "Consultando cotas…" : "Cotas dos agentes"}
+    </button>
     {open && <section id="provider-usage-panel" className="provider-usage-panel" aria-label="Cotas dos agentes">
       <header><strong>Uso das contas</strong><button type="button" disabled={busy} onClick={() => void refresh()}>{busy ? "Consultando…" : "Atualizar cotas"}</button><button type="button" aria-label="Fechar cotas" onClick={() => setOpen(false)}>×</button></header>
       <div className="quota-display-mode" role="group" aria-label="Modo de exibição das cotas">
         <button type="button" aria-pressed={!compact} onClick={() => setCompact(false)}>Detalhado</button>
         <button type="button" aria-pressed={compact} onClick={() => setCompact(true)}>Compacto</button>
       </div>
-      <h3>Codex</h3>
       {error && <p role="status">Consulta falhou. Dados anteriores não são uma leitura atual.</p>}
-      {!summary && <p>{busy ? "Consultando o cliente Codex…" : "Cota não disponível. Verifique o login no cliente Codex."}</p>}
-      {data?.groups.map(group => <div key={group.id}>{data.groups.length > 1 && <strong>{group.id}</strong>}{group.windows.map(w => <div className={"quota-window" + (compact ? " quota-window-compact" : "")} key={w.windowDurationMins}>
-        <span>{w.windowDurationMins === 10080 ? "Semanal" : w.windowDurationMins === 300 ? "5 horas" : w.windowDurationMins + " min"} · {w.usedPercent}% usado</span>
-        <progress max={100} value={w.usedPercent} aria-label={"Uso da janela de " + w.windowDurationMins + " minutos"} />
-        {!compact && <small>Renova em {new Date(w.resetsAt * 1000).toLocaleString("pt-BR")}</small>}
-      </div>)}</div>)}
-      {data?.observedAt && <small>Fonte: Codex app-server · consulta {new Date(data.observedAt * 1000).toLocaleTimeString("pt-BR")}</small>}
-      <h3>Grok</h3>
-      {data?.grok?.windows.map(w => <div className={"quota-window" + (compact ? " quota-window-compact" : "")} key={w.windowDurationMins}>
-        <span>{w.windowDurationMins === 10080 ? "Semanal" : w.windowDurationMins + " min"} · {w.usedPercent}% usado</span>
-        <progress max={100} value={w.usedPercent} aria-label="Uso da conta Grok" />
-        {!compact && <small>Renova em {new Date(w.resetsAt * 1000).toLocaleString("pt-BR")}</small>}
-      </div>)}
-      {!data?.grok?.windows.length && <p>{data?.grok?.reason === "refresh_in_grok" ? "Abra o Grok neste computador para renovar a sessão e consulte novamente." : data?.grok?.reason === "login_required" ? "Entre no cliente Grok neste computador para consultar sua cota." : "Cota Grok indisponível. Nenhum percentual presumido."}</p>}
-      {data?.grok?.windows.length ? <small>Fonte: Grok CLI billing</small> : null}
+      {renderWindows(codex, "Codex")}
+      {renderWindows(grok, "Grok")}
       <button type="button" onClick={() => { setOpen(false); onHistory(); }}>Histórico de uso do Runtime</button>
       <button type="button" onClick={() => { setOpen(false); onAccounts(); }}>Contas de IA</button>
-      <p className="quota-note">Cotas de assinatura não são tokens faturados nem economia do Runtime. Atualizações respeitam cache de 30 segundos.</p>
+      <p className="quota-note">Cotas de assinatura não são tokens faturados nem economia do Runtime. Atualizações respeitam cache de 30 segundos; estados desatualizados não são tratados como leituras atuais.</p>
     </section>}
   </div>;
 }

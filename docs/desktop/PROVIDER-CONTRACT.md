@@ -35,6 +35,22 @@ The snapshot returns redacted state and account labels only. Secrets, complete
 configuration files, raw command output and provider transcripts never cross
 the Desktop bridge.
 
+## Provider quota telemetry
+
+The read-only quota command returns `simplicio.provider-quotas/v2` with one
+bounded record per provider. Each record carries `source`, `observedAt`,
+`accountScope`, `redacted: true`, `status` (`fresh`, `stale` or `unavailable`),
+an optional bounded error and reset windows with `usedPercent`,
+`windowDurationMins` and `resetsAt`.
+
+Codex is read through the supported `account/rateLimits/read` app-server RPC;
+Grok is read through its fixed CLI billing endpoint using the existing local
+session. Credentials and raw provider payloads stay in native code. Missing
+percentages are unavailable, never zero; stale values remain explicitly stale.
+This telemetry is separate from Runtime token ledgers and never enables account
+creation, logout, login or account selection. Those controls remain unavailable
+until a real provider account contract exists.
+
 ## Host-path caveat
 
 Packaged apps do not inherit the same `PATH` as an interactive shell. Detection

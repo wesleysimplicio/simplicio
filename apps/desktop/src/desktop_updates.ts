@@ -156,6 +156,13 @@ export function selectDesktopRelease(payload: unknown, target: DesktopUpdateTarg
       if (rank === null || asset.browser_download_url !== `${DESKTOP_RELEASES_URL}/download/${entry.tag_name}/${encodeURIComponent(asset.name)}`) continue;
       if (selected === null || rank < selected.rank) selected = { name: asset.name, bytes: asset.size, rank };
     }
+    if (selected) {
+      const signatureName = `${selected.name}.sig`;
+      const signature = entry.assets.find((asset) => record(asset) && asset.state === "uploaded" && asset.name === signatureName &&
+        typeof asset.size === "number" && Number.isSafeInteger(asset.size) && asset.size > 0 && asset.size <= 4096 &&
+        asset.browser_download_url === `${DESKTOP_RELEASES_URL}/download/${entry.tag_name}/${encodeURIComponent(signatureName)}`);
+      if (!signature) selected = null;
+    }
     if (selected && (latest === null || compareVersions(version, latest.version) > 0)) {
       latest = { version, tag: entry.tag_name, releaseUrl, assetName: selected.name, assetBytes: selected.bytes,
         publishedAt: publicationDate(entry.published_at), notes: releaseNotes(entry.body) };

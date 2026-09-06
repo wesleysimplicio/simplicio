@@ -7,10 +7,18 @@ describe("native permission and quota projections", () => {
     expect(parsePermissions({ schema: "simplicio.desktop-permissions/v1", source: "operating_system", rows })[0].status).toBe("unknown");
     expect(() => parsePermissions({ schema: "simplicio.desktop-permissions/v1", source: "operating_system", rows: [...rows.slice(1), rows[1]] })).toThrow();
   });
-  it("rejects quota percentages outside the contract", () => {
-    const quota = { schema: "simplicio.provider-quotas/v1", status: "available", groups: [{ id: "codex", windows: [{ usedPercent: 21, windowDurationMins: 10080, resetsAt: 1900000000 }] }] };
-    expect(parseQuotas(quota).groups[0].windows[0].usedPercent).toBe(21);
-    quota.groups[0].windows[0].usedPercent = 101;
+  it("requires a redacted provider record with source, scope, timestamp and windows", () => {
+    const quota = { schema: "simplicio.provider-quotas/v2", status: "available", observedAt: 1900000000, providers: [{ id: "codex", source: "codex_app_server", accountScope: "local_authenticated_account", observedAt: 1900000000, redacted: true, status: "fresh", windows: [{ usedPercent: 21, windowDurationMins: 10080, resetsAt: 1900000000 }] }] };
+    expect(parseQuotas(quota).providers[0].windows[0].usedPercent).toBe(21);
+    quota.providers[0].windows[0].usedPercent = 101;
     expect(() => parseQuotas(quota)).toThrow();
+    quota.providers[0].windows[0].usedPercent = 21;
+    quota.providers[0].redacted = false;
+    expect(() => parseQuotas(quota)).toThrow();
+  });
+  it("keeps stale and unavailable states explicit", () => {
+    const stale = { schema: "simplicio.provider-quotas/v2", status: "stale", observedAt: 1900000000, providers: [{ id: "grok", source: "grok_cli_billing", accountScope: "local_cli_session", observedAt: 1899990000, redacted: true, status: "stale", error: "stale", windows: [{ usedPercent: 10, windowDurationMins: 43200, resetsAt: 1900000000 }] }] };
+    expect(parseQuotas(stale).providers[0].status).toBe("stale");
+    expect(parseQuotas({ ...stale, status: "unavailable", providers: [{ ...stale.providers[0], status: "unavailable", windows: [], error: "login_required" }] }).providers[0].windows).toHaveLength(0);
   });
 });

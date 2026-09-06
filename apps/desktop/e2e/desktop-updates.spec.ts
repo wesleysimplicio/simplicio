@@ -81,7 +81,10 @@ async function mockUpdates(page: Page, options: { holdVersion?: boolean; version
     status: 200, headers: { "content-type": "application/json", "access-control-allow-origin": "*" },
     body: JSON.stringify([{ tag_name: "v3.8.40", draft: false, prerelease: false, html_url: `${DESKTOP_RELEASES_URL}/tag/v3.8.40`,
       published_at: "2026-08-31T01:34:29Z", body: options.notes ?? "Melhorias no login e nas integrações do Desktop.",
-      assets: [{ name, state: "uploaded", size: 100_000, browser_download_url: `${DESKTOP_RELEASES_URL}/download/v3.8.40/${name}` }],
+      assets: [
+        { name, state: "uploaded", size: 100_000, browser_download_url: `${DESKTOP_RELEASES_URL}/download/v3.8.40/${name}` },
+        { name: `${name}.sig`, state: "uploaded", size: 92, browser_download_url: `${DESKTOP_RELEASES_URL}/download/v3.8.40/${name}.sig` },
+      ],
     }]),
   }));
   await page.goto("/");

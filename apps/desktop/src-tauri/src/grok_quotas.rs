@@ -89,10 +89,10 @@ fn query() -> Result<Value, &'static str> {
     }
     Err("quota_unavailable")
 }
-pub fn read() -> Value {
+pub fn read(observed_at: u64) -> Value {
     match query() {
-        Ok(window) => json!({"status":"available","source":"grok_cli_billing","windows":[window]}),
-        Err(reason) => json!({"status":"unavailable","source":"grok_cli_billing","reason":reason,"windows":[]}),
+        Ok(window) => json!({"id": "grok", "source": "grok_cli_billing", "observedAt": observed_at, "accountScope": "local_cli_session", "redacted": true, "status": "fresh", "windows": [window]}),
+        Err(reason) => json!({"id": "grok", "source": "grok_cli_billing", "observedAt": observed_at, "accountScope": "local_cli_session", "redacted": true, "status": "unavailable", "error": reason, "windows": []}),
     }
 }
 #[cfg(test)]
@@ -101,7 +101,7 @@ mod tests {
     #[test]
     #[ignore = "explicit local acceptance: reads the signed-in Grok CLI session and calls billing"]
     fn local_billing_observation() {
-        let observation = read();
+        let observation = read(1900000000);
         assert_eq!(observation["source"], "grok_cli_billing");
         println!("{observation}");
     }

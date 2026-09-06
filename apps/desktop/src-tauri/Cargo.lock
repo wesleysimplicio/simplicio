@@ -3246,10 +3246,12 @@ checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 name = "simplicio-desktop"
 version = "3.8.47"
 dependencies = [
+ "base64 0.22.1",
  "block2",
  "chrono",
  "objc2",
  "reqwest",
+ "ring",
  "serde",
  "serde_json",
  "sha2",

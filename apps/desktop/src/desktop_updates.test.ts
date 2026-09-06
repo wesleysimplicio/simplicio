@@ -9,7 +9,10 @@ function release(version: string, names = [`Simplicio-${version}-arm64.dmg`]) {
   const tag = `v${version}`;
   return {
     tag_name: tag, draft: false, prerelease: false, html_url: `${DESKTOP_RELEASES_URL}/tag/${tag}`,
-    assets: names.map((name) => ({ name, state: "uploaded", size: 100_000, browser_download_url: `${DESKTOP_RELEASES_URL}/download/${tag}/${encodeURIComponent(name)}` })),
+    assets: [
+      ...names.map((name) => ({ name, state: "uploaded", size: 100_000, browser_download_url: `${DESKTOP_RELEASES_URL}/download/${tag}/${encodeURIComponent(name)}` })),
+      ...names.filter((name) => !name.endsWith(".sig")).map((name) => ({ name: `${name}.sig`, state: "uploaded", size: 92, browser_download_url: `${DESKTOP_RELEASES_URL}/download/${tag}/${encodeURIComponent(name + ".sig")}` })),
+    ],
   };
 }
 
@@ -86,6 +89,14 @@ describe("published Desktop asset selection", () => {
     for (const name of ["simplicio-windows-x64.exe", "simplicio-3.8.39-windows-x64.exe", "simplicio_3.8.39_x64.exe", "simplicio_3.8.39_x64.zip"]) {
       expect(() => selectDesktopRelease([release("3.8.39", [name])], windows)).toThrow("no_compatible_release");
     }
+  });
+
+  it("requires a matching uploaded Ed25519 sidecar", () => {
+    const fixture = release("3.8.39");
+    expect(() => selectDesktopRelease([{ ...fixture, assets: fixture.assets.filter((asset) => !asset.name.endsWith(".sig")) }], mac)).toThrow("no_compatible_release");
+    const signature = fixture.assets.find((asset) => asset.name.endsWith(".sig"));
+    expect(() => selectDesktopRelease([{ ...fixture, assets: [{ ...signature!, browser_download_url: "https://evil.invalid/signature" }, fixture.assets[0]] }], mac)).toThrow("no_compatible_release");
+    expect(selectDesktopRelease([fixture], mac).assetName).toBe("Simplicio-3.8.39-arm64.dmg");
   });
 
   it("requires exact official release and download URLs", () => {

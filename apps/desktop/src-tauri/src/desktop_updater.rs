@@ -6,6 +6,8 @@
 //! to install anything that was not verified.  No authentication state is
 //! consulted: checking and installing a public Desktop release is anonymous.
 
+use base64::Engine as _;
+use ring::signature::{UnparsedPublicKey, ED25519};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::fs::{self, File, OpenOptions};
@@ -33,6 +35,9 @@ struct ReleaseArtifact {
     asset_bytes: u64,
     digest: String,
     url: String,
+    signature_url: String,
+    signature_bytes: u64,
+    signature: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -211,10 +216,31 @@ fn valid_digest(value: &str) -> bool {
         .is_some_and(|hex| hex.len() == 64 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
 }
 
+const SIGNING_PUBLIC_KEY: &str = "2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok=";
+const SIGNATURE_DOMAIN: &str = "simplicio-release-v1:";
+const MAX_SIGNATURE_BYTES: u64 = 4096;
+
+fn valid_signature(value: &str) -> bool {
+    value.starts_with("ed25519:")
+        && value.len() <= MAX_SIGNATURE_BYTES as usize
+        && base64::engine::general_purpose::STANDARD
+            .decode(value.trim_start_matches("ed25519:"))
+            .is_ok_and(|signature| signature.len() == 64)
+}
+
+fn verify_signature(digest: &str, signature: &str) -> bool {
+    let Some(hex) = digest.strip_prefix("sha256:") else { return false; };
+    if !valid_digest(digest) || !valid_signature(signature) { return false; }
+    let Ok(public_key) = base64::engine::general_purpose::STANDARD.decode(SIGNING_PUBLIC_KEY) else { return false; };
+    let Ok(signature_bytes) = base64::engine::general_purpose::STANDARD.decode(signature.trim_start_matches("ed25519:")) else { return false; };
+    let payload = format!("{SIGNATURE_DOMAIN}{}", hex.to_ascii_lowercase());
+    UnparsedPublicKey::new(&ED25519, public_key).verify(payload.as_bytes(), &signature_bytes).is_ok()
+}
+
 fn fixed_asset_url(tag: &str, asset_name: &str) -> Result<String, String> {
     if !safe_component(tag, 80)
         || !tag.starts_with('v')
-        || !safe_component(asset_name, MAX_ASSET_NAME)
+        || !safe_component(asset_name, MAX_ASSET_NAME + 4)
     {
         return Err(error("update_identity_invalid"));
     }
@@ -272,6 +298,22 @@ fn parse_manifest(body: &[u8], tag: &str, asset_name: &str) -> Result<ReleaseArt
     {
         return Err(error("update_asset_invalid"));
     }
+    let signature_name = format!("{asset_name}.sig");
+    let signature_asset = assets
+        .iter()
+        .find(|candidate| candidate.get("name").and_then(Value::as_str) == Some(signature_name.as_str()))
+        .ok_or_else(|| error("update_signature_unavailable"))?;
+    let signature_bytes = signature_asset
+        .get("size")
+        .and_then(Value::as_u64)
+        .filter(|size| *size > 0 && *size <= MAX_SIGNATURE_BYTES)
+        .ok_or_else(|| error("update_signature_invalid"))?;
+    let signature_url = fixed_asset_url(tag, &signature_name)?;
+    if signature_asset.get("state").and_then(Value::as_str) != Some("uploaded")
+        || signature_asset.get("browser_download_url").and_then(Value::as_str) != Some(signature_url.as_str())
+    {
+        return Err(error("update_signature_invalid"));
+    }
     Ok(ReleaseArtifact {
         version: version.to_string(),
         tag: tag.to_string(),
@@ -279,6 +321,9 @@ fn parse_manifest(body: &[u8], tag: &str, asset_name: &str) -> Result<ReleaseArt
         asset_bytes: bytes,
         digest: digest.to_string(),
         url,
+        signature_url,
+        signature_bytes,
+        signature: None,
     })
 }
 
@@ -352,14 +397,17 @@ fn state_to_json(value: &UpdateState) -> Value {
         "asset_name": value.artifact.asset_name,
         "asset_bytes": value.artifact.asset_bytes,
         "asset_digest": value.artifact.digest,
+        "signature_url": value.artifact.signature_url,
+        "signature_bytes": value.artifact.signature_bytes,
+        "signature": value.artifact.signature,
         "received_bytes": value.received_bytes,
         "staged_path": value.staged_path.display().to_string(),
         "previous_path": value.previous_path.as_ref().map(|path| path.display().to_string()),
         "target": { "platform": expected_target().0, "arch": expected_target().1 },
         "restart_required": value.state == "relaunch_pending" || value.state == "awaiting_health",
         "anonymous": true,
-        "integrity": "sha256",
-        "provenance": "github-release-api",
+        "integrity": "sha256+ed25519",
+        "provenance": "github-release-api+ed25519-sidecar",
     })
 }
 
@@ -410,10 +458,28 @@ fn parse_state(value: &Value) -> Result<UpdateState, String> {
         .and_then(Value::as_str)
         .map(PathBuf::from)
         .ok_or_else(|| error("update_state_invalid"))?;
+    let signature_url = value
+        .get("signature_url")
+        .and_then(Value::as_str)
+        .ok_or_else(|| error("update_state_invalid"))?;
+    let signature_bytes = value
+        .get("signature_bytes")
+        .and_then(Value::as_u64)
+        .filter(|size| *size > 0 && *size <= MAX_SIGNATURE_BYTES)
+        .ok_or_else(|| error("update_state_invalid"))?;
+    let signature = value
+        .get("signature")
+        .and_then(Value::as_str)
+        .filter(|signature| valid_signature(signature))
+        .map(str::to_string);
+    if state != "downloading" && signature.is_none() {
+        return Err(error("update_signature_unavailable"));
+    }
     if !version_valid(version)
         || !tag.starts_with('v')
         || !safe_component(asset_name, MAX_ASSET_NAME)
         || !asset_matches_target(asset_name)
+        || signature_url != fixed_asset_url(tag, &format!("{asset_name}.sig"))?
     {
         return Err(error("update_state_invalid"));
     }
@@ -431,6 +497,9 @@ fn parse_state(value: &Value) -> Result<UpdateState, String> {
             asset_bytes,
             digest: digest.to_string(),
             url: fixed_asset_url(tag, asset_name)?,
+            signature_url: signature_url.to_string(),
+            signature_bytes,
+            signature,
         },
         received_bytes: value
             .get("received_bytes")
@@ -498,7 +567,7 @@ pub fn download(
     }
     let _effect = UPDATE_EFFECT_LOCK.try_lock().map_err(|_| error("update_busy"))?;
     ensure_private_dir(&update_root(app_data))?;
-    let artifact = load_manifest(&update_root(app_data), tag, asset_name)?;
+    let mut artifact = load_manifest(&update_root(app_data), tag, asset_name)?;
     if artifact.version != version
         || (asset_bytes_hint != 0 && artifact.asset_bytes != asset_bytes_hint)
     {
@@ -545,6 +614,24 @@ pub fn download(
         write_state(app_data, &state)?;
         return Err(error("update_checksum_mismatch"));
     }
+    let signature_part = update_root(app_data).join(format!("{id}.sig.part"));
+    reject_symlink(&signature_part)?;
+    curl_to(&artifact.signature_url, &signature_part, false, 60)?;
+    let signature_body = fs::read(&signature_part).map_err(|_| error("update_signature_invalid"))?;
+    let _ = fs::remove_file(&signature_part);
+    if signature_body.len() as u64 != artifact.signature_bytes {
+        state.received_bytes = actual_bytes;
+        write_state(app_data, &state)?;
+        return Err(error("update_signature_invalid"));
+    }
+    let signature = std::str::from_utf8(&signature_body).map_err(|_| error("update_signature_invalid"))?.trim();
+    if !valid_signature(signature) || !verify_signature(&artifact.digest, signature) {
+        state.received_bytes = actual_bytes;
+        write_state(app_data, &state)?;
+        return Err(error("update_signature_mismatch"));
+    }
+    artifact.signature = Some(signature.to_string());
+    state.artifact = artifact.clone();
     let final_path = update_root(app_data).join(format!("{id}-{}", artifact.asset_name));
     reject_symlink(&final_path)?;
     fs::rename(&staged_path, &final_path).map_err(|_| error("update_stage_failed"))?;
@@ -835,6 +922,9 @@ pub fn install(
     if digest_file(&state.staged_path)? != state.artifact.digest {
         return Err(error("update_checksum_mismatch"));
     }
+    if !state.artifact.signature.as_deref().is_some_and(|signature| verify_signature(&state.artifact.digest, signature)) {
+        return Err(error("update_signature_mismatch"));
+    }
     install_bundle(app_data, current_executable, &mut state)
 }
 
@@ -922,11 +1012,22 @@ mod tests {
         ReleaseArtifact {
             version: version.to_string(),
             tag: format!("v{version}"),
-            asset_name: "Simplicio-3.8.99-arm64.zip".to_string(),
+            asset_name: "Simplicio_3.8.99_x64.AppImage".to_string(),
             asset_bytes: 10,
             digest: "sha256:".to_string() + &"a".repeat(64),
-            url: fixed_asset_url(&format!("v{version}"), "Simplicio-3.8.99-arm64.zip").unwrap(),
+            url: fixed_asset_url(&format!("v{version}"), "Simplicio_3.8.99_x64.AppImage").unwrap(),
+            signature_url: fixed_asset_url(&format!("v{version}"), "Simplicio_3.8.99_x64.AppImage.sig").unwrap(),
+            signature_bytes: 96,
+            signature: Some("ed25519:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==".to_string()),
         }
+    }
+
+    #[test]
+    fn verifies_domain_separated_release_signature() {
+        let digest = "sha256:12681adb6fa49bc2a5d39f8feca42baabe5d97b61cfdf40a5d452d890a8be83a";
+        let signature = "ed25519:/Tt+wpY4VedOmsOJRPAaAz470OfD4QprLGnTed7QGkkWgyqLoeg2U/dr6PD3EWl4rvHLiok2UWALeDBvG9KmCQ==";
+        assert!(verify_signature(digest, signature));
+        assert!(!verify_signature(digest, "ed25519:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="));
     }
 
     #[test]
@@ -989,24 +1090,48 @@ mod tests {
     }
 
     #[test]
+    fn rejects_manifest_without_signature_sidecar() {
+        let asset_name = "Simplicio_3.8.99_x64.AppImage";
+        let payload = json!([{
+            "tag_name": "v3.8.99", "draft": false, "prerelease": false,
+            "html_url": format!("{RELEASES_URL}/tag/v3.8.99"),
+            "assets": [{
+                "name": asset_name, "state": "uploaded", "size": 10,
+                "digest": "sha256:".to_string() + &"a".repeat(64),
+                "browser_download_url": format!("{RELEASES_URL}/download/v3.8.99/{asset_name}")
+            }]
+        }]);
+        assert_eq!(parse_manifest(payload.to_string().as_bytes(), "v3.8.99", asset_name).unwrap_err(), "update_signature_unavailable");
+    }
+
+    #[test]
     fn keeps_version_and_identity_bound_to_the_manifest() {
+        let asset_name = "Simplicio_3.8.99_x64.AppImage";
         let payload = json!([{
             "tag_name": "v3.8.99",
             "draft": false,
             "prerelease": false,
             "html_url": format!("{RELEASES_URL}/tag/v3.8.99"),
-            "assets": [{
-                "name": "Simplicio-3.8.99-arm64.zip",
-                "state": "uploaded",
-                "size": 10,
-                "digest": "sha256:".to_string() + &"a".repeat(64),
-                "browser_download_url": format!("{RELEASES_URL}/download/v3.8.99/Simplicio-3.8.99-arm64.zip")
-            }]
+            "assets": [
+                {
+                    "name": asset_name,
+                    "state": "uploaded",
+                    "size": 10,
+                    "digest": "sha256:".to_string() + &"a".repeat(64),
+                    "browser_download_url": format!("{RELEASES_URL}/download/v3.8.99/{asset_name}")
+                },
+                {
+                    "name": format!("{asset_name}.sig"),
+                    "state": "uploaded",
+                    "size": 92,
+                    "browser_download_url": format!("{RELEASES_URL}/download/v3.8.99/{asset_name}.sig")
+                }
+            ]
         }]);
         assert!(parse_manifest(
             payload.to_string().as_bytes(),
             "v3.8.99",
-            "Simplicio-3.8.99-arm64.zip"
+            asset_name
         )
         .is_ok());
         assert_eq!(
