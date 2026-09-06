@@ -37,11 +37,25 @@ the Desktop bridge.
 
 ## Provider quota telemetry
 
-The read-only quota command returns `simplicio.provider-quotas/v2` with one
-bounded record per provider. Each record carries `source`, `observedAt`,
-`accountScope`, `redacted: true`, `status` (`fresh`, `stale` or `unavailable`),
-an optional bounded error and reset windows with `usedPercent`,
-`windowDurationMins` and `resetsAt`.
+The read-only `desktop_provider_quotas` command returns
+`simplicio.provider-quotas/v2`. Its root status is `available`, `stale`,
+`unavailable` or transient `busy`; `busy` always has an empty provider list.
+Otherwise the root status is `available` when any provider is `fresh`, `stale`
+when none is fresh but at least one is stale, and `unavailable` when no usable
+record exists. Each provider record carries `source`, `observedAt` (no later
+than the root timestamp), `accountScope`, `redacted: true`, `status` (`fresh`,
+`stale` or `unavailable`), an optional error code of at most 64 lowercase ASCII
+characters, and at most 32 reset windows.
+
+| Provider | Source | Account scope |
+| --- | --- | --- |
+| `codex` | `codex_app_server` | `local_authenticated_account` |
+| `grok` | `grok_cli_billing` | `local_cli_session` |
+
+Every window has finite `usedPercent` in `0..100`, a positive
+`windowDurationMins` no larger than 366 days, and a non-negative reset epoch
+that fits JavaScript's safe integer range. An `unavailable` provider has no
+windows; missing values remain unavailable rather than becoming zero.
 
 Codex is read through the supported `account/rateLimits/read` app-server RPC;
 Grok is read through its fixed CLI billing endpoint using the existing local
@@ -50,6 +64,10 @@ percentages are unavailable, never zero; stale values remain explicitly stale.
 This telemetry is separate from Runtime token ledgers and never enables account
 creation, logout, login or account selection. Those controls remain unavailable
 until a real provider account contract exists.
+
+The renderer validates this boundary again before displaying it. A valid
+contract with no current provider session is an honest `unavailable`
+observation, not proof of a live quota reading.
 
 ## Host-path caveat
 

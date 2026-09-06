@@ -4,6 +4,9 @@ use std::{path::PathBuf, process::Command, sync::Mutex, time::{Duration, Instant
 
 const SCHEMA: &str = "simplicio.provider-quotas/v2";
 const MAX_STALE_SECS: u64 = 15 * 60;
+const MAX_WINDOW_DURATION_MINS: u64 = 366 * 24 * 60;
+const MAX_SAFE_EPOCH_SECS: u64 = 9_007_199_254_740_991;
+const MAX_WINDOWS: usize = 32;
 static CACHE: Mutex<Option<(Instant, Value)>> = Mutex::new(None);
 
 fn now_secs() -> u64 {
@@ -34,7 +37,9 @@ fn window(value: &Value) -> Option<Value> {
     let used = value.get("usedPercent")?.as_f64()?;
     let minutes = value.get("windowDurationMins")?.as_u64()?;
     let resets = value.get("resetsAt")?.as_u64()?;
-    if !used.is_finite() || !(0.0..=100.0).contains(&used) || minutes == 0 { return None; }
+    if !used.is_finite() || !(0.0..=100.0).contains(&used)
+        || minutes == 0 || minutes > MAX_WINDOW_DURATION_MINS
+        || resets > MAX_SAFE_EPOCH_SECS { return None; }
     Some(json!({"usedPercent": used, "windowDurationMins": minutes, "resetsAt": resets}))
 }
 
@@ -58,6 +63,7 @@ fn flatten_windows(groups: &[Value]) -> Vec<Value> {
     groups.iter()
         .filter_map(|group| group.get("windows").and_then(Value::as_array))
         .flat_map(|windows| windows.iter().cloned())
+        .take(MAX_WINDOWS)
         .collect()
 }
 
@@ -162,6 +168,11 @@ time.sleep(10)
         assert!(project(&json!({"rateLimits": null})).is_empty());
     }
     #[test]
+    fn rejects_unbounded_window_fields() {
+        assert!(window(&json!({"usedPercent": 21, "windowDurationMins": MAX_WINDOW_DURATION_MINS + 1, "resetsAt": 1900000000})).is_none());
+        assert!(window(&json!({"usedPercent": 21, "windowDurationMins": 10080, "resetsAt": MAX_SAFE_EPOCH_SECS + 1})).is_none());
+    }
+    #[test]
     fn falls_back_to_legacy_limits_when_limit_id_map_is_empty() {
         let result = project(&json!({"rateLimitsByLimitId": {}, "rateLimits": {"primary": {"usedPercent": 21, "windowDurationMins": 10080, "resetsAt": 1900000000}}}));
         assert_eq!(result.len(), 1);
@@ -185,5 +196,11 @@ time.sleep(10)
         mark_stale(&mut value, MAX_STALE_SECS + 2);
         assert_eq!(value["providers"][0]["status"], "stale");
         assert_eq!(value["providers"][0]["error"], "stale");
+    }
+    #[test]
+    fn root_status_preserves_fresh_stale_and_unavailable_states() {
+        assert_eq!(root_status(&[provider("codex", "codex_app_server", "local_authenticated_account", 1, "fresh", vec![json!({"usedPercent": 1, "windowDurationMins": 10080, "resetsAt": 1900000000})], None)]), "available");
+        assert_eq!(root_status(&[provider("codex", "codex_app_server", "local_authenticated_account", 1, "stale", vec![json!({"usedPercent": 1, "windowDurationMins": 10080, "resetsAt": 1900000000})], Some("stale"))]), "stale");
+        assert_eq!(root_status(&[provider("codex", "codex_app_server", "local_authenticated_account", 1, "unavailable", vec![], Some("login_required"))]), "unavailable");
     }
 }

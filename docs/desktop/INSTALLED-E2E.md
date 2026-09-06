@@ -37,3 +37,42 @@ Local-project acceptance validates an actual folder, opens it through the fixed
 native handler, scopes the token query to that directory and removes only the
 bookmark. Native diagnostic/activity exports must return an actual saved path
 and preserve existing Downloads files, just like the token exports.
+
+## #375 acceptance evidence path
+
+The installed run writes one redacted report per native executor under the
+ignored local path `reports/desktop-installed/<platform>-<run>.json`. Validate
+that report with:
+
+```bash
+python3 scripts/verify_desktop_installed_acceptance.py \
+  --evidence reports/desktop-installed/macos-arm64-<run>.json --json
+```
+
+The report schema is `simplicio.desktop-installed-acceptance/v1`. It must name
+the installed app and bundled Runtime digest, use an isolated clean HOME, and
+mark each of these checks as `verified` before the report can be `READY`:
+
+`bundle_identity`, `runtime_snapshot`, `provider_quotas_contract`,
+`provider_quotas_current`, `signed_update_download`, `signed_update_install`,
+`signed_update_relaunch`, `signed_update_health`, `signed_update_rollback`,
+`logout_relogin`, and `permissions`.
+
+`provider_quotas_contract` records only the v2 schema, fixed source/scope,
+redaction and status/window counts. `provider_quotas_current` separately
+requires at least one fresh provider id; an honest unavailable session is not
+converted into a current reading. The report contains no paths, credentials,
+raw provider payloads or account identity.
+
+The updater checks are separate lifecycle gates: a verified download is not an
+installed update, a relaunch is not health confirmation, and a failed health
+check must retain rollback evidence. A missing Desktop `.sig`, unavailable
+native executor, unavailable Apple signing/notarization, or incompatible Rust
+toolchain is recorded with `blocked`/`unexecuted` plus a reason code and keeps
+the report blocked. Preview/Playwright evidence is rejected by the verifier.
+
+For the current Linux workspace, do not create a synthetic macOS report. The
+published v3.8.47 DMG has no matching `.sig`, Linux has no native signed
+macOS-install evidence, and native Rust evidence is conditional on a
+Tauri-compatible `rustc` (the earlier PR run was blocked by rustc 1.85.0);
+these remain explicit blockers in the PR and release notes when applicable.
