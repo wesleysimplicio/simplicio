@@ -8,6 +8,15 @@ pub const LOGIN_ARGS: &[&str] = &["login", "google", "--authentication-only", "-
 pub const STATUS_ARGS: &[&str] = &["desktop", "status", "--json"];
 const MAX_AUTH_BYTES: usize = 64 * 1024;
 
+/// Reject overlapping authentication effects, including their confirming snapshots.
+pub fn exclusive<T>(gate: &std::sync::Mutex<()>, operation: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+    let _guard = gate.try_lock().map_err(|error| match error {
+        std::sync::TryLockError::WouldBlock => "runtime_auth_busy".to_string(),
+        std::sync::TryLockError::Poisoned(_) => "runtime_auth_state_unavailable".to_string(),
+    })?;
+    operation()
+}
+
 fn supported(output: &Output) -> bool {
     if !output.status.success() || output.stdout.len() > MAX_AUTH_BYTES {
         return false;
@@ -71,6 +80,17 @@ mod tests {
     use super::*;
     use crate::runtime_process::{ChildState, FailureKind};
     use serde_json::{json, Value};
+
+    #[test]
+    fn gate_rejects_overlap_and_releases_after_failure() {
+        let gate = std::sync::Mutex::new(());
+        let result: Result<(), String> = exclusive(&gate, || {
+            assert_eq!(exclusive(&gate, || -> Result<(), String> { panic!("overlapping effect") }), Err("runtime_auth_busy".into()));
+            Err("provider_failed".into())
+        });
+        assert_eq!(result, Err("provider_failed".into()));
+        assert_eq!(exclusive(&gate, || Ok(42)), Ok(42));
+    }
 
     fn output(code: i32, value: Value) -> Output {
         bytes_output(code, serde_json::to_vec(&value).unwrap())

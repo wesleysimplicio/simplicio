@@ -288,6 +288,16 @@ def test_public_publisher_updates_all_release_version_consumers(tmp_path, monkey
         encoding="utf-8",
     )
 
+    desktop_files = (
+        "apps/desktop/package.json", "apps/desktop/package-lock.json",
+        "apps/desktop/src-tauri/tauri.conf.json", "apps/desktop/src-tauri/Cargo.toml",
+        "apps/desktop/src-tauri/Cargo.lock",
+    )
+    for relative in desktop_files:
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / relative, path)
+
     changed = module.update_public_metadata(
         "v3.8.31",
         "3.8.31",
@@ -299,6 +309,12 @@ def test_public_publisher_updates_all_release_version_consumers(tmp_path, monkey
     assert "3.8.30" not in ecosystem
     assert ecosystem.count("3.8.31") == 2
     assert tmp_path / "SIMPLICIO_ECOSYSTEM.md" in changed
+    assert all(tmp_path / relative in changed for relative in desktop_files)
+    for relative in desktop_files[:3]:
+        assert json.loads((tmp_path / relative).read_text())["version"] == "3.8.31"
+    assert json.loads((tmp_path / desktop_files[1]).read_text())["packages"][""]["version"] == "3.8.31"
+    for relative in desktop_files[3:]:
+        assert 'name = "simplicio-desktop"\nversion = "3.8.31"' in (tmp_path / relative).read_text()
 
 
 def test_public_runbook_requires_manual_publication_without_actions():

@@ -41,6 +41,8 @@ async function preparePreflightFailure(page: Page) {
         unregisterCallback: () => undefined,
         metadata: { currentWindow: { label: "main" }, currentWebview: { label: "main" } },
         invoke: async (command: string, args: Record<string, unknown> = {}) => {
+          if (command === "desktop_runtime_install_status") return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+          if (command === "desktop_preparation_status") return true;
           calls.push(command);
           if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
           if (command === "desktop_plan_integrations") {
@@ -76,7 +78,7 @@ for (const view of ["setup", "providers"] as const) {
     await page.goto(`/?view=${view}`);
     const setup = view === "setup";
     const surface = setup ? page.getByRole("main") : page.getByRole("region", { name: "Configuração do MCP", exact: true });
-    const review = page.getByRole("button", { name: setup ? "Configurar Simplicio" : "Revisar configuração MCP", exact: true });
+    const review = page.getByRole("button", { name: setup ? "Install Now" : "Revisar configuração MCP", exact: true });
     const apply = page.getByRole("button", { name: setup ? "Instalar e conectar" : "Aplicar configuração MCP", exact: true });
     const consent = surface.getByRole("checkbox", { name: /Autorizo o Runtime/ });
 

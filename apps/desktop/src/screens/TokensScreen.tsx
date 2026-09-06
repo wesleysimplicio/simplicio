@@ -60,6 +60,7 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
   const unifiedRequests = useRef(new UnifiedUsageRequestGuard());
   const unifiedExportSequence = useRef(0);
   const unifiedExportLock = useRef(false);
+  const unifiedRead = useRef<{ query: UsageQuery; repoPath?: string } | null>(null);
 
   async function load(query: TokenQuery) {
     const request = ++sequence.current;
@@ -86,6 +87,8 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
   function invalidateUnifiedUsage() {
     unifiedRequests.current.invalidate();
     unifiedExportSequence.current += 1;
+    unifiedRead.current = null;
+    setUnifiedExporting(false);
     setUnifiedProjection(null);
     setUnifiedError(null);
     setUnifiedExportPath(null);
@@ -143,6 +146,10 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
   async function loadUnifiedUsage() {
     if (unifiedBusy) return;
     const request = unifiedRequests.current.begin();
+    unifiedRead.current = null;
+    unifiedExportSequence.current += 1;
+    setUnifiedExportPath(null);
+    setUnifiedExportError(null);
     setUnifiedBusy(true);
     setUnifiedProjection(null);
     setUnifiedError(null);
@@ -150,8 +157,12 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
       // Project paths are intentionally not sent to this contract. Runtime owns
       // project identity and redaction; the public v1 query supports session scope.
       const query = currentUnifiedQuery();
-      const next = await loadDesktopUnifiedUsage(query, repoPath.trim() || undefined);
-      if (unifiedRequests.current.isCurrent(request)) setUnifiedProjection(next);
+      const selectedRepo = repoPath.trim() || undefined;
+      const next = await loadDesktopUnifiedUsage(query, selectedRepo);
+      if (unifiedRequests.current.isCurrent(request)) {
+        unifiedRead.current = { query, repoPath: selectedRepo };
+        setUnifiedProjection(next);
+      }
     } catch (cause) {
       if (unifiedRequests.current.isCurrent(request)) {
         setUnifiedError(cause instanceof Error ? cause.message : "unified_usage_unavailable");
@@ -162,7 +173,8 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
   }
 
   async function exportUnifiedUsage(format: "json" | "csv") {
-    if (!unifiedProjection || unifiedExportLock.current) return;
+    const read = unifiedRead.current;
+    if (!unifiedProjection || !read || unifiedExportLock.current) return;
     unifiedExportLock.current = true;
     const request = unifiedExportSequence.current;
     setUnifiedExporting(true);
@@ -170,8 +182,8 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
     setUnifiedExportError(null);
     try {
       const receipt = await exportDesktopUnifiedUsageReport(
-        currentUnifiedQuery(),
-        repoPath.trim() || undefined,
+        read.query,
+        read.repoPath,
         format,
         unifiedProjection.metadata.report_digest,
       );
@@ -234,10 +246,10 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
       <section className="page-heading">
         <div><span className="eyebrow">Recibos do Runtime</span><h1>Relatório de tokens</h1><p>Uso registrado por período e sessão. Economia de contexto não é consumo faturado.</p></div>
       </section>
-      <section className="panel session-feed-summary" aria-label="Changefeed da sessão">
-        <strong>Sessão atual</strong>
-        <span>{usage?.changefeed.connection === "live" ? "ao vivo" : usage?.changefeed.connection === "reconnecting" ? "reconectando" : usage?.changefeed.connection === "stale" ? "último dado conhecido" : "offline"}</span>
-        <p>{usage?.changefeed.projection ? usage.changefeed.projection.totals.event_count + " evento(s) · " + usage.changefeed.projection.totals.total_tokens.toLocaleString("pt-BR") + " tokens registrados · cobertura " + usage.changefeed.projection.metadata.coverage.status : "Aguardando changefeed comprovado pelo Runtime; nenhum zero foi inferido."}</p>
+      <section className="panel session-feed-summary" aria-label="Consulta periódica do Runtime">
+        <strong>Ledger do Runtime</strong>
+        <span>{usage?.changefeed.connection === "live" ? "consultado" : usage?.changefeed.connection === "reconnecting" ? "reconectando" : usage?.changefeed.connection === "stale" ? "último dado conhecido" : "offline"}</span>
+        <p>{usage?.changefeed.projection && !["no_data", "unavailable"].includes(usage.changefeed.projection.metadata.coverage.status) ? usage.changefeed.projection.totals.event_count + " evento(s) · " + usage.changefeed.projection.totals.total_tokens.toLocaleString("pt-BR") + " tokens registrados · cobertura " + usage.changefeed.projection.metadata.coverage.status : "Sem dados comprovados pelo Runtime; nenhum zero foi inferido. Esta consulta não mede cotas de assinatura."}</p>
       </section>
       <ConsolidatedTokens paths={[...projectPaths, ...extraPaths, ...(discovery?.projects.map(project => project.path) ?? [])]} discoveryReady={discoveryReady} discoveryPartial={!discovery || discovery.partial} />
       <section className="individual-token-report" aria-label="Relatório individual">

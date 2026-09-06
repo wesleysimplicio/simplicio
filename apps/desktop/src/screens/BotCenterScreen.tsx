@@ -217,7 +217,7 @@ export function BotCenterScreen({ snapshot, onAction }: { snapshot: BotCenterSna
 
           <section className="panel bot-telemetry-panel">
             <div className="panel-heading"><div><span className="eyebrow">Receipts</span><h2>Medição</h2></div><Glyph name="activity" size={18} /></div>
-            {session ? <dl className="bot-telemetry"><div><dt>Input</dt><dd>{formatNumber(session.tokenUsage.input)}</dd></div><div><dt>Output</dt><dd>{formatNumber(session.tokenUsage.output)}</dd></div><div><dt>Cache</dt><dd>{session.cacheHitPercent === null ? "—" : `${session.cacheHitPercent.toLocaleString("pt-BR")}%`}</dd></div><div><dt>Custo</dt><dd>{session.costUsd === null ? "—" : `US$ ${session.costUsd.toFixed(4)}`}</dd></div></dl> : <p className="empty-state">Sem telemetria medida.</p>}
+            {session ? <dl className="bot-telemetry"><div><dt>Input</dt><dd>{formatNumber(session.tokenUsage.input)}</dd></div><div><dt>Output</dt><dd>{formatNumber(session.tokenUsage.output)}</dd></div><div><dt>Reasoning</dt><dd>{formatNumber(session.tokenUsage.reasoning)}</dd></div><div><dt>Cache</dt><dd>{session.cacheHitPercent === null ? "—" : `${session.cacheHitPercent.toLocaleString("pt-BR")}%`}</dd></div><div><dt>Custo</dt><dd>{session.costUsd === null ? "—" : `US$ ${session.costUsd.toFixed(4)}`}</dd></div></dl> : <p className="empty-state">Sem telemetria medida.</p>}
             <span className="bot-measurement-note">{session?.tokenUsage.proofKind === "measured" ? "medido pelo Runtime" : "sem evidência"}</span>
           </section>
         </aside>

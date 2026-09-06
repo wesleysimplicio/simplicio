@@ -19,6 +19,8 @@ test("a Runtime-owned pending receipt blocks another plan and reconciles exactly
     const calls: Array<{ command: string; args: Record<string, unknown> }> = [];
     Object.assign(window, { __referenceRecoveryCalls: calls, __TAURI_INTERNALS__: {
       invoke: async (command: string, args: Record<string, unknown> = {}) => {
+          if (command === "desktop_runtime_install_status") return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+          if (command === "desktop_preparation_status") return true;
         calls.push({ command, args });
         if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
         if (command === "desktop_reconcile_host_plugins") return reconciled;
@@ -30,7 +32,7 @@ test("a Runtime-owned pending receipt blocks another plan and reconciles exactly
   }, { snapshot, reconciled });
 
   await page.goto("/?view=setup");
-  await expect(page.getByRole("button", { name: "Configurar Simplicio", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Install Now", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Reconciliar recibo", exact: true })).toBeEnabled();
   expect(await calls(page, "desktop_plan_integrations")).toHaveLength(0);
   expect(await calls(page, "desktop_apply_host_plugins")).toHaveLength(0);
@@ -56,6 +58,8 @@ test("a canonical partial apply exposes one explicit reconcile without replaying
     const calls: Array<{ command: string; args: Record<string, unknown> }> = [];
     Object.assign(window, { __referenceRecoveryCalls: calls, __TAURI_INTERNALS__: {
       invoke: async (command: string, args: Record<string, unknown> = {}) => {
+          if (command === "desktop_runtime_install_status") return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+          if (command === "desktop_preparation_status") return true;
         calls.push({ command, args });
         if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
         if (command === "desktop_plan_integrations") return plan;
@@ -69,7 +73,7 @@ test("a canonical partial apply exposes one explicit reconcile without replaying
   }, { snapshot, plan, partial, reconciled });
 
   await page.goto("/?view=setup");
-  await page.getByRole("button", { name: "Configurar Simplicio", exact: true }).click();
+  await page.getByRole("button", { name: "Install Now", exact: true }).click();
   await page.getByRole("checkbox", { name: /Autorizo o Runtime/ }).check();
   await page.getByRole("button", { name: "Instalar e conectar", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Não foi possível concluir.", exact: true })).toBeVisible();

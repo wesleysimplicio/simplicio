@@ -14,6 +14,8 @@ test("a canonical partial receipt stays sanitized and cannot enable another appl
     let applications = 0;
     Object.assign(window, { __installDiagnosticApplications: () => applications, __TAURI_INTERNALS__: {
       invoke: async (command: string) => {
+        if (command === "desktop_runtime_install_status") return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+        if (command === "desktop_preparation_status") return true;
         if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
         if (command === "desktop_plan_integrations") return plan;
         if (command === "desktop_apply_host_plugins") {
@@ -28,7 +30,7 @@ test("a canonical partial receipt stays sanitized and cannot enable another appl
   }, { snapshot, plan, partial });
 
   await page.goto("/?view=setup");
-  await page.getByRole("button", { name: "Configurar Simplicio", exact: true }).click();
+  await page.getByRole("button", { name: "Install Now", exact: true }).click();
   await page.getByRole("checkbox", { name: /Autorizo o Runtime/ }).check();
   await page.getByRole("button", { name: "Instalar e conectar", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Não foi possível concluir.", exact: true })).toBeVisible();

@@ -35,6 +35,18 @@ async function mockAccountRecovery(page: Page, state: LockedState, options: {
       __TAURI_INTERNALS__: {
         invoke: async (command: string) => {
           calls.push(command);
+          if (command === "desktop_runtime_install_status") return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+          if (command === "desktop_preparation_status") return true;
+          if (command === "desktop_prepare_runtime_environment") return {
+  schema: "simplicio.desktop-preparation-result/v1",
+  status: "ready",
+  effectsApplied: true,
+  runtimeDependencies: { status: "ready", pythonRequired: false },
+  python: { status: "not_detected", dependenciesVerified: false },
+  memory: { ready: true, items: 100, skills: 50, migrations: 1 },
+  clients: { configured: 0, skipped: 0 },
+  redacted: true,
+}
           if (command === "desktop_snapshot") {
             if (options.failSnapshot) throw "snapshot_unavailable";
             return snapshot;
@@ -119,9 +131,9 @@ for (const state of ["inactive", "unknown"] as const) {
 test("a failed initial snapshot requires Runtime installation before account actions (mocked IPC)", async ({ page }) => {
   await mockAccountRecovery(page, "unknown", { failSnapshot: true });
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Prepare o Simplicio Runtime", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Install Now", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sair da conta", exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "Instalar e validar Runtime", exact: true }).click();
+  await page.getByRole("button", { name: "Install Now", exact: true }).click();
   await expect(page.getByRole("button", { name: "Começar", exact: true })).toBeVisible();
   const calls = await page.evaluate(() => (window as RecoveryTestWindow).__accessRecoveryCalls);
   expect(calls.filter((command) => command === "desktop_install_runtime")).toHaveLength(1);
@@ -136,8 +148,8 @@ for (const failSnapshot of [false, true]) {
     await mockAccountRecovery(page, "unknown", { anonymous: true, failSnapshot });
     await page.goto("/");
     if (failSnapshot) {
-      await expect(page.getByRole("heading", { name: "Prepare o Simplicio Runtime", exact: true })).toBeVisible();
-      await page.getByRole("button", { name: "Instalar e validar Runtime", exact: true }).click();
+      await expect(page.getByRole("button", { name: "Install Now", exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "Install Now", exact: true }).click();
       await expect(page.getByRole("button", { name: "Começar", exact: true })).toBeVisible();
       await page.getByRole("button", { name: "Começar", exact: true }).click();
     } else {

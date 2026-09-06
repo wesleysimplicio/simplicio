@@ -52,6 +52,19 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("desktop unified usage bridge", () => {
+  it("polls the supported snapshot without inventing changefeed events or usage", async () => {
+    invokeMock.mockResolvedValue(NO_DATA);
+    const bridge = await import("./bridge");
+    const result = await bridge.pullDesktopUsageSnapshot();
+    expect(invokeMock).toHaveBeenCalledExactlyOnceWith("desktop_unified_usage", {
+      query: {}, repoPath: null,
+    });
+    expect(result.projection?.metadata.coverage.status).toBe("no_data");
+    expect(result.reason_code).toBe("usage_snapshot_no_data");
+    expect(result.last_event_at_epoch).toBeNull();
+    expect(result.cost_projection).toBeNull();
+  });
+
   it("forwards only the query and native repo selector to the real Tauri command", async () => {
     invokeMock.mockResolvedValue(NO_DATA);
     const bridge = await import("./bridge");

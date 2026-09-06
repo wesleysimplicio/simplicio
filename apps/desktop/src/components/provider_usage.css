@@ -1,0 +1,12 @@
+.provider-usage { position: relative; }
+.provider-usage-panel { position: fixed; bottom: 44px; left: 20px; width: min(430px, calc(100vw - 40px)); max-height: calc(100vh - 100px); overflow-y: auto; background: #fff; color: #29342e; border: 1px solid #dce4df; box-shadow: 0 12px 48px #14251d33; border-radius: 16px; padding: 20px; z-index: 80; font-size: 14px; }
+.provider-usage-panel header { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+.provider-usage-panel h3 { margin: 16px 0 8px; }
+.provider-usage-panel > button { display: block; margin-top: 14px; }
+.quota-window { display: grid; gap: 8px; padding: 10px 0; }
+.quota-window progress { width: 100%; accent-color: #287259; }
+.quota-display-mode { display: flex; gap: 4px; margin-top: 14px; padding: 4px; border: 1px solid #dce4df; border-radius: 10px; }
+.quota-display-mode button { flex: 1; padding: 6px 10px; border-radius: 6px; }
+.quota-display-mode button[aria-pressed="true"] { background: #e9f2ed; color: #245d49; font-weight: 600; }
+.quota-window-compact { grid-template-columns: minmax(0, 1fr) 72px; align-items: center; gap: 12px; padding: 5px 0; }
+.provider-usage-panel small, .quota-note { color: #65746d; font-size: 12px; }

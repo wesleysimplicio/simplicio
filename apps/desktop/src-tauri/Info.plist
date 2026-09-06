@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>NSMicrophoneUsageDescription</key><string>Permita o microfone ao configurar explicitamente os recursos de áudio do Simplicio. A consulta de permissão não grava áudio.</string>
+<key>NSCameraUsageDescription</key><string>Permita a câmera ao configurar explicitamente os recursos visuais do Simplicio. A consulta de permissão não captura imagens.</string>
+</dict></plist>

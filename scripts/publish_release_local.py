@@ -404,8 +404,36 @@ def verify_plugin_release_policy(version: str) -> None:
     )
 
 
+
+def update_desktop_versions(version: str) -> list[Path]:
+    """Keep the native build inputs aligned; never build or publish an app here."""
+    prepared: dict[Path, str] = {}
+    for relative in ("apps/desktop/package.json", "apps/desktop/src-tauri/tauri.conf.json"):
+        path = ROOT / relative
+        body = json.loads(path.read_text(encoding="utf-8"))
+        body["version"] = version
+        prepared[path] = json.dumps(body, ensure_ascii=False, indent=2) + "\n"
+    lock = ROOT / "apps/desktop/package-lock.json"
+    body = json.loads(lock.read_text(encoding="utf-8"))
+    body["version"] = version
+    body["packages"][""]["version"] = version
+    prepared[lock] = json.dumps(body, ensure_ascii=False, indent=2) + "\n"
+    for relative in ("apps/desktop/src-tauri/Cargo.toml", "apps/desktop/src-tauri/Cargo.lock"):
+        path = ROOT / relative
+        body, count = re.subn(
+            r'(name = "simplicio-desktop"\nversion = ")[^"]+(")',
+            lambda match: match[1] + version + match[2],
+            path.read_text(encoding="utf-8"),
+        )
+        if count != 1:
+            raise PublishError("Desktop package identity missing or ambiguous: " + relative)
+        prepared[path] = body
+    for path, body in prepared.items():
+        path.write_text(body, encoding="utf-8")
+    return list(prepared)
+
 def update_public_metadata(tag: str, version: str, source_commit: str) -> list[Path]:
-    changed: list[Path] = []
+    changed = update_desktop_versions(version)
     version_file = ROOT / "version.txt"
     version_file.write_text(version + "\n", encoding="utf-8")
     changed.append(version_file)

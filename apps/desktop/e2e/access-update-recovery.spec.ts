@@ -33,6 +33,8 @@ async function mockAccessUpdates(page: Page, state: "signed_out" | "unknown" | "
       __TAURI_INTERNALS__: {
         transformCallback: (callback: (event: unknown) => void) => { const id = ++sequence; callbacks.set(id, callback); return id; },
         invoke: async (command: string, args: Record<string, unknown> = {}) => {
+          if (command === "desktop_runtime_install_status") return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+          if (command === "desktop_preparation_status") return true;
           calls.push(command);
           if (command === "plugin:event|listen") {
             const id = ++sequence;
@@ -69,7 +71,7 @@ async function showAndCloseUpdates(page: Page) {
   const dialog = page.getByRole("dialog");
   await expect(dialog).toHaveAttribute("data-update-state", "available");
   await expect(dialog).toContainText("Versão deste aplicativo: 3.8.39");
-  await expect(dialog).toContainText("Download e instalação manuais");
+  await expect(dialog).toContainText("Atualização verificada pela distribuição");
   await expect(page.getByRole("button", { name: "Ver releases oficiais", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "Fechar atualizações", exact: true }).click();
   await expect(dialog).toHaveCount(0);
@@ -112,10 +114,10 @@ test("unknown access retains manual updates and explicit account recovery (mocke
 test("guided setup retains manual updates and an exit without applying a plan (mocked IPC/metadata)", async ({ page }) => {
   await mockAccessUpdates(page, "active");
   await page.goto("/?view=setup");
-  await expect(page.getByRole("heading", { name: "Um bom começo.", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Install Now", exact: true })).toBeVisible();
   await showAndCloseUpdates(page);
-  await expect(page.getByRole("button", { name: "Configurar Simplicio", exact: true })).toBeEnabled();
-  await expect(page.getByRole("button", { name: "Agora não", exact: true })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Install Now", exact: true })).toBeEnabled();
+
   expect(await accountAndInstallCalls(page)).toEqual([]);
 });
 

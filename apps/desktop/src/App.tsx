@@ -5,6 +5,8 @@ import { snapshotWithDemoBots } from "./bot_center";
 import {
   beginDesktopLogin,
   installDesktopRuntime,
+  prepareDesktopRuntimeEnvironment,
+  loadDesktopPreparationStatus,
   loadDesktopSnapshot,
   logoutDesktop,
   openDesktopSubscription,
@@ -14,7 +16,8 @@ import {
   applyDesktopHostPlugins,
   reconcileDesktopHostPlugins,
   dispatchDesktopBotAction,
-  pullDesktopUsageChangefeed,
+  pullDesktopUsageSnapshot,
+  closeIdleDesktopSessions,
 } from "./bridge";
 import { Shell, type View } from "./components/Shell";
 import { AccessGate, LoadingScreen, RuntimeInstallScreen, SignInScreen, type RuntimeInstallPhase } from "./screens/AccessScreens";
@@ -39,6 +42,7 @@ import { isReferenceSettingsView } from "./reference_screens";
 import "./runtime_panels.css";
 import type { HostPluginOperationResult } from "./integration_setup";
 import type { RuntimeInstallResult } from "./runtime_install";
+import type { PreparationResult } from "./runtime_preparation_result";
 import { runtimeIsValid } from "./setup_flow";
 import { createDesktopUsageStore, createUsageChangefeedSupervisor } from "./usage_store";
 
@@ -56,7 +60,9 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
   const [action, setAction] = useState<"install" | "login" | "logout" | "refresh" | "repair" | "reconcile" | "subscribe" | "bot" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [runtimeInstallPhase, setRuntimeInstallPhase] = useState<RuntimeInstallPhase>("idle");
+  const [runtimePreparationReady, setRuntimePreparationReady] = useState<boolean | undefined>(initialSnapshot ? true : undefined);
   const [runtimeInstallReceipt, setRuntimeInstallReceipt] = useState<RuntimeInstallResult | undefined>();
+  const [runtimePreparation, setRuntimePreparation] = useState<PreparationResult | undefined>();
   const [runtimeInstallRecovery, setRuntimeInstallRecovery] = useState(false);
   const [applicationRecovery, setApplicationRecovery] = useState<InstallFailureRecovery | undefined>();
   const [workbench, setWorkbench] = useState(loadWorkbench);
@@ -84,7 +90,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       typeof window === "undefined" ||
       !("__TAURI_INTERNALS__" in window)
     ) return;
-    const supervisor = createUsageChangefeedSupervisor(pullDesktopUsageChangefeed, {
+    const supervisor = createUsageChangefeedSupervisor(pullDesktopUsageSnapshot, {
       pollIntervalMs: 5_000,
       initialBackoffMs: 250,
       maxBackoffMs: 8_000,
@@ -93,6 +99,35 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
     });
     supervisor.start();
     return () => { void supervisor.stop(); };
+  }, [snapshot?.access.state, usageStore]);
+
+  useEffect(() => {
+    if (
+      !snapshot
+      || snapshot.access.state !== "active"
+      || typeof window === "undefined"
+      || !("__TAURI_INTERNALS__" in window)
+    ) return;
+    // Runtime owns the logical transition. A missing/older Runtime capability
+    // is kept quiet and never turns unavailable provider usage into zeroes.
+    let supported = true;
+    const finalize = async () => {
+      if (!supported) return;
+      try {
+        const receipt = await closeIdleDesktopSessions();
+        usageStore.setIdleFinalization(receipt);
+      } catch (error) {
+        const code = error instanceof Error ? error.message : String(error);
+        if (code === "session_idle_finalization_unavailable"
+          || code === "runtime_install_required"
+          || code === "desktop_access_not_active") {
+          supported = false;
+        }
+      }
+    };
+    void finalize();
+    const timer = window.setInterval(() => { void finalize(); }, 60_000);
+    return () => window.clearInterval(timer);
   }, [snapshot?.access.state, usageStore]);
 
 
@@ -139,9 +174,10 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
   useEffect(() => {
     if (initialSnapshot) return;
     let current = true;
-    loadDesktopRuntimeInstallStatus()
-      .then((status) => {
+    Promise.all([loadDesktopRuntimeInstallStatus(), loadDesktopPreparationStatus()])
+      .then(([status, preparationReady]) => {
         if (!current) return null;
+        setRuntimePreparationReady(preparationReady);
         if (status.status === "pending") {
           setRuntimeInstallRecovery(true);
           setLoadFailed(true);
@@ -196,13 +232,18 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
     setActionError(null);
     setRuntimeInstallRecovery(false);
     setRuntimeInstallReceipt(undefined);
+    setRuntimePreparation(undefined);
     setRuntimeInstallPhase("installing");
     let receipt: RuntimeInstallResult | undefined;
     try {
-      // One explicit native install followed by one fresh read. The frontend
-      // never retries either effect and never invokes host-plugin operations.
+      // Install the verified Runtime, then let that Runtime prepare its local
+      // memory and detected clients. Neither native effect is retried here.
       receipt = await installDesktopRuntime();
       setRuntimeInstallReceipt(receipt);
+      setRuntimeInstallPhase("preparing");
+      const preparation = await prepareDesktopRuntimeEnvironment();
+      setRuntimePreparation(preparation);
+      setRuntimePreparationReady(true);
       setRuntimeInstallPhase("validating");
       const next = await refreshDesktopSnapshot();
       if (!runtimeIsValid(next)) throw new Error("runtime_install_snapshot_invalid");
@@ -216,6 +257,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
     } catch (error) {
       if (receipt) setRuntimeInstallReceipt(receipt);
       setLoadFailed(true);
+      setRuntimePreparationReady(receipt ? false : undefined);
       setRuntimeInstallPhase("failed");
       const code = typeof error === "string" ? error : error instanceof Error ? error.message : "";
       setRuntimeInstallRecovery(code === "runtime_install_reconciliation_required");
@@ -235,14 +277,18 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
     try {
       const result = await reconcileDesktopRuntimeInstall();
       if (result.current) {
-        const next = await refreshDesktopSnapshot();
+        const [next, preparationReady] = await Promise.all([
+          refreshDesktopSnapshot(),
+          loadDesktopPreparationStatus(),
+        ]);
         if (!runtimeIsValid(next)) throw new Error("runtime_install_snapshot_invalid");
         setSnapshot(next);
         setBotCenter(next.botCenter);
+        setRuntimePreparationReady(preparationReady);
         setRuntimeInstallRecovery(false);
         setRuntimeInstallPhase("idle");
         setLoadFailed(false);
-        setView("home");
+        if (preparationReady) setView("home");
       } else {
         setRuntimeInstallRecovery(false);
         setRuntimeInstallPhase("failed");
@@ -355,6 +401,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       setBotCenter(next.botCenter);
       setHostPluginOutcome(undefined);
       setApplicationRecovery(undefined);
+      usageStore.setIdleFinalization(null);
       setLoadFailed(false);
       setView("home");
     } catch (error) {
@@ -385,10 +432,11 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
 
   if (!snapshot && !loadFailed) return <LoadingScreen />;
 
-  if ((!snapshot && loadFailed) || (snapshot && !runtimeIsValid(snapshot))) {
+  if ((!snapshot && loadFailed) || (snapshot && (!runtimeIsValid(snapshot) || runtimePreparationReady === false))) {
     return <RuntimeInstallScreen
       phase={runtimeInstallPhase}
       receipt={runtimeInstallReceipt}
+      preparation={runtimePreparation}
       error={actionError}
       onInstall={installRuntime}
       reconciliationRequired={runtimeInstallRecovery}

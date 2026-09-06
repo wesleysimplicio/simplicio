@@ -5,6 +5,7 @@ use tauri::Manager;
 
 mod auth_access;
 mod auth_login;
+mod preparation;
 mod consolidated_tokens;
 mod context_report;
 mod desktop_queries;
@@ -12,6 +13,7 @@ mod desktop_updater;
 mod host_plugins;
 mod install_journal;
 mod local_projects;
+mod mcp_connections;
 #[cfg(desktop)]
 mod native_menu;
 mod project_discovery_process;
@@ -23,11 +25,52 @@ mod runtime_lifecycle;
 mod runtime_process;
 mod snapshot_exports;
 mod supervisor;
+mod system_permissions;
+mod provider_quotas;
+mod grok_quotas;
 mod token_exports;
 mod unified_usage_bridge;
 mod usage_changefeed;
 
 static INSTALL_PROCESS_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[tauri::command]
+async fn desktop_provider_quotas() -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(provider_quotas::read).await.map_err(|_| "quota_unavailable".to_string())
+}
+
+#[tauri::command]
+async fn desktop_request_media_permission(permission: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || system_permissions::request_media(&permission)).await.map_err(|_| "permission_request_pending".to_string())?
+}
+
+#[tauri::command]
+async fn desktop_reveal_permission_app() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let executable = std::env::current_exe().map_err(|_| "permission_app_unknown")?;
+        let bundle = executable.ancestors().find(|p| p.extension().is_some_and(|ext| ext == "app"))
+            .ok_or("permission_app_unknown")?.to_path_buf();
+        tauri::async_runtime::spawn_blocking(move || {
+            std::process::Command::new("/usr/bin/open").arg("-R").arg(bundle).status()
+                .map_err(|_| "permission_app_unknown".to_string())
+                .and_then(|s| if s.success() { Ok(()) } else { Err("permission_app_unknown".into()) })
+        }).await.map_err(|_| "permission_app_unknown".to_string())?
+    }
+    #[cfg(not(target_os = "macos"))]
+    { Err("permission_platform_unsupported".into()) }
+}
+
+#[tauri::command]
+fn desktop_permissions() -> Value {
+    system_permissions::snapshot()
+}
+
+#[tauri::command]
+async fn desktop_open_permission_settings(permission: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || system_permissions::open_settings(&permission))
+        .await.map_err(|_| "permission_settings_failed".to_string())?
+}
 
 #[tauri::command]
 async fn desktop_validate_project(path: String) -> Result<Value, String> {
@@ -74,6 +117,7 @@ const LOGIN_ARGS: &[&str] = auth_login::LOGIN_ARGS;
 const LOGOUT_ARGS: &[&str] = &["logout", "--json"];
 const STATUS_ARGS: &[&str] = auth_login::STATUS_ARGS;
 const HOST_PLUGIN_PLAN_ARGS: &[&str] = &["host-plugins", "plan", "--all"];
+static AUTH_OPERATION_GATE: std::sync::Mutex<()> = std::sync::Mutex::new(());
 const SUBSCRIPTION_URL: &str = "https://simpleti.com.br/simplicio";
 const RELEASES_URL: &str = "https://github.com/wesleysimplicio/simplicio/releases";
 
@@ -85,7 +129,7 @@ fn install_journal_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 }
 
 fn runtime_capture_limits(args: &[&str]) -> runtime_process::CaptureLimits {
-    if matches!(args, ["host-plugins", "apply" | "reconcile", ..]) {
+    if matches!(args, ["host-plugins", "apply" | "reconcile", ..] | ["mcp", "register", ..]) {
         runtime_process::CaptureLimits::INSTALL
     } else if args == LOGIN_ARGS {
         runtime_process::CaptureLimits::OAUTH
@@ -112,6 +156,9 @@ fn runtime_failure_code(args: &[&str], failure: runtime_process::ProcessFailure)
         FailureKind::Deadline if args == LOGIN_ARGS => "runtime_oauth_timeout",
         FailureKind::Deadline if matches!(args, ["host-plugins", "apply" | "reconcile", ..]) => {
             "runtime_install_timeout"
+        }
+        FailureKind::Deadline if matches!(args, ["mcp", "register", ..]) => {
+            "runtime_environment_prepare_timeout"
         }
         FailureKind::Deadline => "runtime_query_timeout",
         FailureKind::StdoutLimit => "runtime_stdout_limit",
@@ -284,6 +331,242 @@ async fn desktop_usage_changefeed(
     })
     .await
     .map_err(|_| "usage_changefeed_unavailable".to_string())?
+}
+
+const SESSION_IDLE_FINALIZATION_SCHEMA: &str = "simplicio.session-idle-finalization/v1";
+const SESSION_IDLE_DEFAULT_MS: u64 = 15 * 60 * 1000;
+const SESSION_IDLE_MIN_MS: u64 = 60 * 1000;
+const SESSION_IDLE_MAX_MS: u64 = 7 * 24 * 60 * 60 * 1000;
+const SESSION_IDLE_METRICS: &[&str] = &[
+    "input_tokens",
+    "output_tokens",
+    "reasoning_tokens",
+    "cache_read_tokens",
+    "cache_write_tokens",
+];
+
+fn validate_idle_scope(value: Option<String>, fallback: &str, field: &str) -> Result<String, String> {
+    let value = value.unwrap_or_else(|| fallback.to_string());
+    if value.is_empty() || value.len() > 256 || value.chars().any(|ch| ch.is_control()) {
+        return Err(format!("session_idle_{field}_invalid"));
+    }
+    Ok(value)
+}
+
+fn validate_provider_usage_report(value: &Value) -> Result<(), String> {
+    let report = value
+        .as_object()
+        .ok_or_else(|| "session_idle_finalization_invalid".to_string())?;
+    let provider = report.get("provider").and_then(Value::as_str).unwrap_or("");
+    if provider.is_empty() || provider.len() > 64 {
+        return Err("session_idle_finalization_invalid".to_string());
+    }
+    match report.get("adapter_id") {
+        Some(value) if value.is_null() => {}
+        Some(value) if value.as_str().is_some_and(|value| !value.is_empty() && value.len() <= 128) => {}
+        _ => return Err("session_idle_finalization_invalid".to_string()),
+    }
+    if !matches!(
+        report.get("status").and_then(Value::as_str),
+        Some("complete" | "partial" | "no_new_events" | "source_not_found" | "source_unavailable" | "adapter_not_bound")
+    ) || report.get("scope").and_then(Value::as_str) != Some("scanned_local_sources")
+        || report.get("redacted").and_then(Value::as_bool) != Some(true)
+    {
+        return Err("session_idle_finalization_invalid".to_string());
+    }
+    for (field, maximum) in [
+        ("sources_discovered", 1024),
+        ("sources_scanned", 1024),
+        ("sources_skipped", 1024),
+        ("events", 10_000),
+        ("matched_session_count", 256),
+    ] {
+        if report.get(field).and_then(Value::as_u64).is_none_or(|value| value > maximum) {
+            return Err("session_idle_finalization_invalid".to_string());
+        }
+    }
+    let metrics = SESSION_IDLE_METRICS;
+    let totals = report
+        .get("totals")
+        .and_then(Value::as_object)
+        .ok_or_else(|| "session_idle_finalization_invalid".to_string())?;
+    if totals.keys().any(|key| !metrics.contains(&key.as_str())) {
+        return Err("session_idle_finalization_invalid".to_string());
+    }
+    if totals.values().any(|value| value.as_u64().is_none()) {
+        return Err("session_idle_finalization_invalid".to_string());
+    }
+    let missing = report
+        .get("missing_metrics")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "session_idle_finalization_invalid".to_string())?;
+    if missing.len() > metrics.len()
+        || missing.iter().any(|value| !value.as_str().is_some_and(|metric| metrics.contains(&metric)))
+        || {
+            let values = missing.iter().filter_map(Value::as_str).collect::<std::collections::BTreeSet<_>>();
+            values.len() != missing.len()
+        }
+    {
+        return Err("session_idle_finalization_invalid".to_string());
+    }
+    let failures = report
+        .get("failure_codes")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "session_idle_finalization_invalid".to_string())?;
+    if failures.len() > 16 || failures.iter().any(|value| value.as_str().is_none_or(|code| code.is_empty() || code.len() > 64)) {
+        return Err("session_idle_finalization_invalid".to_string());
+    }
+    if let Some(reason) = report.get("reason") {
+        if reason.as_str().is_none_or(|value| value.is_empty() || value.len() > 128) {
+            return Err("session_idle_finalization_invalid".to_string());
+        }
+    }
+    Ok(())
+}
+
+fn validate_idle_finalization(value: Value) -> Result<Value, String> {
+    let raw = value
+        .as_object()
+        .ok_or_else(|| "session_idle_finalization_invalid".to_string())?;
+    if raw.get("schema").and_then(Value::as_str) != Some(SESSION_IDLE_FINALIZATION_SCHEMA)
+        || raw.get("status").and_then(Value::as_str) != Some("logical_closed")
+        || raw.get("provider_processes_terminated").and_then(Value::as_bool) != Some(false)
+        || raw.get("redacted").and_then(Value::as_bool) != Some(true)
+    {
+        return Err("session_idle_finalization_invalid".to_string());
+    }
+    let now_millis = raw
+        .get("now_millis")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| "session_idle_finalization_invalid".to_string())?;
+    let idle_ms = raw
+        .get("idle_ms")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| "session_idle_finalization_invalid".to_string())?;
+    if idle_ms < SESSION_IDLE_MIN_MS || idle_ms > SESSION_IDLE_MAX_MS {
+        return Err("session_idle_finalization_invalid".to_string());
+    }
+    if let Some(finalization_id) = raw.get("finalization_id") {
+        let id = finalization_id.as_str().unwrap_or("");
+        if id.is_empty() || id.len() > 128 {
+            return Err("session_idle_finalization_invalid".to_string());
+        }
+    }
+    let profile_id = raw
+        .get("profile_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "session_idle_finalization_invalid".to_string())?;
+    validate_idle_scope(Some(profile_id.to_string()), "default", "profile")?;
+    let workspace_id = raw
+        .get("workspace_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "session_idle_finalization_invalid".to_string())?;
+    validate_idle_scope(Some(workspace_id.to_string()), ".", "workspace")?;
+    let sessions = raw
+        .get("closed_sessions")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "session_idle_finalization_invalid".to_string())?;
+    if sessions.len() > 256 {
+        return Err("session_idle_finalization_invalid".to_string());
+    }
+    for session in sessions {
+        let record = session
+            .as_object()
+            .ok_or_else(|| "session_idle_finalization_invalid".to_string())?;
+        let id = record.get("session_id").and_then(Value::as_str).unwrap_or("");
+        if id.is_empty() || id.len() > 256 || record.get("status").and_then(Value::as_str) != Some("idle")
+            || record.get("updated_at").and_then(Value::as_u64).is_none()
+        {
+            return Err("session_idle_finalization_invalid".to_string());
+        }
+    }
+    let usage = raw
+        .get("usage")
+        .and_then(Value::as_object)
+        .ok_or_else(|| "session_idle_finalization_invalid".to_string())?;
+    if !matches!(
+        usage.get("status").and_then(Value::as_str),
+        Some("pending_provider_refresh" | "complete" | "unavailable")
+    ) {
+        return Err("session_idle_finalization_invalid".to_string());
+    }
+    let metrics = usage
+        .get("metrics")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "session_idle_finalization_invalid".to_string())?;
+    if metrics.len() != SESSION_IDLE_METRICS.len()
+        || SESSION_IDLE_METRICS.iter().any(|required| {
+            metrics
+                .iter()
+                .filter_map(Value::as_str)
+                .filter(|metric| metric == required)
+                .count()
+                != 1
+        })
+    {
+        return Err("session_idle_finalization_invalid".to_string());
+    }
+    if let Some(scope) = usage.get("scope") {
+        if scope.as_str() != Some("scanned_local_sources") {
+            return Err("session_idle_finalization_invalid".to_string());
+        }
+    }
+    if let Some(reports) = usage.get("provider_reports") {
+        let reports = reports
+            .as_array()
+            .ok_or_else(|| "session_idle_finalization_invalid".to_string())?;
+        if reports.len() > 32 {
+            return Err("session_idle_finalization_invalid".to_string());
+        }
+        for report in reports {
+            validate_provider_usage_report(report)?;
+        }
+    }
+    if let Some(reason) = usage.get("reason") {
+        if reason.as_str().is_none_or(|value| value.is_empty() || value.len() > 128) {
+            return Err("session_idle_finalization_invalid".to_string());
+        }
+    }
+    let _ = (now_millis, idle_ms);
+    Ok(value)
+}
+
+#[tauri::command]
+async fn desktop_session_close_idle(
+    now_epoch_ms: Option<u64>,
+    idle_ms: Option<u64>,
+    profile_id: Option<String>,
+    workspace_id: Option<String>,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        require_active_access()?;
+        let idle_ms = idle_ms.unwrap_or(SESSION_IDLE_DEFAULT_MS);
+        if !(SESSION_IDLE_MIN_MS..=SESSION_IDLE_MAX_MS).contains(&idle_ms) {
+            return Err("session_idle_timeout_invalid".to_string());
+        }
+        let profile_id = validate_idle_scope(profile_id, "default", "profile")?;
+        let workspace_id = validate_idle_scope(workspace_id, ".", "workspace")?;
+        let mut args = vec![
+            "session-service".to_string(),
+            "close-idle".to_string(),
+            "--profile".to_string(),
+            profile_id,
+            "--workspace".to_string(),
+            workspace_id,
+            "--idle-ms".to_string(),
+            idle_ms.to_string(),
+            "--json".to_string(),
+        ];
+        if let Some(now_epoch_ms) = now_epoch_ms {
+            args.extend(["--now".to_string(), now_epoch_ms.to_string()]);
+        }
+        let borrowed = args.iter().map(String::as_str).collect::<Vec<_>>();
+        let value = run_runtime_json(&borrowed)
+            .map_err(|_| "session_idle_finalization_unavailable".to_string())?;
+        validate_idle_finalization(value)
+    })
+    .await
+    .map_err(|_| "session_idle_finalization_unavailable".to_string())?
 }
 
 fn default_projection_repo() -> Result<PathBuf, String> {
@@ -627,12 +910,78 @@ fn packaged_runtime_authority() -> Result<PathBuf, String> {
 fn snapshot_from_runtime() -> Result<Value, String> {
     let current_executable =
         std::env::current_exe().map_err(|_| "runtime_install_package_unavailable".to_string())?;
-    runtime_install::current_snapshot(
+    let home = runtime_user_home()?;
+    let snapshot = runtime_install::current_snapshot(
         &current_executable,
-        &runtime_user_home()?,
+        &home,
         snapshot_from_binary,
     )?
-    .ok_or_else(|| "runtime_install_required".to_string())
+    .ok_or_else(|| "runtime_install_required".to_string())?;
+    validate_snapshot(mcp_connections::enrich(snapshot, &home)?)
+}
+
+fn runtime_environment_args(home: &Path) -> Result<Vec<String>, String> {
+    let managed = home.join(".simplicio").join("bin").join(if cfg!(windows) {
+        "simplicio.exe"
+    } else {
+        "simplicio"
+    });
+    if !managed.is_file() {
+        return Err("runtime_install_required".to_string());
+    }
+    let managed = managed
+        .to_str()
+        .ok_or_else(|| "runtime_environment_path_invalid".to_string())?;
+    Ok([
+        "mcp".to_string(),
+        "register".to_string(),
+        "--binary".to_string(),
+        managed.to_string(),
+        "--json".to_string(),
+    ]
+    .into_iter()
+    .collect())
+}
+
+#[tauri::command]
+async fn desktop_prepare_runtime_environment() -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let _process_lock = INSTALL_PROCESS_LOCK
+            .lock()
+            .map_err(|_| "runtime_install_busy".to_string())?;
+        let home = runtime_user_home()?;
+        let args = runtime_environment_args(&home)?;
+        let borrowed = args.iter().map(String::as_str).collect::<Vec<_>>();
+        let output = run_runtime_capture(&borrowed)?;
+        let raw: Value = serde_json::from_slice(&output.stdout)
+            .map_err(|_| "runtime_environment_result_invalid".to_string())?;
+        if !output.status.success() {
+            return Err("runtime_environment_prepare_failed".to_string());
+        }
+        let projected = preparation::project_result(&raw, preparation::python())?;
+        preparation::persist_receipt(&home, &projected)?;
+        Ok(projected)
+    })
+    .await
+    .map_err(|_| "runtime_environment_prepare_unavailable".to_string())?
+}
+
+#[tauri::command]
+fn desktop_preparation_status() -> bool {
+    runtime_user_home().map(|home| preparation::receipt_ready(&home)).unwrap_or(false)
+}
+
+#[tauri::command]
+async fn desktop_preparation_plan() -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let output = run_runtime_capture(&["mcp", "register", "--dry-run", "--json"])?;
+        if !output.status.success() { return Err("preparation_plan_failed".to_string()); }
+        let raw: Value = serde_json::from_slice(&output.stdout)
+            .map_err(|_| "preparation_plan_invalid".to_string())?;
+        let mut plan = preparation::project(&raw)?;
+        plan["python"] = preparation::python();
+        Ok(plan)
+    }).await.map_err(|_| "preparation_plan_unavailable".to_string())?
 }
 
 #[tauri::command]
@@ -755,7 +1104,7 @@ async fn desktop_runtime_lifecycle(action: Option<String>) -> Result<Value, Stri
 }
 #[tauri::command]
 async fn desktop_login() -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(|| {
+    tauri::async_runtime::spawn_blocking(|| auth_login::exclusive(&AUTH_OPERATION_GATE, || {
         let authority = packaged_runtime_authority()?;
         auth_login::authenticate([authority.into_os_string()], |binary, args| {
             let mut command = Command::new(binary);
@@ -763,17 +1112,17 @@ async fn desktop_login() -> Result<Value, String> {
             runtime_process::capture(&mut command, runtime_capture_limits(args))
         })?;
         snapshot_from_runtime()
-    })
+    }))
     .await
     .map_err(|_| "Falha interna durante o login".to_string())?
 }
 
 #[tauri::command]
 async fn desktop_logout() -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(|| {
+    tauri::async_runtime::spawn_blocking(|| auth_login::exclusive(&AUTH_OPERATION_GATE, || {
         run_runtime_action(LOGOUT_ARGS)?;
         snapshot_from_runtime()
-    })
+    }))
     .await
     .map_err(|_| "Falha interna durante o logout".to_string())?
 }
@@ -840,7 +1189,7 @@ pub fn run() {
                 (current_executable, app.path().app_data_dir())
             {
                 if let Err(error) =
-                    desktop_updater::reconcile_startup(&app_data, &current_executable)
+                    desktop_updater::reconcile_startup(&app_data, &current_executable, &app.package_info().version.to_string())
                 {
                     eprintln!("Simplicio: Desktop update recovery is pending: {error}");
                 }
@@ -851,6 +1200,14 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             desktop_snapshot,
+            desktop_preparation_plan,
+            desktop_prepare_runtime_environment,
+            desktop_preparation_status,
+            desktop_permissions,
+            desktop_reveal_permission_app,
+            desktop_request_media_permission,
+            desktop_provider_quotas,
+            desktop_open_permission_settings,
             desktop_install_runtime,
             desktop_runtime_install_status,
             desktop_reconcile_runtime_install,
@@ -866,6 +1223,7 @@ pub fn run() {
             desktop_plan_integrations,
             desktop_usage_projects,
             desktop_usage_changefeed,
+            desktop_session_close_idle,
             desktop_unified_usage,
             desktop_export_unified_usage,
             desktop_cost_projection,

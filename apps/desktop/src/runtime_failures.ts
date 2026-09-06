@@ -4,6 +4,8 @@ const REASONS: Readonly<Record<string, string>> = {
   runtime_not_started: "Não foi possível iniciar um comando do Simplicio Runtime.",
   runtime_query_timeout: "Uma etapa do Runtime ultrapassou o prazo de 20 segundos.",
   runtime_oauth_timeout: "O login ultrapassou o prazo de 3 minutos sem confirmação.",
+  runtime_auth_busy: "Já existe uma entrada ou saída de conta em andamento neste aplicativo. Aguarde a conclusão antes de tentar novamente.",
+  runtime_auth_state_unavailable: "O estado da autenticação não pôde ser confirmado. Reinicie o Desktop antes de tentar novamente.",
   runtime_auth_only_unsupported: "O Runtime não oferece login separado da instalação. Atualize o Simplicio Desktop para entrar com Google com segurança.",
   runtime_auth_result_unconfirmed: "O Runtime não confirmou um login sem configuração automática.",
   runtime_install_timeout: "A instalação ultrapassou o prazo de 5 minutos sem confirmação. Não repita a instalação sem esclarecer o resultado.",

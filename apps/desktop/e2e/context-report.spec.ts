@@ -17,6 +17,8 @@ async function contextBridge(page: Page, fail = false, reportPatch: Partial<Cont
     const calls: Array<{ command: string; args: Record<string, unknown> }> = [];
     Object.assign(window, { __contextCalls: calls, __TAURI_INTERNALS__: {
       invoke: async (command: string, args: Record<string, unknown> = {}) => {
+          if (command === "desktop_runtime_install_status") return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+          if (command === "desktop_preparation_status") return true;
         calls.push({ command, args });
         if (command === "desktop_snapshot") return snapshot;
         if (command === "desktop_token_report") throw "token_ledger_unavailable";

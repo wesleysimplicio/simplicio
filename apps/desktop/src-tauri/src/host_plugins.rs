@@ -7,7 +7,7 @@ const SNAPSHOT_SCHEMA: &str = "simplicio.host-plugin-snapshot/v1";
 const RECEIPT_SCHEMA: &str = "simplicio.host-plugin-receipt/v1";
 const CLI_SCHEMA: &str = "simplicio.host-plugin-cli/v1";
 const HOSTS: &[&str] = &[
-    "codex", "claude", "gemini", "copilot", "qwen", "hermes", "cursor", "kiro",
+    "codex", "claude", "gemini", "copilot", "qwen", "hermes", "kilo", "opencode",
 ];
 const MODES: &[&str] = &["manager", "portable", "hybrid"];
 const DISPOSITIONS: &[&str] = &[
@@ -503,6 +503,16 @@ mod tests {
                 "hosts": hosts
             }
         })
+    }
+
+    #[test]
+    fn bundled_runtime_host_matrix_is_accepted() {
+        let value = serde_json::from_str(include_str!("../../src/runtime-host-plugin-plan.fixture.json")).unwrap();
+        let result = project_plan(value).unwrap();
+        let hosts = result["plan"]["hosts"].as_array().unwrap();
+        assert!(hosts.iter().any(|h| h["host"] == "kilo"));
+        assert!(hosts.iter().any(|h| h["host"] == "opencode"));
+        assert_eq!(hosts.len(), 8);
     }
 
     #[test]

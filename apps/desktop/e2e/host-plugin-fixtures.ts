@@ -5,8 +5,8 @@ export const NATIVE_HOSTS = [
   "copilot",
   "qwen",
   "hermes",
-  "cursor",
-  "kiro",
+  "kilo",
+  "opencode",
 ] as const;
 
 type ReceiptState = "complete" | "partial" | "requires_reconcile";
@@ -25,7 +25,7 @@ export function hostPluginPlan(digestByte = "a") {
       component_versions: { runtime: "3.8.41", plugin: "3.8.41" },
       hosts: NATIVE_HOSTS.map((host, index) => ({
         host,
-        mode: index >= 6 ? "portable" : "manager",
+        mode: host === "hermes" ? "hybrid" : "manager",
         disposition: index === 7 ? "not_detected" : "ready",
         reason_code: index === 7 ? "not_detected" : "ready",
       })),

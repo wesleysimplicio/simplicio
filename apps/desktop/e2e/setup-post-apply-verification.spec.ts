@@ -29,6 +29,8 @@ async function mockHostPluginResult(page: Page, {
     const calls: Array<{ command: string; args: Record<string, unknown> }> = [];
     Object.assign(window, { __setupHostPluginCalls: calls, __TAURI_INTERNALS__: {
       invoke: async (command: string, args: Record<string, unknown> = {}) => {
+          if (command === "desktop_runtime_install_status") return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+          if (command === "desktop_preparation_status") return true;
         calls.push({ command, args });
         if (command === "desktop_snapshot" || command === "refresh_desktop_snapshot") return snapshot;
         if (command === "desktop_plan_integrations") return plan;
@@ -56,7 +58,7 @@ async function commandCalls(page: Page, command: string) {
 
 async function reviewAndApply(page: Page) {
   await page.goto("/?view=setup");
-  await page.getByRole("button", { name: "Configurar Simplicio", exact: true }).click();
+  await page.getByRole("button", { name: "Install Now", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Tudo pronto para revisar.", exact: true })).toBeVisible();
   await page.getByRole("checkbox", { name: /Autorizo o Runtime/ }).check();
   await page.getByRole("button", { name: "Instalar e conectar", exact: true }).click();
@@ -65,7 +67,7 @@ async function reviewAndApply(page: Page) {
 test("one consent submits one digest and uses the returned canonical receipt without any post-apply query (mocked IPC)", async ({ page }) => {
   await mockHostPluginResult(page, { pauseApply: true });
   await page.goto("/?view=setup");
-  await page.getByRole("button", { name: "Configurar Simplicio", exact: true }).click();
+  await page.getByRole("button", { name: "Install Now", exact: true }).click();
   await page.getByRole("checkbox", { name: /Autorizo o Runtime/ }).check();
   await page.getByRole("button", { name: "Instalar e conectar", exact: true }).dblclick();
   await expect(page.getByRole("heading", { name: "Configurando o Simplicio…", exact: true })).toBeVisible();
@@ -150,7 +152,7 @@ test("a later normal snapshot supersedes the ephemeral apply result without an i
 test("an invalid eight-host plan fails closed before consent or apply (mocked IPC)", async ({ page }) => {
   await mockHostPluginResult(page, { invalidPlan: true });
   await page.goto("/?view=setup");
-  await page.getByRole("button", { name: "Configurar Simplicio", exact: true }).click();
+  await page.getByRole("button", { name: "Install Now", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("oito hosts");
   await expect(page.getByRole("button", { name: "Instalar e conectar", exact: true })).toHaveCount(0);
   expect(await commandCalls(page, "desktop_apply_host_plugins")).toHaveLength(0);
@@ -158,7 +160,7 @@ test("an invalid eight-host plan fails closed before consent or apply (mocked IP
 
 test("the browser preview consumes its local canonical fixture and never calls a native effect", async ({ page }) => {
   await page.goto("/?view=setup");
-  await page.getByRole("button", { name: "Configurar Simplicio", exact: true }).click();
+  await page.getByRole("button", { name: "Install Now", exact: true }).click();
   await page.getByRole("checkbox", { name: /Autorizo o Runtime/ }).check();
   await page.getByRole("button", { name: "Simular configuração", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Prévia concluída.", exact: true })).toBeVisible();

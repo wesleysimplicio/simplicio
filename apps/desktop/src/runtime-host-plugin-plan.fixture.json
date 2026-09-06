@@ -1,0 +1,70 @@
+{
+  "schema": "simplicio.host-plugin-command-result/v1",
+  "result": "plan",
+  "plan": {
+    "schema": "simplicio.host-plugin-plan-summary/v1",
+    "plan_digest": "sha256:c9e0fa2e06791eb4ab87e6bad96d3f01a00ff94808fd589cd1a1de0793a1fe23",
+    "selection": {
+      "scope": "all"
+    },
+    "manifest_digest": "sha256:8a146c4ad4165ca03f3b7203072bbfdd939ac40a47dfd724638619211869f521",
+    "plugin_version": "0.2.11",
+    "component_versions": {
+      "simplicio": "0.2.11",
+      "simplicio-gemini": "0.2.11",
+      "simplicio-hermes": "0.4.0",
+      "simplicio-loop": "3.43.1",
+      "simplicio-prompt": "1.4.0"
+    },
+    "hosts": [
+      {
+        "host": "codex",
+        "mode": "manager",
+        "disposition": "blocked",
+        "reason_code": "blocked"
+      },
+      {
+        "host": "claude",
+        "mode": "manager",
+        "disposition": "not_detected",
+        "reason_code": "not_detected"
+      },
+      {
+        "host": "gemini",
+        "mode": "manager",
+        "disposition": "not_detected",
+        "reason_code": "not_detected"
+      },
+      {
+        "host": "copilot",
+        "mode": "manager",
+        "disposition": "not_detected",
+        "reason_code": "not_detected"
+      },
+      {
+        "host": "hermes",
+        "mode": "hybrid",
+        "disposition": "ready",
+        "reason_code": "ready"
+      },
+      {
+        "host": "qwen",
+        "mode": "manager",
+        "disposition": "not_detected",
+        "reason_code": "not_detected"
+      },
+      {
+        "host": "kilo",
+        "mode": "manager",
+        "disposition": "not_detected",
+        "reason_code": "not_detected"
+      },
+      {
+        "host": "opencode",
+        "mode": "manager",
+        "disposition": "blocked",
+        "reason_code": "local_install_capability_unverified"
+      }
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 /* Simplicio workbench: Orca-inspired information architecture, native light surfaces. */
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
   --ink: #23272e;
   --muted: #69727d;
   --muted-soft: #7d8590;
@@ -52,7 +52,7 @@
   border-bottom: 1px solid var(--line-soft);
 }
 .workbench .brand { margin: 0; gap: 9px; }
-.workbench .brand-mark { width: 29px; height: 29px; border-radius: 7px; }
+.workbench .brand-mark { width: 29px; height: 29px; border-radius: 7px; object-fit: cover; display: block; border: 0; box-shadow: none; }
 .workbench .brand-copy strong { font-size: 14px; font-weight: 650; letter-spacing: -.025em; }
 .workbench .brand-copy span { font-size: 7px; color: var(--muted); letter-spacing: .13em; }
 .brand-home, .back-to-app { border: 0; background: transparent; padding: 0; display: flex; align-items: center; gap: 10px; cursor: pointer; min-height: 40px; color: var(--muted); }
@@ -133,7 +133,7 @@
 .workbench .preview-badge { display: inline-flex; min-height: 19px; background: #fff8e7; color: #8e7028; border-color: #eadbad; font-size: 9px; }
 .workbench-welcome { min-height: 100%; max-width: 960px; margin: 0 auto; padding: 40px 40px 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 36px; }
 .welcome-center { text-align: center; padding: 18px 0 6px; }
-.welcome-mark { height: 76px; width: 76px; object-fit: cover; border: 1px solid #e2e6e5; border-radius: 20px; display: block; margin: 0 auto 24px; box-shadow: 0 3px 14px #22372c0b; }
+.welcome-mark { height: 76px; width: 76px; object-fit: cover; border: 0; border-radius: 20px; display: block; margin: 0 auto 24px; box-shadow: none; }
 .welcome-kicker { font-size: 9px; font-weight: 550; letter-spacing: .15em; color: #8a938d; }
 .welcome-center h1 { font-size: clamp(32px, 4vw, 42px); font-weight: 650; letter-spacing: -.055em; line-height: 1.2; margin: 8px 0 14px; color: #2e3832; }
 .welcome-center > p { color: var(--muted); font-size: 15px; line-height: 1.7; margin: 0 0 26px; }
@@ -346,12 +346,12 @@
 /* A quiet two-step entry and an evidence-backed installer, all on white. */
 .entry-flow, .setup-layout {
   width: 100%; height: 100%; min-width: 0; overflow: auto; display: flex;
-  flex-direction: column; gap: 0; padding: 24px 40px 18px; background: #fff;
-  color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  flex-direction: column; gap: 0; padding: 24px 40px 18px; background: var(--canvas);
+  color: var(--ink); font-family: "Avenir Next", "Segoe UI", sans-serif;
 }
 .entry-header { min-height: 40px; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex: 0 0 auto; }
 .entry-header .brand { gap: 9px; }
-.entry-header .brand-mark { width: 28px; height: 28px; border-radius: 7px; }
+.entry-header .brand-mark { width: 28px; height: 28px; border-radius: 7px; object-fit: cover; display: block; border: 0; box-shadow: none; }
 .entry-header .brand-copy strong { font-size: 14px; }
 .entry-header .brand-copy span { font-size: 7px; color: var(--muted); }
 .entry-header .text-button { min-height: 44px; padding: 0 12px; color: var(--muted); font-weight: 500; }
@@ -359,13 +359,13 @@
   border: 0; border-radius: 0; min-height: 0; background: #fff; width: min(500px, 100%);
   flex: 1; margin: 0 auto; padding: 36px 0 44px; display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
-.entry-mark { border-radius: 23px; border: 1px solid #e2e9e4; box-shadow: 0 3px 16px #263c2c09; margin-bottom: 28px; }
+.entry-mark { display: block; border: 0; border-radius: 22px; box-shadow: none; object-fit: cover; margin-bottom: 30px; }
 .entry-welcome h1, .entry-login h1, .setup-heading h1, .setup-welcome h1 {
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
-  font-size: clamp(34px, 4.5vw, 49px); font-weight: 500; line-height: 1.13; letter-spacing: -.035em;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: clamp(32px, 4.2vw, 46px); font-weight: 600; line-height: 1.15; letter-spacing: -.045em;
   text-align: center; margin: 0 0 20px; color: #29382f;
 }
-.entry-welcome h1 em { display: block; font-style: normal; }
+.entry-welcome h1 em { display: block; font-style: normal; font-weight: 400; color: var(--muted); font-size: .58em; letter-spacing: -.015em; margin-top: 10px; }
 .entry-welcome > p { color: var(--muted); font-size: 15px; line-height: 1.7; text-align: center; margin: 0 0 38px; }
 .entry-primary { width: min(380px, 100%); min-height: 48px; border-radius: 9px; background: #244f3a; color: #fff; font-size: 14px; font-weight: 550; padding: 12px 20px; box-shadow: 0 2px 4px #244f3a0f; }
 .entry-primary:hover { background: #1d432f; }
@@ -373,16 +373,16 @@
 .entry-caption { display: block; color: var(--muted); font-size: 11px; font-weight: 400; line-height: 1.8; text-align: center; }
 .entry-welcome > .entry-caption { margin-top: 17px; }
 .entry-flow .entry-login { width: min(430px, 100%); }
-.entry-login h1 { font-size: clamp(32px, 4vw, 43px); margin-bottom: 26px; }
+.entry-login h1 { font-size: clamp(30px, 3.7vw, 40px); margin-bottom: 8px; }
 /* The sign-in content sits directly on the white window, without a card frame. */
-.entry-login-card { width: 100%; min-width: 0; border: 0; border-radius: 0; padding: 28px; box-shadow: none; }
+.entry-login-card { width: 100%; min-width: 0; border: 0; border-radius: 0; padding: 16px 28px 0; box-shadow: none; }
 .entry-account-copy { font-size: 14px; color: var(--muted); line-height: 1.6; text-align: center; margin: 0 0 24px; }
-.entry-google { width: 100%; min-height: 48px; background: white; color: #343c37; border-color: #cdd4d0; border-radius: 8px; font-size: 14px; font-weight: 550; gap: 13px; }
+.entry-google { position: relative; width: min(100%, 320px); min-height: 44px; margin-inline: auto; padding-inline: 38px; background: white; color: #3c4043; border: 1px solid #dadce0; border-radius: 4px; font-family: Arial, sans-serif; font-size: 14px; font-weight: 500; gap: 12px; }
 .entry-google:hover { background: #f7f9f8; border-color: #a0b3a7; }
-.entry-google .google-mark { width: 20px; height: 20px; font-size: 17px; font-weight: 650; background: transparent; color: #326cd5; }
-.entry-login-note { border: 0; padding-top: 22px; margin-top: 26px; display: flex; gap: 10px; align-items: flex-start; color: var(--muted); }
+.entry-google .google-mark { position: absolute; left: 12px; width: 20px; height: 20px; display: block; border-radius: 0; background: transparent; }
+.entry-login-note { border: 0; padding-top: 0; margin-top: 20px; display: flex; justify-content: center; gap: 7px; align-items: center; color: var(--muted); }
 .entry-login-note .glyph { flex: 0 0 auto; margin-top: 2px; }
-.entry-login-note p { font-size: 12px; line-height: 1.7; margin: 0 0 18px; }
+.entry-login-note p { font-size: 11px; line-height: 1.6; margin: 0; }
 .entry-login-card > .entry-caption { text-align: left; font-size: 11px; }
 .entry-login-card .action-error { color: #8c4136; background: #fff6f3; border: 1px solid #ead1c9; padding: 12px; font-size: 12px; line-height: 1.7; border-radius: 8px; margin: 16px 0 0; }
 .entry-wait { display: flex; align-items: flex-start; gap: 10px; padding-top: 16px; color: var(--muted); font-size: 12px; line-height: 1.7; }
@@ -395,6 +395,12 @@
 .runtime-install-body { width: min(760px, 100%); padding-top: clamp(38px, 7vh, 78px); }
 .runtime-install-status { color: var(--muted); font-size: 12px; line-height: 1.7; margin: 12px 0 0; }
 .runtime-install-receipt { display: flex; align-items: center; gap: 9px; color: var(--green-dark); font-size: 11px; line-height: 1.7; margin: 0 14px 18px; }
+.runtime-preparation-summary { margin: 22px 0 24px; border: 1px solid var(--line); border-radius: 12px; background: #fff; overflow: hidden; }
+.runtime-preparation-summary h2 { margin: 0; padding: 16px 18px; color: var(--ink); font-size: 14px; font-weight: 600; letter-spacing: -.015em; }
+.runtime-preparation-summary ul { list-style: none; margin: 0; padding: 0; }
+.runtime-preparation-summary li { min-width: 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 12px 18px; border-top: 1px solid var(--line-soft); font-size: 11px; line-height: 1.6; }
+.runtime-preparation-summary li span { min-width: 0; color: var(--muted); overflow-wrap: anywhere; }
+.runtime-preparation-summary li strong { min-width: 0; color: var(--green-dark); font-size: 10px; font-weight: 550; text-align: right; overflow-wrap: anywhere; }
 .runtime-install-receipt .glyph { flex: 0 0 auto; }
 .runtime-install-layout .setup-footer-inner { display: flex; justify-content: flex-end; }
 .runtime-install-layout .setup-footer-inner > .button { min-width: 220px; }
@@ -413,7 +419,7 @@
 .setup-layout > .entry-footer { min-height: 36px; padding: 6px 24px; background: #fafbfb; border-top: 1px solid var(--line-soft); }
 .setup-intro .setup-main { display: flex; align-items: center; }
 .setup-welcome { width: min(620px, 100%); margin: auto; padding: 40px 24px; display: flex; flex-direction: column; align-items: center; text-align: center; }
-.setup-welcome > img { border-radius: 18px; margin-bottom: 18px; }
+.setup-welcome > img { display: block; border: 0; border-radius: 18px; box-shadow: none; object-fit: cover; margin-bottom: 18px; }
 .setup-wordmark { font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif; color: #245c42; font-size: clamp(48px, 8vw, 88px); line-height: 1.1; letter-spacing: .015em; font-weight: 550; margin-bottom: 24px; }
 .setup-welcome h1 { font-family: inherit; font-size: 18px; font-weight: 550; letter-spacing: -.025em; margin: 0 0 12px; color: var(--ink); }
 .setup-welcome > p { font-size: 16px; color: var(--muted); line-height: 1.7; margin: 0 0 30px; }
@@ -484,6 +490,8 @@
   .setup-step-status { grid-column: 2; text-align: left; }
   .setup-context { font-size: 10px; }
   .setup-review { padding: 18px; }
+  .runtime-preparation-summary li { flex-direction: column; gap: 3px; }
+  .runtime-preparation-summary li strong { text-align: left; }
   .setup-controls { flex-direction: column; align-items: stretch; gap: 4px; }
   .setup-controls > .text-button { align-self: flex-start; }
   .setup-controls > div { justify-content: flex-start; }
@@ -491,3 +499,12 @@
 @media (prefers-reduced-motion: reduce) {
   .setup-spinner { animation: none; }
 }
+/* Quiet precision: a restrained entry accent and progressive disclosure. */
+.entry-flow .entry-header { border-bottom: 1px solid var(--line-soft); padding-bottom: 16px; }
+.entry-login h1::before { content: ""; display: block; width: 24px; height: 3px; border-radius: 2px; background: var(--green); margin: 0 auto 24px; }
+.entry-privacy { margin: 14px auto 0; max-width: 320px; color: var(--muted); font-size: 11px; line-height: 1.7; text-align: center; }
+.entry-privacy summary { cursor: pointer; padding: 8px; min-height: 36px; border-radius: 6px; }
+.entry-privacy summary:hover { color: var(--green-dark); background: var(--green-pale); }
+.entry-privacy summary:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.entry-privacy p { margin: 8px 0 0; padding: 12px; background: var(--surface-muted); border-radius: 8px; }
+.entry-footer { letter-spacing: .025em; }

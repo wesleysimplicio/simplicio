@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { AccessState } from "../contracts";
 import { Brand, Glyph } from "../components/Brand";
 import type { RuntimeInstallResult } from "../runtime_install";
+import type { PreparationResult } from "../runtime_preparation_result";
 
 export function LoadingScreen() {
   return (
@@ -10,51 +11,67 @@ export function LoadingScreen() {
       <div className="boot-orbit" aria-hidden="true">
         <span />
       </div>
-      <p>Conectando ao Runtime local…</p>
     </div>
   );
 }
 
-export type RuntimeInstallPhase = "idle" | "installing" | "validating" | "failed";
+export type RuntimeInstallPhase = "idle" | "installing" | "preparing" | "validating" | "failed";
 
 const runtimeInstallSteps = [
-  ["Validar componente empacotado", "Conferir o Runtime que acompanha este instalador."],
-  ["Instalar o Runtime", "Publicar o binário localmente de forma atômica e privada."],
-  ["Validar o Runtime instalado", "Executar o binário ativo e validar seu contrato."],
-  ["Concluir a preparação", "Ler um snapshot novo antes de seguir para o login."],
+  ["Validar componente", "Conferir o Runtime e as dependências empacotadas."],
+  ["Instalar Runtime", "Publicar a cópia local com segurança."],
+  ["Verificar instalação", "Confirmar integridade e versão."],
+  ["Preparar ambiente", "Detectar Python; preparar memória, seeds, migrations e clientes detectados."],
+  ["Concluir", "Ler o estado atual antes do login."],
 ] as const;
 
 function runtimeInstallStepStates(phase: RuntimeInstallPhase, receipt?: RuntimeInstallResult) {
-  if (phase === "installing") return ["running", "pending", "pending", "pending"] as const;
-  if (phase === "validating") return ["complete", "complete", "complete", "running"] as const;
+  // The native operation confirms these three steps together in its receipt.
+  // Do not invent a current or failed substep while that receipt is absent.
+  if (phase === "installing") return ["awaiting", "awaiting", "awaiting", "pending", "pending"] as const;
+  if (phase === "preparing") return ["complete", "complete", "complete", "running", "pending"] as const;
+  if (phase === "validating") return ["complete", "complete", "complete", "complete", "running"] as const;
   if (phase === "failed") {
     return receipt
-      ? (["complete", "complete", "complete", "failed"] as const)
-      : (["failed", "pending", "pending", "pending"] as const);
+      ? (["complete", "complete", "complete", "unconfirmed", "unconfirmed"] as const)
+      : (["unconfirmed", "unconfirmed", "unconfirmed", "pending", "pending"] as const);
   }
-  return ["pending", "pending", "pending", "pending"] as const;
+  return ["pending", "pending", "pending", "pending", "pending"] as const;
 }
 
-export function RuntimeInstallScreen({ phase, receipt, error, onInstall, reconciliationRequired, onReconcile }: {
+export function RuntimeInstallScreen({ phase, receipt, preparation, error, onInstall, reconciliationRequired, onReconcile }: {
   phase: RuntimeInstallPhase;
   receipt?: RuntimeInstallResult;
+  preparation?: PreparationResult;
   error: string | null;
   onInstall: () => void;
   reconciliationRequired?: boolean;
   onReconcile?: () => void;
 }) {
   const states = runtimeInstallStepStates(phase, receipt);
-  const busy = phase === "installing" || phase === "validating";
-  const progress = phase === "validating" || (phase === "failed" && receipt) ? 75 : phase === "installing" ? 25 : 0;
+  const busy = phase === "installing" || phase === "preparing" || phase === "validating";
+  // Native operations return receipts, not fractional progress events.
+  const progress = phase === "validating" ? 80 : phase === "preparing" || (phase === "failed" && receipt) ? 60 : phase === "installing" ? undefined : 0;
   const status = reconciliationRequired
-    ? "A tentativa anterior precisa ser esclarecida antes de qualquer nova instalação."
+    ? "Consulte o estado da instalação anterior."
     : phase === "installing"
-    ? "Validando e instalando o Runtime…"
-    : phase === "validating"
-      ? "Runtime instalado. Confirmando o estado atual…"
-      : phase === "failed"
-        ? "A preparação não foi concluída."
-        : "Pronto para preparar o Runtime local.";
+      ? "Instalando Runtime…"
+      : phase === "preparing"
+        ? "Preparando ambiente local…"
+        : phase === "validating"
+          ? "Confirmando estado…"
+          : phase === "failed"
+            ? "Preparação não concluída."
+            : "Pronto.";
+
+  if (phase === "idle" && !reconciliationRequired && !error) {
+    return <div className="access-layout entry-flow">
+      <section className="entry-welcome access-story" aria-label="Instalar Simplicio">
+        <img className="entry-mark" src="/icon.png" width="88" height="88" alt="Simplicio" />
+        <button className="button entry-primary" type="button" onClick={onInstall}>Install Now<Glyph name="arrow" size={18} /></button>
+      </section>
+    </div>;
+  }
 
   return <div className="setup-layout runtime-install-layout">
     <header className="entry-header"><Brand /></header>
@@ -64,9 +81,8 @@ export function RuntimeInstallScreen({ phase, receipt, error, onInstall, reconci
     <main className="setup-main">
       <section className="setup-body runtime-install-body" aria-labelledby="runtime-install-title">
         <div className={`setup-heading${phase === "failed" ? " is-failed" : ""}`}>
-          <span className="eyebrow">PRIMEIRA ABERTURA</span>
-          <h1 id="runtime-install-title">Prepare o Simplicio Runtime</h1>
-          <p>O Desktop instalará e validará somente o Runtime empacotado. Plugins, IDEs e configurações continuam intocados até sua revisão e consentimento separados.</p>
+          <span className="eyebrow">INSTALAÇÃO</span>
+          <h1 id="runtime-install-title">Preparando Simplicio</h1>
         </div>
         <p className="runtime-install-status" role="status">{status}</p>
         <ol className="setup-steps">
@@ -75,15 +91,23 @@ export function RuntimeInstallScreen({ phase, receipt, error, onInstall, reconci
             return <li key={label} data-state={state}>
               <span className="setup-step-icon">
                 {state === "complete" ? <Glyph name="check" size={15} />
-                  : state === "running" ? <span className="setup-spinner" aria-hidden="true" />
-                    : state === "failed" ? <Glyph name="attention" size={15} /> : index + 1}
+                  : state === "running" ? <span className="setup-spinner" aria-hidden="true" /> : index + 1}
               </span>
               <span><strong>{label}</strong><p>{detail}</p></span>
-              <span className="setup-step-status">{state === "complete" ? "Concluído" : state === "running" ? "Em andamento" : state === "failed" ? "Falhou" : "Pendente"}</span>
+              <span className="setup-step-status">{state === "complete" ? "Concluído" : state === "running" ? "Em andamento" : state === "awaiting" ? "Aguardando confirmação" : state === "unconfirmed" ? "Não confirmada" : "Pendente"}</span>
             </li>;
           })}
         </ol>
-        {receipt && <p className="runtime-install-receipt"><Glyph name="shield" size={16} />Runtime {receipt.runtime.version} validado · plugins não alterados</p>}
+        {receipt && <p className="runtime-install-receipt"><Glyph name="shield" size={16} />Runtime {receipt.runtime.version} validado</p>}
+        {preparation && <section className="runtime-preparation-summary" aria-label="Ambiente preparado">
+          <h2>Ambiente preparado</h2>
+          <ul>
+            <li><span>Dependências</span><strong>Empacotadas · pronto</strong></li>
+            <li><span>Python</span><strong>{preparation.python.status === "detected" ? `Detectado · ${preparation.python.version}` : preparation.python.status === "unavailable" ? "Indisponível · Runtime nativo ativo" : "Não detectado · não necessário"}</strong></li>
+            <li><span>Memória, seeds e migrations</span><strong>{preparation.memory.items.toLocaleString("pt-BR")} itens · {preparation.memory.skills.toLocaleString("pt-BR")} skills · {preparation.memory.migrations} migrations · pronto</strong></li>
+            <li><span>Clientes detectados</span><strong>{preparation.clients.configured} configurados · {preparation.clients.skipped} ignorados</strong></li>
+          </ul>
+        </section>}
         {error && <p className="action-error" role="alert">{error}</p>}
       </section>
     </main>
@@ -93,12 +117,11 @@ export function RuntimeInstallScreen({ phase, receipt, error, onInstall, reconci
           {busy ? "Consultando…" : "Consultar estado"}
         </button>}
         <button className="button button-primary" type="button" onClick={onInstall} disabled={busy || reconciliationRequired} aria-busy={busy}>
-          {busy ? "Preparando…" : phase === "failed" ? "Tentar novamente" : "Instalar e validar Runtime"}
+          {busy ? "Preparando…" : phase === "failed" ? "Tentar novamente" : "Install Now"}
           {!busy && <Glyph name="arrow" size={17} />}
         </button>
       </div>
     </div>
-    <footer className="entry-footer"><Glyph name="shield" size={14} />Instalação local · Sem plugins antes do consentimento</footer>
   </div>;
 }
 
@@ -107,30 +130,24 @@ export function SignInScreen({ busy, error, onLogin, initialStep = "welcome" }:
   const [step, setStep] = useState(initialStep);
   const primaryAction = useRef<HTMLButtonElement>(null);
   useEffect(() => { primaryAction.current?.focus(); }, [step]);
-  const platform = typeof navigator === "undefined" ? "Desktop"
-    : /Mac/.test(navigator.platform) ? "Mac" : /Win/.test(navigator.platform) ? "Windows" : "Linux";
   return <div className="access-layout entry-flow">
-    <header className="entry-header"><Brand />{step === "login" && <button className="text-button" type="button" disabled={busy} onClick={() => setStep("welcome")}><Glyph name="back" size={16} />Voltar</button>}</header>
-    {step === "welcome" ? <section className="entry-welcome access-story" aria-labelledby="welcome-title">
-      <img className="entry-mark" src="/icon.png" width="88" height="88" alt="" />
-      <h1 id="welcome-title">Simplicio <em>para {platform}</em></h1>
-      <p>Seu Runtime, pronto para trabalhar com você.</p>
+    {step === "welcome" ? <section className="entry-welcome access-story" aria-label="Bem-vindo ao Simplicio">
+      <img className="entry-mark" src="/icon.png" width="88" height="88" alt="Simplicio" />
       <button ref={primaryAction} className="button entry-primary" type="button" onClick={() => setStep("login")}>Começar<Glyph name="arrow" size={18} /></button>
-      <span className="entry-caption">Projetos, agentes e economia. No seu computador.</span>
-    </section> : <section className="entry-login access-panel" aria-labelledby="login-title">
-      <h1 id="login-title">Entre no Simplicio</h1>
+    </section> : <section className="entry-login access-panel" aria-label="Entrar no Simplicio">
+      <img className="entry-mark" src="/icon.png" width="88" height="88" alt="Simplicio" />
       <div className="entry-login-card">
-        <p className="entry-account-copy">Conecte sua conta SimpleTI para continuar.</p>
         <button ref={primaryAction} className="button entry-google" type="button" onClick={onLogin} disabled={busy} aria-busy={busy}>
-          <span className="google-mark" aria-hidden="true">G</span>{busy ? "Aguardando navegador…" : "Continuar com Google"}
+          <svg className="google-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.39-.18-2.05H12v3.88h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.24c1.9-1.75 2.98-4.33 2.98-7.36Z" />
+            <path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.62-2.41l-3.24-2.51c-.9.6-2.05.97-3.38.97-2.6 0-4.81-1.76-5.6-4.13H3.06v2.59A10 10 0 0 0 12 22Z" />
+            <path fill="#FBBC05" d="M6.4 13.92a6 6 0 0 1 0-3.84V7.49H3.06a10 10 0 0 0 0 9.02l3.34-2.59Z" />
+            <path fill="#EA4335" d="M12 5.95c1.47 0 2.79.51 3.82 1.51l2.87-2.87A9.6 9.6 0 0 0 12 2a10 10 0 0 0-8.94 5.49l3.34 2.59C7.19 7.71 9.4 5.95 12 5.95Z" />
+          </svg>{busy ? "Aguardando navegador…" : "Continuar com Google"}
         </button>
-        {busy && <p className="entry-wait" role="status"><span className="setup-spinner" aria-hidden="true" />Conclua o login no navegador. O app continua quando o Runtime confirmar sua sessão.</p>}
         {error && <p className="action-error" role="alert">{error}</p>}
-        <div className="entry-login-note"><Glyph name="lock" size={16} /><p>O login abre no navegador. Nenhuma senha passa pelo app.</p></div>
-        <p className="entry-caption">Sua identidade e assinatura são verificadas separadamente pelo Runtime.</p>
       </div>
     </section>}
-    <footer className="entry-footer"><Glyph name="shield" size={14} />Autenticação pelo Runtime · Dados locais sob seu controle</footer>
   </div>;
 }
 
@@ -229,7 +246,6 @@ export function AccessGate({
             </button>
           )}
         </div>
-        {state === "unknown" && loginBusy && <p className="entry-wait" role="status">Conclua o login no navegador. O acesso permanece desconhecido até o Runtime confirmar sua sessão.</p>}
         {error && <p className="action-error" role="alert">{error}</p>}
         {showDiagnostic && state === "unknown" && (
           <div className="access-diagnostic" aria-live="polite">

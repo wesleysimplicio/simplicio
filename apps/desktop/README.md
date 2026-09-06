@@ -84,10 +84,13 @@ before the Desktop can trust it for upgrade/no-downgrade decisions.
 For a manual build, stage the verified target-specific Runtime at
 `src-tauri/binaries/simplicio-<target-triple>`; for example,
 `simplicio-aarch64-apple-darwin` on Apple Silicon. These executable bytes remain
-ignored by Git and are never committed to the public source tree. The explicit
-integration review generates a plan first; host plugins are applied only after
-the user consents to that exact plan digest. Runtime installation and Google
-login never install host plugins.
+ignored by Git and are never committed to the public source tree. The first-run **Install Now** action installs the verified managed Runtime and
+then invokes its bounded `mcp register` preparation once, before login. Runtime
+owns memory migrations, seeds, local service readiness and registration for
+clients it actually detects; the Desktop accepts only a redacted readiness
+receipt and never retries the effect automatically. Google login itself does not
+install or configure clients. Later integration changes still use the explicit
+plan-digest review flow.
 
 The normal test suite includes a real executable fixture that crosses the
 sidecar process boundary, installs the bytes, and reads a fresh snapshot. The

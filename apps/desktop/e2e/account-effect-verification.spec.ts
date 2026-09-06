@@ -19,6 +19,8 @@ async function mockAccountEffects(page: Page, options: {
     const calls: string[] = [];
     Object.assign(window, { __accountEffectCalls: calls, __TAURI_INTERNALS__: {
       invoke: async (command: string) => {
+          if (command === "desktop_runtime_install_status") return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+          if (command === "desktop_preparation_status") return true;
         calls.push(command);
         if (command === "desktop_snapshot") return states[current];
         if (command === "desktop_login") {

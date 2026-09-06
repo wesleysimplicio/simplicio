@@ -42,6 +42,21 @@ async function mockEntryFlow(page: Page, initial: "missing" | "degraded" | "sign
       __TAURI_INTERNALS__: {
         transformCallback: () => ++callbackSequence,
         invoke: async (command: string, args: Record<string, unknown> = {}) => {
+          if (command === "desktop_runtime_install_status") return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+          if (command === "desktop_preparation_status") return true;
+          if (command === "desktop_prepare_runtime_environment") {
+            calls.push({ command, args });
+            return {
+              schema: "simplicio.desktop-preparation-result/v1",
+              status: "ready",
+              effectsApplied: true,
+              runtimeDependencies: { status: "ready", pythonRequired: false },
+              python: { status: "not_detected", dependenciesVerified: false },
+              memory: { ready: true, items: 100, skills: 50, migrations: 1 },
+              clients: { configured: 0, skipped: 0 },
+              redacted: true,
+            };
+          }
           calls.push({ command, args });
           if (command === "plugin:event|listen") return ++callbackSequence;
           if (command === "plugin:event|unlisten") return;
@@ -96,19 +111,24 @@ function expectNoHostPluginEffects(calls: Array<{ command: string }>) {
 test("first opening installs packaged Runtime exactly once, validates a fresh snapshot, then shows login", async ({ page }) => {
   await mockEntryFlow(page, "missing", true);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Prepare o Simplicio Runtime", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Install Now", exact: true })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Navegação principal" })).toHaveCount(0);
-  await expect(page.getByRole("progressbar")).toHaveAttribute("value", "0");
+  await expect(page.getByRole("progressbar")).toHaveCount(0);
 
-  const install = page.getByRole("button", { name: "Instalar e validar Runtime", exact: true });
+  const install = page.getByRole("button", { name: "Install Now", exact: true });
   await install.evaluate((button: HTMLButtonElement) => { button.click(); button.click(); });
   await expect(page.getByRole("button", { name: "Preparando…", exact: true })).toBeDisabled();
-  await expect(page.getByRole("progressbar")).toHaveAttribute("value", "25");
-  expect(count(await entryCalls(page), "desktop_install_runtime")).toBe(1);
+  await expect(page.getByRole("progressbar")).not.toHaveAttribute("value");
+  await expect(page.locator(".setup-steps [data-state=complete]")).toHaveCount(0);
+  await expect(page.getByText("Conferir o Runtime e as dependências empacotadas.", { exact: true })).toBeVisible();
+  const installCalls = await entryCalls(page);
+  expect(count(installCalls, "desktop_install_runtime")).toBe(1);
 
   await page.evaluate(() => (window as EntryTestWindow).__finishRuntimeInstall?.());
-  await expect(page.getByRole("progressbar")).toHaveAttribute("value", "75");
-  await expect(page.getByText("Runtime 3.8.40 validado · plugins não alterados", { exact: true })).toBeVisible();
+  const preparingCalls = await entryCalls(page);
+  expect(count(preparingCalls, "desktop_prepare_runtime_environment")).toBe(1);
+  await expect(page.getByRole("progressbar")).toHaveAttribute("value", "80");
+  await expect(page.getByText("Runtime 3.8.40 validado", { exact: true })).toBeVisible();
   await expect(page.locator("body")).not.toContainText("/Users/private");
   await expect(page.locator("body")).not.toContainText("secret-token");
 
@@ -116,6 +136,7 @@ test("first opening installs packaged Runtime exactly once, validates a fresh sn
   await expect(page.getByRole("button", { name: "Começar", exact: true })).toBeVisible();
   const calls = await entryCalls(page);
   expect(count(calls, "desktop_install_runtime")).toBe(1);
+  expect(count(calls, "desktop_prepare_runtime_environment")).toBe(1);
   expect(calls.find((call) => call.command === "desktop_install_runtime")?.args).toEqual({});
   expect(count(calls, "refresh_desktop_snapshot")).toBe(1);
   expect(count(calls, "desktop_login")).toBe(0);
@@ -125,7 +146,7 @@ test("first opening installs packaged Runtime exactly once, validates a fresh sn
 test("a degraded Runtime never skips the core repair gate", async ({ page }) => {
   await mockEntryFlow(page, "degraded");
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Prepare o Simplicio Runtime", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Install Now", exact: true })).toBeVisible();
   const calls = await entryCalls(page);
   expect(count(calls, "desktop_install_runtime")).toBe(0);
   expect(count(calls, "desktop_login")).toBe(0);

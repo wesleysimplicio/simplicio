@@ -6,6 +6,8 @@ async function mockReports(page: Page, mode: "ready" | "missing" | "invalid" | "
     const calls: Array<{ command: string; args: Record<string, any> }> = [];
     const projects = ["aulas", "runtime"].map((name, i) => ({ id: `project-${String(i).repeat(64)}`, name, path: `/tmp/${name}`, evidenceType: "usage", lastModifiedEpoch: 1788180000 }));
     Object.assign(window, { __reportCalls: calls, __TAURI_INTERNALS__: { invoke: async (command: string, args: Record<string, any> = {}) => {
+          if (command === "desktop_runtime_install_status") return { schema: "simplicio.desktop-install-status/v1", status: "clear", redacted: true };
+          if (command === "desktop_preparation_status") return true;
       calls.push({ command, args });
       if (command === "desktop_snapshot") return snapshot;
       if (command === "desktop_usage_projects") return { schema: "simplicio.desktop-project-usage/v1", projects, candidateCount: 2, partial: mode === "partial", reasons: mode === "partial" ? ["deadline"] : [], directoriesVisited: 2,

@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("login and conservative access states remain actionable", async ({ page }) => {
   await page.goto("/?state=signed_out");
   await page.getByRole("button", { name: "Começar", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Entre no Simplicio" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continuar com Google", exact: true })).toBeVisible();
   await page.getByRole("button", { name: /Continuar com Google/ }).click();
   await expect(page.getByRole("heading", { name: "Simplicio", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Um bom começo." })).toHaveCount(0);

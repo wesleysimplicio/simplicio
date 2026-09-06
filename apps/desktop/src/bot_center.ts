@@ -136,7 +136,7 @@ export function createDemoBotCenter(generatedAt = new Date().toISOString()): Bot
     state: "blocked",
     revision: 7,
     events,
-    tokenUsage: { input: 2840, output: 618, cached: 1210, proofKind: "measured" },
+    tokenUsage: { input: 2840, output: 618, reasoning: 192, cached: 1210, proofKind: "measured" },
     costUsd: 0.0184,
     cacheHitPercent: 42.6,
   }];
