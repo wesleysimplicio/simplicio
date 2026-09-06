@@ -834,6 +834,54 @@ async fn desktop_open_releases() -> Result<(), String> {
         .map_err(|_| "release_page_unavailable".to_string())?
 }
 
+fn open_uninstall_location() -> Result<(), String> {
+    let executable = std::env::current_exe().map_err(|_| "uninstall_location_unavailable")?;
+
+    #[cfg(target_os = "macos")]
+    {
+        let bundle = executable
+            .ancestors()
+            .find(|path| path.extension().is_some_and(|extension| extension == "app"))
+            .ok_or("uninstall_location_unavailable")?
+            .to_path_buf();
+        let status = Command::new("/usr/bin/open")
+            .args(["-R"])
+            .arg(bundle)
+            .status()
+            .map_err(|_| "uninstall_location_unavailable")?;
+        return if status.success() { Ok(()) } else { Err("uninstall_location_unavailable".into()) };
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let status = Command::new("explorer.exe")
+            .arg(format!("/select,{}", executable.display()))
+            .status()
+            .map_err(|_| "uninstall_location_unavailable")?;
+        return if status.success() { Ok(()) } else { Err("uninstall_location_unavailable".into()) };
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let parent = executable.parent().ok_or("uninstall_location_unavailable")?;
+        let status = Command::new("xdg-open")
+            .arg(parent)
+            .status()
+            .map_err(|_| "uninstall_location_unavailable")?;
+        return if status.success() { Ok(()) } else { Err("uninstall_location_unavailable".into()) };
+    }
+
+    #[allow(unreachable_code)]
+    Err("uninstall_location_unsupported".into())
+}
+
+#[tauri::command]
+async fn desktop_open_uninstall_location() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(open_uninstall_location)
+        .await
+        .map_err(|_| "uninstall_location_unavailable".to_string())?
+}
+
 fn validate_snapshot(value: Value) -> Result<Value, String> {
     let encoded = serde_json::to_vec(&value)
         .map_err(|_| "Contrato de snapshot do Runtime incompatível".to_string())?;
@@ -1238,6 +1286,7 @@ pub fn run() {
             desktop_update_install,
             desktop_update_rollback,
             desktop_open_releases,
+            desktop_open_uninstall_location,
             desktop_bot_action,
             runtime_status
         ])

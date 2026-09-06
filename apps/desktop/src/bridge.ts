@@ -168,7 +168,7 @@ export async function openDesktopProject(path: string): Promise<void> {
   await invoke("desktop_open_project", { path });
 }
 
-export async function exportDesktopSnapshot(kind: "diagnostic" | "activity", filters: { status?: string; provider?: string } = {}): Promise<string | null> {
+export async function exportDesktopSnapshot(kind: "diagnostic" | "activity", filters: { status?: string; provider?: string; search?: string } = {}): Promise<string | null> {
   if (!isTauri()) return null;
   const receipt = await invoke<{ schema: string; path: string; bytes: number }>("desktop_export_snapshot", { kind, filters });
   if (receipt.schema !== "simplicio.desktop-snapshot-export/v1" || typeof receipt.path !== "string" || receipt.bytes <= 0) throw new Error("snapshot_export_invalid");
@@ -352,6 +352,12 @@ export async function openDesktopSubscription(): Promise<void> {
     return;
   }
   await invoke("desktop_open_subscription");
+}
+
+/** Opens the installed app location so the user can remove only the Desktop bundle. */
+export async function openDesktopUninstallLocation(): Promise<void> {
+  if (!isTauri()) throw new Error("preview_no_runtime");
+  await invoke("desktop_open_uninstall_location");
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {

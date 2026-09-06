@@ -419,10 +419,10 @@ export function DesktopUpdates() {
       <p>{checking.progress.receivedBytes > 0 ? formatBytes(checking.progress.receivedBytes) + " de metadados recebidos. " : ""}O instalador não está sendo baixado.</p>
     </div>}
     {(action.stage === "downloading" || action.stage === "installing" || action.stage === "rollback") && <div className="desktop-update-progress" data-update-stage={action.stage}>
-      <div className="desktop-update-progress-label"><span role="status" aria-live="polite">{action.stage === "downloading" ? "Baixando e verificando instalador" : action.stage === "installing" ? "Instalando e preparando reinício" : "Restaurando versão anterior"}</span>
+      <div className="desktop-update-progress-label"><span role="status" aria-live="polite">{action.stage === "downloading" ? "Baixando pacote Desktop" : action.stage === "installing" ? "Aplicando pacote e preparando reinício" : "Restaurando versão anterior"}</span>
         <span>{progressBytes > 0 && result ? formatBytes(progressBytes) + " de " + formatBytes(result.release.assetBytes) : "Aguarde…"}</span></div>
-      <progress aria-label="Progresso do download" value={progressRatio} max="100" />
-      <p>O arquivo é armazenado em área privada e só é instalado após a verificação de tamanho, SHA-256 e assinatura Ed25519.</p>
+      <progress aria-label={action.stage === "downloading" ? "Progresso do download" : action.stage === "installing" ? "Progresso da instalação" : "Progresso da recuperação"} value={progressRatio} max="100" />
+      <p>{action.stage === "downloading" ? "O pacote é recebido em área privada; a verificação de tamanho, SHA-256 e assinatura Ed25519 acontece antes de preparar a instalação." : action.stage === "installing" ? "A versão atual é preservada como recuperação enquanto o Desktop prepara o reinício." : "A versão anterior está sendo restaurada; o estado só será concluído após a validação do aplicativo."}</p>
     </div>}
     {status.currentVersion && <p className="desktop-update-installed">Versão deste aplicativo: <strong>{status.currentVersion}</strong></p>}
     {result && available && <>
@@ -459,4 +459,3 @@ export function DesktopUpdates() {
     </div>
   </dialog>;
 }
-

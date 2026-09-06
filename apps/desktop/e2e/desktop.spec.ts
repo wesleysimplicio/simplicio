@@ -29,6 +29,10 @@ test("all navigation, provider, receipt, and account controls work", async ({ pa
 
   await page.getByRole("button", { name: "Atividade", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Atividade" })).toBeVisible();
+  await page.getByRole("searchbox", { name: "Buscar recibos", exact: true }).fill("contexto");
+  await expect(page.locator(".activity-page-row")).toHaveCount(1);
+  await expect(page.locator(".activity-page-row")).toContainText("Contexto reutilizado");
+  await page.getByRole("searchbox", { name: "Buscar recibos", exact: true }).fill("");
   await page.getByRole("button", { name: "atenção" }).click();
   await page.locator(".activity-provider-filter select").selectOption("all");
   const activityDownload = page.waitForEvent("download");
@@ -61,6 +65,25 @@ test("all navigation, provider, receipt, and account controls work", async ({ pa
   await expect(page.getByRole("heading", { name: "Conta Simplicio" })).toBeVisible();
   await page.getByRole("button", { name: "Sair da conta" }).click();
   await expect(page.getByRole("button", { name: "Começar", exact: true })).toBeVisible();
+});
+
+test("Desktop settings persist language and launch preferences and keep uninstall bounded", async ({ page }) => {
+  await page.goto("/?state=active&view=settings");
+  await expect(page.getByRole("heading", { name: "Conta Simplicio" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Idioma da interface", exact: true })).toHaveValue("pt-BR");
+  await page.getByRole("combobox", { name: "Comportamento ao iniciar", exact: true }).selectOption("last_view");
+  await expect(page.getByRole("combobox", { name: "Comportamento ao iniciar", exact: true })).toHaveValue("last_view");
+  await page.reload();
+  await expect(page.getByRole("combobox", { name: "Comportamento ao iniciar", exact: true })).toHaveValue("last_view");
+  await page.goto("/?state=active&view=activity");
+  await expect(page.getByRole("heading", { name: "Atividade" })).toBeVisible();
+  await page.goto("/?state=active");
+  await expect(page.getByRole("heading", { name: "Atividade" })).toBeVisible();
+  await page.goto("/?state=active&view=settings");
+  await expect(page.getByRole("button", { name: "Abrir localização do app", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Abrir localização do app", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Nenhum arquivo foi removido");
+  await expect(page.getByText("Projetos, relatórios e o Runtime gerenciado não são removidos", { exact: false })).toBeVisible();
 });
 
 test("Bot Center exposes the canonical roster, timeline, rooms, and honest computer state", async ({ page }) => {

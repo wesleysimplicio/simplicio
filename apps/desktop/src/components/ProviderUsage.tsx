@@ -126,6 +126,14 @@ function providerLabel(provider: ProviderQuota | undefined): string {
   return "Cota indisponível. Nenhum percentual presumido.";
 }
 
+function providerStatusLabel(provider: ProviderQuota | undefined): string {
+  if (provider?.status === "fresh") return "Atual";
+  if (provider?.status === "stale") return "Desatualizado";
+  if (provider?.error === "refresh_in_grok") return "Atualize no Grok";
+  if (provider?.error === "login_required") return "Login necessário";
+  return "Indisponível";
+}
+
 function sourceLabel(provider: ProviderQuota): string {
   return provider.source === "codex_app_server" ? "Codex app-server" : "Grok CLI billing";
 }
@@ -173,9 +181,11 @@ export function ProviderUsage({ onAccounts, onHistory }: { onAccounts: () => voi
 
   const codex = data?.providers.find(provider => provider.id === "codex");
   const grok = data?.providers.find(provider => provider.id === "grok");
-  const summary = codex?.windows.find(window => window.windowDurationMins === 10080) ?? codex?.windows[0];
-  const renderWindows = (provider: ProviderQuota | undefined, label: string) => <>
-    <h3>{label}</h3>
+  const summaryProvider = [codex, grok].find(provider => provider?.status === "fresh" && provider.windows.length)
+    ?? [codex, grok].find(provider => provider?.windows.length);
+  const summary = summaryProvider?.windows.find(window => window.windowDurationMins === 10080) ?? summaryProvider?.windows[0];
+  const renderWindows = (provider: ProviderQuota | undefined, label: string) => <section className={`quota-provider quota-provider-${provider?.id ?? label.toLowerCase()}`} data-provider={provider?.id ?? label.toLowerCase()}>
+    <div className="quota-provider-heading"><h3>{label}</h3><span className={`quota-status quota-status-${provider?.status ?? "unavailable"}`}>{providerStatusLabel(provider)}</span></div>
     {provider?.windows.map((window, index) => <div className={"quota-window" + (compact ? " quota-window-compact" : "")} key={window.windowDurationMins + "-" + window.resetsAt + "-" + index}>
       <span>{window.windowDurationMins === 10080 ? "Semanal" : window.windowDurationMins === 300 ? "5 horas" : window.windowDurationMins + " min"} · {window.usedPercent}% usado</span>
       <progress max={100} value={window.usedPercent} aria-label={"Uso da janela de " + window.windowDurationMins + " minutos"} />
@@ -183,11 +193,11 @@ export function ProviderUsage({ onAccounts, onHistory }: { onAccounts: () => voi
     </div>)}
     {(!provider || !provider.windows.length) && <p>{providerLabel(provider)}</p>}
     {provider && <small>Fonte: {sourceLabel(provider)} · consulta {new Date(provider.observedAt * 1000).toLocaleTimeString("pt-BR")}{provider.status === "stale" ? " · desatualizada" : ""}</small>}
-  </>;
+  </section>;
 
   return <div className="provider-usage" ref={root}>
     <button type="button" aria-expanded={open} aria-controls="provider-usage-panel" onClick={() => setOpen(!open)}>
-      {summary && !error ? "Codex " + summary.usedPercent + "% usado" + (codex?.status === "stale" ? " · desatualizado" : "") : busy ? "Consultando cotas…" : "Cotas dos agentes"}
+      {summary && !error ? (summaryProvider?.id === "grok" ? "Grok " : "Codex ") + summary.usedPercent + "% usado" + (summaryProvider?.status === "stale" ? " · desatualizado" : "") : busy ? "Consultando cotas…" : "Cotas dos agentes"}
     </button>
     {open && <section id="provider-usage-panel" className="provider-usage-panel" aria-label="Cotas dos agentes">
       <header><strong>Uso das contas</strong><button type="button" disabled={busy} onClick={() => void refresh()}>{busy ? "Consultando…" : "Atualizar cotas"}</button><button type="button" aria-label="Fechar cotas" onClick={() => setOpen(false)}>×</button></header>

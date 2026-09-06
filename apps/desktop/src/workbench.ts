@@ -65,6 +65,9 @@ export interface WorkbenchPreferences {
   density: "comfortable" | "compact";
   showProjectPaths: boolean;
   rememberProject: boolean;
+  language: "pt-BR";
+  launchBehavior: "home" | "last_view";
+  lastView: View;
 }
 export interface WorkbenchState {
   schema: "simplicio.desktop-workbench/v1";
@@ -74,7 +77,14 @@ export interface WorkbenchState {
 }
 
 export const WORKBENCH_KEY = "simplicio.desktop.workbench.v1";
-export const DEFAULT_PREFERENCES: WorkbenchPreferences = { density: "comfortable", showProjectPaths: false, rememberProject: true };
+export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
+  density: "comfortable",
+  showProjectPaths: false,
+  rememberProject: true,
+  language: "pt-BR",
+  launchBehavior: "home",
+  lastView: "home",
+};
 export const MAX_PROJECTS = 32;
 
 export function emptyWorkbench(): WorkbenchState {
@@ -108,6 +118,12 @@ export function parseWorkbench(raw: string | null): WorkbenchState {
     if (preferences?.density === "compact") state.preferences.density = "compact";
     if (typeof preferences?.showProjectPaths === "boolean") state.preferences.showProjectPaths = preferences.showProjectPaths;
     if (typeof preferences?.rememberProject === "boolean") state.preferences.rememberProject = preferences.rememberProject;
+    if (preferences?.language === "pt-BR") state.preferences.language = "pt-BR";
+    if (preferences?.launchBehavior === "last_view") state.preferences.launchBehavior = "last_view";
+    if (typeof preferences?.lastView === "string" && isView(preferences.lastView)
+      && !isSettingsView(preferences.lastView) && preferences.lastView !== "setup") {
+      state.preferences.lastView = preferences.lastView;
+    }
     if (state.preferences.rememberProject && state.projects.some((item) => item.id === value.selectedProjectId)) {
       state.selectedProjectId = value.selectedProjectId;
     }

@@ -273,5 +273,5 @@ test("diagnostic and activity exports go through native commands with no fronten
   await page.getByRole("button", { name: "atenção", exact: true }).click();
   await page.getByRole("button", { name: "Exportar recibos" }).click();
   await expect(page.getByRole("status")).toContainText("/Downloads/simplicio-activity.json");
-  expect((await calls(page, "desktop_export_snapshot")).at(-1)?.args).toEqual({ kind: "activity", filters: { status: "attention", provider: "all" } });
+  expect((await calls(page, "desktop_export_snapshot")).at(-1)?.args).toEqual({ kind: "activity", filters: { status: "attention", provider: "all", search: "" } });
 });

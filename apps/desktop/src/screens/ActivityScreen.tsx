@@ -4,6 +4,7 @@ import type { ActivityItem, DesktopSnapshot } from "../contracts";
 import { Glyph } from "../components/Brand";
 import { createActivityProjection } from "../activity_projection";
 import type { DesktopUsageState } from "../usage_store";
+import { searchMatches } from "../workbench";
 
 type StatusFilter = "all" | ActivityItem["status"];
 
@@ -28,11 +29,16 @@ function statusLabel(status: ActivityItem["status"]): string {
   return status === "verified" ? "verificado" : status === "running" ? "em execução" : "atenção";
 }
 
+export function activityMatchesSearch(item: ActivityItem, query: string): boolean {
+  return searchMatches([item.id, item.title, item.detail, item.provider, item.status].join(" "), query);
+}
+
 export function ActivityScreen({ snapshot, usage }: { snapshot: DesktopSnapshot; usage?: DesktopUsageState }) {
   const projection = createActivityProjection(snapshot);
   const savingsProven = snapshot.savings.proofKind === "measured" || snapshot.savings.proofKind === "replayed" || snapshot.savings.proofKind === "mixed";
   const [status, setStatus] = useState<StatusFilter>("all");
   const [provider, setProvider] = useState("all");
+  const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exported, setExported] = useState<string | null>(null);
@@ -40,7 +46,9 @@ export function ActivityScreen({ snapshot, usage }: { snapshot: DesktopSnapshot;
   const exportLock = useRef(false);
   const pageSize = Math.max(1, Math.min(snapshot.limits.maxActivity, 5));
   const providers = useMemo(() => Array.from(new Set(projection.items.map((item) => item.provider))).sort(), [projection.items]);
-  const filtered = projection.items.filter((item) => (status === "all" || item.status === status) && (provider === "all" || item.provider === provider));
+  const filtered = projection.items.filter((item) => (status === "all" || item.status === status)
+    && (provider === "all" || item.provider === provider)
+    && activityMatchesSearch(item, query));
   const visible = filtered.slice(page * pageSize, (page + 1) * pageSize);
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, pageCount - 1);
@@ -50,7 +58,7 @@ export function ActivityScreen({ snapshot, usage }: { snapshot: DesktopSnapshot;
     if (exportLock.current) return;
     exportLock.current = true; setExporting(true); setExported(null); setExportError(null);
     try {
-      const path = await exportDesktopSnapshot("activity", { status, provider });
+      const path = await exportDesktopSnapshot("activity", { status, provider, search: query });
       if (path) setExported(path);
       else downloadActivity(filtered, savingsProven);
     } catch { setExportError("Não foi possível salvar os recibos em Downloads. Verifique as permissões e o espaço em disco."); }
@@ -72,6 +80,7 @@ export function ActivityScreen({ snapshot, usage }: { snapshot: DesktopSnapshot;
       {exportError && <p className="inline-error" role="alert">{exportError}</p>}
       <section className="panel activity-page-panel">
         <div className="activity-toolbar">
+          <label className="activity-search"><Glyph name="search" size={16} /><input type="search" aria-label="Buscar recibos" placeholder="Buscar recibos" value={query} maxLength={120} onChange={(event) => { setQuery(event.target.value); setPage(0); }} /></label>
           <div className="segmented-control" aria-label="Filtrar por estado">
             {(["all", "verified", "running", "attention"] as const).map((item) => (
               <button key={item} className={status === item ? "active" : ""} type="button" onClick={() => { setStatus(item); setPage(0); }}>

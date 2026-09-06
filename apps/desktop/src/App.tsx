@@ -10,6 +10,7 @@ import {
   loadDesktopPreparationStatus,
   loadDesktopSnapshot,
   logoutDesktop,
+  openDesktopUninstallLocation,
   openDesktopSubscription,
   refreshDesktopSnapshot,
   reconcileDesktopRuntimeInstall,
@@ -30,7 +31,7 @@ import { ProjectDialog } from "./components/ProjectDialog";
 import { DesktopUpdates } from "./components/DesktopUpdates";
 import { installFailureMessage, installFailureRecovery, type InstallFailureRecovery } from "./install_failures";
 import { runtimeFailureMessage } from "./runtime_failures";
-import { isView, loadWorkbench, MAX_PROJECTS, moveHistory, navigate, WORKBENCH_KEY, type LocalProject, type NavigationEntry, type NavigationState, type WorkbenchState } from "./workbench";
+import { isSettingsView, isView, loadWorkbench, MAX_PROJECTS, moveHistory, navigate, WORKBENCH_KEY, type LocalProject, type NavigationEntry, type NavigationState, type WorkbenchState } from "./workbench";
 import { viewNavigationEntry } from "./settings_navigation";
 import { ProvidersScreen } from "./screens/ProvidersScreen";
 import { MemoryScreen } from "./screens/MemoryScreen";
@@ -48,10 +49,15 @@ import type { PreparationResult } from "./runtime_preparation_result";
 import { runtimeIsValid } from "./setup_flow";
 import { createDesktopUsageStore, createUsageChangefeedSupervisor } from "./usage_store";
 
-function initialView(fallback: View): View {
+function initialView(fallback: View, preferences: WorkbenchState["preferences"], hasSelectedProject: boolean): View {
   if (typeof window === "undefined") return "home";
   const requested = new URLSearchParams(window.location.search).get("view");
-  return isView(requested) ? requested : fallback;
+  if (isView(requested)) return requested;
+  if (preferences.launchBehavior === "last_view"
+    && (preferences.lastView !== "project" || hasSelectedProject)) {
+    return preferences.lastView;
+  }
+  return fallback;
 }
 
 export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSnapshot }) {
@@ -69,7 +75,11 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
   const [applicationRecovery, setApplicationRecovery] = useState<InstallFailureRecovery | undefined>();
   const [workbench, setWorkbench] = useState(loadWorkbench);
   const [history, setHistory] = useState<NavigationState>(() => ({ entries: [{
-    view: initialView(workbench.selectedProjectId ? "project" : "home"),
+    view: initialView(
+      workbench.selectedProjectId ? "project" : "home",
+      workbench.preferences,
+      Boolean(workbench.selectedProjectId),
+    ),
     projectId: workbench.selectedProjectId,
     tokenRepo: "",
   }], index: 0 }));
@@ -160,6 +170,13 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
 
   function setView(next: View, restoreRoute?: NavigationEntry) {
     setHistory((current) => navigate(current, viewNavigationEntry(current.entries[current.index], next, restoreRoute)));
+    if (!isSettingsView(next) && next !== "setup" && workbench.preferences.lastView !== next) {
+      saveWorkbench({ ...workbench, preferences: { ...workbench.preferences, lastView: next } });
+    }
+  }
+
+  async function openUninstallLocation() {
+    await openDesktopUninstallLocation();
   }
 
   function moveNavigation(direction: -1 | 1) {
@@ -539,7 +556,10 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       {view === "memory" && <MemoryScreen snapshot={snapshot} />}
       {view === "tokens" && <TokensScreen key={tokenRepo} initialRepoPath={tokenRepo} projectPaths={workbench.projects.map(project => project.path)} usage={usage} />}
       {(view === "settings" || view === "diagnostics") && (
-        <SettingsScreen section={view === "diagnostics" ? "diagnostics" : "account"} snapshot={snapshot} busy={action !== null} onRefresh={refresh} onSubscribe={subscribe} onLogout={logout} logoutBusy={action === "logout"} />
+        <SettingsScreen section={view === "diagnostics" ? "diagnostics" : "account"} snapshot={snapshot} busy={action !== null}
+          onRefresh={refresh} onSubscribe={subscribe} onLogout={logout} logoutBusy={action === "logout"}
+          preferences={workbench.preferences} onPreferences={(preferences) => saveWorkbench({ ...workbench, preferences })}
+          onUninstall={openUninstallLocation} />
       )}
       {(view === "general" || view === "shortcuts" || view === "models") && <PreferencesScreen view={view} snapshot={snapshot} preferences={workbench.preferences} onPreferences={(preferences) => saveWorkbench({ ...workbench, preferences })} onProviders={() => setView("agents")} />}
       {view === "activity" && <ActivityScreen snapshot={snapshot} usage={usage} />}
