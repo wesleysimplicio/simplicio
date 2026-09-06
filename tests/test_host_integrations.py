@@ -65,6 +65,7 @@ def test_claude_code_has_runtime_verification_contract() -> None:
     assert claude.capability == "runtime-mcp"
     assert claude.verification_command[-1] == "--json"
     assert "<absolute-path>" in claude.verification_command
+    assert claude.mcp_environment == (("SIMPLICIO_RUNTIME_MODE", "mapper-only"),)
 
 
 def test_cursor_declares_user_and_workspace_scopes() -> None:
