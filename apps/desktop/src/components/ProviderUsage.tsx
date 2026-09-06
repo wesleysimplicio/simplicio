@@ -25,6 +25,11 @@ const sources = ["codex_app_server", "grok_cli_billing"] as const;
 const scopes = ["local_authenticated_account", "local_cli_session"] as const;
 const statuses = ["fresh", "stale", "unavailable"] as const;
 const maxProviderWindows = 32;
+const maxWindowDurationMins = 366 * 24 * 60;
+const providerContract = {
+  codex: { source: "codex_app_server", accountScope: "local_authenticated_account" },
+  grok: { source: "grok_cli_billing", accountScope: "local_cli_session" },
+} as const;
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -36,8 +41,8 @@ function parseWindow(value: unknown): WindowUsage {
   const minutes = value.windowDurationMins;
   const resets = value.resetsAt;
   if (typeof used !== "number" || !Number.isFinite(used) || used < 0 || used > 100
-    || typeof minutes !== "number" || !Number.isSafeInteger(minutes) || minutes <= 0
-    || typeof resets !== "number" || !Number.isSafeInteger(resets) || resets < 0) {
+    || typeof minutes !== "number" || !Number.isSafeInteger(minutes) || minutes <= 0 || minutes > maxWindowDurationMins
+    || typeof resets !== "number" || !Number.isSafeInteger(resets) || resets < 0 || resets > Number.MAX_SAFE_INTEGER) {
     throw new Error("quota_invalid");
   }
   return { usedPercent: used, windowDurationMins: minutes, resetsAt: resets };
@@ -53,13 +58,17 @@ export function parseQuotas(value: unknown): Quotas {
   }
   const seen = new Set<string>();
   const providers = value.providers.map((raw): ProviderQuota => {
+    const id = record(raw) ? raw.id : undefined;
+    const contract = providerContract[id as keyof typeof providerContract];
     if (!record(raw)
       || !providerIds.includes(raw.id as typeof providerIds[number])
       || seen.has(String(raw.id))
       || !sources.includes(raw.source as typeof sources[number])
       || !scopes.includes(raw.accountScope as typeof scopes[number])
+      || !contract || raw.source !== contract.source || raw.accountScope !== contract.accountScope
       || raw.redacted !== true
       || !Number.isSafeInteger(raw.observedAt) || Number(raw.observedAt) < 0
+      || Number(raw.observedAt) > Number(value.observedAt)
       || !statuses.includes(raw.status as typeof statuses[number])
       || !Array.isArray(raw.windows) || raw.windows.length > maxProviderWindows
       || (raw.status === "unavailable" && raw.windows.length !== 0)
@@ -84,6 +93,12 @@ export function parseQuotas(value: unknown): Quotas {
     };
   });
   if (value.status === "busy" && providers.length !== 0) throw new Error("quota_invalid");
+  if (value.status !== "busy") {
+    const expectedStatus = providers.some(provider => provider.status === "fresh")
+      ? "available"
+      : providers.some(provider => provider.status === "stale") ? "stale" : "unavailable";
+    if (value.status !== expectedStatus) throw new Error("quota_invalid");
+  }
   return {
     schema: "simplicio.provider-quotas/v2",
     status: value.status as Quotas["status"],
