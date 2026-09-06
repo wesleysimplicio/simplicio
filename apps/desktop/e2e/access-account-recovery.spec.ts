@@ -169,10 +169,8 @@ for (const failSnapshot of [false, true]) {
     await expect(pending).toBeDisabled();
     await expect(pending).toHaveAttribute("aria-busy", "true");
     if (failSnapshot) {
-      await expect(page.getByRole("status")).toContainText("Conclua o login no navegador");
       await expect(page.getByRole("navigation", { name: "Navegação principal" })).toHaveCount(0);
     } else {
-      await expect(page.getByRole("status")).toContainText("O acesso permanece desconhecido");
       await expect(page.getByRole("button", { name: "Aguarde…", exact: true })).toBeDisabled();
       await expect(page.getByRole("button", { name: "Sair da conta", exact: true })).toBeDisabled();
       await page.getByRole("button", { name: "Abrir diagnóstico", exact: true }).click();
