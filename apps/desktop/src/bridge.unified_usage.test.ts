@@ -84,7 +84,7 @@ describe("desktop unified usage bridge", () => {
     invokeMock.mockResolvedValue({
       schema: "simplicio.desktop-unified-usage-export/v1",
       format: "json",
-      path: "/Users/test/Downloads/simplicio-unified-usage.json",
+      path: "/tmp/simplicio fixture/Downloads/simplicio-unified-usage.json",
       bytes: 128,
       report_digest: NO_DATA.metadata.report_digest,
     });

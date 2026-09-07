@@ -71,7 +71,7 @@ describe("Runtime host-plugin plan review", () => {
   it("accepts only opaque SHA-256 identifiers for effect commands", () => {
     expect(isHostPluginDigest(digest("a"))).toBe(true);
     expect(isHostPluginDigest("sha256:private")).toBe(false);
-    expect(isHostPluginDigest("/Users/private/receipt")).toBe(false);
+    expect(isHostPluginDigest("/tmp/simplicio fixture/private/receipt")).toBe(false);
   });
   it("requires and shows exactly the eight canonical native/plugin hosts", () => {
     const result = parseIntegrationPlan(runtimePlan());

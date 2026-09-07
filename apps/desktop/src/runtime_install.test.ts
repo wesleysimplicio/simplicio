@@ -20,8 +20,8 @@ describe("Runtime core installer receipt", () => {
   it("keeps only the sanitized native projection", () => {
     const parsed = parseRuntimeInstallResult({
       ...validResult(),
-      path: "/Users/private/.simplicio/bin/simplicio",
-      backupPath: "/Users/private/.simplicio/bin/simplicio.previous",
+      path: "/tmp/simplicio fixture/private/.simplicio/bin/simplicio",
+      backupPath: "/tmp/simplicio fixture/private/.simplicio/bin/simplicio.previous",
       rawOutput: "secret-token",
       runtime: { ...validResult().runtime, config: { token: "secret-token" } },
     });

@@ -63,7 +63,7 @@ def test_stale_handshake_and_preview_are_not_connected_passes() -> None:
 
 def test_sensitive_receipts_and_unavailable_platforms_block() -> None:
     document = deepcopy(valid_matrix())
-    document["runtime"]["home_path"] = "/Users/test"
+    document["runtime"]["home_path"] = r"fixtures\home\test folder"
     document["platform_matrix"][0] = {
         "id": PLATFORMS[0],
         "status": "unavailable",

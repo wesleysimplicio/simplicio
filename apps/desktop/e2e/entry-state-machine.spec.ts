@@ -26,7 +26,7 @@ async function mockEntryFlow(page: Page, initial: "missing" | "degraded" | "sign
     backupAvailable: false,
     pluginsMutated: false,
     runtime: { state: "healthy", version: "3.8.40", config: { token: "secret-token" } },
-    path: "/Users/private/.simplicio/bin/simplicio",
+    path: "/tmp/simplicio fixture/private/.simplicio/bin/simplicio",
     rawOutput: "secret-token",
   };
   await page.addInitScript(({ snapshots, receipt, initial, pauseInstall }) => {
@@ -129,7 +129,7 @@ test("first opening installs packaged Runtime exactly once, validates a fresh sn
   expect(count(preparingCalls, "desktop_prepare_runtime_environment")).toBe(1);
   await expect(page.getByRole("progressbar")).toHaveAttribute("value", "80");
   await expect(page.getByText("Runtime 3.8.40 validado", { exact: true })).toBeVisible();
-  await expect(page.locator("body")).not.toContainText("/Users/private");
+  await expect(page.locator("body")).not.toContainText("/tmp/simplicio fixture/private");
   await expect(page.locator("body")).not.toContainText("secret-token");
 
   await page.evaluate(() => (window as EntryTestWindow).__finishRuntimeRefresh?.());
