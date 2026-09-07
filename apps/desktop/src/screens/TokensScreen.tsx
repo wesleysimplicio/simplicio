@@ -48,6 +48,21 @@ function IdleFinalizationReport({ finalization }: { finalization?: IdleSessionFi
   </section>;
 }
 
+function IdleFinalizationHistory({ items }: { items?: IdleSessionFinalization[] | null }) {
+  if (!items?.length) return null;
+  return <>
+    <IdleFinalizationReport finalization={items[0]} />
+    {items.length > 1 && <details className="idle-finalization-history" data-testid="idle-finalization-history">
+      <summary>Histórico de {items.length} finalizações</summary>
+      <ol>
+        {items.slice(1).map((item) => <li key={item.finalization_id ?? String(item.now_millis)}>
+          {item.closed_sessions.length} sessão(ões) · {item.usage.status === "complete" ? "coleta concluída" : item.usage.status === "pending_provider_refresh" ? "aguardando providers" : "indisponível"}
+        </li>)}
+      </ol>
+    </details>}
+  </>;
+}
+
 interface TokenScreenPeriodActions {
   invalidate: () => void;
   setPeriod: (period: TokenPeriod) => void;
@@ -366,7 +381,7 @@ export function TokensScreen({ initialRepoPath = "", projectPaths = [], usage }:
           <p>Proveniência: {costProjection.rows.map((row) => row.state).filter((value, index, values) => values.indexOf(value) === index).join(", ") || "indisponível"} · confiança: {costProjection.confidence.actual} · baseline: {costProjection.baseline.values_status} · digest <code>{costProjection.metadata.report_digest}</code></p>
         </div>}
       </section>
-      <IdleFinalizationReport finalization={usage?.idleFinalization} />
+      <IdleFinalizationHistory items={usage?.idleHistory?.length ? usage.idleHistory : usage?.idleFinalization ? [usage.idleFinalization] : []} />
       <ContextSavings repoPath={repoPath} autoLoad={autoContext} />
       </section>
     </div>

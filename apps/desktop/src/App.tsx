@@ -142,6 +142,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
     if (
       !snapshot
       || snapshot.access.state !== "active"
+      || !workbench.preferences.closeIdleSessions
       || typeof window === "undefined"
       || !("__TAURI_INTERNALS__" in window)
     ) return;
@@ -165,7 +166,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
     void finalize();
     const timer = window.setInterval(() => { void finalize(); }, 60_000);
     return () => window.clearInterval(timer);
-  }, [snapshot?.access.state, usageStore]);
+  }, [snapshot?.access.state, usageStore, workbench.preferences.closeIdleSessions]);
 
 
   function setView(next: View, restoreRoute?: NavigationEntry) {

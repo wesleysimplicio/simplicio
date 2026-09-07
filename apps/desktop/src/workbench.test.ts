@@ -49,6 +49,20 @@ describe("local workbench state", () => {
     expect(unsafe.preferences.lastView).toBe("home");
   });
 
+  it("keeps the 15-minute idle close on by default and accepts an explicit opt-out", () => {
+    expect(emptyWorkbench().preferences.closeIdleSessions).toBe(true);
+    const disabled = parseWorkbench(JSON.stringify({
+      ...emptyWorkbench(),
+      preferences: { ...emptyWorkbench().preferences, closeIdleSessions: false },
+    }));
+    expect(disabled.preferences.closeIdleSessions).toBe(false);
+    const ignored = parseWorkbench(JSON.stringify({
+      ...emptyWorkbench(),
+      preferences: { ...emptyWorkbench().preferences, closeIdleSessions: "no" },
+    }));
+    expect(ignored.preferences.closeIdleSessions).toBe(true);
+  });
+
   it("rejects untrusted project identifiers, remote paths and control characters", () => {
     for (const path of ["../project", "https://example.com", "//server/share", "\\\\server\\share", "/local\nsecret"]) {
       expect(() => parseLocalProject({ ...project(), path })).toThrow();
