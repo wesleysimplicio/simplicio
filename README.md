@@ -278,16 +278,29 @@ memory recall, deterministic edits, validation, and execution under its
 authentication and safety gates. MCP is an invocation surface, not a second
 installation of Mapper, Loop, or the other projects.
 
+The public vocabulary is `simplicio map`, `simplicio context`,
+`simplicio memory`, `simplicio edit`, and `simplicio run`. MCP names follow the
+same ownership: Mapper observes, Fast projects or retrieves, Dev CLI edits,
+Runtime governs, and Loop converges. Claude and Hermes Mapper-only profiles
+advertise `simplicio_map` / `simplicio_context` (and memory only when that host
+profile allows it). They do not advertise `edit`, `run`, `loop`, or `exec`.
+Full-mode hosts keep the broader Runtime surface. Deprecated aliases such as
+`mapper`, `index`, `code-graph`, and `mapper-memory` must not appear as a
+second tool; during compatibility they resolve to the same canonical
+capability. An older Runtime below the unified-surface minimum must not
+advertise the new names.
+
 The Runtime exposes these tools:
 
 | Tool | Purpose |
 |---|---|
-| `simplicio_map` | Build a compact structural map of a repository |
-| `simplicio_memory` | Recall indexed project memory (FTS/vector backends) |
-| `simplicio_edit` | Apply a structured, deterministic file-edit plan |
+| `simplicio_map` | Observe the repository (`simplicio map`) |
+| `simplicio_context` | Bounded task context (`simplicio context`) |
+| `simplicio_memory` | Recall MapperStore facts (`simplicio memory`) |
+| `simplicio_edit` | Apply a deterministic edit (`simplicio edit`; full-mode hosts) |
+| `simplicio_run` | Governed task execution (`simplicio run`; full-mode hosts) |
 | `simplicio_gate` | Check mission/effect gates before a mutation |
 | `simplicio_validate` | Run contract-oriented validation for a task |
-| `simplicio_run` | Execute a governed task through the Runtime |
 | `simplicio_symbol` | Navigate symbols and declarations |
 | `simplicio_search` | Search repository content semantically/structurally |
 | `simplicio_read` | Read files through the compact Runtime surface |
@@ -295,6 +308,7 @@ The Runtime exposes these tools:
 
 The client should call `tools/list` at startup and use the returned schemas;
 the table above is a quick orientation, not a substitute for live schemas.
+Mapper-only reconnect evidence is the live tool list, not this table.
 
 ### Codex: local STDIO MCP and hooks
 
@@ -578,11 +592,12 @@ python3 scripts/verify_distribution_consistency.py
 
 | Command | Description | Cost/effect |
 |---|---|---|
-| `simplicio runtime map --repo . --for-llm markdown` | Maps a repository for an LLM | Compact context |
+| `simplicio map --repo . --for-llm markdown` | Maps a repository for an LLM | Compact context |
+| `simplicio context --repo .` | Retrieves bounded task context from that map | Fast is projection-only |
 | `simplicio memory query "query" --json` | Recalls indexed project memory | Reuses known facts |
-| `simplicio edit --plan plan.json --repo .` | Applies a deterministic edit plan | No generation step |
-| `simplicio validate "task" --repo .` | Runs contract-oriented validation | Deterministic gates |
+| `simplicio edit --plan plan.json --repo .` | Applies a deterministic edit plan | Dev CLI owns the change |
 | `simplicio run "task" --repo . --agents N` | Runs a governed multi-agent task | Local-first routing |
+| `simplicio validate "task" --repo .` | Runs contract-oriented validation | Deterministic gates |
 | `simplicio sprint sprint.md --repo . --evidence` | Executes a sprint with evidence | Auditable delivery |
 | `simplicio benchmark run --sample --json` | Runs fixed benchmark fixtures | Reproducible rows |
 

@@ -13,6 +13,37 @@ const bootstrapPath = path.resolve(__dirname, "..", "bin", "simplicio-mcp-bootst
 const claudeBootstrapPath = path.resolve(__dirname, "..", "bin", "simplicio-claude-mcp-bootstrap.js");
 const bootstrap = require(bootstrapPath);
 
+test("host surface is version-aware and Mapper-only does not advertise execution tools", () => {
+  const stale = bootstrap.advertisedHostSurface("3.7.9", "full");
+  assert.equal(stale.unified, false);
+  assert.deepEqual(stale.tools, []);
+  assert.equal(stale.reason, "runtime_below_unified_surface");
+  assert.ok(stale.retiredAliases.includes("mapper"));
+  assert.ok(stale.retiredAliases.includes("code-graph"));
+
+  const mapperOnly = bootstrap.advertisedHostSurface("3.8.47", "mapper-only");
+  assert.equal(mapperOnly.unified, true);
+  assert.equal(mapperOnly.mode, "mapper-only");
+  assert.ok(mapperOnly.tools.includes("simplicio_map"));
+  assert.ok(mapperOnly.tools.includes("simplicio_context"));
+  assert.ok(!mapperOnly.tools.includes("simplicio_edit"));
+  assert.ok(!mapperOnly.tools.includes("simplicio_run"));
+  assert.ok(!mapperOnly.tools.includes("simplicio_exec"));
+  for (const forbidden of bootstrap.MAPPER_ONLY_FORBIDDEN_TOOLS) {
+    assert.ok(mapperOnly.forbidden.includes(forbidden));
+    assert.ok(!mapperOnly.tools.includes(forbidden));
+  }
+
+  const full = bootstrap.advertisedHostSurface("3.8.47", "full");
+  assert.deepEqual(full.tools, [
+    "simplicio_map",
+    "simplicio_context",
+    "simplicio_memory",
+    "simplicio_edit",
+    "simplicio_run"
+  ]);
+});
+
 test("version comparison is semantic and bounded", () => {
   assert.equal(bootstrap.versionAtLeast("3.8.35", "3.8.35"), true);
   assert.equal(bootstrap.versionAtLeast("v3.9.0", "3.8.35"), true);
@@ -384,6 +415,9 @@ test("real bootstrap completes an MCP handshake and exposes governed tools", { t
     assert.equal(new Set(names).size, names.length, "tool names must be unique");
     assert.ok(names.includes("simplicio_context"));
     assert.ok(names.includes("simplicio_edit"));
+    for (const alias of bootstrap.RETIRED_ALIAS_TOOLS) {
+      assert.ok(!names.includes(alias), `retired alias ${alias} must not appear as a separate MCP tool`);
+    }
   } finally {
     child.stdin.end();
     child.kill("SIGTERM");

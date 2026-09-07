@@ -107,16 +107,27 @@ Replace the placeholder with the installed binary's absolute path. Claude Code p
 
 ## Tools
 
-The server advertises ten tools through `tools/list`:
+The public CLI/MCP vocabulary is `simplicio map`, `simplicio context`,
+`simplicio memory`, `simplicio edit`, and `simplicio run`. Mapper observes,
+Fast projects or retrieves, Dev CLI edits, Runtime governs, and Loop
+converges. Claude and Hermes Mapper-only sessions advertise map/context
+(and memory when the host profile allows it) and never advertise
+`edit`/`run`/`loop`/`exec`. Full-mode hosts keep the broader Runtime surface.
+Deprecated aliases (`mapper`, `index`, `code-graph`, `mapper-memory`) must
+not appear as a second MCP tool. A Runtime below the unified-surface
+minimum must not advertise the new names.
+
+`tools/list` is the live authority. A current full-mode Runtime may advertise:
 
 | Tool | Purpose |
 |---|---|
-| `simplicio_map` | Compact structural repository map |
-| `simplicio_memory` | Indexed project-memory recall |
-| `simplicio_edit` | Structured deterministic file edits |
+| `simplicio_map` | Compact structural repository map (`simplicio map`) |
+| `simplicio_context` | Bounded task context (`simplicio context`) |
+| `simplicio_memory` | Indexed project-memory recall (`simplicio memory`) |
+| `simplicio_edit` | Structured deterministic file edits (`simplicio edit`) |
+| `simplicio_run` | Governed task execution (`simplicio run`) |
 | `simplicio_gate` | Mission/effect safety gate |
 | `simplicio_validate` | Contract-oriented validation |
-| `simplicio_run` | Governed task execution |
 | `simplicio_symbol` | Symbol/declaration navigation |
 | `simplicio_search` | Structural or semantic search |
 | `simplicio_read` | Compact file reads |
