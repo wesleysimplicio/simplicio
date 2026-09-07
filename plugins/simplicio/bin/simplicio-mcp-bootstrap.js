@@ -11,6 +11,7 @@ const { spawn, spawnSync } = require("node:child_process");
 const POLICY = Object.freeze({
   runtimeVersion: "3.8.47",
   minimumRuntimeVersion: "3.8.40",
+  unifiedSurfaceMinimumVersion: "3.8.40",
   installerCommit: "0fab19520aa2e5430aa682ec414cf5a41bb79b09",
   installers: Object.freeze({
     posix: Object.freeze({
@@ -67,6 +68,65 @@ function versionAtLeast(actual, minimum) {
 function supportedRuntimeVersion(actual, minimum = POLICY.minimumRuntimeVersion) {
   const parsed = parseVersion(actual);
   return Boolean(parsed && parsed[0] === 3 && versionAtLeast(actual, minimum));
+}
+
+const MAPPER_ONLY_TOOLS = Object.freeze([
+  "simplicio_map",
+  "simplicio_context",
+  "simplicio_memory",
+  "simplicio_read",
+  "simplicio_search",
+  "simplicio_symbol"
+]);
+const FULL_MODE_CANONICAL_TOOLS = Object.freeze([
+  "simplicio_map",
+  "simplicio_context",
+  "simplicio_memory",
+  "simplicio_edit",
+  "simplicio_run"
+]);
+const RETIRED_ALIAS_TOOLS = Object.freeze([
+  "mapper",
+  "index",
+  "code-graph",
+  "codegraph",
+  "mapper-memory",
+  "mapper-foreground",
+  "mapper-cutover",
+  "simplicio_mapper",
+  "simplicio_index",
+  "simplicio_code_graph"
+]);
+const MAPPER_ONLY_FORBIDDEN_TOOLS = Object.freeze([
+  "simplicio_edit",
+  "simplicio_run",
+  "simplicio_loop",
+  "simplicio_exec"
+]);
+
+function advertisedHostSurface(version, mode = "full") {
+  const unified = Boolean(
+    version && versionAtLeast(version, POLICY.unifiedSurfaceMinimumVersion)
+  );
+  if (!unified) {
+    return Object.freeze({
+      schema: "simplicio.host-surface/v1",
+      unified: false,
+      mode,
+      tools: [],
+      retiredAliases: [...RETIRED_ALIAS_TOOLS],
+      reason: "runtime_below_unified_surface"
+    });
+  }
+  const mapperOnly = mode === "mapper-only";
+  return Object.freeze({
+    schema: "simplicio.host-surface/v1",
+    unified: true,
+    mode: mapperOnly ? "mapper-only" : "full",
+    tools: mapperOnly ? [...MAPPER_ONLY_TOOLS] : [...FULL_MODE_CANONICAL_TOOLS],
+    forbidden: mapperOnly ? [...MAPPER_ONLY_FORBIDDEN_TOOLS] : [],
+    retiredAliases: [...RETIRED_ALIAS_TOOLS]
+  });
 }
 
 function runtimeVersion(payload) {
@@ -355,6 +415,10 @@ if (require.main === module) {
 
 module.exports = {
   POLICY,
+  advertisedHostSurface,
+  MAPPER_ONLY_FORBIDDEN_TOOLS,
+  MAPPER_ONLY_TOOLS,
+  RETIRED_ALIAS_TOOLS,
   acquireInstallLock,
   download,
   executableName,

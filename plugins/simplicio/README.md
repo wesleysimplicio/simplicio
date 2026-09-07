@@ -78,6 +78,12 @@ validation checks required capabilities by name instead of freezing a tool
 count. `simplicio_exec` is the governed supertool for every valid
 Simplicio CLI subcommand; individual CLI commands are not duplicated as separate plugin definitions.
 
+Semantic ownership is fixed: Mapper observes (`simplicio map` /
+`simplicio_map`), Fast projects or retrieves (`simplicio context` /
+`simplicio_context`), Dev CLI edits (`simplicio edit`), Runtime governs, and
+Loop converges (`simplicio run` / `simplicio loop` only on full-mode hosts).
+Claude's Mapper-only bootstrap does not advertise edit, run, loop, or exec.
+
 Included skills:
 
 - `simplicio-runtime`: map, recall, edit, execute, and validate through live MCP

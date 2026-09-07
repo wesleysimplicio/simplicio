@@ -27,6 +27,20 @@ def test_mcp_docs_match_local_authentication_contract():
     assert 'SIMPLICIO_INSTALL_CODEX' not in mcp
     assert 'automatically' in mcp
     assert 'Ed25519' in mcp
+    assert 'simplicio map' in mcp
+    assert 'simplicio context' in mcp
+    assert 'simplicio_context' in mcp
+
+
+def test_public_docs_use_unified_mapper_vocabulary():
+    readme = read('README.md')
+    assert '`simplicio map --repo . --for-llm markdown`' in readme
+    assert '`simplicio context --repo .`' in readme
+    assert '`simplicio memory query "query" --json`' in readme
+    assert '`simplicio edit --plan plan.json --repo .`' in readme
+    assert '`simplicio run "task" --repo . --agents N`' in readme
+    assert 'simplicio_context' in readme
+    assert 'Mapper observes' in readme
 
 
 def test_public_docs_point_to_canonical_distribution_contract():

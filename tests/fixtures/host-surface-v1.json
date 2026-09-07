@@ -1,0 +1,49 @@
+{
+  "schema": "simplicio.host-surface/v1",
+  "unified_surface_minimum_version": "3.8.40",
+  "cli": ["simplicio map", "simplicio context", "simplicio memory", "simplicio edit", "simplicio run"],
+  "ownership": {
+    "map": "Mapper observes",
+    "context": "Fast projects or retrieves from a Mapper generation",
+    "memory": "MapperStore facts with Mapper-owned contracts",
+    "edit": "Dev CLI applies the decided change",
+    "run": "Runtime governs authorized effects",
+    "loop": "Loop converges; absent from Mapper-only hosts"
+  },
+  "modes": {
+    "mapper-only": {
+      "hosts": ["claude-code", "hermes"],
+      "tools": [
+        "simplicio_map",
+        "simplicio_context",
+        "simplicio_memory",
+        "simplicio_read",
+        "simplicio_search",
+        "simplicio_symbol"
+      ],
+      "forbidden": ["simplicio_edit", "simplicio_run", "simplicio_loop", "simplicio_exec"]
+    },
+    "full": {
+      "hosts": ["cursor", "opencode", "vscode", "codex"],
+      "canonical": [
+        "simplicio_map",
+        "simplicio_context",
+        "simplicio_memory",
+        "simplicio_edit",
+        "simplicio_run"
+      ]
+    }
+  },
+  "retired_aliases": [
+    "mapper",
+    "index",
+    "code-graph",
+    "codegraph",
+    "mapper-memory",
+    "mapper-foreground",
+    "mapper-cutover",
+    "simplicio_mapper",
+    "simplicio_index",
+    "simplicio_code_graph"
+  ]
+}
