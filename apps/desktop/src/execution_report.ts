@@ -4,14 +4,15 @@ export const MAX_REPORT_ITEMS = 128;
 
 export type ReportStatus = "OPEN" | "COMPLETE" | "FAIL" | "UNVERIFIED" | string;
 export type ReportCoverageStatus = "complete" | "partial" | "unavailable" | "no_data";
-export type ValidationStatus = "passed" | "failed" | "not_run" | "unavailable" | string;
+export type ValidationStatus = "passed" | "failed" | "partial" | "not_run" | "unavailable" | string;
 export type ReportCostStatus = "known" | "estimated" | "unavailable" | string;
 
 export interface ReportTokenUsage {
   input: number | null;
   output: number | null;
   cacheRead: number | null;
-  cacheWrite: number | null;
+  cacheWrite: number | null;  cacheReadProvenance?: string | null;
+  cacheWriteProvenance?: string | null;
   reasoning: number | null;
   total: number | null;
   inputSemantics: string;
@@ -19,6 +20,13 @@ export interface ReportTokenUsage {
   costMicrousd: number | null;
   costStatus: ReportCostStatus;
   costProvenance: string;
+  source: string;
+}
+
+export interface ReportResourceSample {
+  cpuPercent: number | null;
+  ramMb: number | null;
+  systemRamMb: number | null;
   source: string;
 }
 
@@ -58,8 +66,12 @@ export interface ReportRetry {
 
 export interface ReportValidation {
   status: ValidationStatus;
-  checks: number;
-  failures: number;
+  coverageStatus?: string;
+  checks: number | null;
+  failures: number | null;
+  executed?: number | null;
+  passed?: number | null;
+  ignored?: number | null;
   source: string;
   notes: string[];
 }
@@ -76,6 +88,20 @@ export interface ReportTask {
   title: string;
   wallMs: number | null;
   phaseLatencyMs: Record<string, unknown>;
+  resources?: ReportResourceSample | null;
+  model?: string | null;
+  provider?: string | null;
+  engine?: string | null;
+  engineVersion?: string | null;
+  fallbackReason?: string | null;
+  attemptId?: string | null;
+  parentSpanId?: string | null;
+  completionVerdict?: string | null;
+  taskRunId?: string | null;
+  sessionIds?: string[];
+  receipts?: string[];
+  unresolved?: string[];
+  provenance?: string | null;
   tokens: ReportTokenUsage;
   stages: ReportStage[];
   tools: ReportTool[];
@@ -97,10 +123,14 @@ export interface ReportConsolidated {
   tokensTotalSum: number | null;
   tokensRollup: string;
   tokensCacheReadSum: number | null;
-  tokensCacheWriteSum: number | null;
+  tokensCacheWriteSum: number | null;  tokensCacheReadRollup?: string;
+  tokensCacheWriteRollup?: string;
   tokensReasoningSum: number | null;
+  tokensReasoningRollup?: string;
   costMicrousdSum: number | null;
   costRollup: string;
+  costStatus: ReportCostStatus;
+  costProvenance: string;
   toolInvocations: number;
   errorCount: number;
   retryCount: number;
@@ -126,7 +156,10 @@ export interface PresentExecutionReport {
   finishedAtUnix: number | null;
   wallMs: number | null;
   executionProfile: string;
-  operators: string[];
+  operators: string[];  engine?: string | null;
+  engineVersion?: string | null;
+  fallbackReason?: string | null;
+  loopDecision?: Record<string, unknown> | null;
   tasks: ReportTask[];
   history: ReportHistoryEntry[];
   consolidated: ReportConsolidated;
@@ -174,6 +207,47 @@ function nonNegative(value: unknown): number | null {
   if (value === undefined || value === null) return null;
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) throw new Error("execution_report_invalid");
   return value;
+}
+
+function nonNegativeReal(value: unknown): number | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) throw new Error("execution_report_invalid");
+  return value;
+}
+
+function aliasText(value: Record<string, unknown>, keys: string[], max = 512): string | null {
+  const found = keys
+    .map((key) => value[key])
+    .filter((candidate) => candidate !== undefined && candidate !== null)
+    .map((candidate) => text(candidate, "", max));
+  const distinct = [...new Set(found)];
+  if (distinct.length > 1) throw new Error("execution_report_invalid");
+  return distinct[0] ?? null;
+}
+
+function aliasNumber(value: Record<string, unknown>, keys: string[]): number | null {
+  const found = keys
+    .map((key) => value[key])
+    .filter((candidate) => candidate !== undefined && candidate !== null)
+    .map((candidate) => nonNegative(candidate));
+  const distinct = [...new Set(found)];
+  if (distinct.length > 1) throw new Error("execution_report_invalid");
+  return distinct[0] ?? null;
+}
+
+function aliasStrings(value: Record<string, unknown>, keys: string[], max = MAX_REPORT_ITEMS): string[] {
+  const found: string[] = [];
+  for (const key of keys) {
+    const candidate = value[key];
+    if (candidate === undefined || candidate === null) continue;
+    if (Array.isArray(candidate)) {
+      if (candidate.length > max) throw new Error("execution_report_invalid");
+      found.push(...candidate.map((item) => text(item, "", 256)));
+    } else {
+      found.push(text(candidate, "", 256));
+    }
+  }
+  return [...new Set(found)];
 }
 
 function booleanOrNull(value: unknown): boolean | null {
@@ -231,6 +305,8 @@ function parseTokens(raw: unknown): ReportTokenUsage {
     output,
     cacheRead: metric(value, "tokens_cached", "cache_read_tokens"),
     cacheWrite: metric(value, "cache_write_tokens", "tokens_cache_write"),
+    cacheReadProvenance: aliasText(value, ["cache_read_provenance", "cache_read_source", "provider_cache_read_source"], 96),
+    cacheWriteProvenance: aliasText(value, ["cache_write_provenance", "cache_write_source", "provider_cache_write_source"], 96),
     reasoning: nonNegative(value.tokens_reasoning),
     total: expectedTotal,
     inputSemantics: text(value.input_semantics, "unknown", 96),
@@ -273,7 +349,7 @@ function parseError(raw: unknown): ReportError {
   return {
     code: text(value.code, "unknown_error", 128),
     stageId: optionalText(value.stage_id, 128),
-    message: optionalText(value.message, 256),
+    message: null,
     retryable: booleanOrNull(value.retryable),
   };
 }
@@ -292,10 +368,25 @@ function parseValidation(raw: unknown): ReportValidation {
   const value = optionalRecord(raw);
   return {
     status: text(value.status, "unavailable", 48),
-    checks: nonNegative(value.checks) ?? 0,
-    failures: nonNegative(value.failures) ?? 0,
+    coverageStatus: text(value.coverage_status ?? value.coverage, "unavailable", 32),
+    checks: aliasNumber(value, ["checks", "executed"]),
+    failures: aliasNumber(value, ["failures", "failed"]),
+    executed: aliasNumber(value, ["executed", "checks"]),
+    passed: aliasNumber(value, ["passed", "successful"]),
+    ignored: aliasNumber(value, ["ignored", "skipped"]),
     source: text(value.source, "not_recorded", 128),
     notes: strings(value, "notes"),
+  };
+}
+
+function parseResources(raw: unknown): ReportResourceSample | null {
+  if (raw === undefined || raw === null) return null;
+  const value = record(raw);
+  return {
+    cpuPercent: nonNegativeReal(value.cpu_percent),
+    ramMb: nonNegativeReal(value.ram_mb),
+    systemRamMb: nonNegativeReal(value.system_ram_mb),
+    source: text(value.source, "unavailable", 96),
   };
 }
 
@@ -308,6 +399,20 @@ function parseTask(raw: unknown): ReportTask {
     title: text(value.title, "Tarefa sem título"),
     wallMs: nonNegative(value.wall_ms),
     phaseLatencyMs: phaseLatency,
+    resources: parseResources(value.resources),
+    model: aliasText(value, ["model", "model_id", "model_name"], 128),
+    provider: aliasText(value, ["provider", "provider_id"], 128),
+    engine: aliasText(value, ["engine", "executor", "runtime_engine"], 96),
+    engineVersion: aliasText(value, ["engine_version", "runtime_version"], 128),
+    fallbackReason: aliasText(value, ["fallback_reason", "fallbackReason"], 256),
+    attemptId: aliasText(value, ["attempt_id", "attemptId"], 128),
+    parentSpanId: aliasText(value, ["parent_span_id", "parent_span", "parentSpanId"], 128),
+    completionVerdict: aliasText(value, ["completion_verdict", "result"], 128),
+    taskRunId: aliasText(value, ["run_id", "task_run_id"], 128),
+    sessionIds: aliasStrings(value, ["session_ids", "session_id", "sessions"]),
+    receipts: aliasStrings(value, ["receipts", "receipt_ids"]),
+    unresolved: aliasStrings(value, ["unresolved", "unresolved_items"]),
+    provenance: aliasText(value, ["provenance", "source"], 128),
     tokens: parseTokens(value.tokens),
     stages: array(value, "stages").map(parseStage),
     tools: array(value, "tools").map(parseTool),
@@ -334,9 +439,14 @@ function parseConsolidated(raw: unknown, taskCount: number): ReportConsolidated 
     tokensRollup,
     tokensCacheReadSum: nonNegative(value.tokens_cache_read_sum),
     tokensCacheWriteSum: nonNegative(value.tokens_cache_write_sum),
+    tokensCacheReadRollup: text(value.tokens_cache_read_rollup, "absent", 32),
+    tokensCacheWriteRollup: text(value.tokens_cache_write_rollup, "absent", 32),
     tokensReasoningSum: nonNegative(value.tokens_reasoning_sum),
+    tokensReasoningRollup: text(value.reasoning_rollup, "absent", 32),
     costMicrousdSum: nonNegative(value.cost_microusd_sum),
     costRollup: text(value.cost_rollup, "unavailable", 32),
+    costStatus: text(value.cost_status, "unavailable", 48),
+    costProvenance: text(value.cost_provenance, "unavailable", 96),
     toolInvocations: nonNegative(value.tool_invocations) ?? 0,
     errorCount: nonNegative(value.error_count) ?? 0,
     retryCount: nonNegative(value.retry_count) ?? 0,
@@ -366,7 +476,7 @@ export function parseExecutionReport(raw: unknown, fetchedAtUnix = Math.floor(Da
     return {
       schema: EXECUTION_REPORT_SCHEMA,
       present: false,
-      message: text(value.message, "Nenhum relatório de execução foi registrado."),
+      message: "Nenhum relatório de execução foi registrado.",
       fetchedAtUnix,
     };
   }
@@ -385,6 +495,10 @@ export function parseExecutionReport(raw: unknown, fetchedAtUnix = Math.floor(Da
     finishedAtUnix: nonNegative(value.finished_at_unix),
     wallMs: nonNegative(value.wall_ms),
     executionProfile: text(value.execution_profile, "runtime-backed", 128),
+    engine: aliasText(value, ["engine", "executor", "runtime_engine"], 96),
+    engineVersion: aliasText(value, ["engine_version", "runtime_version"], 128),
+    fallbackReason: aliasText(value, ["fallback_reason", "fallbackReason"], 256),
+    loopDecision: value.loop_decision === undefined || value.loop_decision === null ? null : record(value.loop_decision),
     operators: strings(value, "operators_used"),
     tasks,
     history: parseHistory(value.history),
@@ -496,10 +610,12 @@ export function createPreviewExecutionReport(fetchedAtUnix = Math.floor(Date.now
       tokensReasoningSum: 150,
       costMicrousdSum: null,
       costRollup: "unavailable",
+      costStatus: "unavailable",
+      costProvenance: "no pricing receipt in preview",
       toolInvocations: 3,
       errorCount: 1,
       retryCount: 1,
-      validation: { status: "failed", checks: 8, failures: 1, source: "runtime", notes: [] },
+      validation: { status: "failed", coverageStatus: "partial", checks: 8, failures: 1, source: "runtime", notes: [] },
     },
     measuredFields: ["run_id", "started_at_unix", "task_wall_ms", "tokens_per_task"],
     unverifiedFields: ["cpu_percent", "cost_microusd"],

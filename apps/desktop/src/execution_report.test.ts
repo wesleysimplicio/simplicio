@@ -48,7 +48,7 @@ describe("execution report contract", () => {
         tokens_reasoning_sum: 150,
         error_count: 1,
         retry_count: 1,
-        validation: { status: "failed", checks: 4, failures: 1, source: "cargo-test" },
+        validation: { status: "failed", coverage_status: "partial", checks: 4, failures: 1, source: "cargo-test" },
       },
       measured_fields: ["tokens_per_task"],
       unverified_fields: [],
@@ -92,7 +92,7 @@ describe("execution report contract", () => {
       present: false,
       message: "not recorded",
     });
-    expect(report).toMatchObject({ present: false, message: "not recorded" });
+    expect(report).toMatchObject({ present: false, message: "Nenhum relatório de execução foi registrado." });
   });
 
   it("provides an unmistakable preview fixture with partial coverage", () => {
@@ -117,5 +117,70 @@ describe("execution report contract", () => {
       taskCount: 2,
       recordedAtUnix: 1_700_000_000,
     }]);
+  });
+
+  it("preserves provenance and keeps uncertain rollups explicit", () => {
+    const report = parseExecutionReport({
+      schema: "simplicio.execution-report/v1",
+      run_id: "run-current",
+      engine: "native",
+      engine_version: "3.8.47",
+      loop_decision: { verdict: "required" },
+      tasks: [{
+        task_id: "task-1",
+        title: "MCP via Loop",
+        model: "gpt-5.6",
+        provider: "openai",
+        engine: "python",
+        engine_version: "fallback-1",
+        fallback_reason: "native_unavailable",
+        attempt_id: "attempt-2",
+        parent_span_id: "span-1",
+        completion_verdict: "partial",
+        run_id: "run-current",
+        session_ids: ["session-a", "session-b"],
+        receipts: ["receipt-1"],
+        unresolved: ["late-correction"],
+        resources: { cpu_percent: 12.5, ram_mb: 64.5, system_ram_mb: 1024.25, source: "measured" },
+        tokens: {
+          tokens_in: 10,
+          tokens_out: 2,
+          tokens_total: 12,
+          tokens_cached: 4,
+          cache_read_provenance: "provider",
+          cache_write_tokens: 1,
+          cache_write_provenance: "local",
+          tokens_reasoning: 2,
+          reasoning_semantics: "included_in_output",
+        },
+        validation: { status: "partial", checks: 3, failures: 1, executed: 3, passed: 2, ignored: 0, source: "vitest" },
+        errors: [{ code: "validation_failed", message: "/Users/wesley/token=secret", stage_id: "verify" }],
+      }],
+      consolidated: {
+        task_count: 1,
+        tokens_cache_read_sum: 4,
+        tokens_cache_read_rollup: "partial",
+        tokens_reasoning_sum: 2,
+        reasoning_rollup: "partial",
+        cost_microusd_sum: 123,
+        cost_rollup: "complete",
+        cost_status: "estimated",
+        cost_provenance: "catalog-estimate",
+      },
+    });
+    expect(report.present).toBe(true);
+    if (!report.present) return;
+    expect(report.engine).toBe("native");
+    expect(report.loopDecision?.verdict).toBe("required");
+    expect(report.tasks[0].engine).toBe("python");
+    expect(report.tasks[0].fallbackReason).toBe("native_unavailable");
+    expect(report.tasks[0].sessionIds).toEqual(["session-a", "session-b"]);
+    expect(report.tasks[0].resources?.cpuPercent).toBe(12.5);
+    expect(report.tasks[0].tokens.cacheReadProvenance).toBe("provider");
+    expect(report.tasks[0].validation.failures).toBe(1);
+    expect(report.tasks[0].errors[0].message).toBeNull();
+    expect(report.consolidated.tokensCacheReadRollup).toBe("partial");
+    expect(report.consolidated.tokensReasoningRollup).toBe("partial");
+    expect(report.consolidated.costStatus).toBe("estimated");    expect(report.consolidated.costProvenance).toBe("catalog-estimate");
   });
 });
