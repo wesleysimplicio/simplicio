@@ -6,9 +6,12 @@ import {
 } from "./usage_changefeed";
 import type { IdleSessionFinalization } from "./session_idle";
 
+export const MAX_IDLE_FINALIZATION_HISTORY = 8;
+
 export interface DesktopUsageState {
   changefeed: UsageChangefeedState;
   idleFinalization: IdleSessionFinalization | null;
+  idleHistory: IdleSessionFinalization[];
 }
 
 export type DesktopUsageListener = (state: DesktopUsageState) => void;
@@ -25,7 +28,7 @@ export interface DesktopUsageStore {
 export function createDesktopUsageStore(
   initial: UsageChangefeedState = createUsageChangefeedState(),
 ): DesktopUsageStore {
-  let state: DesktopUsageState = { changefeed: initial, idleFinalization: null };
+  let state: DesktopUsageState = { changefeed: initial, idleFinalization: null, idleHistory: [] };
   const listeners = new Set<DesktopUsageListener>();
 
   function notify() {
@@ -51,7 +54,16 @@ export function createDesktopUsageStore(
       notify();
     },
     setIdleFinalization(receipt) {
-      state = { ...state, idleFinalization: receipt };
+      if (!receipt) return;
+      const same = state.idleHistory[0]
+        && ((receipt.finalization_id && state.idleHistory[0].finalization_id === receipt.finalization_id)
+          || (!receipt.finalization_id && state.idleHistory[0].now_millis === receipt.now_millis));
+      const rest = same ? state.idleHistory.slice(1) : state.idleHistory.filter((item) => {
+        if (receipt.finalization_id && item.finalization_id) return item.finalization_id !== receipt.finalization_id;
+        return true;
+      });
+      const idleHistory = [receipt, ...rest].slice(0, MAX_IDLE_FINALIZATION_HISTORY);
+      state = { ...state, idleFinalization: receipt, idleHistory };
       notify();
     },
   };
