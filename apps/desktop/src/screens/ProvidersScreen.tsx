@@ -5,7 +5,7 @@ import { providerRegistry } from "../provider_registry";
 import { IntegrationSetup } from "../components/IntegrationSetup";
 import { searchMatches } from "../workbench";
 import type { InstallFailureRecovery } from "../install_failures";
-import type { HostPluginOperationResult } from "../integration_setup";
+import type { DesktopHostPlugins, HostPluginOperationResult } from "../integration_setup";
 
 const stateCopy: Record<ProviderState, string> = {
   connected: "Conectado", registered: "Registrado", detected: "Detectado",
@@ -36,6 +36,36 @@ function ProviderRow({ provider }: { provider: ProviderConnection }) {
   </article>;
 }
 
+const pluginStatusCopy: Record<string, string> = {
+  pending: "Pendente",
+  applying: "Aplicando",
+  verified: "Verificado",
+  applied_unverified: "Aplicado, não verificado",
+  not_detected: "Não detectado",
+  unknown: "Desconhecido",
+  failed: "Falhou",
+  drifted: "Divergente",
+  blocked: "Bloqueado",
+};
+
+function HostPluginFreshness({ plugins }: { plugins?: DesktopHostPlugins }) {
+  if (!plugins) return <section className="settings-section" data-testid="host-plugin-freshness">
+    <div className="section-title"><h2>Skills e plugins instalados</h2></div>
+    <p className="token-proof-note">O Runtime ainda não enviou um recibo de plugins. Nenhuma atualização foi inferida.</p>
+  </section>;
+  const hosts = plugins.hosts ?? [];
+  return <section className="settings-section" data-testid="host-plugin-freshness">
+    <div className="section-title"><h2>Skills e plugins instalados</h2><span>{plugins.available ? `${hosts.length} hosts no recibo` : "recibo indisponível"}</span></div>
+    {plugins.reconcileRequired && <p className="token-proof-note" role="status">Há um recibo pendente de reconciliação. Revisar efeitos antes de aplicar de novo.</p>}
+    {hosts.length > 0
+      ? <div className="settings-slab">{hosts.map((host) => <div className="preference-row" key={host.host}>
+        <div><strong>{host.host}</strong><p>{host.reasonCode}{host.failureCode ? ` · ${host.failureCode}` : ""}</p></div>
+        <span className="neutral-badge">{pluginStatusCopy[host.status] ?? host.status} · {host.verification === "none" ? "sem verificação" : host.verification}</span>
+      </div>)}</div>
+      : <p className="token-proof-note">Nenhum host no recibo atual. O Desktop não inventa versões de catálogo.</p>}
+  </section>;
+}
+
 export function ProvidersScreen({ snapshot, busy, repairing, onRefresh, onRepair, onReconcile, hostPluginOutcome, inventoryOnly = false, applicationRecovery, onDiagnostics }:
   { snapshot: DesktopSnapshot; busy: boolean; repairing: boolean; onRefresh: () => void; onRepair: (digest: string) => Promise<HostPluginOperationResult>; onReconcile: (receiptId: string) => Promise<HostPluginOperationResult>; hostPluginOutcome?: HostPluginOperationResult; inventoryOnly?: boolean; applicationRecovery?: InstallFailureRecovery; onDiagnostics?: () => void }) {
   const [filter, setFilter] = useState<"all" | "installed" | "available" | "attention">("all");
@@ -63,6 +93,7 @@ export function ProvidersScreen({ snapshot, busy, repairing, onRefresh, onRepair
 
     {!inventoryOnly && <IntegrationSetup busy={busy} onApply={onRepair} onReconcile={onReconcile} recovery={applicationRecovery}
       status={snapshot.hostPlugins} initialResult={hostPluginOutcome} onDiagnostics={onDiagnostics} />}
+    {!inventoryOnly && <HostPluginFreshness plugins={snapshot.hostPlugins} />}
 
     <section className="connection-overview" aria-label="Resumo das conexões">
       <div><Glyph name="monitor" size={18} /><span><strong>{installed}</strong> aplicativos detectados</span></div>

@@ -68,6 +68,8 @@ export interface WorkbenchPreferences {
   language: "pt-BR";
   launchBehavior: "home" | "last_view";
   lastView: View;
+  /** Logical 15-minute idle close. Never terminates provider processes. */
+  closeIdleSessions: boolean;
 }
 export interface WorkbenchState {
   schema: "simplicio.desktop-workbench/v1";
@@ -84,6 +86,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   language: "pt-BR",
   launchBehavior: "home",
   lastView: "home",
+  closeIdleSessions: true,
 };
 export const MAX_PROJECTS = 32;
 
@@ -124,6 +127,7 @@ export function parseWorkbench(raw: string | null): WorkbenchState {
       && !isSettingsView(preferences.lastView) && preferences.lastView !== "setup") {
       state.preferences.lastView = preferences.lastView;
     }
+    if (preferences?.closeIdleSessions === false) state.preferences.closeIdleSessions = false;
     if (state.preferences.rememberProject && state.projects.some((item) => item.id === value.selectedProjectId)) {
       state.selectedProjectId = value.selectedProjectId;
     }

@@ -154,6 +154,8 @@
 .settings-section { margin-bottom: 30px; }
 .settings-section > h2, .section-title h2, .workbench-section h2 { font-size: 14px; font-weight: 600; letter-spacing: -.015em; margin: 0 0 13px; }
 .settings-slab { min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.preference-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); min-height: var(--target-min); }
+.preference-toggle input { width: 18px; height: 18px; accent-color: var(--green-dark); }
 .preference-row { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px 22px; border-bottom: 1px solid var(--line-soft); }
 .preference-row:last-child { border-bottom: 0; }
 .preference-row > div:first-child { flex: 1; min-width: 0; }
