@@ -51,7 +51,7 @@ test("snapshot no-data is honest and export retains the queried time range", asy
         if (command === "desktop_unified_usage") return projection;
         if (command === "desktop_export_unified_usage") return {
           schema: "simplicio.desktop-unified-usage-export/v1", format: args.format,
-          path: "/Users/test/Downloads/usage.json", bytes: 128, report_digest: projection.metadata.report_digest,
+          path: "/tmp/simplicio fixture/Downloads/usage.json", bytes: 128, report_digest: projection.metadata.report_digest,
         };
         if (command === "plugin:event|listen") return 1;
         if (command === "plugin:event|unlisten") return;
