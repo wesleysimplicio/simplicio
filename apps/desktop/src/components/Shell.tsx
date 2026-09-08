@@ -11,7 +11,7 @@ export type { View } from "../workbench";
 
 interface Destination { id: View; icon: GlyphName; group?: string; description?: string }
 const navigation: Destination[] = ([
-  { id: "home", icon: "home" }, { id: "activity", icon: "activity" },
+  { id: "home", icon: "home" }, { id: "activity", icon: "activity" }, { id: "reports", icon: "activity" },
   { id: "automations", icon: "automation" },
   { id: "agents", icon: "teams" }, { id: "providers", icon: "providers" }, { id: "tokens", icon: "spark" },
 ] satisfies Destination[]).filter((item) => isNavigationVisible(item.id));

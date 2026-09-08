@@ -22,6 +22,7 @@ import { parseUsageProjects } from "./project_usage";
 import { applyUsageChangefeedEvent, createUsageChangefeedState, type UsageChangefeedState } from "./usage_changefeed";
 import { exportUnifiedUsageProjection, parseUnifiedUsageProjection, type UnifiedUsageProjection, type UsageQuery } from "./unified_usage";
 import { parseCostProjection, type CostProjection, type CostQuery } from "./cost_projection";
+import { createPreviewExecutionReport, parseExecutionReport, type ExecutionReport } from "./execution_report";
 import { createConsolidatedReader, type ConsolidatedQuery, type ConsolidatedReport } from "./consolidated_tokens";
 import {
   createPreviewRuntimeInstallResult,
@@ -58,6 +59,18 @@ export async function loadDesktopUnifiedUsage(query: UsageQuery = {}, repoPath?:
     invoke<unknown>("desktop_unified_usage", { query, repoPath: repoPath || null }),
     60_000,
     "unified_usage_timeout",
+  ));
+}
+
+export async function loadDesktopExecutionReport(repoPath?: string, runId?: string): Promise<ExecutionReport> {
+  if (!isTauri()) return createPreviewExecutionReport();
+  return parseExecutionReport(await withTimeout(
+    invoke<unknown>("desktop_execution_report", {
+      repoPath: repoPath || null,
+      runId: runId || null,
+    }),
+    60_000,
+    "execution_report_timeout",
   ));
 }
 

@@ -4,7 +4,7 @@ import { providerRegistry } from "./provider_registry";
 import { isReferenceSettingsView, REFERENCE_LABELS, type ReferenceSettingsView } from "./reference_screens";
 
 export type View = ReferenceSettingsView | "home" | "project" | "agents" | "models" | "general" | "shortcuts" | "diagnostics" | "setup"
-  | "today" | "chats" | "teams" | "automations" | "apps" | "bot" | "providers" | "tokens" | "activity" | "memory" | "settings";
+  | "today" | "chats" | "teams" | "automations" | "apps" | "bot" | "providers" | "tokens" | "reports" | "activity" | "memory" | "settings";
 
 /** Presentation policy only: retain implementations and direct preview routes. */
 const HIDDEN_NAVIGATION_VIEWS: ReadonlySet<View> = new Set<View>([
@@ -22,7 +22,7 @@ export const VIEW_LABELS: Record<View, string> = {
   ...REFERENCE_LABELS,
   home: "Início", project: "Projeto", agents: "Agentes e IDEs", models: "Modelos e skills", setup: "Instalação guiada",
   general: "Aparência", shortcuts: "Atalhos", diagnostics: "Runtime e diagnóstico",
-  providers: "Integrações MCP", tokens: "Relatório de tokens", activity: "Atividade",
+  providers: "Integrações MCP", tokens: "Relatório de tokens", reports: "Relatórios de execução", activity: "Atividade",
   memory: "Memória", settings: "Conta Simplicio", today: "Hoje", chats: "Conversas",
   teams: "Equipes", automations: "Automações", apps: "Aplicativos", bot: "Central de agentes",
 };

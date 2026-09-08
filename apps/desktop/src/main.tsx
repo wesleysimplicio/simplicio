@@ -5,6 +5,7 @@ import "./styles.css";
 import "./product_surfaces.css";
 import "./motion_tokens.css";
 import "./workbench.css";
+import "./reports.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

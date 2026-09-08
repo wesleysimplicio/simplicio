@@ -596,6 +596,26 @@ async fn desktop_unified_usage(query: Value, repo_path: Option<String>) -> Resul
 }
 
 #[tauri::command]
+async fn desktop_execution_report(
+    repo_path: Option<String>,
+    run_id: Option<String>,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        require_read_access()?;
+        let default_repo = default_projection_repo()?;
+        let args = projection_queries::execution_report_args(
+            repo_path.as_deref(),
+            run_id.as_deref(),
+            &default_repo,
+        )?;
+        let borrowed = args.iter().map(String::as_str).collect::<Vec<_>>();
+        run_runtime_json(&borrowed).map_err(|_| "execution_report_unavailable".to_string())
+    })
+    .await
+    .map_err(|_| "execution_report_unavailable".to_string())?
+}
+
+#[tauri::command]
 async fn desktop_export_unified_usage(
     app: tauri::AppHandle,
     query: Value,
@@ -1273,6 +1293,7 @@ pub fn run() {
             desktop_usage_changefeed,
             desktop_session_close_idle,
             desktop_unified_usage,
+            desktop_execution_report,
             desktop_export_unified_usage,
             desktop_cost_projection,
             desktop_context_report,

@@ -106,6 +106,44 @@ pub fn query_args(
     ])
 }
 
+fn report_id(value: Option<&str>) -> Result<Option<String>, String> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    if value.is_empty()
+        || value.len() > 128
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+    {
+        return Err("projection_query_invalid".into());
+    }
+    Ok(Some(value.to_string()))
+}
+
+pub fn execution_report_args(
+    selected_repo: Option<&str>,
+    selected_run_id: Option<&str>,
+    default_repo: &Path,
+) -> Result<Vec<String>, String> {
+    let repo = selected_repo
+        .map(repo_path)
+        .transpose()?
+        .unwrap_or_else(|| default_repo.to_path_buf());
+    let repo = repo_path(&repo.to_string_lossy())?;
+    let mut args = vec![
+        "execution-report".into(),
+        "show".into(),
+        "--repo".into(),
+        repo.to_string_lossy().into_owned(),
+        "--json".into(),
+    ];
+    if let Some(run_id) = report_id(selected_run_id)? {
+        args.extend(["--run-id".into(), run_id]);
+    }
+    Ok(args)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -127,6 +165,21 @@ mod tests {
         assert_eq!(args[5], "--json");
         let args = query_args("desktop-unified-usage", &json!({}), None, &repo).unwrap();
         assert_eq!(args[0], "desktop-unified-usage");
+    }
+
+    #[test]
+    fn builds_bounded_execution_report_args() {
+        let repo = std::env::temp_dir().canonicalize().unwrap();
+        let args = execution_report_args(None, None, &repo).unwrap();
+        assert_eq!(args[0], "execution-report");
+        assert_eq!(args[1], "show");
+        assert_eq!(args[2], "--repo");
+        assert_eq!(args[3], repo.to_string_lossy());
+        assert_eq!(args[4], "--json");
+        let args = execution_report_args(None, Some("run-123"), &repo).unwrap();
+        assert_eq!(args[5], "--run-id");
+        assert_eq!(args[6], "run-123");
+        assert!(execution_report_args(None, Some("../private"), &repo).is_err());
     }
 
     #[test]

@@ -40,6 +40,7 @@ import { ActivityScreen } from "./screens/ActivityScreen";
 import { BotCenterScreen } from "./screens/BotCenterScreen";
 import { ProductSurfaceScreen } from "./screens/ProductScreens";
 import { TokensScreen } from "./screens/TokensScreen";
+import { ReportsScreen } from "./screens/ReportsScreen";
 import { ReferenceSettingsScreen } from "./screens/ReferenceSettingsScreen";
 import { isReferenceSettingsView } from "./reference_screens";
 import "./runtime_panels.css";
@@ -556,6 +557,7 @@ export function DesktopApp({ snapshot: initialSnapshot }: { snapshot?: DesktopSn
       )}
       {view === "memory" && <MemoryScreen snapshot={snapshot} />}
       {view === "tokens" && <TokensScreen key={tokenRepo} initialRepoPath={tokenRepo} projectPaths={workbench.projects.map(project => project.path)} usage={usage} />}
+      {view === "reports" && <ReportsScreen repoPath={contextRepoPath} />}
       {(view === "settings" || view === "diagnostics") && (
         <SettingsScreen section={view === "diagnostics" ? "diagnostics" : "account"} snapshot={snapshot} busy={action !== null}
           onRefresh={refresh} onSubscribe={subscribe} onLogout={logout} logoutBusy={action === "logout"}
