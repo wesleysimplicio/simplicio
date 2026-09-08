@@ -77,4 +77,31 @@ describe("Desktop usage store", () => {
     }
     expect(store.getState().idleHistory).toHaveLength(MAX_IDLE_FINALIZATION_HISTORY);
   });
+  it("clears idle finalization history when the Desktop session is reset", () => {
+    const store = createDesktopUsageStore();
+    const receipt: IdleSessionFinalization = {
+      schema: "simplicio.session-idle-finalization/v1",
+      status: "logical_closed",
+      finalization_id: "sha256:logout-reset",
+      profile_id: "default",
+      workspace_id: "/workspace",
+      now_millis: 1,
+      idle_ms: IDLE_SESSION_TIMEOUT_MS,
+      closed_sessions: [{ session_id: "s1", status: "idle", updated_at: 1 }],
+      usage: {
+        status: "pending_provider_refresh",
+        metrics: ["input_tokens", "output_tokens", "reasoning_tokens", "cache_read_tokens", "cache_write_tokens"],
+      },
+      provider_processes_terminated: false,
+      redacted: true,
+    };
+    store.setIdleFinalization(receipt);
+    expect(store.getState().idleHistory).toHaveLength(1);
+
+    store.setIdleFinalization(null);
+
+    expect(store.getState().idleFinalization).toBeNull();
+    expect(store.getState().idleHistory).toEqual([]);
+  });
+
 });

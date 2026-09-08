@@ -54,7 +54,12 @@ export function createDesktopUsageStore(
       notify();
     },
     setIdleFinalization(receipt) {
-      if (!receipt) return;
+      if (!receipt) {
+        if (!state.idleFinalization && state.idleHistory.length === 0) return;
+        state = { ...state, idleFinalization: null, idleHistory: [] };
+        notify();
+        return;
+      }
       const same = state.idleHistory[0]
         && ((receipt.finalization_id && state.idleHistory[0].finalization_id === receipt.finalization_id)
           || (!receipt.finalization_id && state.idleHistory[0].now_millis === receipt.now_millis));
