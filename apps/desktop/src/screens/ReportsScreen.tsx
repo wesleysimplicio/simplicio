@@ -254,6 +254,20 @@ export function ReportsScreen({ repoPath = "" }: { repoPath?: string }) {
   const request = useRef(0);
   const inFlight = useRef<{ key: string; promise: Promise<void> } | null>(null);
   const hasReport = useRef(false);
+  const queryKey = JSON.stringify([repoPath, selectedRunId || null]);
+  const previousQueryKey = useRef(queryKey);
+
+  useEffect(() => {
+    if (previousQueryKey.current === queryKey) return;
+    previousQueryKey.current = queryKey;
+    request.current += 1;
+    setReport(null);
+    setBusy(false);
+    setError(null);
+    setConnection("connecting");
+    setLastRefreshAt(null);
+    hasReport.current = false;
+  }, [queryKey]);
 
   const refresh = useCallback(() => {
     const key = repoPath + "\\u0000" + (selectedRunId || "");
