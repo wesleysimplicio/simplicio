@@ -154,7 +154,7 @@ describe("execution report contract", () => {
           reasoning_semantics: "included_in_output",
         },
         validation: { status: "partial", checks: 3, failures: 1, executed: 3, passed: 2, ignored: 0, source: "vitest" },
-        errors: [{ code: "validation_failed", message: "/Users/wesley/token=secret", stage_id: "verify" }],
+        errors: [{ code: "validation_failed", message: "/tmp/simplicio-test-user/token=secret", stage_id: "verify" }],
       }],
       consolidated: {
         task_count: 1,
