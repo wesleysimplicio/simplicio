@@ -100,3 +100,49 @@ describe('logical idle-session policy', () => {
     expect(() => parseIdleSessionFinalization(invalid)).toThrow('session_idle_finalization_invalid');
   });
 });
+
+function boundUsage() {
+  return {
+    schema: 'simplicio.bound-session-usage/v1',
+    scope: 'bound_runtime_sessions', redacted: true, network_calls: 0, provider_processes_terminated: false,
+    scan: { provider_reports: [{ failure_codes: [] as string[] }], redacted: true, network_calls: 0 },
+    session_reports: [{
+      session_id: 'session-1', status: 'partial', binding_count: 1, events: 2,
+      totals: { input_tokens: 12, output_tokens: null, reasoning_tokens: null, cache_read_tokens: null, cache_write_tokens: null },
+      known_totals: { input_tokens: 12, output_tokens: 3 },
+      provenance: 'provider_reported', redacted: true,
+    }],
+  };
+}
+
+describe('bound Runtime session usage', () => {
+  it('keeps unknown totals separate from known subtotals', () => {
+    const receipt = parseIdleSessionFinalization({ ...baseReceipt, session_usage: boundUsage() });
+    expect(receipt.session_usage?.session_reports[0].totals.output_tokens).toBeNull();
+    expect(receipt.session_usage?.session_reports[0].known_totals.output_tokens).toBe(3);
+    expect(receipt.session_usage?.collection_partial).toBe(false);
+  });
+  it('exposes a bounded collection failure', () => {
+    const usage = boundUsage();
+    usage.scan.provider_reports[0].failure_codes = ['source_bound_reached'];
+    expect(parseIdleSessionFinalization({ ...baseReceipt, session_usage: usage })
+      .session_usage?.collection_partial).toBe(true);
+  });
+  it('rejects another session and duplicate session projections', () => {
+    const usage = boundUsage();
+    usage.session_reports[0].session_id = 'another-session';
+    expect(() => parseIdleSessionFinalization({ ...baseReceipt, session_usage: usage })).toThrow();
+    usage.session_reports[0].session_id = 'session-1';
+    usage.session_reports.push(usage.session_reports[0]);
+    expect(() => parseIdleSessionFinalization({ ...baseReceipt, session_usage: usage })).toThrow();
+  });
+  it('rejects missing metrics and inconsistent known totals', () => {
+    const usage = boundUsage();
+    usage.session_reports[0].known_totals.input_tokens = 99;
+    expect(() => parseIdleSessionFinalization({ ...baseReceipt, session_usage: usage })).toThrow();
+    usage.session_reports[0].known_totals.input_tokens = 12;
+    expect(() => parseIdleSessionFinalization({ ...baseReceipt, session_usage: {
+      ...usage, session_reports: [{ ...usage.session_reports[0], totals: {} }],
+    } })).toThrow();
+  });
+});
