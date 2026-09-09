@@ -3,8 +3,9 @@
 # simplicio-hook-version: 3240-v12
 #
 # The hook builds one complete Map artifact per repository generation.
-# Lifecycle events inject a bounded Map excerpt once per generation; callers can
-# retrieve the complete artifact with simplicio_context. Native shell/terminal
+# Lifecycle events may inject a bounded Map excerpt once per generation when
+# explicitly opted in; default Mapper-only emits no context. Callers can retrieve
+# the complete artifact with simplicio_context. Native shell/terminal
 # execution is governed: only direct Simplicio Shell/CLI invocations pass.
 set -uo pipefail
 
@@ -662,11 +663,12 @@ if runtime_mode(repo_from_hook()) == "mapper-only":
                     if not (state / "warm.lock").exists() or time.monotonic() >= deadline:
                         break
                     time.sleep(0.05)
-        summary = mapper_context_once(root, generation, auth_state)
-        if summary:
-            print(json.dumps({"hookSpecificOutput": {
-                "hookEventName": mapper_event, "additionalContext": summary,
-            }}, separators=(",", ":")))
+        if os.environ.get("SIMPLICIO_MAPPER_AUTO_CONTEXT") == "1":
+            summary = mapper_context_once(root, generation, auth_state)
+            if summary:
+                print(json.dumps({"hookSpecificOutput": {
+                    "hookEventName": mapper_event, "additionalContext": summary,
+                }}, separators=(",", ":")))
     raise SystemExit(0)
 
 if event in context_events:
