@@ -75,7 +75,8 @@ test("Desktop settings persist language and launch preferences and keep uninstal
   await expect(page.getByRole("combobox", { name: "Comportamento ao iniciar", exact: true })).toHaveValue("last_view");
   await page.reload();
   await expect(page.getByRole("combobox", { name: "Comportamento ao iniciar", exact: true })).toHaveValue("last_view");
-  await page.goto("/?state=active&view=activity");
+  await page.getByRole("button", { name: "Voltar ao app", exact: true }).click();
+  await page.getByRole("button", { name: "Atividade", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Atividade" })).toBeVisible();
   await page.goto("/?state=active");
   await expect(page.getByRole("heading", { name: "Atividade" })).toBeVisible();
