@@ -105,7 +105,7 @@ function boundUsage() {
   return {
     schema: 'simplicio.bound-session-usage/v1',
     scope: 'bound_runtime_sessions', redacted: true, network_calls: 0, provider_processes_terminated: false,
-    scan: { provider_reports: [{ failure_codes: [] as string[] }], redacted: true, network_calls: 0 },
+    scan: { provider_reports: [{ status: 'collected', failure_codes: [] as string[] }], redacted: true, network_calls: 0 },
     session_reports: [{
       session_id: 'session-1', status: 'partial', binding_count: 1, events: 2,
       totals: { input_tokens: 12, output_tokens: null, reasoning_tokens: null, cache_read_tokens: null, cache_write_tokens: null },
@@ -125,6 +125,15 @@ describe('bound Runtime session usage', () => {
   it('exposes a bounded collection failure', () => {
     const usage = boundUsage();
     usage.scan.provider_reports[0].failure_codes = ['source_bound_reached'];
+    expect(parseIdleSessionFinalization({ ...baseReceipt, session_usage: usage })
+      .session_usage?.collection_partial).toBe(true);
+  });
+  it('keeps failed or empty collection unavailable for a bound session', () => {
+    const usage = boundUsage();
+    expect(parseIdleSessionFinalization({ ...baseReceipt, session_usage: {
+      ...usage, scan: { status: 'unavailable', provider_reports: [], redacted: true, network_calls: 0 },
+    } }).session_usage?.collection_partial).toBe(true);
+    usage.scan.provider_reports = [];
     expect(parseIdleSessionFinalization({ ...baseReceipt, session_usage: usage })
       .session_usage?.collection_partial).toBe(true);
   });

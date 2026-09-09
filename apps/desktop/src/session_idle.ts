@@ -257,7 +257,12 @@ function parseBoundSessionUsage(value: unknown, closures: IdleSessionClosure[]):
   const providers = scan.provider_reports;
   let partial = true;
   if (Array.isArray(providers) && providers.length <= 32 && scan.redacted === true && scan.network_calls === 0) {
-    partial = providers.some(value => parseFailureCodes(record(value).failure_codes).length > 0);
+    partial = scan.status !== undefined
+      || (providers.length === 0 && reports.some(report => report.binding_count > 0))
+      || providers.some(value => {
+        const provider = record(value);
+        return provider.status !== 'collected' || parseFailureCodes(provider.failure_codes).length > 0;
+      });
   }
   return { schema: 'simplicio.bound-session-usage/v1', scope: 'bound_runtime_sessions',
     session_reports: reports, collection_partial: partial };
