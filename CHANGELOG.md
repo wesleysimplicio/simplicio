@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- Optional-module overlay **v3.8.49** (browser, computer, voice, n8n, skills,
+  image, comms) for Linux x64, macOS arm64/x64 and Windows x64. GitHub
+  prerelease `v3.8.49` — does not replace signed Runtime **v3.8.47**.
+  Installers and host plugins stay pinned to 3.8.47.
+
 ### Fixed
 
 - Replace the stale mandatory Codex hook with the canonical advisory route:
