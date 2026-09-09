@@ -65,6 +65,24 @@ describe("execution report contract", () => {
     expect(report.tasks[0].validation.failures).toBe(1);
   });
 
+  it.each([
+    [{ status: "passed", checks: 0, executed: 0, failures: 0 }, "not_run"],
+    [{ status: "passed", executed: 0, failures: 0 }, "not_run"],
+    [{ status: "passed" }, "unavailable"],
+    [{ status: "passed", checks: 4, failures: 1 }, "failed"],
+    [{ status: "passed", checks: 4, failures: 0 }, "passed"],
+  ])("requires executed checks before accepting validation success: %j", (validation, status) => {
+    const report = parseExecutionReport({
+      schema: "simplicio.execution-report/v1",
+      tasks: [{ task_id: "task-validation", validation }],
+      consolidated: { validation },
+    });
+    expect(report.present).toBe(true);
+    if (!report.present) return;
+    expect(report.tasks[0].validation.status).toBe(status);
+    expect(report.consolidated.validation.status).toBe(status);
+  });
+
   it("does not turn a missing token dimension into zero", () => {
     const report = parseExecutionReport({
       schema: "simplicio.execution-report/v1",

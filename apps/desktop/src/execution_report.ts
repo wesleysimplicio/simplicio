@@ -366,8 +366,17 @@ function parseRetry(raw: unknown): ReportRetry {
 
 function parseValidation(raw: unknown): ReportValidation {
   const value = optionalRecord(raw);
+  const executed = aliasNumber(value, ["executed", "checks"]);
+  const checks = aliasNumber(value, ["checks", "executed"]);
+  const failures = aliasNumber(value, ["failures", "failed"]);
+  let status = text(value.status, "unavailable", 48);
+  if (status === "passed") {
+    if (failures !== null && failures > 0) status = "failed";
+    else if (executed === 0 || checks === 0) status = "not_run";
+    else if (executed === null) status = "unavailable";
+  }
   return {
-    status: text(value.status, "unavailable", 48),
+    status,
     coverageStatus: text(value.coverage_status ?? value.coverage, "unavailable", 32),
     checks: aliasNumber(value, ["checks", "executed"]),
     failures: aliasNumber(value, ["failures", "failed"]),
@@ -442,7 +451,7 @@ function parseConsolidated(raw: unknown, taskCount: number): ReportConsolidated 
     tokensCacheReadRollup: text(value.tokens_cache_read_rollup, "absent", 32),
     tokensCacheWriteRollup: text(value.tokens_cache_write_rollup, "absent", 32),
     tokensReasoningSum: nonNegative(value.tokens_reasoning_sum),
-    tokensReasoningRollup: text(value.reasoning_rollup, "absent", 32),
+    tokensReasoningRollup: aliasText(value, ["tokens_reasoning_rollup", "reasoning_rollup"], 32) ?? "absent",
     costMicrousdSum: nonNegative(value.cost_microusd_sum),
     costRollup: text(value.cost_rollup, "unavailable", 32),
     costStatus: text(value.cost_status, "unavailable", 48),
