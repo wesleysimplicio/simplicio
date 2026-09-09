@@ -1,6 +1,7 @@
 # Simplicio MCP route — advisory Map cache for Windows hosts.
 # simplicio-hook-version: 3240-v12
-# Lifecycle events inject a bounded Map excerpt once per generation.
+# Lifecycle events may inject a bounded Map excerpt once per generation when
+# explicitly opted in; default Mapper-only emits no context.
 # Native shell/terminal execution is governed: only direct Simplicio Shell/CLI
 # invocations pass; third-party MCP/apps remain available unchanged.
 param([switch]$WarmWorker)
@@ -756,8 +757,10 @@ if ((Get-RuntimeMode) -eq 'mapper-only') {
         }
       }
     }
-    $summary = Get-MapperContextOnce $repo $generation $authState
-    if (-not [string]::IsNullOrWhiteSpace($summary)) { Emit-Context $mapperEvent $summary }
+    if ([Environment]::GetEnvironmentVariable("SIMPLICIO_MAPPER_AUTO_CONTEXT") -eq "1") {
+      $summary = Get-MapperContextOnce $repo $generation $authState
+      if (-not [string]::IsNullOrWhiteSpace($summary)) { Emit-Context $mapperEvent $summary }
+    }
   }
   Allow-Unchanged
 }
