@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { BoundSessionUsageReport } from "../components/BoundSessionUsageReport";
 import { Glyph } from "../components/Brand";
 import { ContextSavings } from "../components/ContextSavings";
 import { TokenProjects } from "../components/TokenProjects";
@@ -22,7 +23,7 @@ const IDLE_REPORT_METRICS: Array<[ProviderUsageMetric, string]> = [
 
 function IdleFinalizationReport({ finalization }: { finalization?: IdleSessionFinalization | null }) {
   if (!finalization) return null;
-  const statusLabel = finalization.usage.status === "complete"
+  const statusLabel = finalization.session_usage ? "consumo por sessão" : finalization.usage.status === "complete"
     ? "coleta concluída"
     : finalization.usage.status === "pending_provider_refresh"
       ? "aguardando providers"
@@ -38,7 +39,7 @@ function IdleFinalizationReport({ finalization }: { finalization?: IdleSessionFi
       <span className="neutral-badge">{statusLabel}</span>
     </div>
     <p>{finalization.closed_sessions.length} sessão(ões) fechada(s) · recibo {finalization.finalization_id ?? "sem identificador exposto"}.</p>
-    {providerReports.length > 0
+    {finalization.session_usage ? <BoundSessionUsageReport usage={finalization.session_usage} /> : providerReports.length > 0
       ? <div className="provider-usage-list">{providerReports.map((report) => <div className="provider-usage-row" key={report.provider}>
         <div className="provider-usage-row-heading"><strong>{report.provider}</strong><span className="neutral-badge">{report.events > 0 ? report.events + " eventos" : report.status}</span></div>
         <small>{IDLE_REPORT_METRICS.map(([metric, label]) => label + " " + number(report, metric)).join(" · ")}</small>

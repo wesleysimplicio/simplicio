@@ -66,6 +66,22 @@ export interface IdleSessionClosure {
   updated_at: number;
 }
 
+
+export interface BoundSessionUsageReport {
+  session_id: string;
+  status: 'provider_session_not_bound' | 'pending_provider_refresh' | 'available' | 'partial';
+  binding_count: number;
+  events: number;
+  totals: Record<ProviderUsageMetric, number | null>;
+  known_totals: Partial<Record<ProviderUsageMetric, number>>;
+}
+export interface BoundSessionUsage {
+  schema: 'simplicio.bound-session-usage/v1';
+  scope: 'bound_runtime_sessions';
+  session_reports: BoundSessionUsageReport[];
+  collection_partial: boolean;
+}
+
 export interface IdleSessionFinalization {
   schema: typeof SESSION_IDLE_FINALIZATION_SCHEMA;
   status: 'logical_closed';
@@ -77,6 +93,7 @@ export interface IdleSessionFinalization {
   idle_ms: number;
   closed_sessions: IdleSessionClosure[];
   usage: IdleSessionUsage;
+  session_usage?: BoundSessionUsage;
   provider_processes_terminated: false;
   redacted: true;
 }
@@ -202,6 +219,55 @@ function parseProviderReport(value: unknown): ProviderUsageReport {
   return report;
 }
 
+
+function parseBoundSessionUsage(value: unknown, closures: IdleSessionClosure[]): BoundSessionUsage {
+  const raw = record(value);
+  if (raw.schema !== 'simplicio.bound-session-usage/v1' || raw.scope !== 'bound_runtime_sessions'
+    || raw.redacted !== true || raw.network_calls !== 0 || raw.provider_processes_terminated !== false
+    || !Array.isArray(raw.session_reports) || raw.session_reports.length > 256) {
+    throw new Error('session_idle_finalization_invalid');
+  }
+  const ids = new Set(closures.map(item => item.session_id));
+  const seen = new Set<string>();
+  const reports = raw.session_reports.map((value): BoundSessionUsageReport => {
+    const item = record(value);
+    const id = boundedString(item.session_id, SESSION_ID_MAX);
+    if (!ids.has(id) || seen.has(id) || item.redacted !== true
+      || item.provenance !== 'provider_reported') throw new Error('session_idle_finalization_invalid');
+    seen.add(id);
+    const status = item.status;
+    if (status !== 'provider_session_not_bound' && status !== 'pending_provider_refresh'
+      && status !== 'available' && status !== 'partial') throw new Error('session_idle_finalization_invalid');
+    const totalsRaw = record(item.totals);
+    const totals = {} as Record<ProviderUsageMetric, number | null>;
+    for (const metric of METRICS) {
+      totals[metric] = totalsRaw[metric] === null ? null : safeInteger(totalsRaw[metric]);
+    }
+    const known = parseProviderTotals(item.known_totals);
+    for (const metric of METRICS) {
+      if (totals[metric] !== null && totals[metric] !== known[metric]) {
+        throw new Error('session_idle_finalization_invalid');
+      }
+    }
+    return { session_id: id, status, binding_count: boundedCount(item.binding_count, 10_000),
+      events: boundedCount(item.events, 10_000), totals, known_totals: known };
+  });
+  if (seen.size !== ids.size) throw new Error('session_idle_finalization_invalid');
+  const scan = record(raw.scan);
+  const providers = scan.provider_reports;
+  let partial = true;
+  if (Array.isArray(providers) && providers.length <= 32 && scan.redacted === true && scan.network_calls === 0) {
+    partial = scan.status !== undefined
+      || (providers.length === 0 && reports.some(report => report.binding_count > 0))
+      || providers.some(value => {
+        const provider = record(value);
+        return provider.status !== 'collected' || parseFailureCodes(provider.failure_codes).length > 0;
+      });
+  }
+  return { schema: 'simplicio.bound-session-usage/v1', scope: 'bound_runtime_sessions',
+    session_reports: reports, collection_partial: partial };
+}
+
 function parseClosure(value: unknown): IdleSessionClosure {
   const raw = record(value);
   return {
@@ -259,6 +325,7 @@ export function parseIdleSessionFinalization(value: unknown): IdleSessionFinaliz
     now_millis: nowMillis,
     idle_ms: idleMs,
     closed_sessions: closedSessions,
+    ...(raw.session_usage === undefined ? {} : { session_usage: parseBoundSessionUsage(raw.session_usage, closedSessions) }),
     usage,
     provider_processes_terminated: false,
     redacted: true,
