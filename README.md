@@ -89,10 +89,11 @@ The installers for macOS/Linux, Windows and PyPI call the same native
 `simplicio mcp register --binary <absolute-path> --json` flow. Each client uses
 its own configuration format and points to the installed Simplicio binary.
 
-**Release boundary:** the expanded adapters below are implemented in source and
-need a Runtime release containing this change. They are not retroactively added
-to the immutable v3.8.47 download. A successful configuration write is not a
-completed MCP handshake; restart/reload the client and verify its tool list.
+**Available in [Runtime v3.8.50](https://github.com/wesleysimplicio/simplicio/releases/tag/v3.8.50):**
+the expanded adapters below are included in the signed native release and
+`simplicio-installer==3.8.50`. Devin and Codebuff require the manual integrations
+listed in the matrix. A successful configuration write is not a completed MCP
+handshake; restart/reload the client and verify its tool list.
 
 | Harness | Integration | Scope and limits |
 |---|---|---|

@@ -1,8 +1,10 @@
 # Installer host registration
 
 The public shell, PowerShell and PyPI installers delegate MCP configuration to
-the downloaded Runtime. The adapter expansion must ship in a new signed Runtime
-release before these paths are available to public installer users.
+the downloaded Runtime. The expanded adapters ship in the signed
+[Runtime v3.8.50 release](https://github.com/wesleysimplicio/simplicio/releases/tag/v3.8.50)
+and are available through the public shell, PowerShell and PyPI installers.
+Devin and Codebuff retain the manual integration requirements documented below.
 
 ## Additional user configuration paths
 

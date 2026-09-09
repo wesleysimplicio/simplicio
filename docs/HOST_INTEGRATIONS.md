@@ -10,8 +10,9 @@ Runtime owns the transactional configuration changes. The PyPI launcher records
 the redacted result beside the binary in `simplicio-host-integrations.json`.
 The [29-host README matrix](../README.md#host-integrations) and
 [installer paths and upstream contracts](INSTALLER_HOSTS.md) describe the
-expanded adapters and their release boundary. Immutable v3.8.47 downloads do
-not gain adapters merely because the public metadata changed.
+expanded adapters released in [v3.8.50](https://github.com/wesleysimplicio/simplicio/releases/tag/v3.8.50).
+Upgrade the Runtime to use them; older immutable downloads do not gain adapters
+merely because the public metadata changed.
 
 ## Detection and registration evidence
 
