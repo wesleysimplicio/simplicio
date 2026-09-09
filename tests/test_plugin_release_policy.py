@@ -39,6 +39,8 @@ def release_policy(tmp_path, monkeypatch):
     bootstrap = public / module.PLUGIN_BOOTSTRAP
     bootstrap.parent.mkdir(parents=True)
     bootstrap.write_text(source, encoding="utf-8")
+    claude_bootstrap = public / "plugins/simplicio/bin/simplicio-claude-mcp-bootstrap.js"
+    claude_bootstrap.write_bytes((ROOT / claude_bootstrap.relative_to(public)).read_bytes())
     test_path = public / "plugins/simplicio/tests/bootstrap.test.js"
     test_path.parent.mkdir(parents=True)
     test_path.write_bytes((ROOT / test_path.relative_to(public)).read_bytes())
