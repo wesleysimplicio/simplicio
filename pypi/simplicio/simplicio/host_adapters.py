@@ -17,7 +17,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
-from .host_integrations import HOSTS, HostSpec, detect_hosts
+from .host_integrations import HOSTS, INSTALLER_HOSTS, HostSpec, detect_hosts
 
 
 SCHEMA = "simplicio.host-adapters/v1"
@@ -222,6 +222,9 @@ def install_detected_hosts(
             continue
         if spec.capability == "portable-cli":
             results.append(IntegrationResult(spec.host_id, "detected", chosen_scope, None, spec.capability, "portable_cli", "manual_host_verification"))
+            continue
+        if spec.host_id in {item.host_id for item in INSTALLER_HOSTS}:
+            results.append(IntegrationResult(spec.host_id, "requires-runtime-registration", chosen_scope, None, spec.capability, "none", "run_simplicio_mcp_register"))
             continue
         path = _scope_path(spec, scope=chosen_scope, home=resolved_home, cwd=resolved_cwd)
         if path is None:

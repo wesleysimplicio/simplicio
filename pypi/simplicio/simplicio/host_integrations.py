@@ -238,6 +238,37 @@ HOSTS = HOSTS + tuple(
 )
 
 
+
+# Installer adapters are owned by Runtime; never route these through the legacy
+# generic JSON writer (Goose, Vibe, Pi and OpenCode-family schemas differ).
+INSTALLER_HOSTS = (
+    _runtime_mcp("antigravity", "Antigravity", (), ("~/.gemini/config/mcp_config.json",), "https://antigravity.google/docs/"),
+    _runtime_mcp("hermes-agent", "Hermes Agent", ("hermes",), (), "https://github.com/NousResearch/hermes-agent"),
+    _runtime_mcp("cline", "Cline", (), ("~/.cline/mcp_settings.json",), "https://docs.cline.bot/mcp/configuring-mcp-servers"),
+    _runtime_mcp("github-copilot", "GitHub Copilot in VS Code", (), (), "https://code.visualstudio.com/docs/copilot/chat/mcp-servers"),
+    _runtime_mcp("command-code", "Command Code", ("commandcode",), ("~/.commandcode/mcp.json",), "https://commandcode.ai/docs/settings"),
+    _runtime_mcp("grok", "Grok CLI (Superagent)", ("grok",), ("~/.grok/settings.json",), "https://github.com/superagent-ai/grok-cli"),
+    _runtime_mcp("mimo-code", "MiMo Code", ("mimo",), ("~/.config/mimocode/mimocode.json",), "https://github.com/XiaomiMiMo/MiMo-Code"),
+    _runtime_mcp("amp", "Amp", ("amp",), ("~/.config/amp/settings.json",), "https://ampcode.com/docs/customize/mcp"),
+    _runtime_mcp("openclaude", "OpenClaude", ("openclaude",), ("~/.openclaude.json",), "https://github.com/Gitlawb/openclaude"),
+    _runtime_mcp("oh-my-pi", "oh-my-pi", ("omp",), ("~/.omp/agent/mcp.json",), "https://github.com/can1357/oh-my-pi"),
+    _runtime_mcp("goose", "Goose", ("goose",), ("~/.config/goose/config.yaml",), "https://block.github.io/goose/docs/guides/config-files/"),
+    _runtime_mcp("auggie", "Auggie", ("auggie",), ("~/.augment/settings.json",), "https://docs.augmentcode.com/cli/integrations"),
+    _runtime_mcp("autohand-code", "Autohand Code", ("autohand",), ("~/.autohand/config.json",), "https://github.com/autohandai/code-cli/blob/main/docs/config-reference.md"),
+    _runtime_mcp("charm-crush", "Charm / Crush", ("crush",), ("~/.config/crush/crush.json",), "https://github.com/charmbracelet/crush"),
+    _runtime_mcp("continue", "Continue IDE", ("continue",), ("~/.continue/mcpServers/simplicio.yaml",), "https://docs.continue.dev/customize/mcp-tools"),
+    _runtime_mcp("droid", "Droid", ("droid",), ("~/.factory/mcp.json",), "https://docs.factory.ai/harness/connectors"),
+    _runtime_mcp("kilocode", "Kilo Code CLI", ("kilo",), ("~/.config/kilo/kilo.json",), "https://kilo.ai/docs/automate/mcp/using-in-cli"),
+    _runtime_mcp("kimi", "Kimi", ("kimi",), ("~/.kimi/mcp.json",), "https://moonshotai.github.io/kimi-cli/en/customization/mcp.html"),
+    _runtime_mcp("mistral-vibe", "Mistral Vibe", ("vibe",), ("~/.vibe/config.toml",), "https://docs.mistral.ai/vibe/code/cli/mcp-servers"),
+    _runtime_mcp("qwen-code", "Qwen Code", ("qwen",), ("~/.qwen/settings.json",), "https://qwenlm.github.io/qwen-code-docs/en/users/features/mcp/"),
+    _runtime_mcp("rovo-dev", "Rovo Dev CLI", ("acli",), ("~/.rovodev/mcp.json",), "https://support.atlassian.com/rovo/docs/connect-to-an-mcp-server-in-rovo-dev-cli/"),
+    _runtime_mcp("pi", "Pi", ("pi",), ("~/.pi/agent/extensions/simplicio.ts",), "https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/extensions.md"),
+    _runtime_mcp("codex", "Codex", ("codex",), ("~/.codex/config.toml",), "https://developers.openai.com/codex/mcp/"),
+)
+_INSTALLER_IDS = frozenset(spec.host_id for spec in INSTALLER_HOSTS)
+HOSTS = tuple(spec for spec in HOSTS if spec.host_id not in _INSTALLER_IDS) + INSTALLER_HOSTS
+
 def compatibility_matrix() -> Tuple[Dict[str, object], ...]:
     """Expose the complete, redacted host contract table for UIs and CI."""
 
@@ -281,7 +312,7 @@ def _exact_executables(spec: HostSpec, env: Mapping[str, str]) -> List[str]:
     found: List[str] = []
     for name in spec.executable_names:
         resolved = shutil.which(name, path=path)
-        if resolved and Path(resolved).name == name:
+        if resolved and Path(resolved).name.lower() in {name.lower(), name.lower() + ".exe", name.lower() + ".cmd", name.lower() + ".bat"}:
             found.append(str(Path(resolved).resolve()))
     return found
 
@@ -309,7 +340,7 @@ def detect_hosts(
             for path in (_home_path(item, resolved_home) for item in spec.config_paths)
             if path.exists()
         ]
-        present = bool(executable_paths or app_paths)
+        present = bool(executable_paths or app_paths or config_paths)
         skipped_host = _is_skipped(spec, environ, skipped)
         if skipped_host:
             status = "skipped"
@@ -352,10 +383,34 @@ def build_summary(
     runtime_status = report.get("status") if report else "not-run"
     registered = report.get("registered")
     failed = report.get("failed")
+    aliases = {"claudecode": "claude-code", "vscodecline": "cline",
+               "hermes": "hermes-agent", "codex-stdio": "codex"}
+    # Only applied receipts count; a dry-run or planned write is not registration.
+    if report.get("dry_run") is not True and report.get("status") in {"passed", "failed"}:
+        successful, failures = set(), set()
+        for write in report.get("writes", []):
+            if not isinstance(write, dict):
+                continue
+            label = aliases.get(str(write.get("label")), str(write.get("label")))
+            if write.get("status") in {"done", "skipped"}:
+                successful.add(label)
+            elif write.get("status") == "failed":
+                failures.add(label)
+        registered = list(set(registered or []) | successful)
+        failed = list(set(failed or []) | failures)
+    else:
+        registered = []
+    for reason in report.get("skipped", []):
+        host_id, _, detail = str(reason).partition(": ")
+        for host in hosts:
+            if host["id"] == host_id and detail and detail != "not_detected":
+                host["status"] = "skipped"
+                host["reason"] = detail
+
     if isinstance(registered, list):
         registered_ids = {str(item) for item in registered}
         for host in hosts:
-            if host["status"] == "detected" and host["id"] in registered_ids:
+            if host["status"] != "skipped" and host["id"] in registered_ids:
                 host["status"] = "registered"
     if isinstance(failed, list):
         failed_ids = {str(item) for item in failed}
