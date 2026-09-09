@@ -1,16 +1,16 @@
 {
   "schema": "simplicio.update-manifest/v1",
-  "version": "3.8.47",
+  "version": "3.8.49",
   "channel": "stable",
-  "release_tag": "v3.8.47",
+  "release_tag": "v3.8.49",
   "repository": "wesleysimplicio/simplicio",
-  "commit": "91321141789acd7fa4d91469435e2e0a04759f72",
+  "commit": "87991074318cc55db6f1be2ed3c7da3f98f2b6a0",
   "signing_pubkey": "2RoVWAoqA/DtDkT5PZdzQYIP82zFskQqJx4S1w06Wok=",
-  "generated_at": "2026-09-05T12:55:51.142179Z",
+  "generated_at": "2026-09-09T12:19:14.656971Z",
   "source": {
     "version": "Cargo.toml",
-    "tag": "v3.8.47",
-    "commit": "91321141789acd7fa4d91469435e2e0a04759f72"
+    "tag": "v3.8.49",
+    "commit": "87991074318cc55db6f1be2ed3c7da3f98f2b6a0"
   },
   "host_plugins": {
     "schema": "simplicio.host-plugin-release-binding/v1",
@@ -31,7 +31,7 @@
     {
       "target": "macos-arm64",
       "artifact": "simplicio-macos-arm64",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.47/simplicio-macos-arm64",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.49/simplicio-macos-arm64",
       "size": 50974800,
       "checksum_file": "SHA256SUMS",
       "sha256": "529ab8130222b93953485d5fe7c49cddfa29767c6a7db60cdd4f5db88a1ac053",
@@ -55,7 +55,7 @@
     {
       "target": "macos-x64",
       "artifact": "simplicio-macos-x64",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.47/simplicio-macos-x64",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.49/simplicio-macos-x64",
       "size": 57151200,
       "checksum_file": "SHA256SUMS",
       "sha256": "83cad1f08714a183838361eca84ba286e74320ae62d8492d7c2f1cee3bed5f33",
@@ -79,7 +79,7 @@
     {
       "target": "linux-x64",
       "artifact": "simplicio-linux-x64",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.47/simplicio-linux-x64",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.49/simplicio-linux-x64",
       "size": 64734624,
       "checksum_file": "SHA256SUMS",
       "sha256": "a242f90a1ec0c410346ada9d82b4940349f46bd9c51a88c00c96d70ca283c78b",
@@ -103,7 +103,7 @@
     {
       "target": "windows-x64",
       "artifact": "simplicio-windows-x64.exe",
-      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.47/simplicio-windows-x64.exe",
+      "url": "https://github.com/wesleysimplicio/simplicio/releases/download/v3.8.49/simplicio-windows-x64.exe",
       "size": 76665344,
       "checksum_file": "SHA256SUMS",
       "sha256": "2e21f866184b926f85a3ee2377e35585c9b78921b7080d62404950604e3eec64",
@@ -124,5 +124,12 @@
         "required": false
       }
     }
-  ]
+  ],
+  "runtime_binary": {
+    "schema": "simplicio.runtime-binary-carry-forward/v1",
+    "version": "3.8.47",
+    "tag": "v3.8.47",
+    "bytes": "unchanged-signed",
+    "reason": "official-runtime not rebuilt; signed installer assets carried forward"
+  }
 }

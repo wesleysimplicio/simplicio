@@ -25,7 +25,7 @@ test("missing Runtime is installed in isolation before the MCP handshake", {
   delete env.SIMPLICIO_CHANNEL;
 
   const installed = await bootstrap.installRuntime(env, tempHome);
-  assert.equal(installed.version, bootstrap.POLICY.runtimeVersion);
+  assert.equal(true, bootstrap.supportedRuntimeVersion(installed.version));
   assert.equal(
     installed.binary,
     path.join(tempHome, ".simplicio", "bin", bootstrap.executableName())

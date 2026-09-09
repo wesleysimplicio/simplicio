@@ -2,12 +2,21 @@
 
 ## [Unreleased]
 
+## [3.8.49] - 2026-09-09
+
 ### Added
 
-- Optional-module overlay **v3.8.49** (browser, computer, voice, n8n, skills,
-  image, comms) for Linux x64, macOS arm64/x64 and Windows x64. GitHub
-  prerelease `v3.8.49` — does not replace signed Runtime **v3.8.47**.
-  Installers and host plugins stay pinned to 3.8.47.
+- Public **v3.8.49** is latest. Optional Zig modules (browser, computer, voice,
+  n8n, skills, image, comms) for Linux/macOS/Windows.
+- `scripts/cut_public_overlay_release.py` carries last signed Runtime bytes
+  forward when official-runtime cannot be rebuilt. Next overlay releases reuse
+  that script.
+
+### Changed
+
+- Signed Runtime installer assets are the v3.8.47 bytes (Ed25519 unchanged).
+  Manifest `runtime_binary` records the carry-forward. `simplicio --version`
+  still reports 3.8.47 until a new official-runtime is signed.
 
 ### Fixed
 
