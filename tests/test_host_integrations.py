@@ -11,6 +11,7 @@ sys.path.insert(0, str(PACKAGE_ROOT))
 from simplicio.host_integrations import (
     COMPATIBILITY_MATRIX_HOST_IDS,
     HOSTS,
+    INSTALLER_HOSTS,
     build_summary,
     compatibility_matrix,
     detect_hosts,
@@ -54,7 +55,7 @@ def test_detection_uses_exact_executable_and_app_evidence(tmp_path: Path) -> Non
     by_id = {item["id"]: item for item in snapshot}
     assert by_id["claude-code"]["status"] == "detected"
     assert by_id["claude-code"]["executable"].endswith("/claude")
-    assert by_id["cursor"]["status"] == "absent"
+    assert by_id["cursor"]["status"] == "detected"
     assert by_id["deepseek-harness"]["status"] == "unsupported"
 
 
@@ -102,12 +103,10 @@ def test_vscode_declares_all_supported_configuration_scopes() -> None:
     assert vscode.verification_command[-1] == "--json"
 
 
-def test_antigravity_is_fail_closed_until_public_contract_is_verified() -> None:
-    antigravity = next(spec for spec in HOSTS if spec.host_id == "antigravity")
-    assert antigravity.executable_names == ()
-    assert antigravity.capability == "unsupported"
-    assert antigravity.contract == "unverified"
-    assert antigravity.verification_command == ()
+def test_antigravity_uses_runtime_registration() -> None:
+    spec = next(spec for spec in HOSTS if spec.host_id == "antigravity")
+    assert spec.capability == "runtime-mcp"
+    assert spec.config_paths == ("~/.gemini/config/mcp_config.json",)
 
 
 def test_kiro_has_runtime_registration_contract() -> None:
@@ -141,7 +140,7 @@ def test_compatibility_matrix_covers_every_requested_remaining_host() -> None:
     by_id = {spec.host_id: spec for spec in HOSTS}
     assert COMPATIBILITY_MATRIX_HOST_IDS <= set(by_id)
     assert len(COMPATIBILITY_MATRIX_HOST_IDS) == 22
-    for host_id in COMPATIBILITY_MATRIX_HOST_IDS - {"oh-my-pi"}:
+    for host_id in COMPATIBILITY_MATRIX_HOST_IDS - {spec.host_id for spec in INSTALLER_HOSTS}:
         spec = by_id[host_id]
         assert spec.contract == "unverified"
         assert spec.capability == "unsupported"
@@ -163,12 +162,11 @@ def test_compatibility_matrix_is_complete_and_redacted() -> None:
             assert row["executable_names"] == []
 
 
-def test_command_code_is_fail_closed_until_official_contract_is_confirmed() -> None:
+def test_command_code_has_official_runtime_contract() -> None:
     command_code = next(spec for spec in HOSTS if spec.host_id == "command-code")
-    assert command_code.executable_names == ()
-    assert command_code.capability == "unsupported"
-    assert command_code.contract == "unverified"
-    assert command_code.verification_command == ()
+    assert command_code.executable_names == ("commandcode",)
+    assert command_code.capability == "runtime-mcp"
+    assert command_code.config_paths == ("~/.commandcode/mcp.json",)
 
 
 def test_skip_controls_are_explicit_and_do_not_touch_host_files(tmp_path: Path) -> None:
@@ -206,3 +204,25 @@ def test_summary_is_atomic_and_restrictive(tmp_path: Path) -> None:
     assert json.loads(target.read_text(encoding="utf-8"))["schema"] == "test"
     assert os.stat(target).st_mode & 0o777 == 0o600
     assert not list(target.parent.glob("host-integrations.json.*"))
+
+def test_native_write_receipts_and_dry_run(tmp_path):
+    report = {"status": "passed", "dry_run": False, "writes": [
+        {"label": "amp", "status": "done"},
+        {"label": "kimi", "status": "skipped"},
+        {"label": "droid", "status": "failed"},
+    ], "skipped": ["qwen-code: malformed_json_preserved"]}
+    hosts = {h["id"]: h for h in build_summary(report, home=tmp_path, env={"PATH": ""})["hosts"]}
+    assert hosts["amp"]["status"] == "registered"
+    assert hosts["kimi"]["status"] == "registered"
+    assert hosts["droid"]["status"] == "failed"
+    assert hosts["qwen-code"]["status"] == "skipped"
+    report["dry_run"] = True
+    dry = build_summary(report, home=tmp_path, env={"PATH": ""})
+    assert not any(h["status"] == "registered" for h in dry["hosts"])
+
+
+def test_windows_executable_suffix_is_recognized(tmp_path, monkeypatch):
+    monkeypatch.setattr("simplicio.host_integrations.shutil.which", lambda name, path=None: str(tmp_path / (name + ".exe")))
+    hosts = detect_hosts(home=tmp_path, env={"PATH": ""})
+    assert next(h for h in hosts if h["id"] == "codex")["status"] == "detected"
+

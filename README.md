@@ -15,6 +15,7 @@
   <a href="#-installation">Install</a> ·
   <a href="#-login-and-entitlement">Login</a> ·
   <a href="#-simplicio-mcp">MCP</a> ·
+  <a href="#host-integrations">Integrations</a> ·
   <a href="#-what-it-does">Features</a> ·
   <a href="#-benchmarks-and-token-savings">Benchmarks</a> ·
   <a href="https://simpleti.com.br/simplicio/">Website</a>
@@ -81,6 +82,59 @@ Login is never a substitute for installation, and a successful process exit is
 not proof that a host is configured. The CLI path below remains the supported
 cross-platform fallback and follows the same Runtime, authentication, consent,
 reload, and first-call contract.
+
+## Host integrations
+
+The installers for macOS/Linux, Windows and PyPI call the same native
+`simplicio mcp register --binary <absolute-path> --json` flow. Each client uses
+its own configuration format and points to the installed Simplicio binary.
+
+**Release boundary:** the expanded adapters below are implemented in source and
+need a Runtime release containing this change. They are not retroactively added
+to the immutable v3.8.47 download. A successful configuration write is not a
+completed MCP handshake; restart/reload the client and verify its tool list.
+
+| Harness | Integration | Scope and limits |
+|---|---|---|
+| Claude Code | Runtime MCP + native hooks | User configuration; mapper-only lifecycle hooks. |
+| Codex | Runtime MCP registry | Managed binary registered through Codex MCP. |
+| Grok | Runtime MCP | Superagent Grok CLI; not the xAI web application. |
+| Cursor | Runtime MCP | User MCP configuration. |
+| GitHub Copilot | VS Code MCP | Uses the VS Code registration; Copilot CLI is a separate client. |
+| OpenCode | Runtime MCP | OpenCode local-server schema. |
+| MiMo Code | Runtime MCP | Xiaomi MiMo Code local-server schema. |
+| Amp | Runtime MCP | amp.mcpServers in user settings. |
+| OpenClaude | Runtime MCP | Independent .openclaude.json; legacy .config.json supported. |
+| Antigravity | Runtime MCP | Detected Antigravity user configuration. |
+| Pi | Bundled MCP extension | Auto-discovered extension connects to local stdio MCP. |
+| oh-my-pi | Runtime MCP | User .omp/agent/mcp.json. |
+| Hermes Agent | Runtime MCP + native plugin | Hermes registry reconciliation and host plugin flow. |
+| Devin | Environment setup required | Configure MCP in Devin's environment/admin interface; a local installer cannot alter the cloud workspace. |
+| Goose | Runtime MCP | YAML extensions with cmd/envs; Windows Block/Goose path supported. |
+| Auggie | Runtime MCP | Augment user settings. |
+| Autohand Code | Runtime MCP | Named entry in mcp.servers array. |
+| Charm / Crush | Runtime MCP | Crush mcp object, stdio transport. |
+| Cline | Runtime MCP | VS Code extension global-storage configuration. |
+| Codebuff | Project/SDK bridge required | Custom agents/tools use project or SDK setup; no verified global MCP registry. |
+| Command Code | Runtime MCP | User .commandcode/mcp.json. |
+| Continue | Runtime MCP (IDE) | Dedicated YAML server file; cn CLI discovery is not claimed. |
+| Droid | Runtime MCP | Factory user MCP configuration. |
+| Kilo Code | Runtime MCP (CLI) | Current kilo.json local-server schema. |
+| Kimi | Runtime MCP | Kimi user MCP configuration. |
+| Kiro | Runtime MCP | Kiro user MCP configuration. |
+| Mistral Vibe | Runtime MCP | TOML mcp_servers entries. |
+| Qwen Code | Runtime MCP | Qwen user settings. |
+| Rovo Dev | Runtime MCP (CLI) | User MCP configuration; custom paths are preserved. |
+
+New adapters detect initialized user configuration directories. They preserve
+other servers and explicit disablement, and report invalid configuration,
+JSONC files and custom configuration overrides as skipped instead of replacing
+them. Initialize the client first, then rerun registration. Pi uses a bundled
+local extension, without installing an unrelated npm package.
+
+See [installation paths, upstream references and verification](docs/INSTALLER_HOSTS.md).
+Devin and Codebuff remain explicit setup requirements, not automatic-registration
+successes.
 
 ## 🚀 Installation
 

@@ -228,8 +228,8 @@ def test_unverified_antigravity_is_reported_without_guessing_a_binary(tmp_path: 
         env={"PATH": str(bin_dir)}, specs=(spec,)
     )
 
-    assert result["results"][0]["status"] == "unsupported"
-    assert result["results"][0]["reason_code"] == "unsupported"
+    assert result["results"][0]["status"] == "absent"
+    assert result["results"][0]["reason_code"] == "absent"
 
 
 def test_kiro_contract_is_atomic_and_idempotent(tmp_path: Path) -> None:
@@ -276,10 +276,9 @@ def test_pi_and_oh_my_pi_use_separate_exact_executables_and_configs(tmp_path: Pa
 
     assert pi_result["failed_hosts"] == []
     assert omp_result["failed_hosts"] == []
-    assert (home / ".pi/agent/mcp.json").is_file()
-    assert (home / ".omp/mcp.json").is_file()
-    assert json.loads((home / ".pi/agent/mcp.json").read_text())["mcpServers"]["simplicio"]
-    assert json.loads((home / ".omp/mcp.json").read_text())["mcpServers"]["simplicio"]
+    assert pi_result["results"][0]["status"] == "requires-runtime-registration"
+    assert omp_result["results"][0]["status"] == "requires-runtime-registration"
+    assert not home.exists()  # No invented generic MCP files for these hosts.
 
 
 def test_orca_portable_contract_is_verification_only() -> None:
@@ -298,12 +297,12 @@ def test_command_code_contract_requires_an_official_contract(tmp_path: Path) -> 
     spec = next(item for item in HOSTS if item.host_id == "command-code")
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    _command(bin_dir / "command-code")
+    _command(bin_dir / "commandcode")
     home = tmp_path / "home"
     result = install_detected_hosts(
         "/opt/simplicio/bin/simplicio", home=home, cwd=tmp_path,
         env={"PATH": str(bin_dir)}, specs=(spec,)
     )
-    assert result["results"][0]["status"] == "unsupported"
-    assert result["results"][0]["reason_code"] == "unsupported"
+    assert result["results"][0]["status"] == "requires-runtime-registration"
+    assert result["results"][0]["reason_code"] == "run_simplicio_mcp_register"
     assert not home.exists()
