@@ -336,30 +336,90 @@ installation of Mapper, Loop, or the other projects.
 The public vocabulary is `simplicio map`, `simplicio context`,
 `simplicio memory`, `simplicio edit`, and `simplicio run`. MCP names follow the
 same ownership: Mapper observes, Fast projects or retrieves, Dev CLI edits,
-Runtime governs, and Loop converges. Claude and Hermes Mapper-only profiles
-advertise `simplicio_map` / `simplicio_context` (and memory only when that host
-profile allows it). They do not advertise `edit`, `run`, `loop`, or `exec`.
-Full-mode hosts keep the broader Runtime surface. Deprecated aliases such as
-`mapper`, `index`, `code-graph`, and `mapper-memory` must not appear as a
-second tool; during compatibility they resolve to the same canonical
-capability. An older Runtime below the unified-surface minimum must not
-advertise the new names.
+Runtime governs, and Loop converges.
 
-The Runtime exposes these tools:
+All supported host integrations use `mapper-only` as the Runtime execution
+policy. The LLM must successfully call `simplicio_map` and then
+`simplicio_context` for each repository task. The remaining retained Runtime
+commands are exposed as optional tools: the LLM may call them when the task
+needs them, but they are not forced into every workflow. Authentication,
+entitlement, effect authorization, and command-specific safety gates still
+apply.
+
+`SIMPLICIO_MCP_PROFILE=full` controls catalogue visibility; it does not switch
+the execution policy to Full. In the default full catalogue, the Runtime
+currently exposes 55 tools:
+
+Required for every repository task:
 
 | Tool | Purpose |
 |---|---|
 | `simplicio_map` | Observe the repository (`simplicio map`) |
-| `simplicio_context` | Bounded task context (`simplicio context`) |
-| `simplicio_memory` | Recall MapperStore facts (`simplicio memory`) |
-| `simplicio_edit` | Apply a deterministic edit (`simplicio edit`; full-mode hosts) |
-| `simplicio_run` | Governed task execution (`simplicio run`; full-mode hosts) |
-| `simplicio_gate` | Check mission/effect gates before a mutation |
-| `simplicio_validate` | Run contract-oriented validation for a task |
-| `simplicio_symbol` | Navigate symbols and declarations |
-| `simplicio_search` | Search repository content semantically/structurally |
-| `simplicio_read` | Read files through the compact Runtime surface |
-| `simplicio_exec` | Run a supervised, compact external command |
+| `simplicio_context` | Retrieve bounded task context (`simplicio context`) |
+
+Optional retained tools (all are callable when their gates and schemas permit):
+
+```text
+simplicio_activity
+simplicio_agent_profiles
+simplicio_binary_contracts
+simplicio_bootstrap
+simplicio_checkpoint
+simplicio_claims
+simplicio_context_plane
+simplicio_deliver
+simplicio_desktop_cost_projection
+simplicio_desktop_projection
+simplicio_desktop_snapshot
+simplicio_desktop_unified_usage
+simplicio_edit
+simplicio_effect_authorize
+simplicio_effect_reconcile
+simplicio_effect_transaction
+simplicio_exec
+simplicio_fast_authorize
+simplicio_file_read
+simplicio_host_fixtures
+simplicio_host_registry
+simplicio_llm
+simplicio_loop
+simplicio_mapper_cutover
+simplicio_mapper_store
+simplicio_mcp_cpu_benchmark
+simplicio_mcp_recovery
+simplicio_memory
+simplicio_nest
+simplicio_neural
+simplicio_orient
+simplicio_parallel
+simplicio_prepare_model_call
+simplicio_prism
+simplicio_prompt
+simplicio_prototype_artifact_read
+simplicio_prototype_artifact_write
+simplicio_provider_path_status
+simplicio_read_signatures
+simplicio_record_model_result
+simplicio_route
+simplicio_run
+simplicio_runtime_health
+simplicio_runtime_readiness
+simplicio_savings
+simplicio_search
+simplicio_session_search
+simplicio_skills
+simplicio_symbol
+simplicio_test_run
+simplicio_todo
+simplicio_validate
+simplicio_workspace_snapshot
+```
+
+The list is a live catalogue, not a guarantee that every tool is appropriate
+for every task. Deprecated aliases such as `mapper`, `index`, `code-graph`,
+and `mapper-memory` must not appear as duplicate tools; during compatibility
+they resolve to the same canonical capability. An older Runtime below the
+unified-surface minimum must not advertise the new names.
 
 The client should call `tools/list` at startup and use the returned schemas;
 the table above is a quick orientation, not a substitute for live schemas.
@@ -402,10 +462,11 @@ escapes such as `\\U` in `C:\\Users\\...`.
 ~~~toml
 [mcp_servers.simplicio]
 command = "C:/Users/YourName/.simplicio/bin/simplicio.exe"
-args = ["serve", "--mcp", "--stdio"]
+args = ["serve", "--mcp", "--stdio", "--no-facade-mode"]
 
 [mcp_servers.simplicio.env]
 SIMPLICIO_MCP_URL = "http://127.0.0.1:8787/mcp"
+SIMPLICIO_RUNTIME_MODE = "mapper-only"
 ~~~
 
 #### macOS
@@ -413,10 +474,11 @@ SIMPLICIO_MCP_URL = "http://127.0.0.1:8787/mcp"
 ~~~toml
 [mcp_servers.simplicio]
 command = "/Users/your-name/.simplicio/bin/simplicio"
-args = ["serve", "--mcp", "--stdio"]
+args = ["serve", "--mcp", "--stdio", "--no-facade-mode"]
 
 [mcp_servers.simplicio.env]
 SIMPLICIO_MCP_URL = "http://127.0.0.1:8787/mcp"
+SIMPLICIO_RUNTIME_MODE = "mapper-only"
 ~~~
 
 #### Linux
@@ -424,10 +486,11 @@ SIMPLICIO_MCP_URL = "http://127.0.0.1:8787/mcp"
 ~~~toml
 [mcp_servers.simplicio]
 command = "/home/your-name/.simplicio/bin/simplicio"
-args = ["serve", "--mcp", "--stdio"]
+args = ["serve", "--mcp", "--stdio", "--no-facade-mode"]
 
 [mcp_servers.simplicio.env]
 SIMPLICIO_MCP_URL = "http://127.0.0.1:8787/mcp"
+SIMPLICIO_RUNTIME_MODE = "mapper-only"
 ~~~
 
 The Runtime currently registers supported configurations for Codex, Claude
@@ -461,7 +524,10 @@ server entry using the installed binary:
   "mcpServers": {
     "simplicio": {
       "command": "simplicio",
-      "args": ["serve", "--mcp", "--stdio"]
+      "args": ["serve", "--mcp", "--stdio", "--no-facade-mode"],
+      "env": {
+        "SIMPLICIO_RUNTIME_MODE": "mapper-only"
+      }
     }
   }
 }
@@ -485,12 +551,13 @@ Smoke-test the local server:
 
 ```bash
 printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \\
-  | ~/.simplicio/bin/simplicio serve --mcp --stdio
+  | SIMPLICIO_RUNTIME_MODE=mapper-only ~/.simplicio/bin/simplicio serve --mcp --stdio --no-facade-mode
 ```
 
-The response should contain the ten tool definitions. If the command says
-login is required, authenticate first; do not disable the gate or insert a
-token into a config file.
+The response should contain `simplicio_map` and `simplicio_context`, plus the
+optional retained catalogue available to that host. If the command says login
+is required, authenticate first; do not disable the gate or insert a token into
+a config file.
 
 ### MCP request flow
 
